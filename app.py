@@ -17,8 +17,30 @@ with app.app_context():
     db.create_all()
 
 PRICES = {
-    19: "1GB_1HR", 20: "250MB_24HRS", 49: "350MB_7DAYS", 
-    99: "1GB_24HRS", 300: "2.5GB_7DAYS", 700: "6GB_7DAYS"
+    # DATA BUNDLES - Buy once per day
+    19: "1GB_1HR", 
+    20: "250MB_24HRS", 
+    49: "350MB_7DAYS", 
+    50: "1.5GB_3HRS", 
+    55: "1.25GB_TILL_MIDNIGHT", 
+    99: "1GB_24HRS", 
+    300: "2.5GB_7DAYS", 
+    700: "6GB_7DAYS",
+
+    # TUNUKIWA OFFERS - Buy many times per day 
+    23: "1GB_1HR_TUNUKIWA", 
+    51: "1.5GB_3HRS_TUNUKIWA", 
+    110: "2GB_24HRS_TUNUKIWA",
+
+    # MINUTES OFFERS - Buy many times per day
+    22: "43MINS_3HRS", 
+    52: "50MINS_TILL_MID",
+
+    # SMS OFFERS - Buy many times per day
+    5: "20SMS_24HRS", 
+    10: "200SMS_24HRS", 
+    30: "1000SMS_7DAYS", 
+    101: "1500SMS_30DAYS",
 }
 
 def process_bundle(phone, amount, mpesa_code):
