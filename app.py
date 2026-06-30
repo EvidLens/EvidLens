@@ -95,12 +95,40 @@ def login():
     return LOGIN_FORM
 
 # ===== STEP 3: DASHBOARD PAGE =====
+DASHBOARD_PAGE = """
+<h2>Welcome, {email}</h2>
+<p>Balance: Ksh {balance}</p>
+
+<p><a href="/topup">+ Add Ksh 100 Test Money</a></p>
+<form action="/buy" method="post">
+  <p>Buy 250MB 24HRS for Ksh 20</p>
+  <input type="hidden" name="amount" value="20">
+  <button>Buy Now - M-PESA Sim</button>
+</form>
+<br>
+<a href='/logout'>Logout</a>
+"""
+
 @app.route('/dashboard')
 def dashboard():
     if 'user_id' not in session:
         return redirect('/login')
     user = User.query.get(session['user_id'])
-    return f"<h2>Welcome, {user.email}</h2><p>Balance: {user.balance}</p><a href='/logout'>Logout</a>"
+    return DASHBOARD_PAGE.format(email=user.email, balance=user.balance)
+
+@app.route('/buy', methods=['POST'])
+def buy():
+    if 'user_id' not in session:
+        return redirect('/login')
+    user = User.query.get(session['user_id'])
+    amount = float(request.form['amount'])
+    
+    if user.balance >= amount:
+        user.balance -= amount
+        db.session.commit()
+        return f"Success! Sent 250MB 24HRS. New Balance: {user.balance} <a href='/dashboard'>Back</a>"
+    else:
+        return f"Balance too low: {user.balance}. <a href='/dashboard'>Back</a>"
 
 @app.route('/logout')
 def logout():
@@ -126,7 +154,16 @@ def mpesa_confirmation():
     db.session.add(txn); db.session.commit()
     threading.Thread(target=process_bundle, args=(phone, amount, mpesa_code)).start()
     return jsonify({"ResultCode": 0, "ResultDesc": "Accepted"})
+@app.route('/topup')
+def topup():
+    if 'user_id' not in session:
+        return redirect('/login')
+    user = User.query.get(session['user_id'])
+    user.balance += 100.0 # Free money for testing
+    db.session.commit()
+    return redirect('/dashboard')
 
+if __name__ == "__main__":
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
