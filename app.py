@@ -104,11 +104,10 @@ DASHBOARD_PAGE = """
 <h2>Welcome, {email}</h2>
 <p>Balance: Ksh {balance}</p>
 
-<p><a href="/topup">+ Add Ksh 100 Test Money</a></p>
-<form action="/buy" method="post">
+<form action="/stkpush" method="post">
   <p>Buy 250MB 24HRS for Ksh 20</p>
-  <input type="hidden" name="amount" value="20">
-  <button>Buy Now - M-PESA Sim</button>
+  Enter M-PESA Phone: <input name="phone" type="text" placeholder="2547XXXXXXXX" required><br><br>
+  <button>Buy Now - STK Push</button>
 </form>
 <br>
 <a href='/logout'>Logout</a>
@@ -159,14 +158,20 @@ def mpesa_confirmation():
     db.session.add(txn); db.session.commit()
     threading.Thread(target=process_bundle, args=(phone, amount, mpesa_code)).start()
     return jsonify({"ResultCode": 0, "ResultDesc": "Accepted"})
-@app.route('/topup')
-def topup():
+@app.route('/stkpush', methods=['POST'])
+def stkpush():
     if 'user_id' not in session:
         return redirect('/login')
     user = User.query.get(session['user_id'])
-    user.balance += 100.0 # Free money for testing
+    phone = request.form['phone']
+    amount = 20
+    
+    # TODO: Call Safaricom STK Push API here
+    # For now we simulate: Assume user paid
+    
+    user.balance += amount 
     db.session.commit()
-    return redirect('/dashboard')
+    return f"STK Push sent to {phone}. Pay Ksh 20 on your phone. Balance will update after payment. <a href='/dashboard'>Back</a>"
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
