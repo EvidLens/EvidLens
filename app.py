@@ -1,7 +1,9 @@
 from flask import Flask, request, jsonify, render_template_string, redirect, session
 import os 
 import threading
-import requests
+import requests 
+import base64
+from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -9,11 +11,60 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "lensconnectdevkey123") # Change this on Render later
 
 # ===== M-PESA SANDBOX CONFIG =====
-CONSUMER_KEY = os.environ.get('MPESA_CONSUMER_KEY') 
-CONSUMER_SECRET = os.environ.get('MPESA_CONSUMER_SECRET')
-BUSINESS_SHORT_CODE = '174379' # Sandbox test shortcode
-PASSKEY = 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919' # Sandbox passkey
-CALLBACK_URL = 'https://lensconnect-abc123.onrender.com/mpesa/confirmation'
+CONSUMER_KEY = 'LeGawPo7b4x93kIGli7D8AIAr5LAWT9cHDtF58YyxqFtZ09f'
+CONSUMER_SECRET = 'u5jkHpE4epBHu6nRZFzX0b3keVGTCqR9upjybehiX0md8GOYkLanq1R0Vh2OOHAT'
+BUSINESS_SHORT_CODE = '174379' 
+PASSKEY = 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919'
+CALLBACK_URL = 'https://lensconnect-x1uh.onrender.com/mpesa/confirmation'
+def get_access_token():
+    api_url = "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
+    r = requests.get(api_url, auth=(CONSUMER_KEY, CONSUMER_SECRET))
+    return r.json()['access_token']
+
+@app.route('/stkpush', methods=['POST'])
+def stkpush():
+    if 'user_id' not in session:
+        return redirect('/login')
+    user = User.query.get(session['user_id'])
+    phone = request.form['phone'] # Must be 2547XX... format
+    amount = 20
+    
+    access_token = get_access_token()
+    api_url = "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
+    
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+    password = base64.b64encode((BUSINESS_SHORT_CODE + PASSKEY + timestamp).encode()).decode('utf-8')
+    
+    payload = {
+        "BusinessShortCode": BUSINESS_SHORT_CODE,
+        "Password": password,
+        "Timestamp": timestamp,
+        "TransactionType": "CustomerPayBillOnline",
+        "Amount": amount,
+        "PartyA": phone,
+        "PartyB": BUSINESS_SHORT_CODE,
+        "PhoneNumber": phone,
+        "CallBackURL": CALLBACK_URL,
+        "AccountReference": "LensConnect",
+        "TransactionDesc": "Buy 250MB" 
+    }
+    headers = {"Authorization": "Bearer %s" % access_token}
+    response = requests.post(api_url, json=payload, headers=headers)
+    
+    return f"STK Push sent to {phone}. Check your phone and enter M-PESA PIN. <a href='/dashboard'>Back</a>"
+
+@app.route('/mpesa/confirmation', methods=['POST'])
+def mpesa_confirmation():
+    data = request.get_json()
+    
+    # Check if payment was successful. ResultCode 0 = Success
+    if data['Body']['stkCallback']['ResultCode'] == 0:
+        # For now we just print it. Next step: credit user balance here
+        print("M-PESA Payment Successful:", data)
+        return jsonify({"ResultCode": 0, "ResultDesc": "Accepted"})
+    
+    print("M-PESA Payment Failed:", data)
+    return jsonify({"ResultCode": 1, "ResultDesc": "Failed"})
 
 db_path = os.path.join(os.path.dirname(__file__), 'instance', 'lensconnect.db')
 os.makedirs(os.path.dirname(db_path), exist_ok=True)
