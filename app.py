@@ -131,7 +131,10 @@ LOGIN_FORM = """
 </form>
 <p>No account? <a href="/signup">Signup</a></p>
 """
-
+@app.route('/')
+def home():
+    return redirect('/signup')
+    
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
