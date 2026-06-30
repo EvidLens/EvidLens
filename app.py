@@ -1,16 +1,24 @@
-from flask import Flask, request, jsonify
-import json
+from flask import Flask, request, jsonify, render_template_string, redirect, session
 import os 
 import threading
 from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "lensconnectdevkey123") # Change this on Render later
 
 db_path = os.path.join(os.path.dirname(__file__), 'instance', 'lensconnect.db')
 os.makedirs(os.path.dirname(db_path), exist_ok=True)
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
 
 db = SQLAlchemy(app)
+
+# ===== STEP 2: DATABASE USER MODEL =====
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(256), nullable=False)
+    balance = db.Column(db.Float, default=0.0)
 
 class Transaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -23,23 +31,11 @@ with app.app_context():
     db.create_all()
 
 PRICES = {
-    19: "1GB_1HR", 
-    20: "250MB_24HRS", 
-    49: "350MB_7DAYS", 
-    50: "1.5GB_3HRS", 
-    55: "1.25GB_TILL_MIDNIGHT", 
-    99: "1GB_24HRS", 
-    300: "2.5GB_7DAYS", 
-    700: "6GB_7DAYS",
-    23: "1GB_1HR_TUNUKIWA", 
-    51: "1.5GB_3HRS_TUNUKIWA", 
-    110: "2GB_24HRS_TUNUKIWA",
-    22: "43MINS_3HRS", 
-    52: "50MINS_TILL_MID",
-    5: "20SMS_24HRS", 
-    10: "200SMS_24HRS", 
-    30: "1000SMS_7DAYS", 
-    101: "1500SMS_30DAYS",
+    19: "1GB_1HR", 20: "250MB_24HRS", 49: "350MB_7DAYS", 50: "1.5GB_3HRS", 
+    55: "1.25GB_TILL_MIDNIGHT", 99: "1GB_24HRS", 300: "2.5GB_7DAYS", 700: "6GB_7DAYS",
+    23: "1GB_1HR_TUNUKIWA", 51: "1.5GB_3HRS_TUNUKIWA", 110: "2GB_24HRS_TUNUKIWA",
+    22: "43MINS_3HRS", 52: "50MINS_TILL_MID", 5: "20SMS_24HRS", 
+    10: "200SMS_24HRS", 30: "1000SMS_7DAYS", 101: "1500SMS_30DAYS",
 }
 
 def process_bundle(phone, amount, mpesa_code):
@@ -51,9 +47,70 @@ def process_bundle(phone, amount, mpesa_code):
             txn.status = "FULFILLED"
             db.session.commit()
 
+# ===== STEP 1: SIGNUP/LOGIN ROUTES =====
+SIGNUP_FORM = """
+<h2>Signup</h2>
+<form method="post">
+  Email: <input name="email" type="email" required><br><br>
+  Password: <input name="password" type="password" required><br><br>
+  <button>Signup</button>
+</form>
+<p>Already have an account? <a href="/login">Login</a></p>
+"""
+
+LOGIN_FORM = """
+<h2>Login</h2>
+<form method="post">
+  Email: <input name="email" type="email" required><br><br>
+  Password: <input name="password" type="password" required><br><br>
+  <button>Login</button>
+</form>
+<p>No account? <a href="/signup">Signup</a></p>
+"""
+
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        email = request.form['email']
+        password = request.form['password']
+        if User.query.filter_by(email=email).first():
+            return "Email already exists. <a href='/login'>Login</a>"
+        user = User(email=email, password_hash=generate_password_hash(password))
+        db.session.add(user)
+        db.session.commit()
+        session['user_id'] = user.id
+        return redirect('/dashboard')
+    return SIGNUP_FORM
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        email = request.form['email']
+        password = request.form['password']
+        user = User.query.filter_by(email=email).first()
+        if user and check_password_hash(user.password_hash, password):
+            session['user_id'] = user.id
+            return redirect('/dashboard')
+        return "Invalid login. <a href='/login'>Try again</a>"
+    return LOGIN_FORM
+
+# ===== STEP 3: DASHBOARD PAGE =====
+@app.route('/dashboard')
+def dashboard():
+    if 'user_id' not in session:
+        return redirect('/login')
+    user = User.query.get(session['user_id'])
+    return f"<h2>Welcome, {user.email}</h2><p>Balance: {user.balance}</p><a href='/logout'>Logout</a>"
+
+@app.route('/logout')
+def logout():
+    session.pop('user_id', None)
+    return redirect('/login')
+
+# ===== YOUR OLD M-PESA ROUTES =====
 @app.route('/')
 def home():
-    return "LensConnect API is running"
+    return "LensConnect API is running. Go to <a href='/signup'>/signup</a>"
 
 @app.route('/mpesa/validation', methods=['POST'])
 def mpesa_validation():
@@ -65,11 +122,8 @@ def mpesa_confirmation():
     amount = float(data['TransAmount'])
     phone = data['MSISDN']
     mpesa_code = data['TransID']
-    
     txn = Transaction(phone=phone, amount=amount, mpesa_code=mpesa_code, status="RECEIVED")
-    db.session.add(txn)
-    db.session.commit()
-
+    db.session.add(txn); db.session.commit()
     threading.Thread(target=process_bundle, args=(phone, amount, mpesa_code)).start()
     return jsonify({"ResultCode": 0, "ResultDesc": "Accepted"})
 
