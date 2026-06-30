@@ -198,40 +198,6 @@ def logout():
     session.pop('user_id', None)
     return redirect('/login')
 
-# ===== YOUR OLD M-PESA ROUTES =====
-@app.route('/')
-def home():
-    return "LensConnect API is running. Go to <a href='/signup'>/signup</a>"
-
-@app.route('/mpesa/validation', methods=['POST'])
-def mpesa_validation():
-    return jsonify({"ResultCode": 0, "ResultDesc": "Accepted"})
-
-@app.route('/mpesa/confirmation', methods=['POST'])
-def mpesa_confirmation():
-    data = request.get_json()
-    amount = float(data['TransAmount'])
-    phone = data['MSISDN']
-    mpesa_code = data['TransID']
-    txn = Transaction(phone=phone, amount=amount, mpesa_code=mpesa_code, status="RECEIVED")
-    db.session.add(txn); db.session.commit()
-    threading.Thread(target=process_bundle, args=(phone, amount, mpesa_code)).start()
-    return jsonify({"ResultCode": 0, "ResultDesc": "Accepted"})
-@app.route('/stkpush', methods=['POST'])
-def stkpush():
-    if 'user_id' not in session:
-        return redirect('/login')
-    user = User.query.get(session['user_id'])
-    phone = request.form['phone']
-    amount = 20
-    
-    # TODO: Call Safaricom STK Push API here
-    # For now we simulate: Assume user paid
-    
-    user.balance += amount 
-    db.session.commit()
-    return f"STK Push sent to {phone}. Pay Ksh 20 on your phone. Balance will update after payment. <a href='/dashboard'>Back</a>"
-
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
