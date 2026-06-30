@@ -50,10 +50,13 @@ PRICES = {
 }
 
 def process_bundle(phone, amount, mpesa_code):
-    with app.app_context():  # <-- Add this line
-    bundle = PRICES.get(amount, "UNKNOWN")
-    print(f"SIMULATED: Sending {bundle} to {phone}. Code: {mpesa_code}")
+    with app.app_context():
+        bundle = PRICES.get(amount, "UNKNOWN")
+        print(f"SIMULATED: Sending {bundle} to {phone}. Code: {mpesa_code}")
         txn = Transaction.query.filter_by(mpesa_code=mpesa_code).first()
+        if txn:
+            txn.status = "FULFILLED"
+            db.session.commit()
         if txn:
             txn.status = "FULFILLED" 
             db.session.commit()
