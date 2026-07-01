@@ -11,7 +11,7 @@ from passlib.context import CryptContext
 import os, json
 from fpdf import FPDF
 from io import BytesIO
-from google_search_results import GoogleSearch
+import requests
 import praw
 import enum
 
@@ -163,13 +163,20 @@ class IndustryReport(Base):
     id = Column(Integer, primary_key=True)
     sector = Column(String)
     sub_sector = Column(String)
-    title = Column(String)
-    content = Column(Text)
-    updated_at = Column(DateTime, default=datetime.utcnow)
-
-class Dashboard(Base): # Corporate Dashboard Module
-    __tablename__ = "dashboards"
-    id = Column(Integer, primary_key=True)
+    def get_competitors(idea, location):
+    if SERPAPI_KEY == "demo": 
+        return [{"name": f"{idea} Ltd {location}", "price": "Ksh 120-200", "link": "#", "rating": 4.2}]
+    url = "https://serpapi.com/search.json"
+    params = {
+        "engine": "google",
+        "q": f"{idea} {location} Kenya",
+        "api_key": SERPAPI_KEY,
+        "num": 5
+    }
+    resp = requests.get(url, params=params, timeout=10)
+    data = resp.json()
+    results = data.get("organic_results", [])[:5]
+    return [{"name": r.get("title", "N/A")[:60], "link": r.get("link"), "price": "Ksh N/A"} for r in results]
     org_id = Column(Integer, ForeignKey("users.id"))
     name = Column(String)
     config = Column(JSON) # tracks sentiment, competitors, price monitoring
