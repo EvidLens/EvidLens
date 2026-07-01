@@ -164,12 +164,19 @@ class IndustryReport(Base):
     sector = Column(String)
     sub_sector = Column(String)
     def get_competitors(idea, location):
-    if SERPAPI_KEY == "demo": 
+    if SERPAPI_KEY == "demo":
         return [{"name": f"{idea} Ltd {location}", "price": "Ksh 120-200", "link": "#", "rating": 4.2}]
     url = "https://serpapi.com/search.json"
     params = {
         "engine": "google",
         "q": f"{idea} {location} Kenya",
+        "api_key": SERPAPI_KEY,
+        "num": 5
+    }
+    resp = requests.get(url, params=params, timeout=10)
+    data = resp.json()
+    results = data.get("organic_results", [])[:5]
+    return [{"name": r.get("title", "N/A")[:60], "link": r.get("link"), "price": "Ksh N/A"} for r in results]
         "api_key": SERPAPI_KEY,
         "num": 5
     }
