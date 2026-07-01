@@ -177,13 +177,6 @@ class IndustryReport(Base):
     data = resp.json()
     results = data.get("organic_results", [])[:5]
     return [{"name": r.get("title", "N/A")[:60], "link": r.get("link"), "price": "Ksh N/A"} for r in results]
-        "api_key": SERPAPI_KEY,
-        "num": 5
-    }
-    resp = requests.get(url, params=params, timeout=10)
-    data = resp.json()
-    results = data.get("organic_results", [])[:5]
-    return [{"name": r.get("title", "N/A")[:60], "link": r.get("link"), "price": "Ksh N/A"} for r in results]
     org_id = Column(Integer, ForeignKey("users.id"))
     name = Column(String)
     config = Column(JSON) # tracks sentiment, competitors, price monitoring
