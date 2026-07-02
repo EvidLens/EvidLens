@@ -593,17 +593,6 @@ def pay(sku: str = Form(...), amount: int = Form(...), method: str = Form(...), 
     content = f"<div class='max-w-lg mx-auto bg-slate-800 p-8 rounded-2xl border-slate-700 text-center'><h1 class='text-2xl font-bold mb-4'>Payment Initiated</h1><p class='text-slate-400'>{msg}</p><p class='text-xs mt-4'>Ref: {payment.id}</p><a href='/dashboard' class='mt-6 inline-block bg-emerald-600 px-6 py-3 rounded-xl font-bold'>Dashboard</a></div>"
     return base_html("Pay", content, user)
 
-@app.get("/checkout/{sku}", response_class=HTMLResponse)
-def checkout(sku: str, user: User = Depends(get_current_user)):
-    price_map = {"PRO_1K":1000, "REPORT_500":500, "CUSTOM_150K":150000, "DATA_500K":500000, "AI_25K":25000, "API_15K":15000, "TRAINING_10K":10000, "TRAINING_150K":150000, "SPONSORED_50K":50000, "ENTERPRISE_40K":40000}
-    price = price_map.get(sku, 0)
-    content = f"""
-    <div class="max-w-lg mx-auto bg-slate-800 p-8 rounded-2xl border-slate-700">
-        <h1 class="text-2xl font-bold mb-2">Checkout</h1>
-        <p class="text-slate-400 mb-6">{sku} - KES {price:,}</p>
-        <form method="post" action="/pay" class="space-y-4">
-            <input type="hidden" name="sku"
-
 @app.get("/profile", response_class=HTMLResponse)
 def profile(user: User = Depends(get_current_user)):
     content = f"""
