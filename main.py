@@ -573,25 +573,25 @@ def pricing(user: User = Depends(get_current_user)):
     ]
     
     service_cards = "".join([
-        f"""<div class="bg-slate-800 p-6 rounded-2xl border-slate-700 flex-col">
-            <h3 class="font-bold text-lg">{s['name']}</h3>
-            <p class="text-2xl font-bold mt-2">KES {s['price']:,}</p>
-            <p class="text-slate-400 text-sm mt-1">{s['desc']}</p>
-            <a href="/checkout/{s['sku']}" class="mt-4 w-full text-center bg-emerald-600 px-4 py-2 rounded-xl font-bold hover:bg-emerald-700">Pay Now</a>
-        </div>""" for s in services
+        f"<div class='bg-slate-800 p-6 rounded-2xl border-slate-700 flex-col'><h3 class='font-bold text-lg'>{s['name']}</h3><p class='text-2xl font-bold mt-2'>KES {s['price']:,}</p><p class='text-slate-400 text-sm mt-1'>{s['desc']}</p><a href='/checkout/{s['sku']}' class='mt-4 w-full text-center bg-emerald-600 px-4 py-2 rounded-xl font-bold hover:bg-emerald-700'>Pay Now</a></div>" for s in services
     ])
 
-    content = f"""
-    <h1 class="text-3xl font-bold mb-6">Plans & Services</h1>
-    <div class="grid md:grid-cols-3 gap-4 mb-8">
-        <div class="bg-slate-800 p-6 rounded-2xl border-slate-700"><h2 class="text-xl font-bold">Free</h2><p class="text-3xl font-bold">KES 0</p><ul class="mt-2 text-slate-400 text-sm space-y-1"><li>3 searches/mo</li><li>Basic AI</li><li>Public summaries</li></ul></div>
-        <div class="bg-emerald-800 p-6 rounded-2xl border-2 border-emerald-400"><h2 class="text-xl font-bold">Pro</h2><p class="text-3xl font-bold">KES 1,000/mo</p><ul class="mt-2 text-sm space-y-1"><li>Unlimited searches</li><li>AI Analysis + SWOT</li><li>PDF Reports</li><li>Saved projects</li></ul><a href="/checkout/PRO_1K" class="mt-4 w-full text-center bg-white text-emerald-900 px-4 py-2 rounded-xl font-bold">Subscribe</a></div>
-        <div class="bg-slate-800 p-6 rounded-2xl border-slate-700"><h2 class="text-xl font-bold">Enterprise</h2><p class="text-3xl font-bold">KES 40,000/mo</p><ul class="mt-2 text-slate-400 text-sm space-y-1"><li>Team seats</li><li>Corporate Dashboards</li><li>API Access</li><li>Custom reports</li></ul><a href="/checkout/ENTERPRISE_40K" class="mt-4 w-full text-center bg-emerald-600 px-4 py-2 rounded-xl font-bold">Contact Sales</a></div>
-    </div>
-    <h2 class="text-2xl font-bold mb-4">Other Revenue Streams</h2>
-    <div class="grid md:grid-cols-3 gap-4">{service_cards}</div>
-    """
+    content = f"<h1 class='text-3xl font-bold mb-6'>Plans & Services</h1><div class='grid md:grid-cols-3 gap-4 mb-8'><div class='bg-slate-800 p-6 rounded-2xl border-slate-700'><h2 class='text-xl font-bold'>Free</h2><p class='text-3xl font-bold'>KES 0</p><ul class='mt-2 text-slate-400 text-sm space-y-1'><li>3 searches/mo</li><li>Basic AI</li><li>Public summaries</li></ul></div><div class='bg-emerald-800 p-6 rounded-2xl border-2 border-emerald-400'><h2 class='text-xl font-bold'>Pro</h2><p class='text-3xl font-bold'>KES 1,000/mo</p><ul class='mt-2 text-sm space-y-1'><li>Unlimited searches</li><li>AI Analysis + SWOT</li><li>PDF Reports</li><li>Saved projects</li></ul><a href='/checkout/PRO_1K' class='mt-4 w-full text-center bg-white text-emerald-900 px-4 py-2 rounded-xl font-bold'>Subscribe</a></div><div class='bg-slate-800 p-6 rounded-2xl border-slate-700'><h2 class='text-xl font-bold'>Enterprise</h2><p class='text-3xl font-bold'>KES 40,000/mo</p><ul class='mt-2 text-slate-400 text-sm space-y-1'><li>Team seats</li><li>Corporate Dashboards</li><li>API Access</li><li>Custom reports</li></ul><a href='/checkout/ENTERPRISE_40K' class='mt-4 w-full text-center bg-emerald-600 px-4 py-2 rounded-xl font-bold'>Contact Sales</a></div></div><h2 class='text-2xl font-bold mb-4'>Other Revenue Streams</h2><div class='grid md:grid-cols-3 gap-4'>{service_cards}</div>"
     return base_html("Pricing", content, user)
+@app.get("/checkout/{sku}", response_class=HTMLResponse)
+def checkout(sku: str, user: User = Depends(get_current_user)):
+    price_map = {"PRO_1K":1000, "REPORT_500":500, "CUSTOM_150K":150000, "DATA_500K":500000, "AI_25K":25000, "API_15K":15000, "TRAINING_10K":10000, "TRAINING_150K":150000, "SPONSORED_50K":50000, "ENTERPRISE_40K":40000}
+    price = price_map.get(sku, 0)
+    content = f"<div class='max-w-lg mx-auto bg-slate-800 p-8 rounded-2xl border-slate-700'><h1 class='text-2xl font-bold mb-2'>Checkout</h1><p class='text-slate-400 mb-6'>{sku} - KES {price:,}</p><form method='post' action='/pay' class='space-y-4'><input type='hidden' name='sku' value='{sku}'><input type='hidden' name='amount' value='{price}'><label class='text-sm text-slate-400'>Payment Method</label><select name='method' required class='w-full p-3 bg-slate-700 rounded-xl border-slate-600'><option value='mpesa'>M-Pesa STK Push</option><option value='card'>Card - Stripe</option><option value='paypal'>PayPal / Global Pay</option><option value='flutterwave'>Flutterwave</option><option value='paystack'>Paystack</option></select><input name='phone' placeholder='M-Pesa 2547XXXXXXXX' required class='w-full p-3 bg-slate-700 rounded-xl border-slate-600'><button class='w-full bg-emerald-600 p-3 rounded-xl font-bold'>Pay KES {price:,}</button></form></div>"
+    return base_html("Checkout", content, user)
+
+@app.post("/pay", response_class=HTMLResponse)
+def pay(sku: str = Form(...), amount: int = Form(...), method: str = Form(...), phone: str = Form(...), user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    payment = Payment(user_id=user.id, product_sku=sku, amount_kes=amount, method=method)
+    db.add(payment); db.commit()
+    msg = f"STK Push sent to {phone}. Enter M-Pesa PIN." if method=="mpesa" else f"Redirect to {method.title()}"
+    content = f"<div class='max-w-lg mx-auto bg-slate-800 p-8 rounded-2xl border-slate-700 text-center'><h1 class='text-2xl font-bold mb-4'>Payment Initiated</h1><p class='text-slate-400'>{msg}</p><p class='text-xs mt-4'>Ref: {payment.id}</p><a href='/dashboard' class='mt-6 inline-block bg-emerald-600 px-6 py-3 rounded-xl font-bold'>Dashboard</a></div>"
+    return base_html("Pay", content, user)
 
 @app.get("/checkout/{sku}", response_class=HTMLResponse)
 def checkout(sku: str, user: User = Depends(get_current_user)):
