@@ -15,20 +15,18 @@ import requests
 import praw
 import enum
 
-# ===== CONFIG =====
 SECRET_KEY = os.getenv("SECRET_KEY", "lensconnectsecretkey2026")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "demo")
-SERPAPI_KEY = os.getenv("SERPAPI_KEY", "demo") 
+SERPAPI_KEY = os.getenv("SERPAPI_KEY", "demo")
 REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID", "demo")
 REDDIT_CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET", "demo")
 
 app = FastAPI(title="LensConnect - Decision Intelligence")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# ===== DB =====
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./lensconnect.db")
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -42,13 +40,11 @@ def get_db():
     try: yield db
     finally: db.close()
 
-# ===== ENUMS =====
 class PlanEnum(str, enum.Enum):
     Free = "Free"
     Pro = "Pro"
     Enterprise = "Enterprise"
 
-# ===== KNOWLEDGE BASE = 100% YOUR DATA =====
 KENYA_REGIONS = {
     "Nairobi Region": ["Nairobi (Capital City)"],
     "Central Kenya": ["Nyeri", "Nanyuki", "Murang'a", "Kiambu", "Thika", "Kerugoya", "Karatina", "Embu", "Meru"],
@@ -117,7 +113,6 @@ FMCG_CATEGORIES = {
 }
 ALL_FMCG_PRODUCTS = [p for cat in FMCG_CATEGORIES.values() for p in cat]
 
-# ===== DATABASE MODELS = ALL 7 MODULES =====
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
@@ -126,8 +121,8 @@ class User(Base):
     full_name = Column(String)
     plan = Column(Enum(PlanEnum), default=PlanEnum.Free)
     searches_used = Column(Integer, default=0)
-    searches_limit = Column(Integer, default=3) # Free Plan
-    organization = Column(String, nullable=True) # Enterprise
+    searches_limit = Column(Integer, default=3)
+    organization = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     reports = relationship("Report", back_populates="owner")
@@ -142,34 +137,33 @@ class Report(Base):
     sector = Column(String)
     fmcg_product = Column(String, nullable=True)
     idea = Column(String)
-    demand_level = Column(String) # Module 1
+    demand_level = Column(String)
     market_size = Column(String)
-    competitors = Column(JSON) # Module 1
+    competitors = Column(JSON)
     pricing_ranges = Column(String)
-    sentiment = Column(JSON) # Module 2
-    ai_analysis = Column(Text) # Module 4
+    sentiment = Column(JSON)
+    ai_analysis = Column(Text)
     risk_analysis = Column(String)
     saturation = Column(String)
-    pricing_strategy = Column(String) # AI Premium
-    recommendation = Column(String) # Go / No-Go / Needs research
-    price_trends = Column(JSON, nullable=True) # Module 3
-    search_trends = Column(JSON, nullable=True) # Module 3
-    paid = Column(Boolean, default=False) # Pay-Per-Report
+    pricing_strategy = Column(String)
+    recommendation = Column(String)
+    price_trends = Column(JSON, nullable=True)
+    search_trends = Column(JSON, nullable=True)
+    paid = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     owner = relationship("User", back_populates="reports")
 
 class IndustryReport(Base):
-    __tablename__ = "industry_reports" # Module 7 Knowledge Base
+    __tablename__ = "industry_reports"
     id = Column(Integer, primary_key=True)
     sector = Column(String)
     sub_sector = Column(String)
     org_id = Column(Integer, ForeignKey("users.id"))
     name = Column(String)
-    config = Column(JSON) # tracks sentiment, competitors, price monitoring
+    config = Column(JSON)
 
 Base.metadata.create_all(bind=engine)
 
-# ===== AUTH HELPERS =====
 def verify_password(plain, hashed): return pwd_context.verify(plain, hashed)
 def get_password_hash(password): return pwd_context.hash(password)
 def create_access_token(data: dict): return jwt.encode(data, SECRET_KEY, algorithm=ALGORITHM)
@@ -181,11 +175,10 @@ def get_current_user(token: str = Cookie(None), db: Session = Depends(get_db)):
     if not user: raise HTTPException(status_code=401)
     return user
 
-# ===== DATA LAYER = MODULE 1,2,3,4 =====
 def get_competitors(idea, location):
     if SERPAPI_KEY == "demo": return [{"name": f"{idea} Ltd {location}", "price": "Ksh 120-200", "link": "#", "rating": 4.2}]
     params = {"engine": "google", "q": f"{idea} {location} Kenya", "api_key": SERPAPI_KEY}
-    results = GoogleSearch(params).get_dict().get("organic_results", [])[:5]
+    results = requests.get("https://serpapi.com/search.json", params=params, timeout=10).json().get("organic_results", [])[:5]
     return [{"name": r.get("title", "N/A")[:60], "link": r.get("link"), "price": "Ksh N/A"} for r in results]
 
 def get_sentiment(idea):
@@ -194,11 +187,11 @@ def get_sentiment(idea):
     posts = [p.title for p in reddit.subreddit("Kenya").search(idea, limit=50)]
     return {"positive": 60, "negative": 20, "neutral": 20, "sample": posts[:5], "likes": ["Taste", "Price"], "dislikes": ["Packaging"], "complaints": ["Availability"]}
 
-def get_price_trends(idea): return {"labels": ["Jan","Feb","Mar","Apr","May"], "data": [120,125,130,128,135]} # Module 3
-def get_search_trends(idea): return {"labels": ["Jan","Feb","Mar","Apr","May"], "data": [200,250,300,280,350]} # Module 3
+def get_price_trends(idea): return {"labels": ["Jan","Feb","Mar","Apr","May"], "data": [120,125,130,128,135]}
+def get_search_trends(idea): return {"labels": ["Jan","Feb","Mar","Apr","May"], "data": [200,250,300,280,350]}
 
 def get_ai_insight(sector, town, region, idea, fmcg, plan):
-    if OPENAI_API_KEY == "demo": 
+    if OPENAI_API_KEY == "demo":
         base = {"demand":"Rising","size":"Ksh 50M-200M","risk":"Medium","saturation":"Medium","pricing":"Ksh 99-199","recommendation":"GO","swot":{"S":"Local","W":"Capital","O":"Mobile","T":"Imports"},"strategy":"Launch at Ksh 99"}
         if plan == PlanEnum.Free: base = {"demand":"Rising","size":"Ksh 50M-200M","recommendation":"Needs research"}
         return json.dumps(base)
@@ -208,7 +201,6 @@ def get_ai_insight(sector, town, region, idea, fmcg, plan):
     resp = client.chat.completions.create(model="gpt-4o-mini", messages=[{"role":"user","content":prompt}], response_format={"type":"json_object"})
     return resp.choices[0].message.content
 
-# ===== UI BASE = MODERN FANCY + MOBILE PWA + PC =====
 def base_html(title, content, user=None, active=""):
     nav = "" if not user else f"""
     <nav class="hidden md:flex gap-6 mb-8 border-b border-slate-700 pb-4">
@@ -227,10 +219,8 @@ def base_html(title, content, user=None, active=""):
         <a href="/profile" class="flex flex-col items-center {'text-emerald-400' if active=='profile' else 'text-slate-400'}"><svg class="w-6 h-6" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/></svg><span class="text-xs">Profile</span></a>
     </nav>
     """
-    return f"""
-    <!DOCTYPE html><html lang="en"><head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-# ===== ROUTES = ALL 7 MODULES + UI SCREENS + 9 REVENUE STREAMS =====
+    return f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"><title>{title} | LensConnect</title><script src="https://cdn.tailwindcss.com"></script><script src="https://cdn.jsdelivr.net/npm/chart.js"></script><link rel="manifest" href="/static/manifest.json"><meta name="theme-color" content="#0F172A"><style>body{{background:#0F172A;font-family:'Inter',sans-serif}}::-webkit-scrollbar{{width:8px}}::-webkit-scrollbar-thumb{{background:#334155;border-radius:4px}}</style></head><body class="text-slate-200 pb-24 md:pb-4"><div class="max-w-7xl mx-auto min-h-screen p-4 md:p-8">{content}</div>{nav}<script>if('serviceWorker' in navigator){{navigator.serviceWorker.register('/static/sw.js')}}</script></body></html>"""
+
 @app.get("/", response_class=HTMLResponse)
 def landing():
     content = """
@@ -309,20 +299,16 @@ def dashboard(user: User = Depends(get_current_user), db: Session = Depends(get_
     content = f"""
     <h1 class="text-3xl font-bold">Hello {user.full_name}</h1>
     <p class="text-slate-400">Plan: {user.plan.value} | Searches: {user.searches_used}/{user.searches_limit if user.plan==PlanEnum.Free else '∞'}</p>
-    
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
         <a href="/analyze" class="bg-slate-800 p-6 rounded-2xl text-center hover:bg-slate-700 border-slate-700 transition"><div class="text-4xl"></div><p class="mt-2 font-semibold">Market Insight</p></a>
         <a href="/ai" class="bg-slate-800 p-6 rounded-2xl text-center hover:bg-slate-700 border-slate-700 transition"><div class="text-4xl"></div><p class="mt-2 font-semibold">AI Analysis</p></a>
         <a href="/location" class="bg-slate-800 p-6 rounded-2xl text-center hover:bg-slate-700 border-slate-700 transition"><div class="text-4xl"></div><p class="mt-2 font-semibold">Location Intel</p></a>
         <a href="/knowledge" class="bg-slate-800 p-6 rounded-2xl text-center hover:bg-slate-700 border-slate-700 transition"><div class="text-4xl"></div><p class="mt-2 font-semibold">Knowledge Base</p></a>
     </div>
-    
     <h2 class="mt-8 font-bold text-xl">Trending Insights</h2>
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">{trend_html}</div>
-    
     <h2 class="mt-8 font-bold text-xl">Recent Searches</h2>
-    <table class="w-full mt
-<table class="w-full mt-2 text-sm"><tr class="text-slate-400"><th class="text-left py-2">Idea</th><th class="text-left">Town</th><th class="text-left">Decision</th></tr>{rows}</table>
+    <table class="w-full mt-2 text-sm"><tr class="text-slate-400"><th class="text-left py-2">Idea</th><th class="text-left">Town</th><th class="text-left">Decision</th></tr>{rows}</table>
     """
     return base_html("Dashboard", content, user, active="dashboard")
 
@@ -349,43 +335,33 @@ def analyze_form(user: User = Depends(get_current_user)):
 
 @app.post("/analyze", response_class=HTMLResponse)
 def analyze(region: str = Form(...), town: str = Form(...), sector: str = Form(...), idea: str = Form(...), fmcg_product: str = Form(""), user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # REVENUE STREAM 1: Subscription Check
     if user.plan == PlanEnum.Free and user.searches_used >= user.searches_limit:
         return base_html("Limit Reached", "<h1 class='text-2xl font-bold'>Free Limit Reached</h1><p>Upgrade to Pro for unlimited searches + PDF exports.</p><a href='/pricing' class='mt-4 inline-block bg-emerald-600 px-6 py-3 rounded-xl font-bold'>Upgrade Ksh 1,000/mo</a>", user)
-    
-    # MODULE 1,2,3,4: Data Layer
     competitors = get_competitors(idea, town)
     sentiment = get_sentiment(idea)
     price_trends = get_price_trends(idea)
     search_trends = get_search_trends(idea)
     ai_raw = get_ai_insight(sector, town, region, idea, fmcg_product, user.plan)
-    
     try: ai_json = json.loads(ai_raw)
     except: ai_json = {"demand":"Rising","size":"Ksh 50M-200M","risk":"Medium","saturation":"Medium","pricing":"Ksh 99-199","recommendation":"GO"}
-    
-    # Save Report
     report = Report(user_id=user.id, title=idea, region=region, town=town, sector=sector, fmcg_product=fmcg_product, idea=idea,
         demand_level=ai_json.get("demand","Rising"), market_size=ai_json.get("size","Ksh 50M-200M"), competitors=competitors,
         pricing_ranges=ai_json.get("pricing","Ksh 99-199"), sentiment=sentiment, ai_analysis=ai_raw,
         risk_analysis=ai_json.get("risk","Medium"), saturation=ai_json.get("saturation","Medium"), pricing_strategy=ai_json.get("pricing","Ksh 99-199"),
         recommendation=ai_json.get("recommendation","GO"), price_trends=price_trends, search_trends=search_trends, paid=user.plan!=PlanEnum.Free)
     db.add(report); user.searches_used += 1; db.commit()
-    
-    # MODULE 1: Market Overview + Charts
     content = f"""
     <h1 class="text-2xl font-bold">{idea} {f' - {fmcg_product}' if fmcg_product else ''}</h1>
     <p class="text-slate-400">{sector} | {town}, {region}</p>
-    
     <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
         <div class="bg-slate-800 p-4 rounded-xl border-slate-700"><p class="text-slate-400 text-sm">Demand</p><p class="text-xl font-bold text-emerald-400">{report.demand_level}</p></div>
         <div class="bg-slate-800 p-4 rounded-xl border-slate-700"><p class="text-slate-400 text-sm">Market Size</p><p class="text-xl font-bold">{report.market_size}</p></div>
         <div class="bg-slate-800 p-4 rounded-xl border-slate-700"><p class="text-slate-400 text-sm">Saturation</p><p class="text-xl font-bold">{report.saturation}</p></div>
         <div class="bg-slate-800 p-4 rounded-xl border-slate-700"><p class="text-slate-400 text-sm">Decision</p><p class="text-xl font-bold text-emerald-400">{report.recommendation}</p></div>
     </div>
-    
     <div class="grid md:grid-cols-2 gap-4 mt-6">
         <div class="bg-slate-800 p-4 rounded-xl border-slate-700">
-            <h3 class="font-bold mb-2">💬 Consumer Voice Aggregator</h3>
+            <h3 class="font-bold mb-2">Consumer Voice Aggregator</h3>
             <p>Pos: {sentiment['positive']}% | Neg: {sentiment['negative']}% | Neu: {sentiment['neutral']}%</p>
             <p class="text-sm mt-2"><b>Likes:</b> {', '.join(sentiment.get('likes',[]))}</p>
             <p class="text-sm"><b>Dislikes:</b> {', '.join(sentiment.get('dislikes',[]))}</p>
@@ -396,19 +372,16 @@ def analyze(region: str = Form(...), town: str = Form(...), sector: str = Form(.
             {''.join([f"<p class='text-sm'><a href='{c['link']}' class='text-emerald-400' target='_blank'>{c['name']}</a> - {c.get('price','N/A')}</p>" for c in competitors])}
         </div>
     </div>
-    
     <div class="grid md:grid-cols-2 gap-4 mt-6">
         <div class="bg-slate-800 p-4 rounded-xl border-slate-700"><canvas id="priceChart"></canvas></div>
         <div class="bg-slate-800 p-4 rounded-xl border-slate-700"><canvas id="searchChart"></canvas></div>
     </div>
-    
     <div class="bg-slate-800 p-4 rounded-xl border-slate-700 mt-6">
         <h3 class="font-bold mb-2">AI Insight Generator</h3>
         <p class="whitespace-pre-wrap">{report.ai_analysis}</p>
         <p class="mt-2"><b>Risk:</b> {report.risk_analysis} | <b>Pricing Strategy:</b> {report.pricing_strategy}</p>
     </div>
-    
-    <a href="/report/{report.id}/pdf" class="mt-6 inline-block bg-emerald-600 px-6 py-3 rounded-xl font-bold">📄 Download PDF Report</a>
+    <a href="/report/{report.id}/pdf" class="mt-6 inline-block bg-emerald-600 px-6 py-3 rounded-xl font-bold">Download PDF Report</a>
     <script>
     new Chart(document.getElementById('priceChart'),{{type:'line',data:{{labels:{price_trends['labels']},datasets:[{{label:'Price Ksh',data:{price_trends['data']},borderColor:'#10B981'}}]}}}});
     new Chart(document.getElementById('searchChart'),{{type:'bar',data:{{labels:{search_trends['labels']},datasets:[{{label:'Search Volume',data:{search_trends['data']},backgroundColor:'#3B82F6'}}]}}}});
@@ -438,9 +411,7 @@ def ai_ask(question: str = Form(...), user: User = Depends(get_current_user)):
 def report_pdf(report_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     report = db.query(Report).filter(Report.id == report_id, Report.user_id == user.id).first()
     if not report: raise HTTPException(404)
-    # REVENUE STREAM 2: Pay-Per-Report
     if not report.paid and user.plan == PlanEnum.Free: return HTMLResponse("<h1>Pay Ksh 500 to download</h1><a href='/pricing'>Upgrade to Pro</a>")
-    
     pdf = FPDF(); pdf.add_page(); pdf.set_font("Arial", size=12)
     pdf.cell(0, 10, f"LensConnect Report: {report.idea}", ln=True)
     pdf.cell(0, 10, f"Location: {report.town}, {report.region}", ln=True)
@@ -470,7 +441,6 @@ def knowledge(user: User = Depends(get_current_user)):
 
 @app.get("/pricing", response_class=HTMLResponse)
 def pricing(user: User = Depends(get_current_user)):
-    # ALL 9 REVENUE STREAMS LISTED
     content = """
     <h1 class="text-3xl font-bold mb-6">Revenue Streams</h1>
     <div class="grid md:grid-cols-3 gap-4">
@@ -488,7 +458,6 @@ def pricing(user: User = Depends(get_current_user)):
         <li><b>Training & Certification:</b> BI workshops, AI courses</li>
         <li><b>Sponsored Content:</b> After trust established</li>
     </div>
-    </body></html>
     """
     return base_html("Pricing", content, user)
 
