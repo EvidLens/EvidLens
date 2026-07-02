@@ -541,27 +541,68 @@ def knowledge(user: User = Depends(get_current_user)):
     fmcg_html = "".join([f"<details class='bg-slate-800 p-3 rounded-xl border-slate-700'><summary class='font-bold cursor-pointer'>{cat}</summary><p class='text-sm mt-2 text-slate-400'>{', '.join(prods)}</p></details>" for cat,prods in FMCG_CATEGORIES.items()])
     return base_html("Knowledge", f"<h1 class='text-2xl font-bold mb-4'>Knowledge Base</h1><h2 class='text-xl font-semibold mb-2'>Industries</h2><div class='grid md:grid-cols-2 gap-2 mb-6'>{sectors_html}</div><h2 class='text-xl font-semibold mb-2'>FMCG Categories</h2><div class='grid md:grid-cols-2 gap-2'>{fmcg_html}</div>", user, active="knowledge")
 
+class Product(Base):
+    __tablename__ = "products"
+    id = Column(Integer, primary_key=True)
+    sku = Column(String, unique=True, index=True)
+    name = Column(String)
+    description = Column(Text)
+    price_kes = Column(Integer)
+
+class Payment(Base):
+    __tablename__ = "payments"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    product_sku = Column(String)
+    amount_kes = Column(Integer)
+    method = Column(String)
+    status = Column(String, default="pending")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 @app.get("/pricing", response_class=HTMLResponse)
 def pricing(user: User = Depends(get_current_user)):
-    content = """
-    <h1 class="text-3xl font-bold mb-6">Revenue Streams</h1>
-    <div class="grid md:grid-cols-3 gap-4">
-        <div class="bg-slate-800 p-6 rounded-2xl border-slate-700"><h2 class="text-xl font-bold">Free</h2><p class="text-3xl font-bold">Ksh 0</p><li>3 searches/mo</li><li>Basic AI</li><li>Public summaries</li></div>
-        <div class="bg-emerald-800 p-6 rounded-2xl border-2 border-emerald-400"><h2 class="text-xl font-bold">Pro</h2><p class="text-3xl font-bold">Ksh 1,000/mo</p><li>Unlimited searches</li><li>AI Analysis + SWOT</li><li>PDF Reports</li><li>Saved projects</li></div>
-        <div class="bg-slate-800 p-6 rounded-2xl border-slate-700"><h2 class="text-xl font-bold">Enterprise</h2><p class="text-3xl font-bold">Ksh 40,000/mo</p><li>Team seats</li><li>Corporate Dashboards</li><li>API Access</li><li>Custom reports</li></div>
+    services = [
+        {"sku":"REPORT_500", "name":"Pay-Per-Report", "desc":"Report download", "price":500},
+        {"sku":"CUSTOM_150K", "name":"Custom Research", "desc":"Nationwide surveys and consulting", "price":150000},
+        {"sku":"DATA_500K", "name":"Data Licensing", "desc":"Anonymized trends and benchmarks per year", "price":500000},
+        {"sku":"AI_25K", "name":"AI Premium", "desc":"Feasibility, market entry, and SWOT analysis", "price":25000},
+        {"sku":"API_15K", "name":"API Access", "desc":"Usage-based or annual license per month", "price":15000},
+        {"sku":"TRAINING_10K", "name":"Training & Certification", "desc":"Per participant", "price":10000},
+        {"sku":"TRAINING_150K", "name":"Training Workshop", "desc":"Per workshop", "price":150000},
+        {"sku":"SPONSORED_50K", "name":"Sponsored Content", "desc":"Once trust is established", "price":50000},
+    ]
+    
+    service_cards = "".join([
+        f"""<div class="bg-slate-800 p-6 rounded-2xl border-slate-700 flex-col">
+            <h3 class="font-bold text-lg">{s['name']}</h3>
+            <p class="text-2xl font-bold mt-2">KES {s['price']:,}</p>
+            <p class="text-slate-400 text-sm mt-1">{s['desc']}</p>
+            <a href="/checkout/{s['sku']}" class="mt-4 w-full text-center bg-emerald-600 px-4 py-2 rounded-xl font-bold hover:bg-emerald-700">Pay Now</a>
+        </div>""" for s in services
+    ])
+
+    content = f"""
+    <h1 class="text-3xl font-bold mb-6">Plans & Services</h1>
+    <div class="grid md:grid-cols-3 gap-4 mb-8">
+        <div class="bg-slate-800 p-6 rounded-2xl border-slate-700"><h2 class="text-xl font-bold">Free</h2><p class="text-3xl font-bold">KES 0</p><ul class="mt-2 text-slate-400 text-sm space-y-1"><li>3 searches/mo</li><li>Basic AI</li><li>Public summaries</li></ul></div>
+        <div class="bg-emerald-800 p-6 rounded-2xl border-2 border-emerald-400"><h2 class="text-xl font-bold">Pro</h2><p class="text-3xl font-bold">KES 1,000/mo</p><ul class="mt-2 text-sm space-y-1"><li>Unlimited searches</li><li>AI Analysis + SWOT</li><li>PDF Reports</li><li>Saved projects</li></ul><a href="/checkout/PRO_1K" class="mt-4 w-full text-center bg-white text-emerald-900 px-4 py-2 rounded-xl font-bold">Subscribe</a></div>
+        <div class="bg-slate-800 p-6 rounded-2xl border-slate-700"><h2 class="text-xl font-bold">Enterprise</h2><p class="text-3xl font-bold">KES 40,000/mo</p><ul class="mt-2 text-slate-400 text-sm space-y-1"><li>Team seats</li><li>Corporate Dashboards</li><li>API Access</li><li>Custom reports</li></ul><a href="/checkout/ENTERPRISE_40K" class="mt-4 w-full text-center bg-emerald-600 px-4 py-2 rounded-xl font-bold">Contact Sales</a></div>
     </div>
-    <div class="mt-8 bg-slate-800 p-6 rounded-2xl border-slate-700">
-        <h2 class="text-xl font-bold mb-2">Other Revenue Streams</h2>
-        <li><b>Pay-Per-Report:</b> Ksh 500 per report download</li>
-        <li><b>Custom Research:</b> Nationwide surveys, consulting</li>
-        <li><b>Data Licensing:</b> Anonymized trends, benchmarks</li>
-        <li><b>AI Premium:</b> Feasibility, Market entry, SWOT</li>
-        <li><b>API Access:</b> Usage-based or annual license</li>
-        <li><b>Training & Certification:</b> BI workshops, AI courses</li>
-        <li><b>Sponsored Content:</b> After trust established</li>
-    </div>
+    <h2 class="text-2xl font-bold mb-4">Other Revenue Streams</h2>
+    <div class="grid md:grid-cols-3 gap-4">{service_cards}</div>
     """
     return base_html("Pricing", content, user)
+
+@app.get("/checkout/{sku}", response_class=HTMLResponse)
+def checkout(sku: str, user: User = Depends(get_current_user)):
+    price_map = {"PRO_1K":1000, "REPORT_500":500, "CUSTOM_150K":150000, "DATA_500K":500000, "AI_25K":25000, "API_15K":15000, "TRAINING_10K":10000, "TRAINING_150K":150000, "SPONSORED_50K":50000, "ENTERPRISE_40K":40000}
+    price = price_map.get(sku, 0)
+    content = f"""
+    <div class="max-w-lg mx-auto bg-slate-800 p-8 rounded-2xl border-slate-700">
+        <h1 class="text-2xl font-bold mb-2">Checkout</h1>
+        <p class="text-slate-400 mb-6">{sku} - KES {price:,}</p>
+        <form method="post" action="/pay" class="space-y-4">
+            <input type="hidden" name="sku"
 
 @app.get("/profile", response_class=HTMLResponse)
 def profile(user: User = Depends(get_current_user)):
