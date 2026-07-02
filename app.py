@@ -311,10 +311,10 @@ def dashboard(user: User = Depends(get_current_user), db: Session = Depends(get_
     <p class="text-slate-400">Plan: {user.plan.value} | Searches: {user.searches_used}/{user.searches_limit if user.plan==PlanEnum.Free else '∞'}</p>
     
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-        <a href="/analyze" class="bg-slate-800 p-6 rounded-2xl text-center hover:bg-slate-700 border-slate-700 transition"><div class="text-4xl">🔍</div><p class="mt-2 font-semibold">Market Insight</p></a>
-        <a href="/ai" class="bg-slate-800 p-6 rounded-2xl text-center hover:bg-slate-700 border-slate-700 transition"><div class="text-4xl">🧠</div><p class="mt-2 font-semibold">AI Analysis</p></a>
-        <a href="/location" class="bg-slate-800 p-6 rounded-2xl text-center hover:bg-slate-700 border-slate-700 transition"><div class="text-4xl">📍</div><p class="mt-2 font-semibold">Location Intel</p></a>
-        <a href="/knowledge" class="bg-slate-800 p-6 rounded-2xl text-center hover:bg-slate-700 border-slate-700 transition"><div class="text-4xl">📚</div><p class="mt-2 font-semibold">Knowledge Base</p></a>
+        <a href="/analyze" class="bg-slate-800 p-6 rounded-2xl text-center hover:bg-slate-700 border-slate-700 transition"><div class="text-4xl"></div><p class="mt-2 font-semibold">Market Insight</p></a>
+        <a href="/ai" class="bg-slate-800 p-6 rounded-2xl text-center hover:bg-slate-700 border-slate-700 transition"><div class="text-4xl"></div><p class="mt-2 font-semibold">AI Analysis</p></a>
+        <a href="/location" class="bg-slate-800 p-6 rounded-2xl text-center hover:bg-slate-700 border-slate-700 transition"><div class="text-4xl"></div><p class="mt-2 font-semibold">Location Intel</p></a>
+        <a href="/knowledge" class="bg-slate-800 p-6 rounded-2xl text-center hover:bg-slate-700 border-slate-700 transition"><div class="text-4xl"></div><p class="mt-2 font-semibold">Knowledge Base</p></a>
     </div>
     
     <h2 class="mt-8 font-bold text-xl">Trending Insights</h2>
@@ -333,7 +333,7 @@ def analyze_form(user: User = Depends(get_current_user)):
     sectors_html = "".join([f'<option>{s}</option>' for s in ALL_SECTORS_FLAT])
     fmcg_html = "".join([f'<option>{p}</option>' for p in ALL_FMCG_PRODUCTS[:100]])
     content = f"""
-    <h1 class="text-2xl font-bold mb-4">🔍 Market Insight Engine</h1>
+    <h1 class="text-2xl font-bold mb-4">Market Insight Engine</h1>
     <form method="post" action="/analyze" class="space-y-4 bg-slate-800 p-6 rounded-2xl border-slate-700">
         <div class="grid md:grid-cols-2 gap-4">
             <div><label class="text-sm text-slate-400">Region</label><select name="region" required class="w-full p-3 bg-slate-700 rounded-xl border-slate-600 mt-1">{regions_html}</select></div>
@@ -392,7 +392,7 @@ def analyze(region: str = Form(...), town: str = Form(...), sector: str = Form(.
             <p class="text-sm"><b>Complaints:</b> {', '.join(sentiment.get('complaints',[]))}</p>
         </div>
         <div class="bg-slate-800 p-4 rounded-xl border-slate-700">
-            <h3 class="font-bold mb-2">🏢 Competitor Overview</h3>
+            <h3 class="font-bold mb-2">Competitor Overview</h3>
             {''.join([f"<p class='text-sm'><a href='{c['link']}' class='text-emerald-400' target='_blank'>{c['name']}</a> - {c.get('price','N/A')}</p>" for c in competitors])}
         </div>
     </div>
@@ -403,7 +403,7 @@ def analyze(region: str = Form(...), town: str = Form(...), sector: str = Form(.
     </div>
     
     <div class="bg-slate-800 p-4 rounded-xl border-slate-700 mt-6">
-        <h3 class="font-bold mb-2">🧠 AI Insight Generator</h3>
+        <h3 class="font-bold mb-2">AI Insight Generator</h3>
         <p class="whitespace-pre-wrap">{report.ai_analysis}</p>
         <p class="mt-2"><b>Risk:</b> {report.risk_analysis} | <b>Pricing Strategy:</b> {report.pricing_strategy}</p>
     </div>
@@ -419,7 +419,7 @@ def analyze(region: str = Form(...), town: str = Form(...), sector: str = Form(.
 @app.get("/ai", response_class=HTMLResponse)
 def ai_page(user: User = Depends(get_current_user)):
     content = """
-    <h1 class="text-2xl font-bold mb-4">🧠 AI Analysis Page</h1>
+    <h1 class="text-2xl font-bold mb-4">AI Analysis Page</h1>
     <p class="text-slate-400 mb-4">Ask any business question: "Is this business viable?" "Should I start X in Nairobi?"</p>
     <form method="post" action="/ai-ask" class="space-y-4 bg-slate-800 p-6 rounded-2xl border-slate-700">
         <textarea name="question" placeholder="Your business question..." required class="w-full p-3 bg-slate-700 rounded-xl border-slate-600 h-32"></textarea>
@@ -455,24 +455,24 @@ def report_pdf(report_id: int, user: User = Depends(get_current_user), db: Sessi
 def reports(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     reps = db.query(Report).filter(Report.user_id == user.id).order_by(Report.created_at.desc()).all()
     rows = "".join([f"<tr class='border-b border-slate-700 hover:bg-slate-800'><td class='py-3'>{r.idea}</td><td>{r.town}</td><td>{r.created_at.date()}</td><td><a href='/report/{r.id}/pdf' class='text-emerald-400'>PDF</a></td></tr>" for r in reps])
-    return base_html("Reports", f"<h1 class='text-2xl font-bold mb-4'>📊 Saved Reports</h1><table class='w-full text-sm'><tr class='text-slate-400'><th class='text-left'>Idea</th><th class='text-left'>Town</th><th class='text-left'>Date</th><th class='text-left'>Download</th></tr>{rows}</table>", user, active="reports")
+    return base_html("Reports", f"<h1 class='text-2xl font-bold mb-4'>Saved Reports</h1><table class='w-full text-sm'><tr class='text-slate-400'><th class='text-left'>Idea</th><th class='text-left'>Town</th><th class='text-left'>Date</th><th class='text-left'>Download</th></tr>{rows}</table>", user, active="reports")
 
 @app.get("/location", response_class=HTMLResponse)
 def location_intel(user: User = Depends(get_current_user)):
     regions_html = "".join([f"<div class='bg-slate-800 p-4 rounded-xl border-slate-700'><h3 class='font-bold'>{r}</h3><p class='text-sm text-slate-400'>{', '.join(t)}</p></div>" for r,t in KENYA_REGIONS.items()])
-    return base_html("Location", f"<h1 class='text-2xl font-bold mb-4'>📍 Location-Based Intelligence</h1><p class='text-slate-400 mb-4'>City/region comparisons. Urban vs rural insights.</p><div class='grid md:grid-cols-2 gap-4'>{regions_html}</div>", user, active="location")
+    return base_html("Location", f"<h1 class='text-2xl font-bold mb-4'>Location-Based Intelligence</h1><p class='text-slate-400 mb-4'>City/region comparisons. Urban vs rural insights.</p><div class='grid md:grid-cols-2 gap-4'>{regions_html}</div>", user, active="location")
 
 @app.get("/knowledge", response_class=HTMLResponse)
 def knowledge(user: User = Depends(get_current_user)):
     sectors_html = "".join([f"<details class='bg-slate-800 p-3 rounded-xl border-slate-700'><summary class='font-bold cursor-pointer'>{cat}</summary><ul class='mt-2 text-sm text-slate-400 list-disc pl-5'>{''.join([f'<li>{i}</li>' for i in items])}</ul></details>" for cat,items in KENYA_SECTORS.items()])
     fmcg_html = "".join([f"<details class='bg-slate-800 p-3 rounded-xl border-slate-700'><summary class='font-bold cursor-pointer'>{cat}</summary><p class='text-sm mt-2 text-slate-400'>{', '.join(prods)}</p></details>" for cat,prods in FMCG_CATEGORIES.items()])
-    return base_html("Knowledge", f"<h1 class='text-2xl font-bold mb-4'>📚 Knowledge Base</h1><h2 class='text-xl font-semibold mb-2'>Industries</h2><div class='grid md:grid-cols-2 gap-2 mb-6'>{sectors_html}</div><h2 class='text-xl font-semibold mb-2'>FMCG Categories</h2><div class='grid md:grid-cols-2 gap-2'>{fmcg_html}</div>", user, active="knowledge")
+    return base_html("Knowledge", f"<h1 class='text-2xl font-bold mb-4'>Knowledge Base</h1><h2 class='text-xl font-semibold mb-2'>Industries</h2><div class='grid md:grid-cols-2 gap-2 mb-6'>{sectors_html}</div><h2 class='text-xl font-semibold mb-2'>FMCG Categories</h2><div class='grid md:grid-cols-2 gap-2'>{fmcg_html}</div>", user, active="knowledge")
 
 @app.get("/pricing", response_class=HTMLResponse)
 def pricing(user: User = Depends(get_current_user)):
     # ALL 9 REVENUE STREAMS LISTED
     content = """
-    <h1 class="text-3xl font-bold mb-6">💰 Revenue Streams</h1>
+    <h1 class="text-3xl font-bold mb-6">Revenue Streams</h1>
     <div class="grid md:grid-cols-3 gap-4">
         <div class="bg-slate-800 p-6 rounded-2xl border-slate-700"><h2 class="text-xl font-bold">Free</h2><p class="text-3xl font-bold">Ksh 0</p><li>3 searches/mo</li><li>Basic AI</li><li>Public summaries</li></div>
         <div class="bg-emerald-800 p-6 rounded-2xl border-2 border-emerald-400"><h2 class="text-xl font-bold">Pro</h2><p class="text-3xl font-bold">Ksh 1,000/mo</p><li>Unlimited searches</li><li>AI Analysis + SWOT</li><li>PDF Reports</li><li>Saved projects</li></div>
@@ -495,7 +495,7 @@ def pricing(user: User = Depends(get_current_user)):
 @app.get("/profile", response_class=HTMLResponse)
 def profile(user: User = Depends(get_current_user)):
     content = f"""
-    <h1 class="text-2xl font-bold mb-4">👤 Profile</h1>
+    <h1 class="text-2xl font-bold mb-4">Profile</h1>
     <div class="bg-slate-800 p-6 rounded-2xl border-slate-700 space-y-2">
         <p><b>Name:</b> {user.full_name}</p>
         <p><b>Email:</b> {user.email}</p>
