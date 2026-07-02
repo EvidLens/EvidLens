@@ -14,6 +14,7 @@ from io import BytesIO
 import requests
 import praw
 import enum
+import sqlalchemy as sqla
 
 SECRET_KEY = os.getenv("SECRET_KEY", "lensconnectsecretkey2026")
 ALGORITHM = "HS256"
@@ -204,8 +205,8 @@ class Subscription(Base):
     __tablename__ = 'subscriptions'
     id = Column(Integer, primary_key=True)
     org_id = Column(Integer, ForeignKey('organizations.id'))
-    plan = Column(Enum(PlanEnum), default=PlanEnum.Free)
-    status = Column(Enum(SubscriptionStatus), default=SubscriptionStatus.Active)
+    plan = Column(sqla.Enum(PlanEnum), default=PlanEnum.Free)
+    status = Column(sqla.Enum(SubscriptionStatus), default=SubscriptionStatus.Active)
     current_period_end = Column(DateTime)
     stripe_customer_id = Column(String, nullable=True)
     mpesa_code = Column(String, nullable=True)
@@ -223,7 +224,7 @@ class Invoice(Base):
 # Upgrade User table for V2. Add these columns below existing User columns
 User.org_id = Column(Integer, ForeignKey('organizations.id'), nullable=True)
 User.team_id = Column(Integer, ForeignKey('teams.id'), nullable=True) 
-User.role = Column(py_enum.Enum(RoleEnum), default=RoleEnum.Member)
+User.role = Column(sqla.Enum(RoleEnum), default=RoleEnum.Member)
 User.is_verified = Column(Boolean, default=False)
 User.totp_secret = Column(String, nullable=True) # For 2FA App Spec 3
 User.org = relationship('Organization', back_populates='users')
