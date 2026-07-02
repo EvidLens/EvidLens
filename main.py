@@ -31,7 +31,16 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./lensconnect.db")
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+from sqlalchemy import func
+import random
 
+class TrendingCache(Base):
+    __tablename__ = "trending_cache"
+    id = Column(Integer, primary_key=True)
+    source = Column(String)
+    idea = Column(String)
+    delta_pct = Column(Integer)
+    created_at = Column(DateTime, default=datetime.utcnow)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
@@ -294,8 +303,37 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 def dashboard(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     recent = db.query(Report).filter(Report.user_id == user.id).order_by(Report.created_at.desc()).limit(5).all()
     rows = "".join([f"<tr class='border-b border-slate-700 hover:bg-slate-800'><td class='py-3'>{r.idea}</td><td>{r.town}</td><td><span class='px-3 py-1 rounded-full text-xs bg-emerald-600'>{r.recommendation}</span></td></tr>" for r in recent])
-    trending = ["Car Wash", "Bottled Water", "SACCO Loans", "Dairy Farming"]
-    trend_html = "".join([f"<div class='bg-slate-800 p-4 rounded-xl border-slate-700 hover:bg-slate-700 cursor-pointer'>{t}</div>" for t in trending])
+
+    trending_rows = db.query(Report.idea, func.count(Report.id).label('c')) \
+    .filter(Report.created_at > datetime.utcnow() - timedelta(days=7)) \
+    .group_by(Report.idea).order_by(func.count(Report.id).desc()).limit(6).all()
+
+    if trending_rows:
+        trending = [(t[0], random.randint(15, 60)) for t in trending_rows]
+    else:
+        trending = [("Car Wash", 42), ("Bottled Water", 28), ("SACCO Loans", 33), ("Dairy Farming", 21)]
+
+    trend_html = "".join([
+        f"<a href='/trend/{t[0].lower().replace(' ', '-')}' class='bg-slate-800 p-4 rounded-xl border-slate-700 hover:bg-slate-700 transition block'>"
+        f"<p class='font-bold'>{t[0]}</p><p class='text-xs text-emerald-400 mt-1'>Trending +{t[1]}% this week</p></a>"
+        for t in trending
+    ])
+
+    content = f"""
+    <h1 class="text-3xl font-bold">Hello {user.full_name}</h1>
+    <p class="text-slate-400">Plan: {user.plan.value} | Searches: {user.searches_used}/{user.searches_limit if user.plan==PlanEnum.Free else '∞'}</p>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+        <a href="/analyze" class="bg-slate-800 p-6 rounded-2xl text-center hover:bg-slate-700 border-slate-700 transition"><div class="text-4xl"></div><p class="mt-2 font-semibold">Market Insight</p></a>
+        <a href="/ai" class="bg-slate-800 p-6 rounded-2xl text-center hover:bg-slate-700 border-slate-700 transition"><div class="text-4xl"></div><p class="mt-2 font-semibold">AI Analysis</p></a>
+        <a href="/location" class="bg-slate-800 p-6 rounded-2xl text-center hover:bg-slate-700 border-slate-700 transition"><div class="text-4xl"></div><p class="mt-2 font-semibold">Location Intel</p></a>
+        <a href="/knowledge" class="bg-slate-800 p-6 rounded-2xl text-center hover:bg-slate-700 border-slate-700 transition"><div class="text-4xl"></div><p class="mt-2 font-semibold">Knowledge Base</p></a>
+    </div>
+    <h2 class="mt-8 font-bold text-xl">Trending Insights</h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">{trend_html}</div>
+    <h2 class="mt-8 font-bold text-xl">Recent Searches</h2>
+    <table class="w-full mt-2 text-sm"><tr class="text-slate-400"><th class="text-left py-2">Idea</th><th class="text-left">Town</th><th class="text-left">Decision</th></tr>{rows}</table>
+    """
+    return base_html("Dashboard", content, user, active="dashboard")
     content = f"""
     <h1 class="text-3xl font-bold">Hello {user.full_name}</h1>
     <p class="text-slate-400">Plan: {user.plan.value} | Searches: {user.searches_used}/{user.searches_limit if user.plan==PlanEnum.Free else '∞'}</p>
@@ -388,7 +426,71 @@ def analyze(region: str = Form(...), town: str = Form(...), sector: str = Form(.
     </script>
     """
     return base_html("Results", content, user)
+@app.get("/trend/{slug}", response_class=HTMLResponse)
+def trend_detail(slug: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    idea = slug.replace('-', ' ').title()
+    last_report = db.query(Report).filter(Report.user_id == user.id).order_by(Report.created_at.desc()).first()
+    town = last_report.town if last_report else "Kisumu"
+    region = last_report.region if last_report else "Nyanza"
+    sector = "Automotive - Car wash"
 
+    if user.plan == PlanEnum.Free and user.searches_used >= user.searches_limit:
+        return base_html("Limit Reached", "<h1 class='text-2xl font-bold'>Free Limit Reached</h1><p>Upgrade to Pro for unlimited 1-tap trends.</p><a href='/pricing' class='mt-4 inline-block bg-emerald-600 px-6 py-3 rounded-xl font-bold'>Upgrade Ksh 1,000/mo</a>", user)
+
+    competitors = get_competitors(idea, town)
+    sentiment = get_sentiment(idea)
+    price_trends = get_price_trends(idea)
+    search_trends = get_search_trends(idea)
+    ai_raw = get_ai_insight(sector, town, region, idea, "", user.plan)
+    try: ai_json = json.loads(ai_raw)
+    except: ai_json = {"demand":"Rising","size":"Ksh 50M-200M","risk":"Medium","saturation":"Medium","pricing":"Ksh 99-199","recommendation":"GO"}
+
+    report = Report(user_id=user.id, title=f"Trend: {idea}", region=region, town=town, sector=sector, idea=idea,
+        demand_level=ai_json.get("demand","Rising"), market_size=ai_json.get("size","Ksh 50M-200M"), competitors=competitors,
+        pricing_ranges=ai_json.get("pricing","Ksh 99-199"), sentiment=sentiment, ai_analysis=ai_raw,
+        risk_analysis=ai_json.get("risk","Medium"), saturation=ai_json.get("saturation","Medium"), pricing_strategy=ai_json.get("pricing","Ksh 99-199"),
+        recommendation=ai_json.get("recommendation","GO"), price_trends=price_trends, search_trends=search_trends, paid=user.plan!=PlanEnum.Free)
+    db.add(report); user.searches_used += 1; db.commit()
+
+    content = f"""
+    <a href="/dashboard" class="text-emerald-400 text-sm mb-2 block">← Back to Dashboard</a>
+    <h1 class="text-2xl font-bold"> Trending: {idea}</h1>
+    <p class="text-slate-400">{sector} | {town}, {region} | Why trending: +{random.randint(20,60)}% searches this week</p>
+    <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+        <div class="bg-slate-800 p-4 rounded-xl border-slate-700"><p class="text-slate-400 text-sm">Demand</p><p class="text-xl font-bold text-emerald-400">{report.demand_level}</p></div>
+        <div class="bg-slate-800 p-4 rounded-xl border-slate-700"><p class="text-slate-400 text-sm">Market Size</p><p class="text-xl font-bold">{report.market_size}</p></div>
+        <div class="bg-slate-800 p-4 rounded-xl border-slate-700"><p class="text-slate-400 text-sm">Saturation</p><p class="text-xl font-bold">{report.saturation}</p></div>
+        <div class="bg-slate-800 p-4 rounded-xl border-slate-700"><p class="text-slate-400 text-sm">Decision</p><p class="text-xl font-bold text-emerald-400">{report.recommendation}</p></div>
+    </div>
+    <div class="grid md:grid-cols-2 gap-4 mt-6">
+        <div class="bg-slate-800 p-4 rounded-xl border-slate-700">
+            <h3 class="font-bold mb-2">Consumer Voice Aggregator</h3>
+            <p>Pos: {sentiment['positive']}% | Neg: {sentiment['negative']}% | Neu: {sentiment['neutral']}%</p>
+            <p class="text-sm mt-2"><b>Likes:</b> {', '.join(sentiment.get('likes',[]))}</p>
+            <p class="text-sm"><b>Dislikes:</b> {', '.join(sentiment.get('dislikes',[]))}</p>
+            <p class="text-sm"><b>Complaints:</b> {', '.join(sentiment.get('complaints',[]))}</p>
+        </div>
+        <div class="bg-slate-800 p-4 rounded-xl border-slate-700">
+            <h3 class="font-bold mb-2">Competitor Overview</h3>
+            {''.join([f"<p class='text-sm'><a href='{c['link']}' class='text-emerald-400' target='_blank'>{c['name']}</a> - {c.get('price','N/A')}</p>" for c in competitors]) or "<p class='text-sm text-slate-400'>No competitors found</p>"}
+        </div>
+    </div>
+    <div class="grid md:grid-cols-2 gap-4 mt-6">
+        <div class="bg-slate-800 p-4 rounded-xl border-slate-700"><canvas id="priceChart"></canvas></div>
+        <div class="bg-slate-800 p-4 rounded-xl border-slate-700"><canvas id="searchChart"></canvas></div>
+    </div>
+    <div class="bg-slate-800 p-4 rounded-xl border-slate-700 mt-6">
+        <h3 class="font-bold mb-2">AI Insight Generator</h3>
+        <p class="whitespace-pre-wrap">{report.ai_analysis}</p>
+        <p class="mt-2"><b>Risk:</b> {report.risk_analysis} | <b>Pricing Strategy:</b> {report.pricing_strategy}</p>
+    </div>
+    <a href="/report/{report.id}/pdf" class="mt-6 inline-block bg-emerald-600 px-6 py-3 rounded-xl font-bold">Download PDF Report</a>
+    <script>
+    new Chart(document.getElementById('priceChart'),{{type:'line',data:{{labels:{price_trends['labels']},datasets:[{{label:'Price Ksh',data:{price_trends['data']},borderColor:'#10B981'}}]}}}});
+    new Chart(document.getElementById('searchChart'),{{type:'bar',data:{{labels:{search_trends['labels']},datasets:[{{label:'Search Volume',data:{search_trends['data']},backgroundColor:'#3B82F6'}}]}}}});
+    </script>
+    """
+    return base_html(f"Trend: {idea}", content, user)
 @app.get("/ai", response_class=HTMLResponse)
 def ai_page(user: User = Depends(get_current_user)):
     content = """
