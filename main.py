@@ -170,7 +170,64 @@ class IndustryReport(Base):
     org_id = Column(Integer, ForeignKey("users.id"))
     name = Column(String)
     config = Column(JSON)
+import enum as py_enum
 
+class RoleEnum(str, py_enum.Enum):
+    Member = 'Member'
+    Team_Admin = 'Team_Admin' 
+    Org_Admin = 'Org_Admin'
+    Super_Admin = 'Super_Admin'
+
+class SubscriptionStatus(str, py_enum.Enum):
+    Active = 'Active'
+    Past_Due = 'Past_Due'
+    Canceled = 'Canceled'
+
+class Organization(Base):
+    __tablename__ = 'organizations'
+    id = Column(Integer, primary_key=True)
+    name = Column(String, unique=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    teams = relationship('Team', back_populates='org')
+    users = relationship('User', back_populates='org')
+    subscriptions = relationship('Subscription', back_populates='org')
+
+class Team(Base):
+    __tablename__ = 'teams'
+    id = Column(Integer, primary_key=True)
+    name = Column(String)
+    org_id = Column(Integer, ForeignKey('organizations.id'))
+    org = relationship('Organization', back_populates='teams')
+    members = relationship('User', back_populates='team')
+
+class Subscription(Base):
+    __tablename__ = 'subscriptions'
+    id = Column(Integer, primary_key=True)
+    org_id = Column(Integer, ForeignKey('organizations.id'))
+    plan = Column(Enum(PlanEnum), default=PlanEnum.Free)
+    status = Column(Enum(SubscriptionStatus), default=SubscriptionStatus.Active)
+    current_period_end = Column(DateTime)
+    stripe_customer_id = Column(String, nullable=True)
+    mpesa_code = Column(String, nullable=True)
+    org = relationship('Organization', back_populates='subscriptions')
+
+class Invoice(Base):
+    __tablename__ = 'invoices'
+    id = Column(Integer, primary_key=True)
+    org_id = Column(Integer, ForeignKey('organizations.id'))
+    amount_kes = Column(Integer)
+    status = Column(String, default='unpaid') # unpaid, paid, void
+    mpesa_receipt = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+# Upgrade User table for V2. Add these columns below existing User columns
+User.org_id = Column(Integer, ForeignKey('organizations.id'), nullable=True)
+User.team_id = Column(Integer, ForeignKey('teams.id'), nullable=True) 
+User.role = Column(py_enum.Enum(RoleEnum), default=RoleEnum.Member)
+User.is_verified = Column(Boolean, default=False)
+User.totp_secret = Column(String, nullable=True) # For 2FA App Spec 3
+User.org = relationship('Organization', back_populates='users')
+User.team = relationship('Team', back_populates='members')
 Base.metadata.create_all(bind=engine)
 
 def verify_password(plain, hashed): return pwd_context.verify(plain, hashed)
@@ -183,7 +240,17 @@ def get_current_user(token: str = Cookie(None), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == email).first()
     if not user: raise HTTPException(status_code=401)
     return user
+def require_role(*roles: RoleEnum):
+    def wrapper(user: User = Depends(get_current_user)):
+        if user.role not in roles and user.role != RoleEnum.Super_Admin:
+            raise HTTPException(status_code=403, detail='Not enough permissions')
+        return user
+    return wrapper
 
+@app.get('/admin', response_class=HTMLResponse)
+def admin_panel(user: User = Depends(require_role(RoleEnum.Org_Admin, RoleEnum.Super_Admin))):
+    content = '<h1 class="text-3xl font-bold">Admin Panel</h1>' + '<p>Org: ' + (user.org.name if user.org else 'None') + ' | Role: ' + user.role.value + '</p>'
+    return base_html('Admin', content, user)
 def get_competitors(idea, location):
     if SERPAPI_KEY == "demo": return [{"name": f"{idea} Ltd {location}", "price": "Ksh 120-200", "link": "#", "rating": 4.2}]
     params = {"engine": "google", "q": f"{idea} {location} Kenya", "api_key": SERPAPI_KEY}
@@ -319,21 +386,6 @@ def dashboard(user: User = Depends(get_current_user), db: Session = Depends(get_
         for t in trending
     ])
 
-    content = f"""
-    <h1 class="text-3xl font-bold">Hello {user.full_name}</h1>
-    <p class="text-slate-400">Plan: {user.plan.value} | Searches: {user.searches_used}/{user.searches_limit if user.plan==PlanEnum.Free else '∞'}</p>
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-        <a href="/analyze" class="bg-slate-800 p-6 rounded-2xl text-center hover:bg-slate-700 border-slate-700 transition"><div class="text-4xl"></div><p class="mt-2 font-semibold">Market Insight</p></a>
-        <a href="/ai" class="bg-slate-800 p-6 rounded-2xl text-center hover:bg-slate-700 border-slate-700 transition"><div class="text-4xl"></div><p class="mt-2 font-semibold">AI Analysis</p></a>
-        <a href="/location" class="bg-slate-800 p-6 rounded-2xl text-center hover:bg-slate-700 border-slate-700 transition"><div class="text-4xl"></div><p class="mt-2 font-semibold">Location Intel</p></a>
-        <a href="/knowledge" class="bg-slate-800 p-6 rounded-2xl text-center hover:bg-slate-700 border-slate-700 transition"><div class="text-4xl"></div><p class="mt-2 font-semibold">Knowledge Base</p></a>
-    </div>
-    <h2 class="mt-8 font-bold text-xl">Trending Insights</h2>
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">{trend_html}</div>
-    <h2 class="mt-8 font-bold text-xl">Recent Searches</h2>
-    <table class="w-full mt-2 text-sm"><tr class="text-slate-400"><th class="text-left py-2">Idea</th><th class="text-left">Town</th><th class="text-left">Decision</th></tr>{rows}</table>
-    """
-    return base_html("Dashboard", content, user, active="dashboard")
     content = f"""
     <h1 class="text-3xl font-bold">Hello {user.full_name}</h1>
     <p class="text-slate-400">Plan: {user.plan.value} | Searches: {user.searches_used}/{user.searches_limit if user.plan==PlanEnum.Free else '∞'}</p>
