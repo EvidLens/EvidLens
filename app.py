@@ -307,7 +307,7 @@ def dashboard(user: User = Depends(get_current_user), db: Session = Depends(get_
     trending = ["Car Wash", "Bottled Water", "SACCO Loans", "Dairy Farming"]
     trend_html = "".join([f"<div class='bg-slate-800 p-4 rounded-xl border-slate-700 hover:bg-slate-700 cursor-pointer'>{t}</div>" for t in trending])
     content = f"""
-    <h1 class="text-3xl font-bold">Hello {user.full_name} 👋</h1>
+    <h1 class="text-3xl font-bold">Hello {user.full_name}</h1>
     <p class="text-slate-400">Plan: {user.plan.value} | Searches: {user.searches_used}/{user.searches_limit if user.plan==PlanEnum.Free else '∞'}</p>
     
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
