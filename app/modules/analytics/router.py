@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List
 
-from app.core.db import get_db
-from app.modules.analytic import service
+from core.db import get_db
+from modules.analytic import service
 
 router = APIRouter(prefix="/analytic", tags=["analytic"])
 
