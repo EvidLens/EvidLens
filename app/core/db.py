@@ -1,12 +1,21 @@
-from fastapi import FastAPI
-from core.config import settings
+from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
-app = FastAPI(title="EvidLens", debug=settings.DEBUG)
+from core.config import settings  # FIXED import
 
-@app.get("/")
-def read_root():
-    return {"message": "EvidLens API is running", "debug": settings.DEBUG}
+engine = create_engine(
+    settings.DATABASE_URL,
+    pool_pre_ping=True
+)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-@app.get("/health")
-def health_check():
-    return {"status": "ok"}
+Base = declarative_base()
+
+# Dependency for routes
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
