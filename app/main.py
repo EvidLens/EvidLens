@@ -13,8 +13,12 @@ from app.modules.marketing import router as marketing_router
 from app.modules.payments import router as payments_router
 from app.modules.ai_agent import router as ai_agent_router
 
-# Create tables
-Base.metadata.create_all(bind=engine)
+
+# Create tables on startup instead of on import
+@app.on_event("startup")
+def create_tables():
+    Base.metadata.create_all(bind=engine)
+
 
 app = FastAPI(
     title="Business ERP API",
@@ -31,19 +35,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register all routers
-app.include_router(invoicing_router.router)
-app.include_router(inventory_router.router)
-app.include_router(hr_router.router)
-app.include_router(support_router.router)
-app.include_router(analytic_router.router)
-app.include_router(marketing_router.router)
-app.include_router(payments_router.router)
-app.include_router(ai_agent_router.router)
+# Register all routers - NO .router here
+app.include_router(invoicing_router)
+app.include_router(inventory_router)
+app.include_router(hr_router)
+app.include_router(support_router)
+app.include_router(analytic_router)
+app.include_router(marketing_router)
+app.include_router(payments_router)
+app.include_router(ai_agent_router)
+
 
 @app.get("/")
 def root():
     return {"message": "Business ERP API is running", "docs": "/docs"}
+
 
 @app.get("/health")
 def health_check():
