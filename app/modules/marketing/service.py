@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from app.modules.marketing import models
+from modules.marketing import models
 from typing import List, Optional
 from datetime import datetime
 
