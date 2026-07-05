@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime
 from sqlalchemy.sql import func
-from app.core.db import Base
+from core.db import Base
 
 class Campaign(Base):
     __tablename__ = "marketing_campaigns"
