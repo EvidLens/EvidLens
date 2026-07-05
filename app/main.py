@@ -5,9 +5,9 @@ from core.db import engine, Base  # FIXED: removed "app."
 
 # Import all module routers
 from modules.invoicing.router import router as invoicing_router
-from modules.inventory import router as inventory_router
+from modules.inventory.router import router as inventory_router
 from modules.hr import router as hr_router
-from modules.support import router as support_router
+from modules.support.router import router as support_router
 from modules.analytics.router import router as analytics_router
 from modules.marketing import router as marketing_router
 from modules.payments import router as payments_router
