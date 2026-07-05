@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from app.modules.support import models
+from modules.support import models
 from typing import List, Optional
 
 def get_all_tickets(db: Session) -> List[models.Ticket]:
