@@ -1,36 +1,14 @@
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from modules.invoicing import models
-from typing import List, Optional
-from datetime import date
+from modules.database import get_db
+from modules.inventory import service
 
-def get_all_invoices(db: Session) -> List[models.Invoice]:
-    return db.query(models.Invoice).all()
+router = APIRouter(prefix="/inventory", tags=["inventory"])
 
-def get_invoice_by_id(db: Session, invoice_id: int) -> Optional[models.Invoice]:
-    return db.query(models.Invoice).filter(models.Invoice.id == invoice_id).first()
+@router.get("/")
+def get_all_inventory(db: Session = Depends(get_db)):
+    return service.get_all_inventory(db)
 
-def generate_invoice_number(db: Session) -> str:
-    last_invoice = db.query(models.Invoice).order_by(models.Invoice.id.desc()).first()
-    next_id = 1 if not last_invoice else last_invoice.id + 1
-    return f"INV-{next_id:04d}"
-
-def create_invoice(db: Session, case_id: int, amount: float, due_date: date) -> models.Invoice:
-    invoice_number = generate_invoice_number(db)
-    db_invoice = models.Invoice(
-        case_id=case_id,
-        invoice_number=invoice_number,
-        amount=amount,
-        due_date=due_date
-    )
-    db.add(db_invoice)
-    db.commit()
-    db.refresh(db_invoice)
-    return db_invoice
-
-def update_invoice_status(db: Session, invoice_id: int, status: str) -> Optional[models.Invoice]:
-    db_invoice = get_invoice_by_id(db, invoice_id)
-    if db_invoice:
-        db_invoice.status = status
-        db.commit()
-        db.refresh(db_invoice)
-    return db_invoice
+@router.get("/{item_id}")
+def get_inventory_item(item_id: int, db: Session = Depends(get_db)):
+    return service.get_inventory_item(db, item_id)
