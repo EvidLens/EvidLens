@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from app.modules.invoicing import models as invoice_models
-from app.modules.inventory import models as inventory_models
-from app.modules.support import models as support_models
+from modules.invoicing import models as invoice_models
+from modules.inventory import models as inventory_models
+from modules.support import models as support_models
 from typing import Dict
 
 def get_revenue_summary(db: Session) -> Dict:
