@@ -14,12 +14,6 @@ from app.modules.payments import router as payments_router
 from app.modules.ai_agent import router as ai_agent_router
 
 
-# Create tables on startup instead of on import
-@app.on_event("startup")
-def create_tables():
-    Base.metadata.create_all(bind=engine)
-
-
 app = FastAPI(
     title="Business ERP API",
     description="A-Z Business Management System",
@@ -34,6 +28,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Create tables on startup instead of on import
+@app.on_event("startup")
+def create_tables():
+    Base.metadata.create_all(bind=engine)
+
 
 # Register all routers - NO .router here
 app.include_router(invoicing_router)
