@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from app.modules.inventory import models
+from modules.inventory import models
 from typing import List, Optional
 
 def get_all_items(db: Session) -> List[models.Item]:
