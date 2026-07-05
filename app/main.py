@@ -1,17 +1,17 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.db import engine, Base
+from core.db import engine, Base  # FIXED: removed "app."
 
 # Import all module routers
-from app.modules.invoicing import router as invoicing_router
-from app.modules.inventory import router as inventory_router
-from app.modules.hr import router as hr_router
-from app.modules.support import router as support_router
-from app.modules.analytic import router as analytic_router
-from app.modules.marketing import router as marketing_router
-from app.modules.payments import router as payments_router
-from app.modules.ai_agent import router as ai_agent_router
+from modules.invoicing import router as invoicing_router
+from modules.inventory import router as inventory_router
+from modules.hr import router as hr_router
+from modules.support import router as support_router
+from modules.analytic import router as analytic_router
+from modules.marketing import router as marketing_router
+from modules.payments import router as payments_router
+from modules.ai_agent import router as ai_agent_router
 
 
 app = FastAPI(
@@ -29,13 +29,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Create tables on startup instead of on import
+# Create tables on startup
 @app.on_event("startup")
 def create_tables():
     Base.metadata.create_all(bind=engine)
 
 
-# Register all routers - NO .router here
+# Register all routers
 app.include_router(invoicing_router)
 app.include_router(inventory_router)
 app.include_router(hr_router)
