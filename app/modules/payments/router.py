@@ -4,8 +4,8 @@ from pydantic import BaseModel
 from typing import List
 from datetime import datetime
 
-from app.core.db import get_db
-from app.modules.payments import service, models
+from core.db import get_db
+from modules.payments import service, models
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
