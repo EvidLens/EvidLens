@@ -1,10 +1,9 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    DATABASE_URL: str = "sqlite:///./evidlens.db"
-    SECRET_KEY: str = "supersecretkey123"
-    DEBUG: bool = True
-
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    DATABASE_URL: str
+    
+    class Config:
+        env_file = ".env"
 
 settings = Settings()
