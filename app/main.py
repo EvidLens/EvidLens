@@ -8,7 +8,7 @@ from modules.invoicing import router as invoicing_router
 from modules.inventory import router as inventory_router
 from modules.hr import router as hr_router
 from modules.support import router as support_router
-from modules.analytic import router as analytic_router
+from modules.analytics import router as analytic_router
 from modules.marketing import router as marketing_router
 from modules.payments import router as payments_router
 from modules.ai_agent import router as ai_agent_router
