@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.sql import func
-from app.core.db import Base
+from core.db import Base
 
 class Ticket(Base):
     __tablename__ = "support_tickets"
