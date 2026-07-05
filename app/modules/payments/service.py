@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from app.modules.payments import models
+from modules.payments import models
 from typing import List, Optional
 
 def get_all_payments(db: Session) -> List[models.Payment]:
