@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime
 from sqlalchemy.sql import func
-from app.core.db import Base
+from core.db import Base
 
 class AgentTask(Base):
     __tablename__ = "ai_agent_tasks"
