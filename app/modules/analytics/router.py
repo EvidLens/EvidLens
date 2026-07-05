@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import List
 
 from core.db import get_db
-from modules.analytic import service
+from modules.analytics import service
 
 router = APIRouter(prefix="/analytic", tags=["analytic"])
 
