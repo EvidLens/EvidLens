@@ -4,8 +4,8 @@ from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 
-from app.core.db import get_db
-from app.modules.ai_agent import service, models
+from core.db import get_db
+from modules.ai_agent import service, models
 
 router = APIRouter(prefix="/ai-agent", tags=["ai_agent"])
 
