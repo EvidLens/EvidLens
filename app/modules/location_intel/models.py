@@ -87,7 +87,7 @@ class PriceArbitrage(Base):
     )
 
 # ========== PYDANTIC API MODELS ==========
-class LocationComparison(BaseModel):
+class LocationComparisonResponse(BaseModel):
     sector: str
     location_a: str
     location_b: str
