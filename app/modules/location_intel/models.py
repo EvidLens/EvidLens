@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, JSON, Index
 from sqlalchemy.sql import func
 from app.modules.database import Base
+from pydantic import BaseModel
 
 KENYA_COUNTIES = [
     "Nairobi", "Mombasa", "Kisumu", "Nakuru", "Eldoret", "Nyeri", "Meru", "Thika", "Malindi", "Kitale",
@@ -8,6 +9,7 @@ KENYA_COUNTIES = [
     "Kilifi", "Kiambu", "Naivasha", "Nanyuki", "Voi", "Wajir", "Isiolo", "Mandera", "Lamu", "Marsabit"
 ]
 
+# ========== SQLALCHEMY DB MODELS ==========
 class LocationComparison(Base):
     __tablename__ = "location_comparisons"
     
@@ -83,3 +85,22 @@ class PriceArbitrage(Base):
     __table_args__ = (
         Index('ix_arbitrage_product', 'product_name', 'county_from', 'county_to'),
     )
+
+# ========== PYDANTIC API MODELS ==========
+class LocationComparison(BaseModel):
+    sector: str
+    location_a: str
+    location_b: str
+    business_density_a: float = 0.0
+    business_density_b: float = 0.0
+    avg_price_a: float = 0.0
+    avg_price_b: float = 0.0
+    demand_score_a: float = 0.0
+    demand_score_b: float = 0.0
+    sentiment_score_a: float = 0.0
+    sentiment_score_b: float = 0.0
+    opportunity_gap: float = 0.0
+    recommendation: str | None = None
+
+    class Config:
+        from_attributes = True
