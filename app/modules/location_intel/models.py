@@ -86,7 +86,6 @@ class PriceArbitrage(Base):
         Index('ix_arbitrage_product', 'product_name', 'county_from', 'county_to'),
     )
 
-# ========== PYDANTIC API MODELS ==========
 class LocationComparisonResponse(BaseModel):
     sector: str
     location_a: str
