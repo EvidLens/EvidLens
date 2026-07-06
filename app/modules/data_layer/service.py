@@ -151,3 +151,8 @@ def seed_fmcg_catalog(db: Session) -> int:
 
     db.commit()
     return count
+def get_demand_signal(data):
+    return {"demand": 0}
+
+def get_price_stats(data):
+    return {"avg_price": 0}
