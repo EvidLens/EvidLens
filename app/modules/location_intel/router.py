@@ -31,7 +31,7 @@ def list_counties():
     """Return all 47 Kenya counties for dropdowns"""
     return {"counties": KENYA_COUNTIES}
 
-@router.post("/compare", response_model=LocationComparison)
+@router.post("/compare") # response_model removed temporarily
 def compare_locations(request: ComparisonRequest, db: Session = Depends(get_db)):
     """Compare 2 counties/constituencies for a sector. Powers Insight Page"""
     if request.location_a not in KENYA_COUNTIES or request.location_b not in KENYA_COUNTIES:
