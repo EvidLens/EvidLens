@@ -146,3 +146,5 @@ def aggregate_sentiment(db: Session, sector: str, product_or_topic: str, county:
         "top_likes": top_likes,
         "top_complaints": top_complaints
     }
+def get_sentiment_summary(data):
+    return {"summary": "placeholder"}
