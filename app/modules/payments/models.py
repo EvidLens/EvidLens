@@ -3,7 +3,7 @@ from sqlalchemy.dialects.postgresql import JSONB  # use JSONB for Postgres
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 import enum
-from app.modules.database import Base
+from app.modules.db import Base
 
 class PaymentStatus(str, enum.Enum):
     PENDING = "pending"
