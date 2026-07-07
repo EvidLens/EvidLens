@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from .service import create_business, get_business, add_product, create_invoice, add_employee
 from .models import Business, Product, Invoice, Employee
-from app.modules.database import get_db
+from app.modules.db import get_db
 
 router = APIRouter()
 
