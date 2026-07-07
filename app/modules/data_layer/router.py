@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from.service import fetch_price_trends, fetch_demand_signals, fetch_location_analytics, seed_fmcg_catalog
 from.models import PriceTrend, DemandSignal, LocationMetric, FMCGCatalog
-from app.modules.database import get_db
+from app.modules.db import get_db
 
 router = APIRouter()
 
