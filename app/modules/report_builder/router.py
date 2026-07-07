@@ -6,7 +6,7 @@ from typing import Optional
 from.service import generate_market_report_pdf, generate_market_report_excel
 from.models import Report, ReportType, ReportFormat, ReportStatus
 from app.modules.payments.service import get_subscription
-from app.modules.database import get_db
+from app.modules.db import get_db
 import os
 from datetime import datetime, timedelta
 
