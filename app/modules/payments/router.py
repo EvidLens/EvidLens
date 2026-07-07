@@ -5,7 +5,7 @@ from typing import Optional
 from.service import (
     initiate_stk_push,
     handle_c2b_webhook,
-    verify_payment_status,
+    verify_payment,
     create_subscription,
     get_subscription
 )
