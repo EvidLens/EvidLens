@@ -6,7 +6,7 @@ from openpyxl.styles import Font, PatternFill, Alignment
 from sqlalchemy.orm import Session
 
 from app.modules.market_engine.service import search_market
-from app.modules.ai_insights.service import generate_ai_insight
+# from app.modules.ai_insights.service import generate_ai_insight
 from app.modules.knowledge_base.service import get_sector_benchmark
 
 PRIMARY = (10, 31, 68) # #0A1F44 Dark Navy
