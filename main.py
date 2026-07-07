@@ -12,7 +12,7 @@ from app.modules.seed_data import run_seed
 from app.modules.market_engine.router import router as market_router
 from app.modules.consumer_voice.router import router as consumer_router
 from app.modules.data_layer.router import router as data_router
-from app.modules.ai_insight.router import router as ai_router
+from app.modules.ai_insights.router import router as ai_router
 from app.modules.report_builder.router import router as report_router
 from app.modules.location_intel.router import router as location_router
 from app.modules.knowledge_base.router import router as knowledge_router
