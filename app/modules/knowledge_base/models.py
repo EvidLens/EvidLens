@@ -54,7 +54,7 @@ class KnowledgeChunk(Base):
     source = Column(String, nullable=False)
     
     embedding = Column(JSON, nullable=True)
-    metadata = Column(JSON, default=dict)
+    chunk_metadata = Column(JSON, default=dict)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
