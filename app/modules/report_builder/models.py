@@ -2,7 +2,7 @@ from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, E
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 import enum
-from app.modules.database import Base
+from app.modules.db import Base
 
 class ReportType(str, enum.Enum):
     MARKET_FEASIBILITY = "market_feasibility"
