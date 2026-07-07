@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+import threading # ADD THIS
 
 # Load env first
 load_dotenv()
@@ -43,14 +44,19 @@ app.add_middleware(
 )
 
 # ======================
-# STARTUP EVENTS
+# STARTUP EVENTS - RUN IN BACKGROUND
 # ======================
-@app.on_event("startup")
-def on_startup():
+def run_seed_in_background():
     print("Starting EvidLens...")
     init_db()  # Create all tables in Neon/SQlite
     run_seed() # Seed 47 Counties + 36 Sectors + FMCG. Zero Setup
     print("EvidLens Ready. All 9 Lanes loaded.")
+
+@app.on_event("startup")
+def on_startup():
+    # This starts immediately so Render doesn't timeout
+    threading.Thread(target=run_seed_in_background, daemon=True).start()
+
 
 # ======================
 # HEALTH CHECK
@@ -92,4 +98,4 @@ app.include_router(research_router, prefix="/research", tags=["Lane 9: Custom Re
 # ======================
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
