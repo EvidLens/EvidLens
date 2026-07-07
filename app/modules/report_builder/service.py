@@ -136,3 +136,5 @@ def generate_market_report_excel(db: Session, query: str, sector: str, county: s
     filepath = f"/tmp/{filename}"
     wb.save(filepath)
     return filepath
+def generate_ai_insight(data: dict):
+    return {"insight": "placeholder", "status": "ok"}
