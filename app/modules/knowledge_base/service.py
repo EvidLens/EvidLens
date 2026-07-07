@@ -115,7 +115,7 @@ def ingest_sector_data(db: Session, sector: str):
             chunk_text=f"Price of {p.product_name} in {p.county} is KES {p.price_kes}. Change: {p.price_change_percent}%",
             chunk_type="price",
             source="Jumia/Naivas Scraper",
-            metadata={"product": p.product_name, "price": p.price_kes}
+            chunk_metadata={"product": p.product_name, "price": p.price_kes}
         )
         db.add(chunk)
         count += 1
