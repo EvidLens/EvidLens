@@ -1,4 +1,3 @@
-# app/main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -9,20 +8,19 @@ load_dotenv()
 from app.modules.database import init_db
 from app.modules.seed_data import run_seed
 
-# Import all 9 Lane Routers
-from app.modules import (
-    market_engine,
-    consumer_voice,
-    data_layer,
-    ai_insight,
-    report_builder,
-    location_intel,
-    knowledge_base,
-    business_os,
-    custom_research,
-    payments,
-    auth
-)
+# Import all 9 Lane Routers DIRECTLY - don't go through app.modules
+from app.modules.market_engine.router import router as market_router
+from app.modules.consumer_voice.router import router as consumer_router
+from app.modules.data_layer.router import router as data_router
+from app.modules.ai_insight.router import router as ai_router
+from app.modules.report_builder.router import router as report_router
+from app.modules.location_intel.router import router as location_router
+from app.modules.knowledge_base.router import router as knowledge_router
+from app.modules.business_os.router import router as business_router
+from app.modules.custom_research.router import router as research_router
+from app.modules.auth.router import router as auth_router
+from app.modules.payments.router import router as payments_router
+
 
 app = FastAPI(
     title="EvidLens API",
@@ -76,19 +74,20 @@ def health():
 # REGISTER ALL ROUTERS
 # ======================
 # Core Services
-app.include_router(auth.router, prefix="/auth", tags=["Auth - Supabase"])
-app.include_router(payments.router, prefix="/payments", tags=["Payments - M-Pesa"])
+app.include_router(auth_router, prefix="/auth", tags=["Auth - Supabase"])
+app.include_router(payments_router, prefix="/payments", tags=["Payments - M-Pesa"])
 
 # 9 SAAS LANES
-app.include_router(market_engine.router, prefix="/market", tags=["Lane 1: Market Insight Engine"])
-app.include_router(consumer_voice.router, prefix="/voice", tags=["Lane 2: Consumer Voice Aggregator"])
-app.include_router(data_layer.router, prefix="/data", tags=["Lane 3: Quantitative Data Layer"])
-app.include_router(ai_insight.router, prefix="/ai", tags=["Lane 4: AI Insight Generator - Lens"])
-app.include_router(report_builder.router, prefix="/reports", tags=["Lane 5: Report Builder - KRA PDF/Excel"])
-app.include_router(location_intel.router, prefix="/location", tags=["Lane 6: Location Intelligence - Heatmaps"])
-app.include_router(knowledge_base.router, prefix="/kb", tags=["Lane 7: Knowledge Base - 36 Sectors"])
-app.include_router(business_os.router, prefix="/os", tags=["Lane 8: Business OS - ERP/CRM/HR"])
-app.include_router(custom_research.router, prefix="/research", tags=["Lane 9: Custom Research Services"])
+app.include_router(market_router, prefix="/market", tags=["Lane 1: Market Insight Engine"])
+app.include_router(consumer_router, prefix="/voice", tags=["Lane 2: Consumer Voice Aggregator"])
+app.include_router(data_router, prefix="/data", tags=["Lane 3: Quantitative Data Layer"])
+app.include_router(ai_router, prefix="/ai", tags=["Lane 4: AI Insight Generator - Lens"])
+app.include_router(report_router, prefix="/reports", tags=["Lane 5: Report Builder - KRA PDF/Excel"])
+app.include_router(location_router, prefix="/location", tags=["Lane 6: Location Intelligence - Heatmaps"])
+app.include_router(knowledge_router, prefix="/kb", tags=["Lane 7: Knowledge Base - 36 Sectors"])
+app.include_router(business_router, prefix="/os", tags=["Lane 8: Business OS - ERP/CRM/HR"])
+app.include_router(research_router, prefix="/research", tags=["Lane 9: Custom Research Services"])
+
 
 # ======================
 # RUN SERVER
