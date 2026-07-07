@@ -1,4 +1,4 @@
-import os  # <- ADDED for point 1
+import os
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 import requests
@@ -9,14 +9,14 @@ from typing import Dict, Any
 from .models import Payment, Subscription, MpesaTransaction, PaymentStatus
 from app.modules.database import get_db
 
-# 1. REPLACE MPESA_* VARS WITH os.getenv() - Set these in Render > Environment
+# 1. MPESA ENV VARS - Set these in Render > Environment
 MPESA_CONSUMER_KEY = os.getenv("MPESA_CONSUMER_KEY")
 MPESA_CONSUMER_SECRET = os.getenv("MPESA_CONSUMER_SECRET")
 MPESA_SHORTCODE = os.getenv("MPESA_SHORTCODE", "174379")
 MPESA_PASSKEY = os.getenv("MPESA_PASSKEY")
 MPESA_CALLBACK_URL = os.getenv("MPESA_CALLBACK_URL")
 
-# 3. TOGGLE SANDBOX / PROD URLS
+# 2. TOGGLE SANDBOX / PROD URLS
 MPESA_ENV = os.getenv("MPESA_ENV", "sandbox") # set to "prod" in Render for live
 
 if MPESA_ENV == "prod":
@@ -34,7 +34,7 @@ def get_access_token() -> str:
 
 def initiate_stk_push(db: Session, phone_number: str, amount: float, account_reference: str, user_id: int) -> Dict[str, Any]:
     """
-    2. FIXED: Now takes real user_id from router instead of user_id=0
+    Initiate M-Pesa STK Push
     """
     access_token = get_access_token()
     api_url = f"{MPESA_BASE_URL}/mpesa/stkpush/v1/processrequest"
@@ -62,7 +62,7 @@ def initiate_stk_push(db: Session, phone_number: str, amount: float, account_ref
     
     if data.get("ResponseCode") == "0":
         new_payment = Payment(
-            user_id=user_id, # <- NOW USING REAL USER_ID
+            user_id=user_id,
             phone_number=phone_number,
             amount_kes=amount,
             checkout_request_id=data.get("CheckoutRequestID"),
@@ -78,6 +78,7 @@ def initiate_stk_push(db: Session, phone_number: str, amount: float, account_ref
 
 
 def handle_c2b_webhook(db: Session, payload: Dict[str, Any]) -> Dict[str, str]:
+    """Handle M-Pesa STK Callback"""
     result_code = payload.get("Body", {}).get("stkCallback", {}).get("ResultCode")
     checkout_id = payload.get("Body", {}).get("stkCallback", {}).get("CheckoutRequestID")
     
@@ -102,6 +103,7 @@ def handle_c2b_webhook(db: Session, payload: Dict[str, Any]) -> Dict[str, str]:
 
 
 def verify_payment(db: Session, checkout_request_id: str) -> Dict[str, Any]:
+    """Verify payment status by checkout_request_id"""
     payment = db.query(Payment).filter(Payment.checkout_request_id == checkout_request_id).first()
     if not payment:
         return {"status": "not_found", "message": "Payment not found"}
@@ -115,6 +117,7 @@ def verify_payment(db: Session, checkout_request_id: str) -> Dict[str, Any]:
 
 
 def process_b2c(db: Session, phone_number: str, amount: float, remarks: str) -> Dict[str, Any]:
+    """Process M-Pesa B2C Payment - Pay out"""
     access_token = get_access_token()
     api_url = f"{MPESA_BASE_URL}/mpesa/b2c/v1/paymentrequest"
     
@@ -134,11 +137,12 @@ def process_b2c(db: Session, phone_number: str, amount: float, remarks: str) -> 
     headers = {"Authorization": f"Bearer {access_token}"}
     response = requests.post(api_url, json=payload, headers=headers)
     return response.json()
+
+
 def create_subscription(db: Session, user_id: int, plan: str, amount: float) -> Dict[str, Any]:
     """
     Create a new subscription record. STK push should be called after this
     """
-    # Check if user already has active subscription
     existing = db.query(Subscription).filter(
         Subscription.user_id == user_id,
         Subscription.status == "active"
@@ -164,4 +168,27 @@ def create_subscription(db: Session, user_id: int, plan: str, amount: float) -> 
         "plan": new_sub.plan,
         "amount": new_sub.amount_kes,
         "status": new_sub.status
+    }
+
+
+def get_subscription(db: Session, user_id: int) -> Dict[str, Any]:
+    """
+    Get active subscription for a user
+    """
+    sub = db.query(Subscription).filter(
+        Subscription.user_id == user_id,
+        Subscription.status == "active"
+    ).first()
+    
+    if not sub:
+        return {"status": "no_active_subscription"}
+    
+    return {
+        "id": sub.id,
+        "user_id": sub.user_id,
+        "plan": sub.plan,
+        "amount": sub.amount_kes,
+        "status": sub.status,
+        "start_date": sub.start_date,
+        "end_date": sub.end_date
     }
