@@ -48,7 +48,7 @@ class TeamMember(Base):
     business = relationship("Business", back_populates="team")
 
 class Product(Base):
-    __tablename__ = "products"
+    __tablename__ = "business_products"
     
     id = Column(Integer, primary_key=True, index=True)
     business_id = Column(Integer, ForeignKey("businesses.id"))
