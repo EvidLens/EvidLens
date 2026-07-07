@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Dict, Any
 
 from .models import Payment, Subscription, MpesaTransaction, PaymentStatus
-from app.modules.database import get_db
+from app.modules.db import get_db
 
 # 1. MPESA ENV VARS - Set these in Render > Environment
 MPESA_CONSUMER_KEY = os.getenv("MPESA_CONSUMER_KEY")
