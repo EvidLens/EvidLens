@@ -30,3 +30,5 @@ def init_db():
     from app.modules.report_builder.models import Report, ReportTemplate, ReportShare
     from app.modules.market_engine.models import MarketSearch, Competitor, MarketMetric
     Base.metadata.create_all(bind=engine)
+def init_db():
+    Base.metadata.create_all(bind=engine)
