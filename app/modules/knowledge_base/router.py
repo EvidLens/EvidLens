@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from.service import get_sector_report, search_knowledge, ingest_sector_data, generate_report_with_groq
 from.models import SectorReport, KnowledgeChunk, KENYA_SECTORS
-from app.modules.database import get_db
+from app.modules.db import get_db
 
 router = APIRouter()
 
