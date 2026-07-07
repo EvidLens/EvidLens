@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, Enum, Index
 from sqlalchemy.sql import func
-from app.modules.database import Base
+from app.modules.db import Base
 import enum
 
 class DataSource(str, enum.Enum):
