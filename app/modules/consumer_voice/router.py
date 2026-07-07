@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from.service import aggregate_sentiment, fetch_reddit_data
 from.models import ConsumerFeedback, SentimentSummary
-from app.modules.database import get_db
+from app.modules.db import get_db
 
 router = APIRouter()
 
