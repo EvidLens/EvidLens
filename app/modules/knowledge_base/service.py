@@ -147,3 +147,10 @@ def ingest_sector_data(db: Session, sector: str):
 
     db.commit()
     return count
+def get_sector_benchmark(db: Session, sector: str):
+    """Temp placeholder so market_engine can import"""
+    return {
+        "sector": sector,
+        "avg_growth": 0,
+        "avg_margin": 0
+    }
