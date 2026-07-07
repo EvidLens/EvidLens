@@ -47,7 +47,7 @@ class Report(Base):
     # Branding + KRA
     is_branded = Column(Boolean, default=False) # Premium: logo + custom colors
     kra_compliant = Column(Boolean, default=True)
-    metadata = Column(JSON, default=dict) # Stores raw data used for audit
+    report_metadata = Column(JSON, default=dict) # FIXED: was 'metadata' - Stores raw data used for audit
     
     # Monetization
     payment_id = Column(Integer, nullable=True) # Link to payments table for KSH 500 reports
