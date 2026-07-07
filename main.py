@@ -21,7 +21,6 @@ from app.modules.custom_research.router import router as research_router
 from app.modules.auth.router import router as auth_router
 from app.modules.payments.router import router as payments_router
 
-
 app = FastAPI(
     title="EvidLens API",
     version="1.0.0",
@@ -88,10 +87,9 @@ app.include_router(knowledge_router, prefix="/kb", tags=["Lane 7: Knowledge Base
 app.include_router(business_router, prefix="/os", tags=["Lane 8: Business OS - ERP/CRM/HR"])
 app.include_router(research_router, prefix="/research", tags=["Lane 9: Custom Research Services"])
 
-
 # ======================
 # RUN SERVER
 # ======================
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("app.main:app", host="0.0.0.0", port
