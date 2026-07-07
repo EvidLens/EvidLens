@@ -18,7 +18,7 @@ from app.modules.report_builder.router import router as report_router
 from app.modules.location_intel.router import router as location_router
 from app.modules.knowledge_base.router import router as knowledge_router
 from app.modules.business_os.router import router as business_router
-from app.modules.custom_research.router import router as research_router
+# from app.modules.custom_research.router import router as research_router
 from app.modules.auth.router import router as auth_router
 from app.modules.payments.router import router as payments_router
 
