@@ -54,4 +54,8 @@ def search_kb(request: SearchRequest, db: Session = Depends(get_db)):
         "results": [
             {
                 "chunk_text": r.chunk_text,
-                "sector": r
+                "sector": r.sector,
+                "county": r.county
+            } for r in results
+        ]
+    }
