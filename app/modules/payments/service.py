@@ -134,3 +134,34 @@ def process_b2c(db: Session, phone_number: str, amount: float, remarks: str) -> 
     headers = {"Authorization": f"Bearer {access_token}"}
     response = requests.post(api_url, json=payload, headers=headers)
     return response.json()
+def create_subscription(db: Session, user_id: int, plan: str, amount: float) -> Dict[str, Any]:
+    """
+    Create a new subscription record. STK push should be called after this
+    """
+    # Check if user already has active subscription
+    existing = db.query(Subscription).filter(
+        Subscription.user_id == user_id,
+        Subscription.status == "active"
+    ).first()
+    
+    if existing:
+        return {"error": "User already has an active subscription"}
+    
+    new_sub = Subscription(
+        user_id=user_id,
+        plan=plan,
+        amount_kes=amount,
+        status="pending",
+        start_date=datetime.utcnow()
+    )
+    
+    db.add(new_sub)
+    db.commit()
+    db.refresh(new_sub)
+    
+    return {
+        "id": new_sub.id,
+        "plan": new_sub.plan,
+        "amount": new_sub.amount_kes,
+        "status": new_sub.status
+    }
