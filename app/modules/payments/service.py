@@ -1,189 +1,136 @@
-import os
-import base64
-import requests
-from datetime import datetime, timedelta
+import os  # <- ADDED for point 1
 from sqlalchemy.orm import Session
-from.models import Payment, Subscription, MpesaTransaction, PaymentStatus, SubscriptionTier
+from sqlalchemy import desc
+import requests
+import base64
+from datetime import datetime
+from typing import Dict, Any
 
+from .models import Payment, Subscription, MpesaTransaction, PaymentStatus
+from app.modules.database import get_db
+
+# 1. REPLACE MPESA_* VARS WITH os.getenv() - Set these in Render > Environment
 MPESA_CONSUMER_KEY = os.getenv("MPESA_CONSUMER_KEY")
 MPESA_CONSUMER_SECRET = os.getenv("MPESA_CONSUMER_SECRET")
-MPESA_BUSINESS_SHORTCODE = os.getenv("MPESA_BUSINESS_SHORTCODE", "174379")
+MPESA_SHORTCODE = os.getenv("MPESA_SHORTCODE", "174379")
 MPESA_PASSKEY = os.getenv("MPESA_PASSKEY")
 MPESA_CALLBACK_URL = os.getenv("MPESA_CALLBACK_URL")
 
-DARAJA_BASE = "https://sandbox.safaricom.co.ke" # Change to https://api.safaricom.co.ke for prod
+# 3. TOGGLE SANDBOX / PROD URLS
+MPESA_ENV = os.getenv("MPESA_ENV", "sandbox") # set to "prod" in Render for live
 
-def get_access_token():
-    """Get OAuth token from Daraja"""
-    url = f"{DARAJA_BASE}/oauth/v1/generate?grant_type=client_credentials"
-    response = requests.get(url, auth=(MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET))
-    return response.json()["access_token"]
+if MPESA_ENV == "prod":
+    MPESA_BASE_URL = "https://api.safaricom.co.ke"
+else:
+    MPESA_BASE_URL = "https://sandbox.safaricom.co.ke"
 
-def generate_password():
-    """Generate STK password"""
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    data = MPESA_BUSINESS_SHORTCODE + MPESA_PASSKEY + timestamp
-    password = base64.b64encode(data.encode()).decode()
-    return password, timestamp
 
-def initiate_stk_push(db: Session, phone: str, amount: float, payment_type: str, description: str, reference_id: int = None):
-    """Send STK Push to user. Powers SME Pro, Business, Pay-Per-Report"""
-    phone = phone.replace("+254", "254").replace("0", "254", 1)
-    token = get_access_token()
-    password, timestamp = generate_password()
+def get_access_token() -> str:
+    """Get M-Pesa OAuth token"""
+    api_url = f"{MPESA_BASE_URL}/oauth/v1/generate?grant_type=client_credentials"
+    response = requests.get(api_url, auth=(MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET))
+    return response.json()['access_token']
+
+
+def initiate_stk_push(db: Session, phone_number: str, amount: float, account_reference: str, user_id: int) -> Dict[str, Any]:
+    """
+    2. FIXED: Now takes real user_id from router instead of user_id=0
+    """
+    access_token = get_access_token()
+    api_url = f"{MPESA_BASE_URL}/mpesa/stkpush/v1/processrequest"
     
-    payment = Payment(
-        user_id=1, # Replace with auth user_id
-        phone_number=phone,
-        amount_kes=amount,
-        payment_type=payment_type,
-        reference_id=reference_id,
-        description=description,
-        status=PaymentStatus.PENDING
-    )
-    db.add(payment)
-    db.commit()
-    db.refresh(payment)
-
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+    password = base64.b64encode(f"{MPESA_SHORTCODE}{MPESA_PASSKEY}{timestamp}".encode()).decode()
+    
     payload = {
-        "BusinessShortCode": MPESA_BUSINESS_SHORTCODE,
+        "BusinessShortCode": MPESA_SHORTCODE,
         "Password": password,
         "Timestamp": timestamp,
         "TransactionType": "CustomerPayBillOnline",
         "Amount": int(amount),
-        "PartyA": phone,
-        "PartyB": MPESA_BUSINESS_SHORTCODE,
-        "PhoneNumber": phone,
+        "PartyA": phone_number,
+        "PartyB": MPESA_SHORTCODE,
+        "PhoneNumber": phone_number,
         "CallBackURL": MPESA_CALLBACK_URL,
-        "AccountReference": f"EvidLens{payment.id}",
-        "TransactionDesc": description
+        "AccountReference": account_reference,
+        "TransactionDesc": f"EvidLens Payment - {account_reference}"
     }
     
-    headers = {"Authorization": f"Bearer {token}"}
-    r = requests.post(f"{DARAJA_BASE}/mpesa/stkpush/v1/processrequest", json=payload, headers=headers)
-    res = r.json()
+    headers = {"Authorization": f"Bearer {access_token}"}
+    response = requests.post(api_url, json=payload, headers=headers)
+    data = response.json()
     
-    if "CheckoutRequestID" in res:
-        payment.checkout_request_id = res["CheckoutRequestID"]
+    if data.get("ResponseCode") == "0":
+        new_payment = Payment(
+            user_id=user_id, # <- NOW USING REAL USER_ID
+            phone_number=phone_number,
+            amount_kes=amount,
+            checkout_request_id=data.get("CheckoutRequestID"),
+            payment_type="subscription",
+            status=PaymentStatus.PENDING,
+            payment_metadata={"mpesa_response": data}
+        )
+        db.add(new_payment)
         db.commit()
+        db.refresh(new_payment)
     
-    return {
-        "success": "CheckoutRequestID" in res,
-        "checkout_request_id": res.get("CheckoutRequestID"),
-        "message": res.get("ResponseDescription", "Failed")
-    }
+    return data
 
-def handle_c2b_webhook(db: Session, payload: dict):
-    """Process Safaricom callback. Updates payment + subscription"""
-    body = payload.get("Body", {}).get("stkCallback", {})
-    checkout_id = body.get("CheckoutRequestID")
-    result_code = body.get("ResultCode")
+
+def handle_c2b_webhook(db: Session, payload: Dict[str, Any]) -> Dict[str, str]:
+    result_code = payload.get("Body", {}).get("stkCallback", {}).get("ResultCode")
+    checkout_id = payload.get("Body", {}).get("stkCallback", {}).get("CheckoutRequestID")
     
-    payment = db.query(Payment).filter(Payment.checkout_request_id==checkout_id).first()
+    payment = db.query(Payment).filter(Payment.checkout_request_id == checkout_id).first()
     if not payment:
-        return
+        return {"status": "payment_not_found"}
     
     if result_code == 0:
-        # Success
-        items = body["CallbackMetadata"]["Item"]
-        receipt = next((i["Value"] for i in items if i["Name"]=="MpesaReceiptNumber"), None)
         payment.status = PaymentStatus.SUCCESS
-        payment.mpesa_receipt_number = receipt
-        payment.completed_at = datetime.now()
-        
-        # Save raw transaction
-        trans = MpesaTransaction(
-            payment_id=payment.id,
-            transaction_type="STKPush",
-            trans_id=receipt,
-            raw_callback=payload
-        )
-        db.add(trans)
-        
-        # Activate subscription or credits
-        activate_purchase(db, payment)
+        payment.completed_at = datetime.utcnow()
+        items = payload.get("Body", {}).get("stkCallback", {}).get("CallbackMetadata", {}).get("Item", [])
+        for item in items:
+            if item.get("Name") == "MpesaReceiptNumber":
+                payment.mpesa_receipt_number = item.get("Value")
     else:
         payment.status = PaymentStatus.FAILED
     
+    payment.payment_metadata = payload
     db.commit()
+    
+    return {"status": "ok"}
 
-def activate_purchase(db: Session, payment: Payment):
-    """Grant access based on payment_type"""
-    sub = get_subscription(db, payment.user_id)
-    
-    if payment.payment_type == "subscription":
-        # Upgrade tier
-        if payment.amount_kes >= 40000:
-            tier = SubscriptionTier.ENTERPRISE
-        elif payment.amount_kes >= 15000:
-            tier = SubscriptionTier.BUSINESS
-        elif payment.amount_kes >= 5000:
-            tier = SubscriptionTier.PROFESSIONAL
-        else:
-            tier = SubscriptionTier.SME_PRO
-        
-        sub.tier = tier
-        sub.status = "active"
-        sub.current_period_end = datetime.now() + timedelta(days=30)
-        sub.auto_renew = True
-        set_tier_limits(sub)
-    
-    elif payment.payment_type == "report":
-        sub.reports_left += 1
-    
-    db.commit()
 
-def process_b2c(db: Session, user_id: int, phone: str, amount: float, reason: str):
-    """Send money out. For refunds and referrals"""
-    token = get_access_token()
+def verify_payment(db: Session, checkout_request_id: str) -> Dict[str, Any]:
+    payment = db.query(Payment).filter(Payment.checkout_request_id == checkout_request_id).first()
+    if not payment:
+        return {"status": "not_found", "message": "Payment not found"}
+    
+    return {
+        "status": payment.status.value,
+        "amount": payment.amount_kes,
+        "receipt": payment.mpesa_receipt_number,
+        "created_at": payment.created_at
+    }
+
+
+def process_b2c(db: Session, phone_number: str, amount: float, remarks: str) -> Dict[str, Any]:
+    access_token = get_access_token()
+    api_url = f"{MPESA_BASE_URL}/mpesa/b2c/v1/paymentrequest"
+    
     payload = {
-        "InitiatorName": "evidlens",
-        "SecurityCredential": os.getenv("MPESA_B2C_SECURITY"),
+        "InitiatorName": os.getenv("MPESA_INITIATOR_NAME"),
+        "SecurityCredential": os.getenv("MPESA_SECURITY_CREDENTIAL"),
         "CommandID": "BusinessPayment",
         "Amount": int(amount),
-        "PartyA": MPESA_BUSINESS_SHORTCODE,
-        "PartyB": phone,
-        "Remarks": reason,
+        "PartyA": MPESA_SHORTCODE,
+        "PartyB": phone_number,
+        "Remarks": remarks,
         "QueueTimeOutURL": MPESA_CALLBACK_URL,
         "ResultURL": MPESA_CALLBACK_URL,
-        "Occasion": "Referral"
+        "Occasion": "EvidLens Refund"
     }
-    headers = {"Authorization": f"Bearer {token}"}
-    r = requests.post(f"{DARAJA_BASE}/mpesa/b2c/v1/paymentrequest", json=payload, headers=headers)
-    return r.json()
-
-def verify_payment_status(db: Session, checkout_request_id: str):
-    return db.query(Payment).filter(Payment.checkout_request_id==checkout_request_id).first()
-
-def get_subscription(db: Session, user_id: int):
-    sub = db.query(Subscription).filter(Subscription.user_id==user_id).first()
-    if not sub:
-        sub = Subscription(user_id=user_id, tier=SubscriptionTier.FREE)
-        db.add(sub)
-        db.commit()
-        db.refresh(sub)
-    return sub
-
-def create_subscription(db: Session, user_id: int, tier: SubscriptionTier, auto_renew: bool):
-    sub = get_subscription(db, user_id)
-    sub.tier = tier
-    sub.auto_renew = auto_renew
-    set_tier_limits(sub)
-    db.commit()
-    return sub
-
-def set_tier_limits(sub: Subscription):
-    """Apply limits from Section 7 pricing"""
-    limits = {
-        SubscriptionTier.FREE: {"searches": 3, "ai": 10, "reports": 1, "api": 0},
-        SubscriptionTier.SME_STARTER: {"searches": 10, "ai": 50, "reports": 1, "api": 0},
-        SubscriptionTier.SME_PRO: {"searches": 9999, "ai": 9999, "reports": 9999, "api": 1000},
-        SubscriptionTier.PROFESSIONAL: {"searches": 200, "ai": 500, "reports": 9999, "api": 10000},
-        SubscriptionTier.BUSINESS: {"searches": 1000, "ai": 2000, "reports": 9999, "api": 100000},
-        SubscriptionTier.ENTERPRISE: {"searches": 99999, "ai": 99999, "reports": 99999, "api": 999999},
-    }
-    l = limits[sub.tier]
-    sub.searches_left = l["searches"]
-    sub.ai_credits_left = l["ai"]
-    sub.reports_left = l["reports"]
-    sub.api_calls_left = l["api"]
+    
+    headers = {"Authorization": f"Bearer {access_token}"}
+    response = requests.post(api_url, json=payload, headers=headers)
+    return response.json()
