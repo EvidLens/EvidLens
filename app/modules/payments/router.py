@@ -10,7 +10,7 @@ from.service import (
     get_subscription
 )
 from.models import Payment, Subscription, PaymentStatus, SubscriptionTier
-from app.modules.database import get_db
+from app.modules.db import get_db
 
 router = APIRouter()
 
