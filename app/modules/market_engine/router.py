@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List, Optional
-from.service import search_market, get_competitor_overview, calculate_market_size
+from .service import search_market, get_competitor_overview, calculate_market_size
 from.models import MarketSearch, Competitor, MarketMetric
-from app.modules.database import get_db
+from app.modules.db import get_db
 
 router = APIRouter()
 
