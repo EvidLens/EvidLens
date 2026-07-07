@@ -9,7 +9,7 @@ from.service import (
     calculate_price_arbitrage
 )
 from.models import LocationComparison, OpportunityHeatmap, PriceArbitrage, KENYA_COUNTIES
-from app.modules.database import get_db
+from app.modules.db import get_db
 
 router = APIRouter()
 
