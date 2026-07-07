@@ -28,3 +28,4 @@ boto3==1.35.44
 africastalking==1.2.5
 python-multipart==0.0.20
 jinja2==3.1.4
+email-validator==2.2.0
