@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Enum, JSON, Index
+from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Enum, Index
+from sqlalchemy.dialects.postgresql import JSONB  # use JSONB for Postgres
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 import enum
@@ -37,7 +38,7 @@ class Payment(Base):
     status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING)
     description = Column(String, nullable=True)
     
-    metadata = Column(JSON, default=dict)
+    payment_metadata = Column('metadata', JSONB, default=dict)  # FIXED: renamed
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     completed_at = Column(DateTime(timezone=True), nullable=True)
@@ -84,6 +85,6 @@ class MpesaTransaction(Base):
     middle_name = Column(String, nullable=True)
     last_name = Column(String, nullable=True)
     
-    raw_callback = Column(JSON, default=dict)
+    raw_callback = Column(JSONB, default=dict)  # FIXED: was raw_callback JSON
     
     received_at = Column(DateTime(timezone=True), server_default=func.now())
