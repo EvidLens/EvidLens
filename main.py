@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 # Load env first
 load_dotenv()
 
-from app.modules.database import init_db
+from app.modules.db import init_db
 from app.modules.seed_data import run_seed
 
 # Import all 9 Lane Routers DIRECTLY - don't go through app.modules
