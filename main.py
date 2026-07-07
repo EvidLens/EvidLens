@@ -91,7 +91,6 @@ app.include_router(report_router, prefix="/reports", tags=["Lane 5: Report Build
 app.include_router(location_router, prefix="/location", tags=["Lane 6: Location Intelligence - Heatmaps"])
 app.include_router(knowledge_router, prefix="/kb", tags=["Lane 7: Knowledge Base - 36 Sectors"])
 app.include_router(business_router, prefix="/os", tags=["Lane 8: Business OS - ERP/CRM/HR"])
-app.include_router(research_router, prefix="/research", tags=["Lane 9: Custom Research Services"])
 
 # ======================
 # RUN SERVER
