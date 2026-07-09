@@ -52,12 +52,6 @@ def run_seed_in_background():
     run_seed() # Seed 47 Counties + 36 Sectors + FMCG. Zero Setup
     print("EvidLens Ready. All 9 Lanes loaded.")
 
-@app.on_event("startup")
-def on_startup():
-    # This starts immediately so Render doesn't timeout
-    threading.Thread(target=run_seed_in_background, daemon=True).start()
-
-
 # ======================
 # HEALTH CHECK
 # ======================
