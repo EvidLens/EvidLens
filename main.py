@@ -55,7 +55,7 @@ def run_seed_in_background():
 @app.on_event("startup")
 def on_startup():
     # This starts immediately so Render doesn't timeout
-    threading.Thread(target=run_seed_in_background, daemon=True).start()
+    # threading.Thread(target=run_seed_in_background, daemon=True).start()
 
 
 # ======================
