@@ -46,12 +46,6 @@ app.add_middleware(
 # ======================
 # STARTUP EVENTS - RUN IN BACKGROUND
 # ======================
-def run_seed_in_background():
-    print("Starting EvidLens...")
-    init_db()  # Create all tables in Neon/SQlite
-    run_seed() # Seed 47 Counties + 36 Sectors + FMCG. Zero Setup
-    print("EvidLens Ready. All 9 Lanes loaded.")
-
 # ======================
 # HEALTH CHECK
 # ======================
