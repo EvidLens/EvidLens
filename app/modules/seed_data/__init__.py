@@ -2,9 +2,7 @@ import json
 import os
 from sqlalchemy.orm import Session
 from app.modules.db import SessionLocal
-from app.models.sector import Sector
-from app.models.county import County 
-from app.models.product import Product
+from app.models.sector import Sector, County, Product
 
 SEED_DIR = os.path.dirname(__file__)
 
