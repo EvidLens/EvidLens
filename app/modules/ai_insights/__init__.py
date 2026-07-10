@@ -1,2 +1,2 @@
 from .router import router
-from .service import generate_insight
+from .service import generate_insights
