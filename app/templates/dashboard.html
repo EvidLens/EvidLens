@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="text-3xl font-bold text-[#0A1F44]">EvidLens Decision Dashboard</h1>
+
+<!-- Lane 1: Search -->
+<form method="post" action="/search-market" class="mt-6 flex gap-3">
+    <input name="q" placeholder="Search any business idea e.g 'maize milling in Nyeri'" required class="border p-3 rounded-lg flex-1">
+    <input name="sector" placeholder="Sector Optional" class="border p-3 rounded-lg">
+    <input name="county" placeholder="County Optional" class="border p-3 rounded-lg">
+    <button class="bg-[#14B8A6] text-white px-6 rounded-lg font-semibold">Analyze</button>
+</form>
+
+{% if result %}
+<div class="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+    <!-- Lane 1: Market Insight -->
+    <div class="p-6 bg-white rounded-xl shadow border">
+        <h3 class="font-bold text-[#0A1F44]">Lane 1: Market Size</h3>
+        <p class="mt-2">Demand: <b>{{ result.demand_level }}</b></p>
+        <p>Market Size: <b>KES {{ "{:,.0f}".format(result.market_size_kes) }}</b></p>
+        <p>Growth: <b>{{ result.growth_rate }}%</b></p>
+    </div>
+
+    <!-- Lane 3: Pricing -->
+    <div class="p-6 bg-white rounded-xl shadow border">
+        <h3 class="font-bold text-[#0A1F44]">Lane 3: Pricing Intel</h3>
+        <p>Min: <b>KES {{ result.price_range.min_kes }}</b></p>
+        <p>Avg: <b>KES {{ result.price_range.avg_kes }}</b></p>
+        <p>Max: <b>KES {{ result.price_range.max_kes }}</b></p>
+    </div>
+
+    <!-- Lane 6: Competitors -->
+    <div class="p-6 bg-white rounded-xl shadow border">
+        <h3 class="font-bold text-[#0A1F44]">Lane 6: Competitors ({{ result.competitor_count }})</h3>
+        {% for c in competitors[:3] %}
+        <p class="text-sm">{{ c.business_name }} - {{ c.avg_rating }}★</p>
+        {% endfor %}
+    </div>
+
+    <!-- Lane 2: Consumer Voice -->
+    <div class="p-6 bg-white rounded-xl shadow border">
+        <h3 class="font-bold text-[#0A1F44]">Lane 2: Sentiment</h3>
+        <p>Positive: {{ result.sentiment_summary.positive }}%</p>
+        <p>Negative: {{ result.sentiment_summary.negative }}%</p>
+    </div>
+
+    <!-- Lane 7: Benchmark -->
+    <div class="p-6 bg-white rounded-xl shadow border">
+        <h3 class="font-bold text-[#0A1F44]">Lane 7: Sector Benchmark</h3>
+        <p>National Avg Price: KES {{ benchmark.avg_price }}</p>
+        <p>Population: {{ "{:,.0f}".format(benchmark.county_population) }}</p>
+    </div>
+
+    <!-- Lane 8: AI Insights -->
+    <div class="p-6 bg-white rounded-xl shadow border md:col-span-2">
+        <h3 class="font-bold text-[#0A1F44]">Lane 8: AI Recommendation</h3>
+        <p class="text-sm">{{ ai }}</p>
+    </div>
+
+</div>
+
+    <!-- Lane 9: Pay + Download -->
+    <div class="mt-6 p-6 bg-white rounded-xl shadow border">
+        <h3 class="font-bold text-[#0A1F44]">Lane 9: Unlock Full Report</h3>
+        <form action="/pay-report" method="post" class="mt-2 flex gap-2">
+            <input name="phone" placeholder="07XXXXXXXX" required class="border p-2 rounded">
+            <button class="bg-white text-[#0A1F44] border-2 border-[#0A1F44] px-4 rounded font-semibold hover:bg-[#0A1F44] hover:text-white">Pay 500 KES</button>
+        </form>
+        <a href="/download-report?q={{ result.query }}" class="mt-3 inline-block text-[#14B8A6] font-semibold">Download PDF Report</a>
+        {% if payment %}<p class="mt-2 text-green-600">STK Sent to {{ payment.PhoneNumber }}</p>{% endif %}
+    </div>
+{% endif %}
+{% endblock %}
