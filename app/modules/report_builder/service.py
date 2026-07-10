@@ -1,15 +1,14 @@
 import os
+import json
 from datetime import datetime
 from fpdf import FPDF
-import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment
 from sqlalchemy.orm import Session
 
 from app.modules.market_engine.service import search_market
-# from app.modules.ai_insights.service import generate_ai_insight
+from app.modules.ai_insights.service import generate_insights
 from app.modules.knowledge_base.service import get_sector_benchmark
 
-PRIMARY = (10, 31, 68) # #0A1F44 Dark Navy
+PRIMARY = (10, 31, 68) #0A1F44 Dark Navy
 SECONDARY = (20, 184, 166) #14B8A6 Teal
 ACCENT = (245, 158, 11) #F59E0B Mustard
 
@@ -30,10 +29,20 @@ class EvidLensPDF(FPDF):
         self.set_font('Arial', 'I', 8)
         self.cell(0, 10, f'Powered by EvidLens Kenya Sector Data | Page {self.page_no()}', 0, 0, 'C')
 
-def generate_market_report_pdf(db: Session, query: str, sector: str, county: str, user_id: int):
-    """Generate KRA-formatted PDF market report. Used for SME Starter + Pay-Per-Report"""
+def generate_report_pdf(db: Session, query: str, sector: str, county: str) -> bytes:
+    """
+    REAL v1 Report Builder 
+    Takes DB session, runs real search_market, real generate_insights, real PDF
+    """
+    # 1. Get REAL market data
     market_data = search_market(db, query, sector, county)
-    ai_insight = generate_ai_insight(db, query, sector, county)
+    
+    # 2. Get REAL AI insight
+    market_dict = {"sector": sector, "county": county}
+    ai_raw = generate_insights(query, market_dict)
+    ai_json = json.loads(ai_raw.replace("### Lens AI Analysis\n```json\n", "").replace("\n```", ""))
+    
+    # 3. Get benchmark
     benchmark = get_sector_benchmark(sector)
 
     pdf = EvidLensPDF()
@@ -50,10 +59,10 @@ def generate_market_report_pdf(db: Session, query: str, sector: str, county: str
     # Section 1: Executive Summary
     pdf.set_font('Arial', 'B', 12)
     pdf.set_text_color(*SECONDARY)
-    pdf.cell(0, 8, '1. Executive Summary', 0, 1)
+    pdf.cell(0, 8, '1. Executive Summary - Lens AI', 0, 1)
     pdf.set_text_color(0, 0, 0)
     pdf.set_font('Arial', '', 10)
-    pdf.multi_cell(0, 6, f"Recommendation: {ai_insight['recommendation']}\n\n{ai_insight['summary']}")
+    pdf.multi_cell(0, 6, f"Recommendation: {ai_json.get('recommendation')}\n\nViability: {ai_json.get('viability')}\n{ai_json.get('risk_analysis')}")
     pdf.ln(3)
 
     # Section 2: Market Metrics
@@ -62,79 +71,23 @@ def generate_market_report_pdf(db: Session, query: str, sector: str, county: str
     pdf.cell(0, 8, '2. Market Metrics', 0, 1)
     pdf.set_text_color(0, 0, 0)
     pdf.set_font('Arial', '', 10)
-    pdf.cell(95, 6, f"Demand Level: {market_data['demand_level']}", 0, 0)
-    pdf.cell(95, 6, f"Market Size: KES {market_data['market_size_kes']:,.0f}", 0, 1)
-    pdf.cell(95, 6, f"Avg Price: KES {market_data['price_range']['avg_kes']:,.0f}", 0, 0)
-    pdf.cell(95, 6, f"Competitors: {market_data['competitor_count']}", 0, 1)
+    pdf.cell(95, 6, f"Demand Level: {market_data.get('demand_level', 'N/A')}", 0, 0)
+    pdf.cell(95, 6, f"Market Size: KES {market_data.get('market_size_kes', 0):,.0f}", 0, 1)
+    pdf.cell(95, 6, f"Avg Price: KES {market_data.get('price_range', {}).get('avg_kes', 0):,.0f}", 0, 0)
+    pdf.cell(95, 6, f"Competitors: {market_data.get('competitor_count', 0)}", 0, 1)
     pdf.ln(3)
 
-    # Section 3: Consumer Sentiment
-    pdf.set_font('Arial', 'B', 12)
-    pdf.set_text_color(*SECONDARY)
-    pdf.cell(0, 8, '3. Consumer Sentiment', 0, 1)
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font('Arial', '', 10)
-    s = market_data['sentiment_summary']
-    pdf.cell(0, 6, f"Positive: {s['positive']}% | Neutral: {s['neutral']}% | Negative: {s['negative']}%", 0, 1)
-    pdf.multi_cell(0, 6, f"Common Complaints: {', '.join(s['complaints'])}")
-    pdf.ln(3)
-
-    # Section 4: Risk Analysis
+    # Section 3: Risk + Pricing
     pdf.set_font('Arial', 'B', 12)
     pdf.set_text_color(*ACCENT)
-    pdf.cell(0, 8, '4. Risk Analysis & Strategy', 0, 1)
+    pdf.cell(0, 8, '3. Risk Analysis & Strategy', 0, 1)
     pdf.set_text_color(0, 0, 0)
     pdf.set_font('Arial', '', 10)
-    pdf.multi_cell(0, 6, f"Saturation Risk: {ai_insight['risk']}\nPricing Strategy: {ai_insight['pricing_strategy']}")
+    pdf.multi_cell(0, 6, f"Saturation: {ai_json.get('saturation')}\nPricing Strategy: {ai_json.get('pricing_strategy')}")
     pdf.ln(5)
 
-    # KRA Compliance Footer
+    # KRA Footer
     pdf.set_fill_color(240, 240, 240)
     pdf.cell(0, 8, 'KRA COMPLIANT REPORT - FOR BUSINESS PLANNING PURPOSES', 0, 1, 'C', 1)
 
-    filename = f"evidlens_report_{user_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
-    filepath = f"/tmp/{filename}"
-    pdf.output(filepath)
-    return filepath
-
-def generate_market_report_excel(db: Session, query: str, sector: str, county: str):
-    """Generate Excel export for investors/banks. KRA formatted"""
-    market_data = search_market(db, query, sector, county)
-    ai_insight = generate_ai_insight(db, query, sector, county)
-
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Market Report"
-
-    # Header
-    ws.merge_cells('A1:D1')
-    ws['A1'] = f'EvidLens Market Report: {query}'
-    ws['A1'].font = Font(bold=True, size=14, color='FFFFFF')
-    ws['A1'].fill = PatternFill(start_color='0A1F44', end_color='0A1F44', fill_type='solid')
-    ws['A1'].alignment = Alignment(horizontal='center')
-
-    # Data
-    rows = [
-        ["Metric", "Value", "County", "Sector"],
-        ["Demand Level", market_data['demand_level'], county, sector],
-        ["Market Size KES", market_data['market_size_kes'], county, sector],
-        ["Avg Price KES", market_data['price_range']['avg_kes'], county, sector],
-        ["Competitor Count", market_data['competitor_count'], county, sector],
-        ["AI Recommendation", ai_insight['recommendation'], "", ""],
-        ["Risk Level", ai_insight['risk'], "", ""]
-    ]
-
-    for row in rows:
-        ws.append(row)
-
-    # Styling
-    for cell in ws[2]:
-        cell.font = Font(bold=True)
-        cell.fill = PatternFill(start_color='14B8A6', end_color='14B8A6', fill_type='solid')
-
-    filename = f"evidlens_report_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"
-    filepath = f"/tmp/{filename}"
-    wb.save(filepath)
-    return filepath
-def generate_ai_insight(data: dict):
-    return {"insight": "placeholder", "status": "ok"}
+    return pdf.output(dest='S').encode('latin1')
