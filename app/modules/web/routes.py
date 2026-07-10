@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Form, Depends
+from fastapi import APIRouter, Request, Form, Depends, Response
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
@@ -14,26 +14,32 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 @router.get("/", response_class=HTMLResponse)
-def home(request: Request): return templates.TemplateResponse("login.html", {"request": request})
+def home(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
 
 @router.get("/signup", response_class=HTMLResponse)
-def signup_page(request: Request): return templates.TemplateResponse("signup.html", {"request": request})
+def signup_page(request: Request):
+    return templates.TemplateResponse("signup.html", {"request": request})
 
 @router.get("/dashboard", response_class=HTMLResponse)
-def dashboard(request: Request): return templates.TemplateResponse("dashboard.html", {"request": request})
+def dashboard(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request})
 
 @router.post("/do-signup")
 def do_signup(request: Request, email: str = Form(...), password: str = Form(...), full_name: str = Form(...), phone: str = Form(...), sector: str = Form(...), county: str = Form(...), db: Session = Depends(get_db)):
-    if get_user_by_email(db, email): return templates.TemplateResponse("signup.html", {"request": request, "error": "Email already registered"})
+    if get_user_by_email(db, email):
+        return templates.TemplateResponse("signup.html", {"request": request, "error": "Email already registered"})
     class Req: pass
-    req = Req(); req.email, req.password, req.full_name, req.phone, req.sector, req.county = email, password, full_name, phone, sector, county
+    req = Req()
+    req.email, req.password, req.full_name, req.phone, req.sector, req.county = email, password, full_name, phone, sector, county
     create_user(db, req)
     return RedirectResponse(url="/dashboard", status_code=303)
 
 @router.post("/do-login")
 def do_login(request: Request, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
     result = login_user(db, email, password)
-    if "error" in result: return templates.TemplateResponse("login.html", {"request": request, "error": result["error"]})
+    if "error" in result:
+        return templates.TemplateResponse("login.html", {"request": request, "error": result["error"]})
     return RedirectResponse(url="/dashboard", status_code=303)
 
 @router.post("/search-market")
@@ -41,7 +47,7 @@ def search_market_ui(request: Request, q: str = Form(...), sector: str = Form(No
     result = search_market(db, q, sector, county)
     competitors = get_competitor_overview(db, result['sector'], county) if county else []
     benchmark = get_sector_benchmark(result['sector'])
-    ai_insights = generate_insights(db, q, result)
+    ai_insights = generate_insights(q, result)
     return templates.TemplateResponse("dashboard.html", {"request": request, "result": result, "competitors": competitors, "benchmark": benchmark, "ai": ai_insights})
 
 @router.post("/pay-report")
@@ -49,7 +55,11 @@ def pay_report(request: Request, phone: str = Form(...), db: Session = Depends(g
     result = initiate_stk_push(db, phone_number=phone, amount=500, account_reference="report_001", user_id=1)
     return templates.TemplateResponse("dashboard.html", {"request": request, "payment": result})
 
-@router.get("/download-report")
-def download_report(request: Request, q: str):
-    pdf = generate_report_pdf(q)
-    return RedirectResponse(url=pdf)
+@router.post("/download-report")
+def download_report(q: str = Form(...), sector: str = Form(...), county: str = Form(...), db: Session = Depends(get_db)):
+    pdf_bytes = generate_report_pdf(db, q, sector, county)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=evidlens_report_{q}.pdf"}
+    )
