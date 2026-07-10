@@ -2,15 +2,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
-import threading
 
 # Load env first
 load_dotenv()
 
-# from app.modules.db import init_db
-# from app.modules.seed_data import run_seed
-
-# Import all 9 Lane Routers DIRECTLY - don't go through app.modules
+# Import all 9 Lane Routers
 from app.modules.market_engine.router import router as market_router
 from app.modules.consumer_voice.router import router as consumer_router
 from app.modules.data_layer.router import router as data_router
@@ -19,10 +15,9 @@ from app.modules.report_builder.router import router as report_router
 from app.modules.location_intel.router import router as location_router
 from app.modules.knowledge_base.router import router as knowledge_router
 from app.modules.business_os.router import router as business_router
-# from app.modules.custom_research.router import router as research_router
 from app.modules.auth.router import router as auth_router
 from app.modules.payments.router import router as payments_router
-from app.modules.web import routes as web_routes  # ADDED FOR UI
+from app.modules.web import routes as web_routes
 
 app = FastAPI(
     title="EvidLens API",
@@ -31,25 +26,22 @@ app = FastAPI(
 )
 
 # ======================
-# CORS - For React + Vercel + Mobile
+# CORS - For Frontend on same Render domain
 # ======================
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000", 
-        "https://evidlens.vercel.app",
-        "*" # remove in prod
+        "http://localhost:8000", 
+        "https://your-eviddlens.onrender.com", # your render URL
+        "*" # keep * for now while testing. Lock this down later
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.mount("/static", StaticFiles(directory="app/static"), name="static") # ADDED FOR UI
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-# ======================
-# STARTUP EVENTS - RUN IN BACKGROUND
-# ======================
 # ======================
 # HEALTH CHECK
 # ======================
@@ -70,11 +62,9 @@ def health():
 # ======================
 # REGISTER ALL ROUTERS
 # ======================
-# Core Services
 app.include_router(auth_router, prefix="/auth", tags=["Auth - Supabase"])
 app.include_router(payments_router, prefix="/payments", tags=["Payments - M-Pesa"])
 
-# 9 SAAS LANES
 app.include_router(market_router, prefix="/market", tags=["Lane 1: Market Insight Engine"])
 app.include_router(consumer_router, prefix="/voice", tags=["Lane 2: Consumer Voice Aggregator"])
 app.include_router(data_router, prefix="/data", tags=["Lane 3: Quantitative Data Layer"])
