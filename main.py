@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles  # ADDED FOR UI
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
-import threading # ADD THIS
+import threading
 
 # Load env first
 load_dotenv()
@@ -84,7 +84,7 @@ app.include_router(location_router, prefix="/location", tags=["Lane 6: Location 
 app.include_router(knowledge_router, prefix="/kb", tags=["Lane 7: Knowledge Base - 36 Sectors"])
 app.include_router(business_router, prefix="/os", tags=["Lane 8: Business OS - ERP/CRM/HR"])
 
-app.include_router(web_routes.router) # ADDED FOR UI - THIS GIVES YOU /login /signup /dashboard
+app.include_router(web_routes.router)
 
 # ======================
 # RUN SERVER
