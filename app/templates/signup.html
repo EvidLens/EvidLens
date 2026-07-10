@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-md mx-auto mt-16 p-8 bg-white rounded-xl shadow-lg border-gray-200">
+<h2 class="text-2xl font-bold text-[#0A1F44]">Create Account</h2>
+{% if error %}<p class="text-red-500 mt-2">{{ error }}</p>{% endif %}
+<form action="/do-signup" method="post" class="mt-6 space-y-4">
+<input name="full_name" placeholder="Full Name" required class="w-full border p-3 rounded-lg">
+<input name="email" type="email" placeholder="Email" required class="w-full border p-3 rounded-lg">
+<input name="phone" placeholder="07XXXXXXXX" required class="w-full border p-3 rounded-lg">
+<input name="password" type="password" placeholder="Password" required class="w-full border p-3 rounded-lg">
+<input name="sector" placeholder="Sector e.g Agriculture" required class="w-full border p-3 rounded-lg">
+<input name="county" placeholder="County e.g Nakuru" required class="w-full border p-3 rounded-lg">
+<button class="w-full bg-white text-[#0A1F44] border-2 border-[#0A1F44] p-3 rounded-lg font-semibold hover:bg-[#0A1F44] hover:text-white">Sign Up</button>
+</form>
+</div>
+{% endblock %}
