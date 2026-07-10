@@ -2,16 +2,16 @@ import os
 import json
 from groq import Groq
 from dotenv import load_dotenv
-from app.modules.db import Session
 
 load_dotenv()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-def generate_insights(db: Session, query: str, market_data: dict) -> str:
+def generate_insights(query: str, market_data: dict) -> str:
     """
     Lane 4: AI Insight Generator - Lens
-    Takes market data and returns AI recommendation string
+    No DB needed for v1. Just takes query + market_data
+    Returns formatted string for dashboard
     """
     sector = market_data.get('sector', 'Unknown')
     county = market_data.get('county', 'Unknown')
@@ -21,9 +21,10 @@ def generate_insights(db: Session, query: str, market_data: dict) -> str:
     Context: Sector={sector}, County={county}, Query={query}
     Market Data: {json.dumps(market_data)}
 
-    Return JSON with: viability, risk_analysis, saturation, pricing_strategy, recommendation.
-    Recommendation must be Go, No-Go, or Needs Research.
-    Keep it under 200 words.
+    Return ONLY valid JSON with these keys:
+    viability, risk_analysis, saturation, pricing_strategy, recommendation.
+    Recommendation must be exactly: Go, No-Go, or Needs Research.
+    Keep it under 200 words total and be specific to Kenya market.
     """
     try:
         chat_completion = client.chat.completions.create(
@@ -34,8 +35,7 @@ def generate_insights(db: Session, query: str, market_data: dict) -> str:
             response_format={"type": "json_object"}
         )
         result = chat_completion.choices[0].message.content
-        # Return as string so it displays in dashboard
-        return f"AI Analysis: {result}"
+        return f"### Lens AI Analysis\n```json\n{result}\n```"
 
     except Exception as e:
-        return f"AI is temporarily down. Fallback: Validate demand manually for {query} in {county}. Start with 5 customer interviews."
+        return f"### Lens AI Temporarily Down\nError: {str(e)}\n\nFallback: Validate demand manually for '{query}' in {county}. Start with 5 customer interviews this week."
