@@ -3,7 +3,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
-from.service import generate_market_report_pdf, generate_market_report_excel
+from.service import generate_report_pdf
 from.models import Report, ReportType, ReportFormat, ReportStatus
 from app.modules.payments.service import get_subscription
 from app.modules.db import get_db
