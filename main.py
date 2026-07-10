@@ -26,15 +26,11 @@ app = FastAPI(
 )
 
 # ======================
-# CORS - For Frontend on same Render domain
+# CORS - OPEN FOR ANY DEPLOYMENT
 # ======================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:8000", 
-        "https://your-eviddlens.onrender.com", # your render URL
-        "*" # keep * for now while testing. Lock this down later
-    ],
+    allow_origins=["*"], # open to any site
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
