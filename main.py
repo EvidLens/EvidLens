@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles  # ADDED FOR UI
 from dotenv import load_dotenv
 import threading # ADD THIS
 
@@ -21,6 +22,7 @@ from app.modules.business_os.router import router as business_router
 # from app.modules.custom_research.router import router as research_router
 from app.modules.auth.router import router as auth_router
 from app.modules.payments.router import router as payments_router
+from app.modules.web import routes as web_routes  # ADDED FOR UI
 
 app = FastAPI(
     title="EvidLens API",
@@ -42,6 +44,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.mount("/static", StaticFiles(directory="app/static"), name="static") # ADDED FOR UI
 
 # ======================
 # STARTUP EVENTS - RUN IN BACKGROUND
@@ -79,6 +83,8 @@ app.include_router(report_router, prefix="/reports", tags=["Lane 5: Report Build
 app.include_router(location_router, prefix="/location", tags=["Lane 6: Location Intelligence - Heatmaps"])
 app.include_router(knowledge_router, prefix="/kb", tags=["Lane 7: Knowledge Base - 36 Sectors"])
 app.include_router(business_router, prefix="/os", tags=["Lane 8: Business OS - ERP/CRM/HR"])
+
+app.include_router(web_routes.router) # ADDED FOR UI - THIS GIVES YOU /login /signup /dashboard
 
 # ======================
 # RUN SERVER
