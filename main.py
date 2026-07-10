@@ -7,8 +7,8 @@ import threading # ADD THIS
 # Load env first
 load_dotenv()
 
-from app.modules.db import init_db
-from app.modules.seed_data import run_seed
+# from app.modules.db import init_db
+# from app.modules.seed_data import run_seed
 
 # Import all 9 Lane Routers DIRECTLY - don't go through app.modules
 from app.modules.market_engine.router import router as market_router
