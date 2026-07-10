@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from .service import generate_insight
+from .service import generate_insights # note the S
 
 router = APIRouter()
 
@@ -11,14 +11,13 @@ class InsightRequest(BaseModel):
 
 @router.post("/ask")
 def ask_insight(req: InsightRequest):
-    result = generate_insight(req.query, req.sector, req.county)
-    if "error" in result:
-        raise HTTPException(status_code=500, detail=result["error"])
-    return result
+    market_data = {"sector": req.sector, "county": req.county}
+    result = generate_insights(req.query, market_data) # 2 params now
+    return {"analysis": result}
 
 @router.post("/viability")
 def viability_check(req: InsightRequest):
-    result = generate_insight(f"Should I start a {req.query} business in {req.county}? Give Go No-Go Needs Research.", req.sector, req.county)
-    if "error" in result:
-        raise HTTPException(status_code=500, detail=result["error"])
-    return result
+    market_data = {"sector": req.sector, "county": req.county}
+    viab_query = f"Should I start a {req.query} business in {req.county}? Give Go, No-Go, or Needs Research."
+    result = generate_insights(viab_query, market_data) # 2 params now
+    return {"analysis": result}
