@@ -39,7 +39,6 @@ def stk_push(request: STKPushRequest, db: Session = Depends(get_db)):
 async def mpesa_callback(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     payload = await request.json()
     background_tasks.add_task(handle_c2b_webhook, db, payload)
-
     body = payload.get("Body", {}).get("stkCallback", {})
     if body.get("ResultCode") == 0:
         items = body.get("CallbackMetadata", {}).get("Item", [])
@@ -91,5 +90,5 @@ def get_user_subscription(user_id: int, db: Session = Depends(get_db)):
 
 @router.post("/b2c/payout")
 def b2c_payout(user_id: int, phone: str, amount: float, reason: str, db: Session = Depends(get_db)):
-    result = process_b2c(db, user_id, phone, amount, reason)
+    result = process_b2c(db, phone, amount, reason)
     return result
