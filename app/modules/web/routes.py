@@ -26,7 +26,16 @@ def dashboard(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
 
 @router.post("/do-signup")
-def do_signup(request: Request, email: str = Form(...), password: str = Form(...), full_name: str = Form(...), phone: str = Form(...), sector: str = Form(...), county: str = Form(...), db: Session = Depends(get_db)):
+def do_signup(
+    request: Request,
+    email: str = Form(...),
+    password: str = Form(...),
+    full_name: str = Form(...),
+    phone: str = Form(...),
+    sector: str = Form(...),
+    county: str = Form(...),
+    db: Session = Depends(get_db)
+):
     if get_user_by_email(db, email):
         return templates.TemplateResponse("signup.html", {"request": request, "error": "Email already registered"})
     class Req: pass
@@ -36,14 +45,25 @@ def do_signup(request: Request, email: str = Form(...), password: str = Form(...
     return RedirectResponse(url="/dashboard", status_code=303)
 
 @router.post("/do-login")
-def do_login(request: Request, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+def do_login(
+    request: Request,
+    email: str = Form(...),
+    password: str = Form(...),
+    db: Session = Depends(get_db)
+):
     result = login_user(db, email, password)
     if "error" in result:
         return templates.TemplateResponse("login.html", {"request": request, "error": result["error"]})
     return RedirectResponse(url="/dashboard", status_code=303)
 
 @router.post("/search-market")
-def search_market_ui(request: Request, q: str = Form(...), sector: str = Form(None), county: str = Form(None), db: Session = Depends(get_db)):
+def search_market_ui(
+    request: Request,
+    q: str = Form(...),
+    sector: str = Form(None),
+    county: str = Form(None),
+    db: Session = Depends(get_db)
+):
     result = search_market(db, q, sector, county)
     competitors = get_competitor_overview(db, result['sector'], county) if county else []
     benchmark = get_sector_benchmark(result['sector'])
@@ -51,12 +71,21 @@ def search_market_ui(request: Request, q: str = Form(...), sector: str = Form(No
     return templates.TemplateResponse("dashboard.html", {"request": request, "result": result, "competitors": competitors, "benchmark": benchmark, "ai": ai_insights})
 
 @router.post("/pay-report")
-def pay_report(request: Request, phone: str = Form(...), db: Session = Depends(get_db)):
+def pay_report(
+    request: Request,
+    phone: str = Form(...),
+    db: Session = Depends(get_db)
+):
     result = initiate_stk_push(db, phone_number=phone, amount=500, account_reference="report_001", user_id=1)
     return templates.TemplateResponse("dashboard.html", {"request": request, "payment": result})
 
 @router.post("/download-report")
-def download_report(q: str = Form(...), sector: str = Form(...), county: str = Form(...), db: Session = Depends(get_db)):
+def download_report(
+    q: str = Form(...),
+    sector: str = Form(...),
+    county: str = Form(...),
+    db: Session = Depends(get_db)
+):
     pdf_bytes = generate_report_pdf(db, q, sector, county)
     return Response(
         content=pdf_bytes,
