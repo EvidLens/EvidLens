@@ -1,7 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 import os
 
@@ -23,36 +24,51 @@ from app.modules.knowledge_base.router import router as knowledge_router
 from app.modules.business_os.router import router as business_router
 from app.modules.auth.router import router as auth_router
 from app.modules.payments.router import router as payments_router
+from app.modules.rag.router import router as rag_router
 from app.modules.web import routes as web_routes
 from app.modules.db import init_db
+from app.modules.cron.price_cron import start_scheduler
 
-app = FastAPI(title="EvidLens API", version="1.0.0", description="Kenya's Decision Intelligence Platform - 9 Lanes in 1")
+app = FastAPI(title="EvidLens API", version="1.0.0", description="Kenya's Decision Intelligence Platform - 9 Lanes in 1. All 35 Sectors.")
 
 @app.on_event("startup")
 def on_startup():
     init_db()
+    start_scheduler()
 
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware, 
+    allow_origins=["*"], 
+    allow_credentials=True, 
+    allow_methods=["*"], 
+    allow_headers=["*"]
+)
+
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
+@app.exception_handler(500)
+async def internal_error(request: Request, exc):
+    return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
+
 @app.get("/health")
 def health():
-    return {"status": "healthy"}
+    return {"status": "healthy", "version": "1.0.0", "sectors": 35}
 
-app.include_router(auth_router, prefix="/auth")
-app.include_router(payments_router, prefix="/payments")
-app.include_router(market_router, prefix="/market")
-app.include_router(consumer_router, prefix="/voice")
-app.include_router(data_router, prefix="/data")
-app.include_router(ai_router, prefix="/ai")
-app.include_router(report_router, prefix="/reports")
-app.include_router(location_router, prefix="/location")
-app.include_router(knowledge_router, prefix="/kb")
-app.include_router(business_router, prefix="/os")
+app.include_router(auth_router, prefix="/auth", tags=["Auth"])
+app.include_router(payments_router, prefix="/payments", tags=["Payments"])
+app.include_router(market_router, prefix="/market", tags=["Market Engine"])
+app.include_router(consumer_router, prefix="/voice", tags=["Consumer Voice"])
+app.include_router(data_router, prefix="/data", tags=["Data Layer"])
+app.include_router(ai_router, prefix="/ai", tags=["AI Insights"])
+app.include_router(report_router, prefix="/reports", tags=["Report Builder"])
+app.include_router(location_router, prefix="/location", tags=["Location Intel"])
+app.include_router(knowledge_router, prefix="/kb", tags=["Knowledge Base"])
+app.include_router(business_router, prefix="/os", tags=["Business OS"])
+app.include_router(rag_router, prefix="/api", tags=["RAG"])
 app.include_router(web_routes.router)
 
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
