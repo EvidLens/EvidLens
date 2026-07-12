@@ -24,7 +24,7 @@ def signup_page(request: Request):
 @router.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
     # Send empty data so dashboard.js doesn't crash on first load
-    return templates.TemplateResponse("dashboard.html", {
+    return templates.TemplateResponse("dashboard_v2.html", {  # <-- CHANGED HERE
         "request": request, 
         "result": None, 
         "competitors": [], 
@@ -91,7 +91,7 @@ def search_market_ui(
         benchmark = None
         ai_insights = None
         
-    return templates.TemplateResponse("dashboard.html", {"request": request, "result": result, "competitors": competitors, "benchmark": benchmark, "ai": ai_insights})
+    return templates.TemplateResponse("dashboard_v2.html", {"request": request, "result": result, "competitors": competitors, "benchmark": benchmark, "ai": ai_insights}) # <-- CHANGED HERE
 
 @router.post("/pay-report")
 def pay_report(
@@ -100,7 +100,7 @@ def pay_report(
     db: Session = Depends(get_db)
 ):
     result = initiate_stk_push(db, phone_number=phone, amount=500, account_reference="report_001", user_id=1)
-    return templates.TemplateResponse("dashboard.html", {"request": request, "payment": result})
+    return templates.TemplateResponse("dashboard_v2.html", {"request": request, "payment": result}) # <-- CHANGED HERE
 
 @router.post("/download-report")
 def download_report(
