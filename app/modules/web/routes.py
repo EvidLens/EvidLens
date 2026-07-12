@@ -23,7 +23,14 @@ def signup_page(request: Request):
 
 @router.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
-    return templates.TemplateResponse("dashboard.html", {"request": request})
+    # Send empty data so dashboard.js doesn't crash on first load
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request, 
+        "result": None, 
+        "competitors": [], 
+        "benchmark": None, 
+        "ai": None
+    })
 
 @router.post("/do-signup")
 def do_signup(
@@ -64,10 +71,26 @@ def search_market_ui(
     county: str = Form(None),
     db: Session = Depends(get_db)
 ):
-    result = search_market(db, q, sector, county)
-    competitors = get_competitor_overview(db, result['sector'], county) if county else []
-    benchmark = get_sector_benchmark(result['sector'])
-    ai_insights = generate_insights(q, result)
+    try:
+        result = search_market(db, q, sector, county)
+        if not result:
+            result = {"error": "No data found"}
+        
+        competitors = []
+        benchmark = None
+        ai_insights = None
+        
+        if "sector" in result:
+            competitors = get_competitor_overview(db, result['sector'], county) if county else []
+            benchmark = get_sector_benchmark(result['sector'])
+            ai_insights = generate_insights(q, result)
+            
+    except Exception as e:
+        result = {"error": str(e)}
+        competitors = []
+        benchmark = None
+        ai_insights = None
+        
     return templates.TemplateResponse("dashboard.html", {"request": request, "result": result, "competitors": competitors, "benchmark": benchmark, "ai": ai_insights})
 
 @router.post("/pay-report")
