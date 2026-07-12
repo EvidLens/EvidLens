@@ -7,31 +7,25 @@ from datetime import datetime
 from.models import PriceTrend, DemandSignal, LocationMetric, FMCGCatalog, DataSource
 
 LOCATIONIQ_KEY = os.getenv("LOCATIONIQ_API_KEY")
-KNBS_API_URL = "https://api.knbs.or.ke/v1"
+KNBS_API_URL = os.getenv("KNBS_API_URL", "https://api.knbs.or.ke/v1")
 
 def fetch_price_trends(db: Session):
-    """Weekly scrape Jumia + Naivas for KE prices. Powers Price Arbitrage Maps"""
     count = 0
     sources = [
         {"name": "jumia", "url": "https://www.jumia.co.ke/groceries/"},
         {"name": "naivas", "url": "https://www.naivas.online/category/food-cupboard"}
     ]
-
     for src in sources:
         try:
             res = requests.get(src["url"], headers={"User-Agent": "EvidLensBot/1.0"}, timeout=10)
             soup = BeautifulSoup(res.text, "html.parser")
-
-            # Jumia example selector - adjust as needed
             products = soup.select(".prd")[:20]
             for p in products:
                 name = p.select_one(".name").text.strip() if p.select_one(".name") else "Unknown"
                 price_text = p.select_one(".prc").text.replace("KSh", "").replace(",", "").strip()
                 price = float(price_text) if price_text else 0.0
-
                 prev = db.query(PriceTrend).filter(PriceTrend.product_name == name).order_by(PriceTrend.scraped_at.desc()).first()
                 change = ((price - prev.price_kes) / prev.price_kes * 100) if prev and prev.price_kes else 0.0
-
                 trend = PriceTrend(
                     sector="Food & Beverage",
                     fmcg_category="Food & Staples",
@@ -44,17 +38,14 @@ def fetch_price_trends(db: Session):
                 )
                 db.add(trend)
                 count += 1
-        except Exception as e:
-            print(f"Scrape error {src['name']}: {e}")
-
+        except Exception:
+            pass
     db.commit()
     return count
 
 def fetch_demand_signals(db: Session, sector: str) -> int:
-    """Pull demand from KNBS API + Google Trends proxy"""
     count = 0
     try:
-        # KNBS API call
         res = requests.get(f"{KNBS_API_URL}/data?sector={sector}", timeout=10)
         if res.status_code == 200:
             data = res.json()
@@ -71,8 +62,6 @@ def fetch_demand_signals(db: Session, sector: str) -> int:
                 count += 1
     except:
         pass
-
-    # Google Trends mock - replace with pytrends in prod
     signal = DemandSignal(
         sector=sector,
         signal_type="google_trends",
@@ -86,27 +75,16 @@ def fetch_demand_signals(db: Session, sector: str) -> int:
     return count
 
 def fetch_location_analytics(db: Session, sector: str) -> int:
-    """Use OSM Overpass + LocationIQ for County x Sector business density"""
     count = 0
     counties = ["Nairobi", "Mombasa", "Kisumu", "Nakuru", "Eldoret"]
-
     for county in counties:
         try:
-            # LocationIQ forward geocode
             url = f"https://us1.locationiq.com/v1/search.php?key={LOCATIONIQ_KEY}&q={county}+Kenya&format=json"
             res = requests.get(url, timeout=5)
             geo = res.json()[0] if res.status_code == 200 else {}
-
-            # OSM Overpass - count businesses in sector
-            overpass_query = f"""
-            [out:json];
-            area["name"="{county}"]->.searchArea;
-            node["shop"](area.searchArea);
-            out count;
-            """
+            overpass_query = f'[out:json];area["name"="{county}"]->.searchArea;node["shop"](area.searchArea);out count;'
             osm_res = requests.post("https://overpass-api.de/api/interpreter", data=overpass_query)
             business_count = osm_res.json().get("elements", [{}])[0].get("tags", {}).get("total", 0)
-
             metric = LocationMetric(
                 sector=sector,
                 county=county,
@@ -118,23 +96,19 @@ def fetch_location_analytics(db: Session, sector: str) -> int:
             )
             db.add(metric)
             count += 1
-        except Exception as e:
-            print(f"Location error {county}: {e}")
-
+        except:
+            pass
     db.commit()
     return count
 
 def seed_fmcg_catalog(db: Session) -> int:
-    """Seed FMCG from OpenFoodFacts API. Zero setup for users"""
     count = 0
     categories = ["maize flour", "rice", "cooking oil", "milk", "sugar"]
-
     for cat in categories:
         try:
             url = f"https://world.openfoodfacts.org/cgi/search.pl?search_terms={cat}&json=true&page_size=20"
             res = requests.get(url, timeout=10)
             products = res.json().get("products", [])
-
             for p in products:
                 product = FMCGCatalog(
                     category="Food & Staples",
@@ -148,11 +122,19 @@ def seed_fmcg_catalog(db: Session) -> int:
                 count += 1
         except:
             continue
-
     db.commit()
     return count
-def get_demand_signal(data):
-    return {"demand": 0}
 
-def get_price_stats(data):
-    return {"avg_price": 0}
+def get_demand_signal(db, sector, county):
+    signal = db.query(DemandSignal).filter(DemandSignal.sector==sector, DemandSignal.county==county).order_by(DemandSignal.period.desc()).first()
+    if not signal:
+        fetch_demand_signals(db, sector)
+        signal = db.query(DemandSignal).filter(DemandSignal.sector==sector).first()
+    level = "High" if signal and signal.signal_value > 60 else "Medium"
+    return {"level": level, "growth": int(signal.signal_value) if signal else 0}
+
+def get_price_stats(db, sector, query, county):
+    avg = db.query(func.avg(PriceTrend.price_kes)).filter(PriceTrend.sector==sector).scalar() or 0
+    minp = db.query(func.min(PriceTrend.price_kes)).filter(PriceTrend.sector==sector).scalar() or 0
+    maxp = db.query(func.max(PriceTrend.price_kes)).filter(PriceTrend.sector==sector).scalar() or 0
+    return {"min": float(minp), "max": float(maxp), "avg": float(avg)}
