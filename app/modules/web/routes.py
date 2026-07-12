@@ -23,7 +23,7 @@ def signup_page(request: Request):
 
 @router.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
-    return templates.TemplateResponse("dashboard.html", {
+    return templates.TemplateResponse("dash.html", {  # CHANGED
         "request": request, 
         "result": None, 
         "competitors": [], 
@@ -86,7 +86,7 @@ def search_market_ui(
         competitors = []
         benchmark = None
         ai_insights = None
-    return templates.TemplateResponse("dashboard.html", {"request": request, "result": result, "competitors": competitors, "benchmark": benchmark, "ai": ai_insights})
+    return templates.TemplateResponse("dash.html", {"request": request, "result": result, "competitors": competitors, "benchmark": benchmark, "ai": ai_insights})  # CHANGED
 
 @router.post("/pay-report")
 def pay_report(
@@ -95,7 +95,7 @@ def pay_report(
     db: Session = Depends(get_db)
 ):
     result = initiate_stk_push(db, phone_number=phone, amount=500, account_reference="report_001", user_id=1)
-    return templates.TemplateResponse("dashboard.html", {"request": request, "payment": result})
+    return templates.TemplateResponse("dash.html", {"request": request, "payment": result})  # CHANGED
 
 @router.post("/download-report")
 def download_report(
