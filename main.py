@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -19,32 +19,28 @@ from app.modules.payments.router import router as payments_router
 from app.modules.web import routes as web_routes
 from app.modules.db import init_db
 
-app = FastAPI(
-    title="EvidLens API",
-    version="1.0.0",
-    description="Kenya's Decision Intelligence Platform - 9 Lanes in 1"
-)
+app = FastAPI(title="EvidLens API", version="1.0.0")
 
 @app.on_event("startup")
 def on_startup():
-    init_db() # Create all tables on Render start
+    init_db() # This creates users, sectors, products tables
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Change to your Vercel URL later
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
-templates = Jinja2Templates(directory="app/templates") # Needed for dashboard
+templates = Jinja2Templates(directory="app/templates") # Needed for your routes.py
 
 @app.get("/health")
 def health():
     return {"status": "healthy"}
 
-# 9 LANES
+# 9 LANES + WEB
 app.include_router(auth_router, prefix="/auth")
 app.include_router(payments_router, prefix="/payments")
 app.include_router(market_router, prefix="/market")
@@ -55,8 +51,4 @@ app.include_router(report_router, prefix="/reports")
 app.include_router(location_router, prefix="/location")
 app.include_router(knowledge_router, prefix="/kb")
 app.include_router(business_router, prefix="/os")
-app.include_router(web_routes.router) # dashboard
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000)
+app.include_router(web_routes.router) # This loads /, /dashboard, /do-signup etc
