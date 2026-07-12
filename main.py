@@ -7,7 +7,8 @@ import os
 
 load_dotenv()
 
-from app.modules.models import User, Sector, County, Product
+from app.modules.auth.models import User, UserRole
+from app.modules.models import Sector, County, Product
 from app.modules.payments.models import Payment, Subscription, MpesaTransaction
 from app.modules.report_builder.models import Report, ReportTemplate, ReportShare
 from app.modules.market_engine.models import MarketSearch, Competitor, MarketMetric
@@ -25,24 +26,13 @@ from app.modules.payments.router import router as payments_router
 from app.modules.web import routes as web_routes
 from app.modules.db import init_db
 
-app = FastAPI(
-    title="EvidLens API",
-    version="1.0.0",
-    description="Kenya's Decision Intelligence Platform - 9 Lanes in 1"
-)
+app = FastAPI(title="EvidLens API", version="1.0.0", description="Kenya's Decision Intelligence Platform - 9 Lanes in 1")
 
 @app.on_event("startup")
 def on_startup():
     init_db()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
