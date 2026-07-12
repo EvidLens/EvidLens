@@ -21,8 +21,4 @@ def get_db():
         db.close()
 
 def init_db():
-    from app.modules.models import User, Sector, County, Product
-    from app.modules.payments.models import Payment, Subscription, MpesaTransaction
-    from app.modules.report_builder.models import Report, ReportTemplate, ReportShare
-    from app.modules.market_engine.models import MarketSearch, Competitor, MarketMetric
     Base.metadata.create_all(bind=engine)
