@@ -71,3 +71,6 @@ def generate_market_report_pdf(db: Session, sector: str, county: str, q: str) ->
 
 def generate_market_report_excel(db: Session, sector: str, county: str, q: str) -> bytes:
     return b""
+
+# ALIAS FOR WEB MODULE
+generate_report_pdf = generate_market_report_pdf
