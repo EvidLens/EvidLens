@@ -1,7 +1,7 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum
-from sqlalchemy.sql import func
-from app.modules.db import Base
+from sqlalchemy import Column, Integer, String, Boolean, Enum, DateTime
 import enum
+from datetime import datetime
+from app.modules.db import Base
 
 class UserRole(str, enum.Enum):
     USER = "USER"
@@ -10,17 +10,13 @@ class UserRole(str, enum.Enum):
 
 class User(Base):
     __tablename__ = "users"
-    
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
     phone = Column(String, unique=True, index=True, nullable=True)
+    full_name = Column(String, nullable=False)
     hashed_password = Column(String, nullable=False)
-    full_name = Column(String, nullable=True)
     sector = Column(String, nullable=True)
     county = Column(String, nullable=True)
     role = Column(Enum(UserRole), default=UserRole.USER)
     is_active = Column(Boolean, default=True)
-    is_verified = Column(Boolean, default=False)
-    mpesa_phone = Column(String, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_at = Column(DateTime, default=datetime.utcnow)
