@@ -5,7 +5,7 @@ from sqlalchemy import text
 
 load_dotenv()
 
-from db import SessionLocal, Base, engine
+from app.db import SessionLocal, Base, engine
 from app.modules.market_engine.router import router as market_router
 from app.modules.consumer_voice.router import router as consumer_router
 from app.modules.data_layer.router import router as data_router
@@ -39,7 +39,6 @@ def reset_enum_on_startup():
         db.execute(text("DROP TABLE IF EXISTS users CASCADE"))
         db.execute(text("DROP TYPE IF EXISTS userrole CASCADE"))
         db.commit()
-        print("✅ Old DB reset. New tables will be created")
     except Exception as e:
         print(f"DB reset error: {e}")
     finally:
