@@ -7,13 +7,11 @@ import os
 
 load_dotenv()
 
-# 1. IMPORT ALL MODELS FIRST so SQLAlchemy registers them once
 from app.modules.models import User, Sector, County, Product
 from app.modules.payments.models import Payment, Subscription, MpesaTransaction
 from app.modules.report_builder.models import Report, ReportTemplate, ReportShare
 from app.modules.market_engine.models import MarketSearch, Competitor, MarketMetric
 
-# 2. THEN IMPORT ROUTERS
 from app.modules.market_engine.router import router as market_router
 from app.modules.consumer_voice.router import router as consumer_router
 from app.modules.data_layer.router import router as data_router
@@ -35,11 +33,11 @@ app = FastAPI(
 
 @app.on_event("startup")
 def on_startup():
-    init_db() # Create all tables
+    init_db()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Change to ["https://your-vercel-app.vercel.app"] later
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -52,7 +50,6 @@ templates = Jinja2Templates(directory="app/templates")
 def health():
     return {"status": "healthy"}
 
-# 9 LANES + WEB
 app.include_router(auth_router, prefix="/auth")
 app.include_router(payments_router, prefix="/payments")
 app.include_router(market_router, prefix="/market")
@@ -63,9 +60,9 @@ app.include_router(report_router, prefix="/reports")
 app.include_router(location_router, prefix="/location")
 app.include_router(knowledge_router, prefix="/kb")
 app.include_router(business_router, prefix="/os")
-app.include_router(web_routes.router) # /, /dashboard, /do-signup etc
+app.include_router(web_routes.router)
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv("PORT", 8000)) # Render uses $PORT
+    port = int(os.getenv("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port)
