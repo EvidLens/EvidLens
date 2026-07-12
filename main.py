@@ -5,7 +5,7 @@ from sqlalchemy import text
 
 load_dotenv()
 
-from app.database import SessionLocal, Base, engine
+from app.db import SessionLocal, Base, engine  # <-- FIXED: was database, now db
 from app.modules.market_engine.router import router as market_router
 from app.modules.consumer_voice.router import router as consumer_router
 from app.modules.data_layer.router import router as data_router
