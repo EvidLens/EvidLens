@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-from sqlalchemy import text
 
 load_dotenv()
 
@@ -31,19 +30,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.on_event("startup")
-def reset_enum_on_startup():
-    db = SessionLocal()
-    try:
-        db.execute(text("DROP TABLE IF EXISTS users CASCADE"))
-        db.execute(text("DROP TYPE IF EXISTS userrole CASCADE"))
-        db.commit()
-    except Exception as e:
-        print(f"DB reset error: {e}")
-    finally:
-        db.close()
-    Base.metadata.create_all(bind=engine)
 
 @app.get("/health")
 def health():
