@@ -3,9 +3,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
+import os
 
 load_dotenv()
 
+# 1. IMPORT ALL MODELS FIRST so SQLAlchemy registers them once
+from app.modules.models import User, Sector, County, Product
+from app.modules.payments.models import Payment, Subscription, MpesaTransaction
+from app.modules.report_builder.models import Report, ReportTemplate, ReportShare
+from app.modules.market_engine.models import MarketSearch, Competitor, MarketMetric
+
+# 2. THEN IMPORT ROUTERS
 from app.modules.market_engine.router import router as market_router
 from app.modules.consumer_voice.router import router as consumer_router
 from app.modules.data_layer.router import router as data_router
@@ -19,22 +27,26 @@ from app.modules.payments.router import router as payments_router
 from app.modules.web import routes as web_routes
 from app.modules.db import init_db
 
-app = FastAPI(title="EvidLens API", version="1.0.0")
+app = FastAPI(
+    title="EvidLens API",
+    version="1.0.0",
+    description="Kenya's Decision Intelligence Platform - 9 Lanes in 1"
+)
 
 @app.on_event("startup")
 def on_startup():
-    init_db() # This creates users, sectors, products tables
+    init_db() # Create all tables
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"], # Change to ["https://your-vercel-app.vercel.app"] later
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
-templates = Jinja2Templates(directory="app/templates") # Needed for your routes.py
+templates = Jinja2Templates(directory="app/templates")
 
 @app.get("/health")
 def health():
@@ -51,4 +63,9 @@ app.include_router(report_router, prefix="/reports")
 app.include_router(location_router, prefix="/location")
 app.include_router(knowledge_router, prefix="/kb")
 app.include_router(business_router, prefix="/os")
-app.include_router(web_routes.router) # This loads /, /dashboard, /do-signup etc
+app.include_router(web_routes.router) # /, /dashboard, /do-signup etc
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", 8000)) # Render uses $PORT
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
