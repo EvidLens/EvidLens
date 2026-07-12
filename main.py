@@ -1,10 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
+# Load env first
 load_dotenv()
 
-from app.db import SessionLocal, Base, engine
+# Import all 9 Lane Routers
 from app.modules.market_engine.router import router as market_router
 from app.modules.consumer_voice.router import router as consumer_router
 from app.modules.data_layer.router import router as data_router
@@ -23,16 +25,24 @@ app = FastAPI(
     description="Kenya's Decision Intelligence Platform - 9 Lanes in 1"
 )
 
+# ======================
+# CORS - OPEN FOR ANY DEPLOYMENT
+# ======================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"], # open to any site
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.get("/health")
-def health():
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+# ======================
+# HEALTH CHECK
+# ======================
+@app.get("/")
+def root():
     return {
         "app": "EvidLens",
         "tagline": "Kenya's Decision Intelligence Platform",
@@ -41,8 +51,16 @@ def health():
         "status": "ok"
     }
 
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
+
+# ======================
+# REGISTER ALL ROUTERS
+# ======================
 app.include_router(auth_router, prefix="/auth", tags=["Auth - Supabase"])
 app.include_router(payments_router, prefix="/payments", tags=["Payments - M-Pesa"])
+
 app.include_router(market_router, prefix="/market", tags=["Lane 1: Market Insight Engine"])
 app.include_router(consumer_router, prefix="/voice", tags=["Lane 2: Consumer Voice Aggregator"])
 app.include_router(data_router, prefix="/data", tags=["Lane 3: Quantitative Data Layer"])
@@ -54,6 +72,9 @@ app.include_router(business_router, prefix="/os", tags=["Lane 8: Business OS - E
 
 app.include_router(web_routes.router)
 
-if __name__ == "__main__":
+# ======================
+# RUN SERVER
+# ======================
+if _name_ == "_main_":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000)
+    uvicorn.run("main:app", host="0.0.0.0"
