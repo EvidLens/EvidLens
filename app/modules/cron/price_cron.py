@@ -1,7 +1,6 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.modules.db import SessionLocal
 from app.modules.data_layer.service import fetch_price_trends
-import asyncio
 
 scheduler = AsyncIOScheduler()
 
@@ -14,5 +13,7 @@ def run_price_job():
         db.close()
 
 def start_scheduler():
-    scheduler.add_job(run_price_job, 'cron', day_of_week='mon', hour=3, minute=0)
-    scheduler.start()
+    if not scheduler.running:
+        scheduler.add_job(run_price_job, 'cron', day_of_week='mon', hour=3, minute=0) # Mon 3AM
+        scheduler.start()
+        print("Price Scheduler started")
