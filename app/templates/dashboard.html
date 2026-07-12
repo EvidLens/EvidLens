@@ -29,7 +29,6 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
 </head>
 <body>
 
-<!-- HEADER -->
 <header class="text-white px-4 py-3 sticky top-0" style="background:#0A1F44">
   <div class="flex items-center gap-3 max-w-[480px] mx-auto">
     <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center">
@@ -44,7 +43,6 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
 
 <div class="px-4 py-4 max-w-[480px] mx-auto">
 
-  <!-- SEARCH -->
   <div class="card mb-4">
     <div class="flex items-center gap-2 text-gray-400">
       <span>🔍</span>
@@ -52,7 +50,6 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
     </div>
   </div>
 
-  <!-- METRICS -->
   <div class="grid grid-cols-2 gap-3 mb-5">
     <div class="card teal-card">
       <p class="text-sm text-gray-500">Total Insights</p>
@@ -66,7 +63,6 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
     </div>
   </div>
 
-  <!-- TRENDING NOW -->
   <div class="mb-5">
     <h2 class="font-bold mb-3 flex items-center gap-2" style="color:#0A1F44"><span>🔥</span>Trending Now</h2>
     <div id="trendingCard" class="trending text-white p-4 rounded-2xl">
@@ -75,17 +71,15 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
     </div>
   </div>
 
-  <!-- INTELLIGENCE LANES -->
   <div class="mb-8">
     <h2 class="font-bold mb-3" style="color:#0A1F44">Intelligence Lanes</h2>
     <div class="grid grid-cols-2 gap-3" id="lanesGrid"></div>
   </div>
 
-  <!-- QUICK ANALYZE -->
   <div class="card mb-10">
     <h2 class="font-bold mb-2" style="color:#0A1F44">Quick Business Analysis</h2>
-    <form id="searchForm" class="space-y-2">
-      <input name="idea" placeholder="e.g maize mill" class="w-full p-2 border rounded-lg text-sm">
+    <form id="searchForm" method="POST" action="/search-market" class="space-y-2">
+      <input name="q" placeholder="e.g maize mill" class="w-full p-2 border rounded-lg text-sm">
       <div class="flex gap-2">
         <input name="sector" placeholder="Sector" class="w-1/2 p-2 border rounded-lg text-sm">
         <input name="county" placeholder="County" class="w-1/2 p-2 border rounded-lg text-sm">
@@ -97,7 +91,12 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
 
 </div>
 
-<!-- FOOTER -->
+<form id="pdfForm" method="POST" action="/download-report">
+  <input type="hidden" name="q" id="pdf_q">
+  <input type="hidden" name="sector" id="pdf_sector">
+  <input type="hidden" name="county" id="pdf_county">
+</form>
+
 <footer class="footer text-white pt-8 pb-8">
   <div class="max-w-[480px] mx-auto px-4">
     <div class="mb-6"><h3 class="font-bold mb-2" style="color:#14B8A6">1. Trust & Legal</h3><ul class="space-y-2 text-sm"><li><a href="/privacy" class="footer-link">Privacy Policy</a></li><li><a href="/terms" class="footer-link">Terms of Service</a></li></ul></div>
@@ -107,14 +106,14 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
   </div>
 </footer>
 
-<!-- FLOATING CHATBOT -->
 <div id="chatWidget">
   <div id="chatBox"><div id="chatHeader">🤖 Lens AI Assistant</div><div id="chatMessages"><div class="msg bot">Hi! I'm Lens. Ask me anything about Kenya markets.</div></div><div id="chatInputBox"><input id="chatInput" placeholder="Ask Lens anything..."><button id="chatSend">Send</button></div></div>
   <button id="chatBtn">💬</button>
 </div>
 
 <script>
-let lastAnalysis = null; // Store last analysis for PDF
+let lastAnalysis = null;
+let chatHistory = [];
 
 async function loadDashboard(){
   const res = await fetch('/api/dashboard');
@@ -126,7 +125,7 @@ async function loadDashboard(){
   lanesGrid.innerHTML = '';
   data.lanes.forEach((lane, index) => {
     let onclick = '';
-    if(index === 4) onclick = `onclick="downloadPDF()"`; // LANE 5 = AGRICULTURE = PDF
+    if(index === 4) onclick = `onclick="downloadPDF()"`;
     lanesGrid.innerHTML += `
     <div class="card cursor-pointer" ${onclick}>
       <div class="lane-icon w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold mb-2">${lane.icon}</div>
@@ -142,21 +141,22 @@ loadDashboard();
 document.getElementById('searchForm').onsubmit = async (e) => {
   e.preventDefault();
   const form = new FormData(e.target);
-  lastAnalysis = Object.fromEntries(form); // Save for PDF
-  const res = await fetch('/market/search', {method:'POST', body:form});
-  const data = await res.json();
-  document.getElementById('result').innerHTML = `<b class='text-[#14B8A6]'>AI Insight:</b><br>${data.ai_insight}`;
+  lastAnalysis = Object.fromEntries(form);
+  const res = await fetch('/search-market', {method:'POST', body:form});
+  const html = await res.text();
+  document.open();
+  document.write(html);
+  document.close();
 }
 
 async function downloadPDF(){
   if(!lastAnalysis){ alert('Please run an analysis first'); return; }
-  const res = await fetch('/report/pdf', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(lastAnalysis)});
-  const blob = await res.blob();
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = "EvidLens_Report.pdf"; a.click();
+  document.getElementById('pdf_q').value = lastAnalysis.q;
+  document.getElementById('pdf_sector').value = lastAnalysis.sector;
+  document.getElementById('pdf_county').value = lastAnalysis.county;
+  document.getElementById('pdfForm').submit();
 }
 
-// CHATBOT
 const chatBtn = document.getElementById('chatBtn');
 const chatBox = document.getElementById('chatBox');
 const chatInput = document.getElementById('chatInput');
@@ -164,14 +164,26 @@ const chatSend = document.getElementById('chatSend');
 const chatMessages = document.getElementById('chatMessages');
 chatBtn.onclick = () => chatBox.style.display = chatBox.style.display === 'flex'? 'none' : 'flex';
 async function sendChat(){
-  const msg = chatInput.value.trim(); if(!msg) return;
-  chatMessages.innerHTML += `<div class="msg user">${msg}</div>`; chatInput.value = ''; chatMessages.scrollTop = chatMessages.scrollHeight;
+  const msg = chatInput.value.trim();
+  if(!msg) return;
+  chatMessages.innerHTML += `<div class="msg user">${msg}</div>`;
+  chatHistory.push({role: "user", content: msg});
+  chatInput.value = '';
   chatMessages.innerHTML += `<div class="msg bot" id="typing">Lens is thinking...</div>`;
-  const res = await fetch('/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message: msg})});
-  const data = await res.json(); document.getElementById('typing').remove();
-  chatMessages.innerHTML += `<div class="msg bot">${data.reply}</div>`; chatMessages.scrollTop = chatMessages.scrollHeight;
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  const res = await fetch('/chat', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({message: msg, history: chatHistory, context: lastAnalysis})
+  });
+  const data = await res.json();
+  document.getElementById('typing').remove();
+  chatHistory.push({role: "assistant", content: data.reply});
+  chatMessages.innerHTML += `<div class="msg bot">${data.reply}</div>`;
+  chatMessages.scrollTop = chatMessages.scrollHeight;
 }
-chatSend.onclick = sendChat; chatInput.onkeypress = (e) => { if(e.key === 'Enter') sendChat(); }
+chatSend.onclick = sendChat;
+chatInput.onkeypress = (e) => { if(e.key === 'Enter') sendChat(); }
 </script>
 </body>
 </html>
