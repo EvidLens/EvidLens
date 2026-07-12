@@ -21,7 +21,6 @@ def get_db():
         db.close()
 
 def init_db():
-    """Import all models here so Base.metadata.create_all sees them"""
     from app.modules.models import User, Sector, County, Product
     from app.modules.payments.models import Payment, Subscription, MpesaTransaction
     from app.modules.report_builder.models import Report, ReportTemplate, ReportShare
