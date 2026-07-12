@@ -23,8 +23,7 @@ def signup_page(request: Request):
 
 @router.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
-    # Send empty data so dashboard.js doesn't crash on first load
-    return templates.TemplateResponse("dashboard_v2.html", {  # <-- CHANGED HERE
+    return templates.TemplateResponse("dashboard.html", {
         "request": request, 
         "result": None, 
         "competitors": [], 
@@ -75,23 +74,19 @@ def search_market_ui(
         result = search_market(db, q, sector, county)
         if not result:
             result = {"error": "No data found"}
-        
         competitors = []
         benchmark = None
         ai_insights = None
-        
         if "sector" in result:
             competitors = get_competitor_overview(db, result['sector'], county) if county else []
             benchmark = get_sector_benchmark(result['sector'])
             ai_insights = generate_insights(q, result)
-            
     except Exception as e:
         result = {"error": str(e)}
         competitors = []
         benchmark = None
         ai_insights = None
-        
-    return templates.TemplateResponse("dashboard_v2.html", {"request": request, "result": result, "competitors": competitors, "benchmark": benchmark, "ai": ai_insights}) # <-- CHANGED HERE
+    return templates.TemplateResponse("dashboard.html", {"request": request, "result": result, "competitors": competitors, "benchmark": benchmark, "ai": ai_insights})
 
 @router.post("/pay-report")
 def pay_report(
@@ -100,7 +95,7 @@ def pay_report(
     db: Session = Depends(get_db)
 ):
     result = initiate_stk_push(db, phone_number=phone, amount=500, account_reference="report_001", user_id=1)
-    return templates.TemplateResponse("dashboard_v2.html", {"request": request, "payment": result}) # <-- CHANGED HERE
+    return templates.TemplateResponse("dashboard.html", {"request": request, "payment": result})
 
 @router.post("/download-report")
 def download_report(
