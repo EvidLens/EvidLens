@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, Enum
+from sqlalchemy import Column, Integer, String, Float, Boolean, Enum, DateTime
 import enum
+from datetime import datetime
 from app.modules.db import Base
 
 class UserRole(str, enum.Enum):
@@ -18,7 +19,21 @@ class User(Base):
     county = Column(String, nullable=True)
     role = Column(Enum(UserRole), default=UserRole.USER)
     is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
-class Sector(Base): __tablename__ = "sectors"; id = Column(Integer, primary_key=True); name = Column(String, unique=True)
-class County(Base): __tablename__ = "counties"; id = Column(Integer, primary_key=True); name = Column(String, unique=True)
-class Product(Base): __tablename__ = "products"; id = Column(Integer, primary_key=True); name = Column(String); price = Column(Float); sector = Column(String)
+class Sector(Base):
+    __tablename__ = "sectors"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
+
+class County(Base):
+    __tablename__ = "counties" 
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
+
+class Product(Base):
+    __tablename__ = "products"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    price = Column(Float)
+    sector = Column(String)
