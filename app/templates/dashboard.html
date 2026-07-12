@@ -119,21 +119,14 @@ async function loadDashboard(){
   const res = await fetch('/api/dashboard');
   const data = await res.json();
   document.getElementById('trendingCategory').innerText = data.trending.category;
-  document.getElementById('trendingHeadline').innerText = `"${data.trending.headline}"`;
+  document.getElementById('trendingHeadline').innerText = '"' + data.trending.headline + '"';
 
   const lanesGrid = document.getElementById('lanesGrid');
   lanesGrid.innerHTML = '';
   data.lanes.forEach((lane, index) => {
     let onclick = '';
-    if(index === 4) onclick = `onclick="downloadPDF()"`;
-    lanesGrid.innerHTML += `
-    <div class="card cursor-pointer" ${onclick}>
-      <div class="lane-icon w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold mb-2">${lane.icon}</div>
-      <p class="font-semibold" style="color:#0A1F44">${lane.name}</p>
-      <p class="text-xs text-gray-500">${lane.insights} Insights</p>
-      <p class="text-xs" style="color:#14B8A6">${lane.growth}</p>
-      ${index === 4? '<p class="text-xs font-bold" style="color:#F59E0B">Download PDF</p>' : ''}
-    </div>`;
+    if(index === 4) onclick = 'onclick="downloadPDF()"';
+    lanesGrid.innerHTML += '<div class="card cursor-pointer" ' + onclick + '><div class="lane-icon w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold mb-2">' + lane.icon + '</div><p class="font-semibold" style="color:#0A1F44">' + lane.name + '</p><p class="text-xs text-gray-500">' + lane.insights + ' Insights</p><p class="text-xs" style="color:#14B8A6">' + lane.growth + '</p>' + (index === 4? '<p class="text-xs font-bold" style="color:#F59E0B">Download PDF</p>' : '') + '</div>';
   });
 }
 loadDashboard();
@@ -166,10 +159,10 @@ chatBtn.onclick = () => chatBox.style.display = chatBox.style.display === 'flex'
 async function sendChat(){
   const msg = chatInput.value.trim();
   if(!msg) return;
-  chatMessages.innerHTML += `<div class="msg user">${msg}</div>`;
+  chatMessages.innerHTML += '<div class="msg user">' + msg + '</div>';
   chatHistory.push({role: "user", content: msg});
   chatInput.value = '';
-  chatMessages.innerHTML += `<div class="msg bot" id="typing">Lens is thinking...</div>`;
+  chatMessages.innerHTML += '<div class="msg bot" id="typing">Lens is thinking...</div>';
   chatMessages.scrollTop = chatMessages.scrollHeight;
   const res = await fetch('/chat', {
     method:'POST',
@@ -179,7 +172,7 @@ async function sendChat(){
   const data = await res.json();
   document.getElementById('typing').remove();
   chatHistory.push({role: "assistant", content: data.reply});
-  chatMessages.innerHTML += `<div class="msg bot">${data.reply}</div>`;
+  chatMessages.innerHTML += '<div class="msg bot">' + data.reply + '</div>';
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 chatSend.onclick = sendChat;
