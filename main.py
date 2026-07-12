@@ -36,13 +36,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
+# FIX 1: Point to your actual static folder
+app.mount("/static", StaticFiles(directory="app/modules/web/static"), name="static")
 
 # ======================
-# HEALTH CHECK
+# HEALTH CHECK - Moved / to /health so it doesn't clash
 # ======================
-@app.get("/")
-def root():
+@app.get("/health")
+def health():
     return {
         "app": "EvidLens",
         "tagline": "Kenya's Decision Intelligence Platform",
@@ -50,10 +51,6 @@ def root():
         "lanes": 9,
         "status": "ok"
     }
-
-@app.get("/health")
-def health():
-    return {"status": "healthy"}
 
 # ======================
 # REGISTER ALL ROUTERS
@@ -70,6 +67,7 @@ app.include_router(location_router, prefix="/location", tags=["Lane 6: Location 
 app.include_router(knowledge_router, prefix="/kb", tags=["Lane 7: Knowledge Base - 36 Sectors"])
 app.include_router(business_router, prefix="/os", tags=["Lane 8: Business OS - ERP/CRM/HR"])
 
+# This now handles /, /signup, /dashboard
 app.include_router(web_routes.router)
 
 # ======================
@@ -77,4 +75,4 @@ app.include_router(web_routes.router)
 # ======================
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000)
