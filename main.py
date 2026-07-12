@@ -1,9 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+from sqlalchemy import text
 
 load_dotenv()
 
+from app.database import SessionLocal, Base, engine
 from app.modules.market_engine.router import router as market_router
 from app.modules.consumer_voice.router import router as consumer_router
 from app.modules.data_layer.router import router as data_router
@@ -33,6 +35,24 @@ app.add_middleware(
 # Commented out because folder doesn't exist yet
 # from fastapi.staticfiles import StaticFiles
 # app.mount("/static", StaticFiles(directory="app/modules/web/static"), name="static")
+
+
+# ONE-TIME DB RESET - DELETE THIS AFTER 1 SUCCESSFUL DEPLOY
+@app.on_event("startup")
+def reset_enum_on_startup():
+    db = SessionLocal()
+    try:
+        db.execute(text("DROP TABLE IF EXISTS users CASCADE"))
+        db.execute(text("DROP TYPE IF EXISTS userrole CASCADE"))
+        db.commit()
+        print("✅ Old DB reset. New tables will be created")
+    except Exception as e:
+        print(f"DB reset error: {e}")
+    finally:
+        db.close()
+    # Recreate all tables with correct enum
+    Base.metadata.create_all(bind=engine)
+
 
 @app.get("/health")
 def health():
