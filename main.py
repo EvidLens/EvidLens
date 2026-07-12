@@ -33,10 +33,6 @@ app.add_middleware(
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-@app.get("/")
-def root():
-    return {"app": "EvidLens", "tagline": "Kenya's Decision Intelligence Platform", "lanes": 9}
-
 @app.get("/health")
 def health():
     return {"status": "healthy"}
