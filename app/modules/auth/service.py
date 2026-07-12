@@ -1,17 +1,15 @@
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
-from.models import User
+from .models import User, UserRole
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def hash_password(password: str):
-    # bcrypt has a hard 72 byte limit. Truncate if needed
     if len(password.encode('utf-8')) > 72:
         password = password[:72]
     return pwd_context.hash(password)
 
 def verify_password(plain_password: str, hashed_password: str):
-    # Also truncate on verify to match
     if len(plain_password.encode('utf-8')) > 72:
         plain_password = plain_password[:72]
     return pwd_context.verify(plain_password, hashed_password)
@@ -27,7 +25,9 @@ def create_user(db: Session, req):
         hashed_password=hashed_pw,
         full_name=req.full_name,
         sector=req.sector,
-        county=req.county
+        county=req.county,
+        role=UserRole.USER,
+        is_active=True
     )
     db.add(db_user)
     db.commit()
