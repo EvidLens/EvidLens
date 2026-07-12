@@ -1,12 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
-# Load env first
 load_dotenv()
 
-# Import all 9 Lane Routers
 from app.modules.market_engine.router import router as market_router
 from app.modules.consumer_voice.router import router as consumer_router
 from app.modules.data_layer.router import router as data_router
@@ -25,23 +22,18 @@ app = FastAPI(
     description="Kenya's Decision Intelligence Platform - 9 Lanes in 1"
 )
 
-# ======================
-# CORS - OPEN FOR ANY DEPLOYMENT
-# ======================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # open to any site
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# FIX 1: Point to your actual static folder
-app.mount("/static", StaticFiles(directory="app/modules/web/static"), name="static")
+# Commented out because folder doesn't exist yet
+# from fastapi.staticfiles import StaticFiles
+# app.mount("/static", StaticFiles(directory="app/modules/web/static"), name="static")
 
-# ======================
-# HEALTH CHECK - Moved / to /health so it doesn't clash
-# ======================
 @app.get("/health")
 def health():
     return {
@@ -52,12 +44,8 @@ def health():
         "status": "ok"
     }
 
-# ======================
-# REGISTER ALL ROUTERS
-# ======================
 app.include_router(auth_router, prefix="/auth", tags=["Auth - Supabase"])
 app.include_router(payments_router, prefix="/payments", tags=["Payments - M-Pesa"])
-
 app.include_router(market_router, prefix="/market", tags=["Lane 1: Market Insight Engine"])
 app.include_router(consumer_router, prefix="/voice", tags=["Lane 2: Consumer Voice Aggregator"])
 app.include_router(data_router, prefix="/data", tags=["Lane 3: Quantitative Data Layer"])
@@ -67,12 +55,8 @@ app.include_router(location_router, prefix="/location", tags=["Lane 6: Location 
 app.include_router(knowledge_router, prefix="/kb", tags=["Lane 7: Knowledge Base - 36 Sectors"])
 app.include_router(business_router, prefix="/os", tags=["Lane 8: Business OS - ERP/CRM/HR"])
 
-# This now handles /, /signup, /dashboard
 app.include_router(web_routes.router)
 
-# ======================
-# RUN SERVER
-# ======================
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000)
