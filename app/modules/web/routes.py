@@ -62,22 +62,34 @@ def do_login(request: Request, email: str = Form(...), password: str = Form(...)
     return RedirectResponse(url="/dashboard", status_code=303)
 
 @router.post("/search-market", response_class=HTMLResponse)
-def search_market_ui(request: Request, q: str = Form(...), sector: str = Form(None), county: str = Form(None), db: Session = Depends(get_db)):
+def search_market_ui(request: Request, q: str = Form(...), sector: str = Form(...), county: str = Form(...), db: Session = Depends(get_db)):
     try:
-        result = search_market(db, q, sector, county)
-        if not result: result = {"error": "No data found"}
-        competitors = get_competitor_overview(db, result['sector'], county) if "sector" in result and county else []
-        benchmark = get_sector_benchmark(result['sector']) if "sector" in result else None
-        ai_insights = generate_insights(q, result) if "sector" in result else None
-    except Exception as e: result = {"error": str(e)}; competitors = []; benchmark = None; ai_insights = None
-    return templates.TemplateResponse("dashboard.html", {"request": request, "result": {"q": q, "sector": sector, "county": county, "data": result, "competitors": competitors, "benchmark": benchmark, "ai": ai_insights}})
+        result_data = search_market(db, q, sector, county)
+        if not result_data: result_data = {"message": "No data found yet"}
+
+        competitors = get_competitor_overview(db, sector, county)
+        benchmark = get_sector_benchmark(sector) # FIXED: use sector directly
+        ai_insights = generate_insights(q, result_data)
+
+        result = {
+            "q": q, "sector": sector, "county": county,
+            "data": result_data,
+            "competitors": competitors,
+            "benchmark": benchmark,
+            "ai": ai_insights
+        }
+
+    except Exception as e:
+        result = {"error": str(e), "q": q, "sector": sector, "county": county}
+
+    return templates.TemplateResponse("dashboard.html", {"request": request, "result": result})
 
 @router.post("/pay-report")
 def pay_report(request: Request, phone: str = Form(...), db: Session = Depends(get_db)):
     result = initiate_stk_push(db, phone_number=phone, amount=500, account_reference="report_001", user_id=1)
-    return templates.TemplateResponse("dashboard.html", {"request": request, "payment": result})
+    return JSONResponse({"status": "success", "data": result}) # Return JSON for MPESA popup
 
 @router.post("/download-report")
 def download_report(q: str = Form(...), sector: str = Form(...), county: str = Form(...), db: Session = Depends(get_db)):
-    pdf_bytes = generate_report_pdf(db, q, sector, county) # ORDER MATCHES NOW
+    pdf_bytes = generate_report_pdf(db, q, sector, county)
     return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=evidlens_report_{q}.pdf"})
