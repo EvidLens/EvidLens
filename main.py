@@ -51,7 +51,7 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory="app/static"), name="static")  # FIXED
 templates = Jinja2Templates(directory="app/templates", auto_reload=True)
 
 @app.exception_handler(500)
