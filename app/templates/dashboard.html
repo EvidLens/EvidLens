@@ -32,7 +32,7 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
 <header class="text-white px-6 py-4 sticky top-0 shadow-md" style="background:#0A1F44">
   <div class="flex items-center justify-between max-w-[1400px] mx-auto">
     <div class="flex items-center gap-3">
-      <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center"><span class="text-[#0A1F44] font-extrabold text-lg">EL</span></div>
+      <img src="/static/logo.png?v=3" alt="EvidLens Logo" class="w-10 h-10 rounded-xl object-contain bg-white p-1">
       <div><h1 class="font-bold text-2xl"><span style="color:#FFFFFF">Evid</span><span style="color:#14B8A6">Lens</span></h1><p class="text-xs" style="color:#CBD5E1">Decision Intelligence</p></div>
     </div>
   </div>
@@ -64,7 +64,7 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
         <div id="result" class="mt-4 text-sm">
           {% if result %}
             {% if result.error %}
-              <div class="p-4 bg-red-50 border border-red-200 rounded-lg"><p class="font-bold text-red-600">Error</p><pre class="text-xs mt-2">{{result.error}}</pre></div>
+              <div class="p-4 bg-red-50 border-red-200 rounded-lg"><p class="font-bold text-red-600">Error</p><pre class="text-xs mt-2">{{result.error}}</pre></div>
             {% else %}
               <div class="p-4 bg-green-50 border-green-200 rounded-lg space-y-2">
                 <p class="font-bold text-[#0A1F44]">Results for: {{result.q}} in {{result.county}}</p>
@@ -100,7 +100,7 @@ loadDashboard();
 document.getElementById('searchForm').onsubmit = async (e) => {
   e.preventDefault();
   const form = new FormData(e.target);
-  lastAnalysis = Object.fromEntries(form); // SAVE FOR PDF DOWNLOAD
+  lastAnalysis = Object.fromEntries(form);
   document.getElementById('result').innerHTML = '<p class="text-gray-500">Analyzing...</p>';
   const res = await fetch('/search-market', {method:'POST', body:form});
   const html = await res.text();
