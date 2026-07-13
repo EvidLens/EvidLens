@@ -23,21 +23,12 @@ def signup_page(request: Request):
 
 @router.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request, 
-        "result": None, 
-        "competitors": [], 
-        "benchmark": None, 
-        "ai": None
-    })
+    return templates.TemplateResponse("dashboard.html", {"request": request, "result": None})
 
 @router.get("/api/dashboard")
 def api_dashboard():
     return JSONResponse({
-        "trending": {
-            "category": "ECONOMY", 
-            "headline": "Kenya inflation drops to 4.2% - Lowest in 18 months"
-        },
+        "trending": {"category": "ECONOMY", "headline": "Kenya inflation drops to 4.2% - Lowest in 18 months"},
         "lanes": [
             {"name": "Market Intel", "icon": "MI", "insights": "42", "growth": "+12%"},
             {"name": "Competitors", "icon": "CO", "insights": "28", "growth": "+8%"},
@@ -52,22 +43,12 @@ def api_dashboard():
 async def chat(request: Request):
     data = await request.json()
     user_msg = data.get("message", "")
-    reply = f"I heard: '{user_msg}'. I'm Lens AI. For market data, use the search form above."
+    reply = f"I heard: '{user_msg}'. I'm Lens AI. Run an analysis above for market data."
     return JSONResponse({"reply": reply})
 
 @router.post("/do-signup")
-def do_signup(
-    request: Request,
-    email: str = Form(...),
-    password: str = Form(...),
-    full_name: str = Form(...),
-    phone: str = Form(...),
-    sector: str = Form(...),
-    county: str = Form(...),
-    db: Session = Depends(get_db)
-):
-    if get_user_by_email(db, email):
-        return templates.TemplateResponse("signup.html", {"request": request, "error": "Email already registered"})
+def do_signup(request: Request, email: str = Form(...), password: str = Form(...), full_name: str = Form(...), phone: str = Form(...), sector: str = Form(...), county: str = Form(...), db: Session = Depends(get_db)):
+    if get_user_by_email(db, email): return templates.TemplateResponse("signup.html", {"request": request, "error": "Email already registered"})
     class Req: pass
     req = Req()
     req.email, req.password, req.full_name, req.phone, req.sector, req.county = email, password, full_name, phone, sector, county
@@ -75,62 +56,28 @@ def do_signup(
     return RedirectResponse(url="/dashboard", status_code=303)
 
 @router.post("/do-login")
-def do_login(
-    request: Request,
-    email: str = Form(...),
-    password: str = Form(...),
-    db: Session = Depends(get_db)
-):
+def do_login(request: Request, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
     result = login_user(db, email, password)
-    if "error" in result:
-        return templates.TemplateResponse("login.html", {"request": request, "error": result["error"]})
+    if "error" in result: return templates.TemplateResponse("login.html", {"request": request, "error": result["error"]})
     return RedirectResponse(url="/dashboard", status_code=303)
 
-@router.post("/search-market")
-def search_market_ui(
-    request: Request,
-    q: str = Form(...),
-    sector: str = Form(None),
-    county: str = Form(None),
-    db: Session = Depends(get_db)
-):
+@router.post("/search-market", response_class=HTMLResponse)
+def search_market_ui(request: Request, q: str = Form(...), sector: str = Form(None), county: str = Form(None), db: Session = Depends(get_db)):
     try:
         result = search_market(db, q, sector, county)
-        if not result:
-            result = {"error": "No data found"}
-        competitors = []
-        benchmark = None
-        ai_insights = None
-        if "sector" in result:
-            competitors = get_competitor_overview(db, result['sector'], county) if county else []
-            benchmark = get_sector_benchmark(result['sector'])
-            ai_insights = generate_insights(q, result)
-    except Exception as e:
-        result = {"error": str(e)}
-        competitors = []
-        benchmark = None
-        ai_insights = None
-    return templates.TemplateResponse("dashboard.html", {"request": request, "result": result, "competitors": competitors, "benchmark": benchmark, "ai": ai_insights})
+        if not result: result = {"error": "No data found"}
+        competitors = get_competitor_overview(db, result['sector'], county) if "sector" in result and county else []
+        benchmark = get_sector_benchmark(result['sector']) if "sector" in result else None
+        ai_insights = generate_insights(q, result) if "sector" in result else None
+    except Exception as e: result = {"error": str(e)}; competitors = []; benchmark = None; ai_insights = None
+    return templates.TemplateResponse("dashboard.html", {"request": request, "result": {"q": q, "sector": sector, "county": county, "data": result, "competitors": competitors, "benchmark": benchmark, "ai": ai_insights}})
 
 @router.post("/pay-report")
-def pay_report(
-    request: Request,
-    phone: str = Form(...),
-    db: Session = Depends(get_db)
-):
+def pay_report(request: Request, phone: str = Form(...), db: Session = Depends(get_db)):
     result = initiate_stk_push(db, phone_number=phone, amount=500, account_reference="report_001", user_id=1)
     return templates.TemplateResponse("dashboard.html", {"request": request, "payment": result})
 
 @router.post("/download-report")
-def download_report(
-    q: str = Form(...),
-    sector: str = Form(...),
-    county: str = Form(...),
-    db: Session = Depends(get_db)
-):
-    pdf_bytes = generate_report_pdf(db, q, sector, county)
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=evidlens_report_{q}.pdf"}
-    )
+def download_report(q: str = Form(...), sector: str = Form(...), county: str = Form(...), db: Session = Depends(get_db)):
+    pdf_bytes = generate_report_pdf(db, q, sector, county) # ORDER MATCHES NOW
+    return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=evidlens_report_{q}.pdf"})
