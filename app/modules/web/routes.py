@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, Form, Depends, Response
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from app.modules.db import get_db
 from app.modules.auth.service import create_user, login_user, get_user_by_email
@@ -30,6 +30,30 @@ def dashboard(request: Request):
         "benchmark": None, 
         "ai": None
     })
+
+@router.get("/api/dashboard")
+def api_dashboard():
+    return JSONResponse({
+        "trending": {
+            "category": "ECONOMY", 
+            "headline": "Kenya inflation drops to 4.2% - Lowest in 18 months"
+        },
+        "lanes": [
+            {"name": "Market Intel", "icon": "MI", "insights": "42", "growth": "+12%"},
+            {"name": "Competitors", "icon": "CO", "insights": "28", "growth": "+8%"},
+            {"name": "Pricing", "icon": "PR", "insights": "35", "growth": "+15%"},
+            {"name": "Regulatory", "icon": "RG", "insights": "19", "growth": "+5%"},
+            {"name": "Reports", "icon": "RP", "insights": "74", "growth": "+22%"},
+            {"name": "AI Insights", "icon": "AI", "insights": "56", "growth": "+30%"}
+        ]
+    })
+
+@router.post("/chat")
+async def chat(request: Request):
+    data = await request.json()
+    user_msg = data.get("message", "")
+    reply = f"I heard: '{user_msg}'. I'm Lens AI. For market data, use the search form above."
+    return JSONResponse({"reply": reply})
 
 @router.post("/do-signup")
 def do_signup(
