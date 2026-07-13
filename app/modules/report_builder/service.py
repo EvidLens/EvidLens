@@ -27,12 +27,18 @@ class EvidLensPDF(FPDF):
         self.set_font('Arial', 'I', 8)
         self.cell(0, 10, f'Powered by EvidLens Kenya Sector Data | Page {self.page_no()}', 0, 0, 'C')
 
-def generate_market_report_pdf(db: Session, sector: str, county: str, q: str) -> bytes:
-    market_data = search_market(db, q, sector, county)
-    market_dict = {"sector": sector, "county": county}
-    ai_raw = generate_insights(q, market_dict)
-    ai_json = json.loads(ai_raw.replace("### Lens AI Analysis\n```json\n", "").replace("\n```", ""))
-    benchmark = get_sector_benchmark(sector)
+def generate_market_report_pdf(db: Session, q: str, sector: str, county: str) -> bytes: # FIXED ORDER TO MATCH ROUTES
+    try:
+        market_data = search_market(db, q, sector, county)
+        market_dict = {"sector": sector, "county": county, "q": q}
+        ai_raw = generate_insights(q, market_dict)
+        ai_json = json.loads(ai_raw.replace("### Lens AI Analysis\n```json\n", "").replace("\n```", ""))
+        benchmark = get_sector_benchmark(sector)
+    except Exception as e:
+        market_data = {"demand_level": "N/A", "market_size_kes": 0, "price_range": {"avg_kes": 0}, "competitor_count": 0}
+        ai_json = {"recommendation": "Error", "viability": "N/A", "risk_analysis": str(e), "saturation": "N/A", "pricing_strategy": "N/A"}
+        benchmark = {}
+
     pdf = EvidLensPDF()
     pdf.add_page()
     pdf.set_text_color(0, 0, 0)
@@ -72,5 +78,4 @@ def generate_market_report_pdf(db: Session, sector: str, county: str, q: str) ->
 def generate_market_report_excel(db: Session, sector: str, county: str, q: str) -> bytes:
     return b""
 
-# ALIAS FOR WEB MODULE
 generate_report_pdf = generate_market_report_pdf
