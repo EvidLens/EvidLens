@@ -6,90 +6,112 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
 body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif}
-.card{background:white; border-radius:16px; padding:16px; box-shadow:0 1px 4px rgba(16,24,40,0.06)}
+.card{background:white; border-radius:16px; padding:20px; box-shadow:0 1px 4px rgba(16,24,40,0.06); transition:transform 0.2s}
+.card:hover{transform:translateY(-2px)}
 .teal-card{border-top:4px solid #14B8A6}
 .lane-icon{background:linear-gradient(135deg, #0A1F44 0%, #14B8A6 100%)}
 .trending{background:linear-gradient(135deg, #14B8A6 0%, #0D9488 100%)}
 .footer{background:#0A1F44}
-.footer-link{color:#CBD5E1; transition:color 0.2s}
+.footer-link{color:#CBD5E1}
 .footer-link:hover{color:#14B8A6}
-#chatWidget{position:fixed; bottom:20px; right:20px; z-index:9999}
+#chatWidget{position:fixed; bottom:24px; right:24px; z-index:9999}
 #chatBtn{width:56px; height:56px; border-radius:50%; background:linear-gradient(135deg,#0A1F44,#14B8A6); color:white; border:none; font-size:24px; cursor:pointer; box-shadow:0 4px 12px rgba(20,184,166,0.4)}
-#chatBox{width:360px; height:500px; background:white; border-radius:16px; box-shadow:0 8px 24px rgba(0,0,0,0.15); display:none; flex-direction:column; overflow:hidden}
-#chatHeader{background:#0A1F44; color:white; padding:12px 16px; font-weight:700}
+#chatBox{width:380px; height:550px; background:white; border-radius:16px; box-shadow:0 8px 24px rgba(0,0,0,0.15); display:none; flex-direction:column; overflow:hidden}
+#chatHeader{background:#0A1F44; color:white; padding:14px 16px; font-weight:700}
 #chatMessages{flex:1; overflow-y:auto; padding:16px; background:#F5F7FA}
 .msg{margin-bottom:12px; padding:10px 12px; border-radius:12px; max-width:85%; font-size:14px}
 .msg.user{background:#14B8A6; color:white; margin-left:auto}
 .msg.bot{background:white; color:#0A1F44; border:1px solid #E2E8F0}
 #chatInputBox{display:flex; padding:12px; border-top:1px solid #E2E8F0}
-#chatInput{flex:1; border:1px solid #CBD5E1; border-radius:20px; padding:8px 12px; outline:none; font-size:14px}
-#chatSend{background:#F59E0B; color:white; border:none; border-radius:20px; padding:8px 16px; margin-left:8px; font-weight:600; cursor:pointer}
-@media(max-width:400px)chatBox{width:calc(100vw - 40px)}}
+#chatInput{flex:1; border:1px solid #CBD5E1; border-radius:20px; padding:10px 14px; outline:none; font-size:14px}
+#chatSend{background:#F59E0B; color:white; border:none; border-radius:20px; padding:10px 18px; margin-left:8px; font-weight:600; cursor:pointer}
+@media(max-width:768px){#chatBox{width:calc(100vw - 32px); right:16px; bottom:80px}}
 </style>
 </head>
 <body>
-
-<header class="text-white px-4 py-3 sticky top-0" style="background:#0A1F44">
-  <div class="flex items-center gap-3 max-w-[480px] mx-auto">
-    <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center">
-      <span class="text-[#0A1F44] font-extrabold text-lg">EL</span>
-    </div>
-    <div>
-      <h1 class="font-bold text-xl"><span style="color:#FFFFFF">Evid</span><span style="color:#14B8A6">Lens</span></h1>
-      <p class="text-xs" style="color:#CBD5E1">Decision Intelligence</p>
+<header class="text-white px-6 py-4 sticky top-0 shadow-md" style="background:#0A1F44">
+  <div class="flex items-center justify-between max-w-[1400px] mx-auto">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center">
+        <span class="text-[#0A1F44] font-extrabold text-lg">EL</span>
+      </div>
+      <div>
+        <h1 class="font-bold text-2xl"><span style="color:#FFFFFF">Evid</span><span style="color:#14B8A6">Lens</span></h1>
+        <p class="text-xs" style="color:#CBD5E1">Decision Intelligence</p>
+      </div>
     </div>
   </div>
 </header>
 
-<div class="px-4 py-4 max-w-[480px] mx-auto">
+<main class="px-4 md:px-6 lg:px-8 py-6">
+  <div class="max-w-[1400px] mx-auto">
 
-  <div class="card mb-4">
-    <div class="flex items-center gap-2 text-gray-400">
-      <span>🔍</span>
-      <input id="searchInput" placeholder="Search insights, lanes, or questions..." class="w-full outline-none text-sm bg-transparent">
-    </div>
-  </div>
-
-  <div class="grid grid-cols-2 gap-3 mb-5">
-    <div class="card teal-card">
-      <p class="text-sm text-gray-500">Total Insights</p>
-      <p class="text-3xl font-bold" style="color:#0A1F44">198</p>
-      <p class="text-xs" style="color:#14B8A6">+18% this week</p>
-    </div>
-    <div class="card teal-card">
-      <p class="text-sm text-gray-500">Active Lanes</p>
-      <p class="text-3xl font-bold" style="color:#0A1F44">9</p>
-      <p class="text-xs" style="color:#14B8A6">All monitoring</p>
-    </div>
-  </div>
-
-  <div class="mb-5">
-    <h2 class="font-bold mb-3 flex items-center gap-2" style="color:#0A1F44"><span>🔥</span>Trending Now</h2>
-    <div id="trendingCard" class="trending text-white p-4 rounded-2xl">
-      <p class="text-xs font-semibold opacity-90 uppercase" id="trendingCategory">ECONOMY</p>
-      <p class="font-semibold text-base mt-1" id="trendingHeadline">"Kenya inflation drops to 4.2% - Lowest in 18 months"</p>
-    </div>
-  </div>
-
-  <div class="mb-8">
-    <h2 class="font-bold mb-3" style="color:#0A1F44">Intelligence Lanes</h2>
-    <div class="grid grid-cols-2 gap-3" id="lanesGrid"></div>
-  </div>
-
-  <div class="card mb-10">
-    <h2 class="font-bold mb-2" style="color:#0A1F44">Quick Business Analysis</h2>
-    <form id="searchForm" method="POST" action="/search-market" class="space-y-2">
-      <input name="q" placeholder="e.g maize mill" class="w-full p-2 border rounded-lg text-sm">
-      <div class="flex gap-2">
-        <input name="sector" placeholder="Sector" class="w-1/2 p-2 border rounded-lg text-sm">
-        <input name="county" placeholder="County" class="w-1/2 p-2 border rounded-lg text-sm">
+    <div class="card mb-6">
+      <div class="flex items-center gap-3 text-gray-400">
+        <span>🔍</span>
+        <input id="searchInput" placeholder="Search insights, lanes, or questions..." class="w-full outline-none text-base bg-transparent">
       </div>
-      <button class="bg-[#F59E0B] text-white w-full p-2 rounded-lg font-bold">Analyze</button>
-    </form>
-    <div id="result" class="mt-3 text-sm"></div>
-  </div>
+    </div>
 
-</div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div class="card teal-card">
+        <p class="text-sm text-gray-500">Total Insights</p>
+        <p class="text-4xl font-bold mt-1" style="color:#0A1F44">198</p>
+        <p class="text-sm mt-1" style="color:#14B8A6">+18% this week</p>
+      </div>
+      <div class="card teal-card">
+        <p class="text-sm text-gray-500">Active Lanes</p>
+        <p class="text-4xl font-bold mt-1" style="color:#0A1F44">9</p>
+        <p class="text-sm mt-1" style="color:#14B8A6">All monitoring</p>
+      </div>
+      <div class="card teal-card">
+        <p class="text-sm text-gray-500">Reports Generated</p>
+        <p class="text-4xl font-bold mt-1" style="color:#0A1F44">74</p>
+        <p class="text-sm mt-1" style="color:#14B8A6">+22% this month</p>
+      </div>
+      <div class="card teal-card">
+        <p class="text-sm text-gray-500">AI Queries</p>
+        <p class="text-4xl font-bold mt-1" style="color:#0A1F44">1.2k</p>
+        <p class="text-sm mt-1" style="color:#14B8A6">+30% this week</p>
+      </div>
+    </div>
+
+    <div class="mb-8">
+      <h2 class="font-bold text-xl mb-4 flex items-center gap-2" style="color:#0A1F44"><span>🔥</span>Trending Now</h2>
+      <div id="trendingCard" class="trending text-white p-6 rounded-2xl">
+        <p class="text-sm font-semibold opacity-90 uppercase" id="trendingCategory">ECONOMY</p>
+        <p class="font-semibold text-lg mt-2" id="trendingHeadline">"Kenya inflation drops to 4.2% - Lowest in 18 months"</p>
+      </div>
+    </div>
+
+    <div class="mb-8">
+      <h2 class="font-bold text-xl mb-4" style="color:#0A1F44">Intelligence Lanes</h2>
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4" id="lanesGrid"></div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+      <div class="card">
+        <h2 class="font-bold text-xl mb-3" style="color:#0A1F44">Quick Business Analysis</h2>
+        <form id="searchForm" method="POST" action="/search-market" class="space-y-3">
+          <input name="q" placeholder="e.g maize mill, retail, fintech" class="w-full p-3 border rounded-lg text-sm">
+          <div class="flex gap-3">
+            <input name="sector" placeholder="Sector" class="w-1/2 p-3 border rounded-lg text-sm">
+            <input name="county" placeholder="County" class="w-1/2 p-3 border rounded-lg text-sm">
+          </div>
+          <button class="bg-[#F59E0B] text-white w-full p-3 rounded-lg font-bold hover:opacity-90">Analyze Market</button>
+        </form>
+        <div id="result" class="mt-4 text-sm"></div>
+      </div>
+
+      <div class="card">
+        <h2 class="font-bold text-xl mb-3" style="color:#0A1F44">Download Full Report</h2>
+        <p class="text-sm text-gray-600 mb-3">Get PDF report with competitors, pricing, and AI insights</p>
+        <button onclick="downloadPDF()" class="bg-[#14B8A6] text-white w-full p-3 rounded-lg font-bold hover:opacity-90">Download PDF</button>
+      </div>
+    </div>
+
+  </div>
+</main>
 
 <form id="pdfForm" method="POST" action="/download-report">
   <input type="hidden" name="q" id="pdf_q">
@@ -97,86 +119,37 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
   <input type="hidden" name="county" id="pdf_county">
 </form>
 
-<footer class="footer text-white pt-8 pb-8">
-  <div class="max-w-[480px] mx-auto px-4">
-    <div class="mb-6"><h3 class="font-bold mb-2" style="color:#14B8A6">1. Trust & Legal</h3><ul class="space-y-2 text-sm"><li><a href="/privacy" class="footer-link">Privacy Policy</a></li><li><a href="/terms" class="footer-link">Terms of Service</a></li></ul></div>
-    <div class="mb-6"><h3 class="font-bold mb-2" style="color:#14B8A6">2. Support</h3><ul class="space-y-2 text-sm"><li><a href="/contact" class="footer-link">Contact Us</a></li></ul></div>
-    <div class="mb-6"><h3 class="font-bold mb-2" style="color:#14B8A6">3. Product</h3><ul class="space-y-2 text-sm"><li><a href="/pricing" class="footer-link">Pricing</a></li></ul></div>
-    <div class="border-t border-gray-700 pt-4 mt-6 text-center text-xs" style="color:#CBD5E1">© 2026 EvidLens. Decision Intelligence for Kenya.</div>
+<footer class="footer text-white pt-12 pb-8 mt-12">
+  <div class="max-w-[1400px] mx-auto px-6">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+      <div><h3 class="font-bold mb-3" style="color:#14B8A6">Legal</h3><ul class="space-y-2 text-sm"><li><a href="/privacy" class="footer-link">Privacy Policy</a></li><li><a href="/terms" class="footer-link">Terms</a></li></ul></div>
+      <div><h3 class="font-bold mb-3" style="color:#14B8A6">Support</h3><ul class="space-y-2 text-sm"><li><a href="/contact" class="footer-link">Contact Us</a></li><li><a href="/help" class="footer-link">Help Center</a></li></ul></div>
+      <div><h3 class="font-bold mb-3" style="color:#14B8A6">Product</h3><ul class="space-y-2 text-sm"><li><a href="/pricing" class="footer-link">Pricing</a></li><li><a href="/features" class="footer-link">Features</a></li></ul></div>
+      <div><h3 class="font-bold mb-3" style="color:#14B8A6">Company</h3><ul class="space-y-2 text-sm"><li><a href="/about" class="footer-link">About</a></li><li><a href="/blog" class="footer-link">Blog</a></li></ul></div>
+    </div>
+    <div class="border-t border-gray-700 pt-6 text-center text-sm" style="color:#CBD5E1">© 2026 EvidLens. Decision Intelligence for Kenya.</div>
   </div>
 </footer>
 
 <div id="chatWidget">
-  <div id="chatBox"><div id="chatHeader">🤖 Lens AI Assistant</div><div id="chatMessages"><div class="msg bot">Hi! I'm Lens. Ask me anything about Kenya markets.</div></div><div id="chatInputBox"><input id="chatInput" placeholder="Ask Lens anything..."><button id="chatSend">Send</button></div></div>
+  <div id="chatBox">
+    <div id="chatHeader">🤖 Lens AI Assistant</div>
+    <div id="chatMessages"><div class="msg bot">Hi! I'm Lens. Ask me anything about Kenya markets.</div></div>
+    <div id="chatInputBox"><input id="chatInput" placeholder="Ask Lens anything..."><button id="chatSend">Send</button></div>
+  </div>
   <button id="chatBtn">💬</button>
 </div>
 
 <script>
-let lastAnalysis = null;
-let chatHistory = [];
-
-async function loadDashboard(){
-  const res = await fetch('/api/dashboard');
-  const data = await res.json();
-  document.getElementById('trendingCategory').innerText = data.trending.category;
-  document.getElementById('trendingHeadline').innerText = '"' + data.trending.headline + '"';
-
-  const lanesGrid = document.getElementById('lanesGrid');
-  lanesGrid.innerHTML = '';
-  data.lanes.forEach((lane, index) => {
-    let onclick = '';
-    if(index === 4) onclick = 'onclick="downloadPDF()"';
-    lanesGrid.innerHTML += '<div class="card cursor-pointer" ' + onclick + '><div class="lane-icon w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold mb-2">' + lane.icon + '</div><p class="font-semibold" style="color:#0A1F44">' + lane.name + '</p><p class="text-xs text-gray-500">' + lane.insights + ' Insights</p><p class="text-xs" style="color:#14B8A6">' + lane.growth + '</p>' + (index === 4? '<p class="text-xs font-bold" style="color:#F59E0B">Download PDF</p>' : '') + '</div>';
-  });
-}
+let lastAnalysis = null;let chatHistory = [];
+async function loadDashboard(){const res = await fetch('/api/dashboard');const data = await res.json();document.getElementById('trendingCategory').innerText = data.trending.category;document.getElementById('trendingHeadline').innerText = '"' + data.trending.headline + '"';const lanesGrid = document.getElementById('lanesGrid');lanesGrid.innerHTML = '';data.lanes.forEach((lane, index) => {let onclick = '';if(index === 4) onclick = 'onclick="downloadPDF()"';lanesGrid.innerHTML += '<div class="card cursor-pointer" ' + onclick + '><div class="lane-icon w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold mb-3 text-lg">' + lane.icon + '</div><p class="font-semibold text-base" style="color:#0A1F44">' + lane.name + '</p><p class="text-sm text-gray-500">' + lane.insights + ' Insights</p><p class="text-sm font-semibold" style="color:#14B8A6">' + lane.growth + '</p>' + (index === 4? '<p class="text-xs font-bold mt-2" style="color:#F59E0B">Download PDF</p>' : '') + '</div>';});}
 loadDashboard();
-
-document.getElementById('searchForm').onsubmit = async (e) => {
-  e.preventDefault();
-  const form = new FormData(e.target);
-  lastAnalysis = Object.fromEntries(form);
-  const res = await fetch('/search-market', {method:'POST', body:form});
-  const html = await res.text();
-  document.open();
-  document.write(html);
-  document.close();
-}
-
-async function downloadPDF(){
-  if(!lastAnalysis){ alert('Please run an analysis first'); return; }
-  document.getElementById('pdf_q').value = lastAnalysis.q;
-  document.getElementById('pdf_sector').value = lastAnalysis.sector;
-  document.getElementById('pdf_county').value = lastAnalysis.county;
-  document.getElementById('pdfForm').submit();
-}
-
-const chatBtn = document.getElementById('chatBtn');
-const chatBox = document.getElementById('chatBox');
-const chatInput = document.getElementById('chatInput');
-const chatSend = document.getElementById('chatSend');
-const chatMessages = document.getElementById('chatMessages');
+document.getElementById('searchForm').onsubmit = async (e) => {e.preventDefault();const form = new FormData(e.target);lastAnalysis = Object.fromEntries(form);const res = await fetch('/search-market', {method:'POST', body:form});const html = await res.text();document.open();document.write(html);document.close();}
+async function downloadPDF(){if(!lastAnalysis){ alert('Please run an analysis first'); return; }document.getElementById('pdf_q').value = lastAnalysis.q;document.getElementById('pdf_sector').value = lastAnalysis.sector;document.getElementById('pdf_county').value = lastAnalysis.county;document.getElementById('pdfForm').submit();}
+const chatBtn = document.getElementById('chatBtn');const chatBox = document.getElementById('chatBox');const chatInput = document.getElementById('chatInput');const chatSend = document.getElementById('chatSend');const chatMessages = document.getElementById('chatMessages');
 chatBtn.onclick = () => chatBox.style.display = chatBox.style.display === 'flex'? 'none' : 'flex';
-async function sendChat(){
-  const msg = chatInput.value.trim();
-  if(!msg) return;
-  chatMessages.innerHTML += '<div class="msg user">' + msg + '</div>';
-  chatHistory.push({role: "user", content: msg});
-  chatInput.value = '';
-  chatMessages.innerHTML += '<div class="msg bot" id="typing">Lens is thinking...</div>';
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-  const res = await fetch('/chat', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({message: msg, history: chatHistory, context: lastAnalysis})
-  });
-  const data = await res.json();
-  document.getElementById('typing').remove();
-  chatHistory.push({role: "assistant", content: data.reply});
-  chatMessages.innerHTML += '<div class="msg bot">' + data.reply + '</div>';
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-chatSend.onclick = sendChat;
-chatInput.onkeypress = (e) => { if(e.key === 'Enter') sendChat(); }
+async function sendChat(){const msg = chatInput.value.trim();if(!msg) return;chatMessages.innerHTML += '<div class="msg user">' + msg + '</div>';chatHistory.push({role: "user", content: msg});chatInput.value = '';chatMessages.innerHTML += '<div class="msg bot" id="typing">Lens is thinking...</div>';chatMessages.scrollTop = chatMessages.scrollHeight;const res = await fetch('/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message: msg, history: chatHistory, context: lastAnalysis})});const data = await res.json();document.getElementById('typing').remove();chatHistory.push({role: "assistant", content: data.reply});chatMessages.innerHTML += '<div class="msg bot">' + data.reply + '</div>';chatMessages.scrollTop = chatMessages.scrollHeight;}
+chatSend.onclick = sendChat;chatInput.onkeypress = (e) => { if(e.key === 'Enter') sendChat(); }
 </script>
 </body>
 </html>
