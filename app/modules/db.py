@@ -5,7 +5,13 @@ from sqlalchemy.orm import sessionmaker
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./evidlens_dev.db")
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {"sslmode": "require"})
+# Fix for Render Postgres
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+connect_args = {"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
+engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -17,4 +23,10 @@ def get_db():
         db.close()
 
 def init_db():
+    # Import all models here so Base.metadata knows about them
+    from app.modules.auth.models import User, UserRole
+    from app.modules.models import Sector, County, CoreProduct
+    from app.modules.payments.models import Payment, Subscription, MpesaTransaction
+    from app.modules.report_builder.models import Report, ReportTemplate, ReportShare
+    from app.modules.market_engine.models import MarketSearch, Competitor, MarketMetric
     Base.metadata.create_all(bind=engine)
