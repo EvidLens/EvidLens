@@ -25,127 +25,83 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
 #chatInputBox{display:flex; padding:12px; border-top:1px solid #E2E8F0}
 #chatInput{flex:1; border:1px solid #CBD5E1; border-radius:20px; padding:10px 14px; outline:none; font-size:14px}
 #chatSend{background:#F59E0B; color:white; border:none; border-radius:20px; padding:10px 18px; margin-left:8px; font-weight:600; cursor:pointer}
-@media(max-width:768px)chatBox{width:calc(100vw - 32px); right:16px; bottom:80px}}
+@media(max-width:768px){#chatBox{width:calc(100vw - 32px); right:16px; bottom:80px}}
 </style>
 </head>
 <body>
 <header class="text-white px-6 py-4 sticky top-0 shadow-md" style="background:#0A1F44">
   <div class="flex items-center justify-between max-w-[1400px] mx-auto">
     <div class="flex items-center gap-3">
-      <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center">
-        <span class="text-[#0A1F44] font-extrabold text-lg">EL</span>
-      </div>
-      <div>
-        <h1 class="font-bold text-2xl"><span style="color:#FFFFFF">Evid</span><span style="color:#14B8A6">Lens</span></h1>
-        <p class="text-xs" style="color:#CBD5E1">Decision Intelligence</p>
-      </div>
+      <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center"><span class="text-[#0A1F44] font-extrabold text-lg">EL</span></div>
+      <div><h1 class="font-bold text-2xl"><span style="color:#FFFFFF">Evid</span><span style="color:#14B8A6">Lens</span></h1><p class="text-xs" style="color:#CBD5E1">Decision Intelligence</p></div>
     </div>
   </div>
 </header>
 
 <main class="px-4 md:px-6 lg:px-8 py-6">
   <div class="max-w-[1400px] mx-auto">
-
-    <div class="card mb-6">
-      <div class="flex items-center gap-3 text-gray-400">
-        <span>🔍</span>
-        <input id="searchInput" placeholder="Search insights, lanes, or questions..." class="w-full outline-none text-base bg-transparent">
-      </div>
-    </div>
-
+    <div class="card mb-6"><div class="flex items-center gap-3 text-gray-400"><span>🔍</span><input id="searchInput" placeholder="Search insights, lanes, or questions..." class="w-full outline-none text-base bg-transparent"></div></div>
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-      <div class="card teal-card">
-        <p class="text-sm text-gray-500">Total Insights</p>
-        <p class="text-4xl font-bold mt-1" style="color:#0A1F44">198</p>
-        <p class="text-sm mt-1" style="color:#14B8A6">+18% this week</p>
-      </div>
-      <div class="card teal-card">
-        <p class="text-sm text-gray-500">Active Lanes</p>
-        <p class="text-4xl font-bold mt-1" style="color:#0A1F44">9</p>
-        <p class="text-sm mt-1" style="color:#14B8A6">All monitoring</p>
-      </div>
-      <div class="card teal-card">
-        <p class="text-sm text-gray-500">Reports Generated</p>
-        <p class="text-4xl font-bold mt-1" style="color:#0A1F44">74</p>
-        <p class="text-sm mt-1" style="color:#14B8A6">+22% this month</p>
-      </div>
-      <div class="card teal-card">
-        <p class="text-sm text-gray-500">AI Queries</p>
-        <p class="text-4xl font-bold mt-1" style="color:#0A1F44">1.2k</p>
-        <p class="text-sm mt-1" style="color:#14B8A6">+30% this week</p>
-      </div>
+      <div class="card teal-card"><p class="text-sm text-gray-500">Total Insights</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">198</p><p class="text-sm mt-1" style="color:#14B8A6">+18% this week</p></div>
+      <div class="card teal-card"><p class="text-sm text-gray-500">Active Lanes</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">9</p><p class="text-sm mt-1" style="color:#14B8A6">All monitoring</p></div>
+      <div class="card teal-card"><p class="text-sm text-gray-500">Reports Generated</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">74</p><p class="text-sm mt-1" style="color:#14B8A6">+22% this month</p></div>
+      <div class="card teal-card"><p class="text-sm text-gray-500">AI Queries</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">1.2k</p><p class="text-sm mt-1" style="color:#14B8A6">+30% this week</p></div>
     </div>
-
-    <div class="mb-8">
-      <h2 class="font-bold text-xl mb-4 flex items-center gap-2" style="color:#0A1F44"><span>🔥</span>Trending Now</h2>
-      <div id="trendingCard" class="trending text-white p-6 rounded-2xl">
-        <p class="text-sm font-semibold opacity-90 uppercase" id="trendingCategory">ECONOMY</p>
-        <p class="font-semibold text-lg mt-2" id="trendingHeadline">"Kenya inflation drops to 4.2% - Lowest in 18 months"</p>
-      </div>
-    </div>
-
-    <div class="mb-8">
-      <h2 class="font-bold text-xl mb-4" style="color:#0A1F44">Intelligence Lanes</h2>
-      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4" id="lanesGrid"></div>
-    </div>
-
+    <div class="mb-8"><h2 class="font-bold text-xl mb-4 flex items-center gap-2" style="color:#0A1F44"><span>🔥</span>Trending Now</h2><div id="trendingCard" class="trending text-white p-6 rounded-2xl"><p class="text-sm font-semibold opacity-90 uppercase" id="trendingCategory">ECONOMY</p><p class="font-semibold text-lg mt-2" id="trendingHeadline">"Kenya inflation drops to 4.2% - Lowest in 18 months"</p></div></div>
+    <div class="mb-8"><h2 class="font-bold text-xl mb-4" style="color:#0A1F44">Intelligence Lanes</h2><div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4" id="lanesGrid"></div></div>
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
       <div class="card">
         <h2 class="font-bold text-xl mb-3" style="color:#0A1F44">Quick Business Analysis</h2>
         <form id="searchForm" method="POST" action="/search-market" class="space-y-3">
-          <input name="q" placeholder="e.g maize mill, retail, fintech" class="w-full p-3 border rounded-lg text-sm">
-          <div class="flex gap-3">
-            <input name="sector" placeholder="Sector" class="w-1/2 p-3 border rounded-lg text-sm">
-            <input name="county" placeholder="County" class="w-1/2 p-3 border rounded-lg text-sm">
-          </div>
+          <input name="q" placeholder="e.g maize mill, retail, fintech" class="w-full p-3 border rounded-lg text-sm" required>
+          <div class="flex gap-3"><input name="sector" placeholder="Sector" class="w-1/2 p-3 border rounded-lg text-sm" required><input name="county" placeholder="County" class="w-1/2 p-3 border rounded-lg text-sm" required></div>
           <button class="bg-[#F59E0B] text-white w-full p-3 rounded-lg font-bold hover:opacity-90">Analyze Market</button>
         </form>
-        <div id="result" class="mt-4 text-sm"></div>
+        <div id="result" class="mt-4 text-sm">
+          {% if result %}
+          <div class="p-4 bg-green-50 border border-green-200 rounded-lg">
+            <p class="font-bold text-[#0A1F44]">Results for: {{result.q}} in {{result.county}}</p>
+            <pre class="text-xs mt-2 whitespace-pre-wrap">{{result.data}}</pre>
+          </div>
+          {% endif %}
+        </div>
       </div>
-
-      <div class="card">
-        <h2 class="font-bold text-xl mb-3" style="color:#0A1F44">Download Full Report</h2>
-        <p class="text-sm text-gray-600 mb-3">Get PDF report with competitors, pricing, and AI insights</p>
-        <button onclick="downloadPDF()" class="bg-[#14B8A6] text-white w-full p-3 rounded-lg font-bold hover:opacity-90">Download PDF</button>
-      </div>
+      <div class="card"><h2 class="font-bold text-xl mb-3" style="color:#0A1F44">Download Full Report</h2><p class="text-sm text-gray-600 mb-3">Get PDF report with competitors, pricing, and AI insights</p><button onclick="downloadPDF()" class="bg-[#14B8A6] text-white w-full p-3 rounded-lg font-bold hover:opacity-90">Download PDF</button></div>
     </div>
-
   </div>
 </main>
 
-<form id="pdfForm" method="POST" action="/download-report">
-  <input type="hidden" name="q" id="pdf_q">
-  <input type="hidden" name="sector" id="pdf_sector">
-  <input type="hidden" name="county" id="pdf_county">
-</form>
+<form id="pdfForm" method="POST" action="/download-report"><input type="hidden" name="q" id="pdf_q"><input type="hidden" name="sector" id="pdf_sector"><input type="hidden" name="county" id="pdf_county"></form>
 
-<footer class="footer text-white pt-12 pb-8 mt-12">
-  <div class="max-w-[1400px] mx-auto px-6">
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
-      <div><h3 class="font-bold mb-3" style="color:#14B8A6">Legal</h3><ul class="space-y-2 text-sm"><li><a href="/privacy" class="footer-link">Privacy Policy</a></li><li><a href="/terms" class="footer-link">Terms</a></li></ul></div>
-      <div><h3 class="font-bold mb-3" style="color:#14B8A6">Support</h3><ul class="space-y-2 text-sm"><li><a href="/contact" class="footer-link">Contact Us</a></li><li><a href="/help" class="footer-link">Help Center</a></li></ul></div>
-      <div><h3 class="font-bold mb-3" style="color:#14B8A6">Product</h3><ul class="space-y-2 text-sm"><li><a href="/pricing" class="footer-link">Pricing</a></li><li><a href="/features" class="footer-link">Features</a></li></ul></div>
-      <div><h3 class="font-bold mb-3" style="color:#14B8A6">Company</h3><ul class="space-y-2 text-sm"><li><a href="/about" class="footer-link">About</a></li><li><a href="/blog" class="footer-link">Blog</a></li></ul></div>
-    </div>
-    <div class="border-t border-gray-700 pt-6 text-center text-sm" style="color:#CBD5E1">© 2026 EvidLens. Decision Intelligence for Kenya.</div>
-  </div>
-</footer>
+<footer class="footer text-white pt-12 pb-8 mt-12"><div class="max-w-[1400px] mx-auto px-6"><div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8"><div><h3 class="font-bold mb-3" style="color:#14B8A6">Legal</h3><ul class="space-y-2 text-sm"><li><a href="/privacy" class="footer-link">Privacy Policy</a></li><li><a href="/terms" class="footer-link">Terms</a></li></ul></div><div><h3 class="font-bold mb-3" style="color:#14B8A6">Support</h3><ul class="space-y-2 text-sm"><li><a href="/contact" class="footer-link">Contact Us</a></li></ul></div><div><h3 class="font-bold mb-3" style="color:#14B8A6">Product</h3><ul class="space-y-2 text-sm"><li><a href="/pricing" class="footer-link">Pricing</a></li></ul></div><div><h3 class="font-bold mb-3" style="color:#14B8A6">Company</h3><ul class="space-y-2 text-sm"><li><a href="/about" class="footer-link">About</a></li></ul></div></div><div class="border-t border-gray-700 pt-6 text-center text-sm" style="color:#CBD5E1">© 2026 EvidLens. Decision Intelligence for Kenya.</div></div></footer>
 
-<div id="chatWidget">
-  <div id="chatBox">
-    <div id="chatHeader">🤖 Lens AI Assistant</div>
-    <div id="chatMessages"><div class="msg bot">Hi! I'm Lens. Ask me anything about Kenya markets.</div></div>
-    <div id="chatInputBox"><input id="chatInput" placeholder="Ask Lens anything..."><button id="chatSend">Send</button></div>
-  </div>
-  <button id="chatBtn">💬</button>
-</div>
+<div id="chatWidget"><div id="chatBox"><div id="chatHeader">🤖 Lens AI Assistant</div><div id="chatMessages"><div class="msg bot">Hi! I'm Lens. Ask me anything about Kenya markets.</div></div><div id="chatInputBox"><input id="chatInput" placeholder="Ask Lens anything..."><button id="chatSend">Send</button></div></div><button id="chatBtn">💬</button></div>
 
 <script>
 let lastAnalysis = null;let chatHistory = [];
 async function loadDashboard(){const res = await fetch('/api/dashboard');const data = await res.json();document.getElementById('trendingCategory').innerText = data.trending.category;document.getElementById('trendingHeadline').innerText = '"' + data.trending.headline + '"';const lanesGrid = document.getElementById('lanesGrid');lanesGrid.innerHTML = '';data.lanes.forEach((lane, index) => {let onclick = '';if(index === 4) onclick = 'onclick="downloadPDF()"';lanesGrid.innerHTML += '<div class="card cursor-pointer" ' + onclick + '><div class="lane-icon w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold mb-3 text-lg">' + lane.icon + '</div><p class="font-semibold text-base" style="color:#0A1F44">' + lane.name + '</p><p class="text-sm text-gray-500">' + lane.insights + ' Insights</p><p class="text-sm font-semibold" style="color:#14B8A6">' + lane.growth + '</p>' + (index === 4? '<p class="text-xs font-bold mt-2" style="color:#F59E0B">Download PDF</p>' : '') + '</div>';});}
 loadDashboard();
-document.getElementById('searchForm').onsubmit = async (e) => {e.preventDefault();const form = new FormData(e.target);lastAnalysis = Object.fromEntries(form);const res = await fetch('/search-market', {method:'POST', body:form});const html = await res.text();document.open();document.write(html);document.close();}
-async function downloadPDF(){if(!lastAnalysis){ alert('Please run an analysis first'); return; }document.getElementById('pdf_q').value = lastAnalysis.q;document.getElementById('pdf_sector').value = lastAnalysis.sector;document.getElementById('pdf_county').value = lastAnalysis.county;document.getElementById('pdfForm').submit();}
+
+document.getElementById('searchForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const form = new FormData(e.target);
+  lastAnalysis = Object.fromEntries(form);
+  document.getElementById('result').innerHTML = '<p class="text-gray-500">Analyzing...</p>';
+  const res = await fetch('/search-market', {method:'POST', body:form});
+  const html = await res.text();
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  document.getElementById('result').innerHTML = doc.getElementById('result').innerHTML;
+}
+
+async function downloadPDF(){
+  if(!lastAnalysis){ alert('Please run an analysis first'); return; }
+  document.getElementById('pdf_q').value = lastAnalysis.q;
+  document.getElementById('pdf_sector').value = lastAnalysis.sector;
+  document.getElementById('pdf_county').value = lastAnalysis.county;
+  document.getElementById('pdfForm').submit();
+}
+
 const chatBtn = document.getElementById('chatBtn');const chatBox = document.getElementById('chatBox');const chatInput = document.getElementById('chatInput');const chatSend = document.getElementById('chatSend');const chatMessages = document.getElementById('chatMessages');
 chatBtn.onclick = () => chatBox.style.display = chatBox.style.display === 'flex'? 'none' : 'flex';
 async function sendChat(){const msg = chatInput.value.trim();if(!msg) return;chatMessages.innerHTML += '<div class="msg user">' + msg + '</div>';chatHistory.push({role: "user", content: msg});chatInput.value = '';chatMessages.innerHTML += '<div class="msg bot" id="typing">Lens is thinking...</div>';chatMessages.scrollTop = chatMessages.scrollHeight;const res = await fetch('/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message: msg, history: chatHistory, context: lastAnalysis})});const data = await res.json();document.getElementById('typing').remove();chatHistory.push({role: "assistant", content: data.reply});chatMessages.innerHTML += '<div class="msg bot">' + data.reply + '</div>';chatMessages.scrollTop = chatMessages.scrollHeight;}
