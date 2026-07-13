@@ -1,0 +1,21 @@
+<!DOCTYPE html><html><head><title>EvidLens Pricing</title><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-gray-50">
+<section class="py-16"><div class="max-w-7xl mx-auto px-4">
+<h1 class="text-4xl font-bold text-center">Choose Your Plan</h1>
+<p class="text-center text-gray-600">ALL PAID TIERS GET: 9 Lanes, 19 Modules, Kenya-First Data, Exportable Reports</p>
+<div class="grid md:grid-cols-4 gap-6 mt-12">
+<div class="bg-white p-6 rounded-2xl shadow"><h3 class="font-bold text-lg">EV-SME</h3><p class="text-2xl font-bold">Ksh 20,000<span class="text-sm">/mo</span></p><ul id="sme-features" class="text-sm mt-4 space-y-1"></ul><button class="mt-4 w-full bg-[#14B8A6] text-white py-2 rounded">Get Started</button></div>
+<div class="bg-white p-6 rounded-2xl shadow border-4 border-[#14B8A6]"><h3 class="font-bold text-lg">EV-GROWTH</h3><p class="text-2xl font-bold">Ksh 50,000<span class="text-sm">/mo</span></p><ul id="growth-features" class="text-sm mt-4 space-y-1"></ul><button class="mt-4 w-full bg-[#14B8A6] text-white py-2 rounded">Get Started</button></div>
+<div class="bg-white p-6 rounded-2xl shadow"><h3 class="font-bold text-lg">EV-PRO</h3><p class="text-2xl font-bold">Ksh 100,000<span class="text-sm">/mo</span></p><ul id="pro-features" class="text-sm mt-4 space-y-1"></ul><button class="mt-4 w-full bg-[#14B8A6] text-white py-2 rounded">Get Started</button></div>
+<div class="bg-white p-6 rounded-2xl shadow border-2 border-[#F59E0B]"><h3 class="font-bold text-lg">EV-ENT</h3><p class="text-2xl font-bold">Ksh 200,000<span class="text-sm">/mo</span></p><ul id="ent-features" class="text-sm mt-4 space-y-1"></ul><button class="mt-4 w-full bg-[#F59E0B] text-white py-2 rounded">Contact Sales</button></div>
+</div>
+<h2 class="mt-12 text-2xl font-bold">Add-Ons: Slack, CRM, API, Analyst WA</h2>
+<h2 class="mt-4 text-2xl font-bold">À La Carte: Benchmark, Due Diligence, Lead Lists</h2>
+</div></section>
+<script>
+fetch('/api/plans').then(r=>r.json()).then(plans=>{
+  plans.forEach(p=>{
+    const ul = document.getElementById(p.code.toLowerCase().replace('ev-','')+'-features');
+    JSON.parse(p.features).forEach(f=>{ul.innerHTML += `<li>✓ ${f}</li>`})
+  })
+})
+</script></body></html>
