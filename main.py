@@ -8,12 +8,19 @@ import os
 
 load_dotenv()
 
+from app.modules.db import init_db
+from app.modules.cron.price_cron import start_scheduler
+
+# Import all models so tables are created
 from app.modules.auth.models import User, UserRole
 from app.modules.models import Sector, County, CoreProduct
 from app.modules.payments.models import Payment, Subscription, MpesaTransaction
 from app.modules.report_builder.models import Report, ReportTemplate, ReportShare
 from app.modules.market_engine.models import MarketSearch, Competitor, MarketMetric
 
+# Import all routers
+from app.modules.auth.router import router as auth_router
+from app.modules.payments.router import router as payments_router
 from app.modules.market_engine.router import router as market_router
 from app.modules.consumer_voice.router import router as consumer_router
 from app.modules.data_layer.router import router as data_router
@@ -22,14 +29,14 @@ from app.modules.report_builder.router import router as report_router
 from app.modules.location_intel.router import router as location_router
 from app.modules.knowledge_base.router import router as knowledge_router
 from app.modules.business_os.router import router as business_router
-from app.modules.auth.router import router as auth_router
-from app.modules.payments.router import router as payments_router
 from app.modules.rag.router import router as rag_router
 from app.modules.web import routes as web_routes
-from app.modules.db import init_db
-from app.modules.cron.price_cron import start_scheduler
 
-app = FastAPI(title="EvidLens API", version="1.0.0", description="Kenya's Decision Intelligence Platform - 9 Lanes in 1. All 35 Sectors.")
+app = FastAPI(
+    title="EvidLens API", 
+    version="1.0.0", 
+    description="Kenya's Decision Intelligence Platform - 9 Lanes in 1. All 35 Sectors."
+)
 
 @app.on_event("startup")
 def on_startup():
@@ -55,6 +62,7 @@ async def internal_error(request: Request, exc):
 def health():
     return {"status": "healthy", "version": "1.0.0", "sectors": 35}
 
+# API Routers
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 app.include_router(payments_router, prefix="/payments", tags=["Payments"])
 app.include_router(market_router, prefix="/market", tags=["Market Engine"])
@@ -66,6 +74,8 @@ app.include_router(location_router, prefix="/location", tags=["Location Intel"])
 app.include_router(knowledge_router, prefix="/kb", tags=["Knowledge Base"])
 app.include_router(business_router, prefix="/os", tags=["Business OS"])
 app.include_router(rag_router, prefix="/api", tags=["RAG"])
+
+# Web UI Routes - NO PREFIX
 app.include_router(web_routes.router)
 
 if __name__ == "__main__":
