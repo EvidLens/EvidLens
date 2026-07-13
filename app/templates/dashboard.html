@@ -25,7 +25,7 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
 #chatInputBox{display:flex; padding:12px; border-top:1px solid #E2E8F0}
 #chatInput{flex:1; border:1px solid #CBD5E1; border-radius:20px; padding:10px 14px; outline:none; font-size:14px}
 #chatSend{background:#F59E0B; color:white; border:none; border-radius:20px; padding:10px 18px; margin-left:8px; font-weight:600; cursor:pointer}
-@media(max-width:768px)chatBox{width:calc(100vw - 32px); right:16px; bottom:80px}}
+@media(max-width:768px){#chatBox{width:calc(100vw - 32px); right:16px; bottom:80px}}
 </style>
 </head>
 <body>
@@ -41,14 +41,18 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
 <main class="px-4 md:px-6 lg:px-8 py-6">
   <div class="max-w-[1400px] mx-auto">
     <div class="card mb-6"><div class="flex items-center gap-3 text-gray-400"><span>🔍</span><input id="searchInput" placeholder="Search insights, lanes, or questions..." class="w-full outline-none text-base bg-transparent"></div></div>
+
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
       <div class="card teal-card"><p class="text-sm text-gray-500">Total Insights</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">198</p><p class="text-sm mt-1" style="color:#14B8A6">+18% this week</p></div>
       <div class="card teal-card"><p class="text-sm text-gray-500">Active Lanes</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">9</p><p class="text-sm mt-1" style="color:#14B8A6">All monitoring</p></div>
       <div class="card teal-card"><p class="text-sm text-gray-500">Reports Generated</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">74</p><p class="text-sm mt-1" style="color:#14B8A6">+22% this month</p></div>
       <div class="card teal-card"><p class="text-sm text-gray-500">AI Queries</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">1.2k</p><p class="text-sm mt-1" style="color:#14B8A6">+30% this week</p></div>
     </div>
+
     <div class="mb-8"><h2 class="font-bold text-xl mb-4 flex items-center gap-2" style="color:#0A1F44"><span>🔥</span>Trending Now</h2><div id="trendingCard" class="trending text-white p-6 rounded-2xl"><p class="text-sm font-semibold opacity-90 uppercase" id="trendingCategory">ECONOMY</p><p class="font-semibold text-lg mt-2" id="trendingHeadline">"Kenya inflation drops to 4.2% - Lowest in 18 months"</p></div></div>
+
     <div class="mb-8"><h2 class="font-bold text-xl mb-4" style="color:#0A1F44">Intelligence Lanes</h2><div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4" id="lanesGrid"></div></div>
+
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
       <div class="card">
         <h2 class="font-bold text-xl mb-3" style="color:#0A1F44">Quick Business Analysis</h2>
@@ -59,14 +63,25 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
         </form>
         <div id="result" class="mt-4 text-sm">
           {% if result %}
-          <div class="p-4 bg-green-50 border border-green-200 rounded-lg">
-            <p class="font-bold text-[#0A1F44]">Results for: {{result.q}} in {{result.county}}</p>
-            <pre class="text-xs mt-2 whitespace-pre-wrap">{{result.data}}</pre>
-          </div>
+            {% if result.error %}
+              <div class="p-4 bg-red-50 border border-red-200 rounded-lg"><p class="font-bold text-red-600">Error</p><pre class="text-xs mt-2">{{result.error}}</pre></div>
+            {% else %}
+              <div class="p-4 bg-green-50 border-green-200 rounded-lg space-y-2">
+                <p class="font-bold text-[#0A1F44]">Results for: {{result.q}} in {{result.county}}</p>
+                <p><b>Sector Benchmark:</b> {{result.benchmark}}</p>
+                <p><b>AI Insight:</b> {{result.ai}}</p>
+                <p><b>Competitors Found:</b> {{result.competitors|length}}</p>
+                <pre class="text-xs mt-2 whitespace-pre-wrap bg-white p-2 rounded">{{result.data}}</pre>
+              </div>
+            {% endif %}
           {% endif %}
         </div>
       </div>
-      <div class="card"><h2 class="font-bold text-xl mb-3" style="color:#0A1F44">Download Full Report</h2><p class="text-sm text-gray-600 mb-3">Get PDF report with competitors, pricing, and AI insights</p><button onclick="downloadPDF()" class="bg-[#14B8A6] text-white w-full p-3 rounded-lg font-bold hover:opacity-90">Download PDF</button></div>
+      <div class="card">
+        <h2 class="font-bold text-xl mb-3" style="color:#0A1F44">Download Full Report</h2>
+        <p class="text-sm text-gray-600 mb-3">Get PDF report with competitors, pricing, and AI insights</p>
+        <button onclick="downloadPDF()" class="bg-[#14B8A6] text-white w-full p-3 rounded-lg font-bold hover:opacity-90">Download PDF</button>
+      </div>
     </div>
   </div>
 </main>
@@ -85,7 +100,7 @@ loadDashboard();
 document.getElementById('searchForm').onsubmit = async (e) => {
   e.preventDefault();
   const form = new FormData(e.target);
-  lastAnalysis = Object.fromEntries(form);
+  lastAnalysis = Object.fromEntries(form); // SAVE FOR PDF DOWNLOAD
   document.getElementById('result').innerHTML = '<p class="text-gray-500">Analyzing...</p>';
   const res = await fetch('/search-market', {method:'POST', body:form});
   const html = await res.text();
