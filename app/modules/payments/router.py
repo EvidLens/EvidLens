@@ -24,7 +24,7 @@ class SubscriptionRequest(BaseModel):
 
 TIER_PRICES = {
     SubscriptionTier.FREE: 0,
-    SubscriptionTier.SME_STARTER: 990, # Fixed
+    SubscriptionTier.SME_STARTER: 990,
     SubscriptionTier.SME_PRO: 2990,
     SubscriptionTier.PROFESSIONAL: 7990,
     SubscriptionTier.BUSINESS: 19990,
