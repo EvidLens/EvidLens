@@ -1,16 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlmodel import Session
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List
 from .service import create_business, get_business, add_product, create_invoice, add_employee
 from .models import Business, Product, Invoice, Employee
-from app.modules.db import get_db
+from app.modules.db import get_session
+from app.modules.core.guards import require_module, consume_credits
 
-router = APIRouter()
+router = APIRouter(prefix="/os", tags=["Business OS"])
 
 class BusinessCreate(BaseModel):
     name: str
-    owner_id: int
     sector: str
     county: str
 
@@ -36,36 +36,66 @@ class EmployeeCreate(BaseModel):
     salary_kes: float
 
 @router.post("/business")
-def create_new_business(req: BusinessCreate, db: Session = Depends(get_db)):
-    return create_business(db, req)
+@require_module(module_number=8)
+def create_new_business(request: Request, req: BusinessCreate, session: Session = Depends(get_session)):
+    user_id = request.state.user.id
+    business = create_business(session, req, user_id)
+    consume_credits(session, user_id, "api_credits", 1)
+    return business
 
 @router.get("/business/{business_id}")
-def get_business_details(business_id: int, db: Session = Depends(get_db)):
-    business = get_business(db, business_id)
-    if not business:
+@require_module(module_number=8)
+def get_business_details(request: Request, business_id: int, session: Session = Depends(get_session)):
+    user_id = request.state.user.id
+    business = get_business(session, business_id)
+    if not business or business.owner_id != user_id:
         raise HTTPException(status_code=404, detail="Business not found")
     return business
 
 @router.post("/inventory/product")
-def add_new_product(req: ProductCreate, db: Session = Depends(get_db)):
-    return add_product(db, req)
+@require_module(module_number=8)
+def add_new_product(request: Request, req: ProductCreate, session: Session = Depends(get_session)):
+    user_id = request.state.user.id
+    consume_credits(session, user_id, "api_credits", 1)
+    return add_product(session, req)
 
 @router.get("/inventory/products/{business_id}")
-def list_products(business_id: int, db: Session = Depends(get_db)):
-    return db.query(Product).filter(Product.business_id == business_id).all()
+@require_module(module_number=8)
+def list_products(request: Request, business_id: int, session: Session = Depends(get_session)):
+    user_id = request.state.user.id
+    business = get_business(session, business_id)
+    if not business or business.owner_id != user_id:
+        raise HTTPException(status_code=403, detail="Not your business")
+    return session.query(Product).filter(Product.business_id == business_id).all()
 
 @router.post("/accounting/invoice")
-def create_new_invoice(req: InvoiceCreate, db: Session = Depends(get_db)):
-    return create_invoice(db, req)
+@require_module(module_number=8)
+def create_new_invoice(request: Request, req: InvoiceCreate, session: Session = Depends(get_session)):
+    user_id = request.state.user.id
+    consume_credits(session, user_id, "api_credits", 2)
+    return create_invoice(session, req)
 
 @router.get("/accounting/invoices/{business_id}")
-def list_invoices(business_id: int, db: Session = Depends(get_db)):
-    return db.query(Invoice).filter(Invoice.business_id == business_id).all()
+@require_module(module_number=8)
+def list_invoices(request: Request, business_id: int, session: Session = Depends(get_session)):
+    user_id = request.state.user.id
+    business = get_business(session, business_id)
+    if not business or business.owner_id != user_id:
+        raise HTTPException(status_code=403, detail="Not your business")
+    return session.query(Invoice).filter(Invoice.business_id == business_id).all()
 
 @router.post("/hr/employee")
-def add_new_employee(req: EmployeeCreate, db: Session = Depends(get_db)):
-    return add_employee(db, req)
+@require_module(module_number=8)
+def add_new_employee(request: Request, req: EmployeeCreate, session: Session = Depends(get_session)):
+    user_id = request.state.user.id
+    consume_credits(session, user_id, "api_credits", 1)
+    return add_employee(session, req)
 
 @router.get("/hr/employees/{business_id}")
-def list_employees(business_id: int, db: Session = Depends(get_db)):
-    return db.query(Employee).filter(Employee.business_id == business_id).all()
+@require_module(module_number=8)
+def list_employees(request: Request, business_id: int, session: Session = Depends(get_session)):
+    user_id = request.state.user.id
+    business = get_business(session, business_id)
+    if not business or business.owner_id != user_id:
+        raise HTTPException(status_code=403, detail="Not your business")
+    return session.query(Employee).filter(Employee.business_id == business_id).all()
