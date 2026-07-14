@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Enum, Text
+from sqlalchemy import Column, Integer, String, Float, DateTime, Enum, Text, UniqueConstraint
 from sqlalchemy.sql import func
 from app.modules.db import Base
 import enum
@@ -23,12 +23,12 @@ class ConsumerFeedback(Base):
     sector = Column(String, nullable=False, index=True)
     county = Column(String, nullable=True, index=True)
     product_or_topic = Column(String, nullable=False, index=True)
-    source = Column(Enum(Source), default=Source.reddit)
-    source_url = Column(String, nullable=True)
+    source = Column(Enum(Source), default=Source.reddit, index=True)
+    source_url = Column(String, nullable=True, unique=True, index=True)
     author = Column(String, nullable=True)
     
     content = Column(Text, nullable=False)
-    sentiment = Column(Enum(Sentiment), default=Sentiment.neutral)
+    sentiment = Column(Enum(Sentiment), default=Sentiment.neutral, index=True)
     sentiment_score = Column(Float, default=0.0)
     
     likes_mentioned = Column(Text, nullable=True)
@@ -53,4 +53,7 @@ class SentimentSummary(Base):
     top_likes = Column(Text, nullable=True)
     top_complaints = Column(Text, nullable=True)
     
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_updated = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    __table_args__ = (UniqueConstraint('sector', 'county', 'product_or_topic', name='uix_sector_county_product'),)
