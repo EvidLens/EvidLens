@@ -7,7 +7,7 @@ import httpx, os
 
 from.service import search_market, get_competitor_overview, get_price_stats
 from.models import MarketSearch, Competitor
-from app.modules.db import get_db
+from app.modules.db import get_session as get_db
 
 router = APIRouter()
 LOCATIONIQ_KEY = os.getenv("LOCATIONIQ_KEY")
