@@ -17,12 +17,13 @@ class InvoiceStatus(str, enum.Enum):
 
 class Business(Base):
     __tablename__ = "businesses"
-    
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     owner_id = Column(Integer, ForeignKey("users.id"))
     sector = Column(String, nullable=True)
     county = Column(String, nullable=True)
+    sub_county = Column(String, nullable=True) # <-- ADD THIS for Ask Lens geo
+    ward = Column(String, nullable=True)       # <-- ADD THIS for Ask Lens geo
     mpesa_paybill = Column(String, nullable=True)
     kra_pin = Column(String, nullable=True)
     subscription_tier = Column(String, default="free")
@@ -32,10 +33,10 @@ class Business(Base):
     products = relationship("Product", back_populates="business")
     invoices = relationship("Invoice", back_populates="business")
     employees = relationship("Employee", back_populates="business")
+    audit_logs = relationship("AuditLog", back_populates="business") # <-- ADD THIS
 
 class TeamMember(Base):
     __tablename__ = "team_members"
-    
     id = Column(Integer, primary_key=True, index=True)
     business_id = Column(Integer, ForeignKey("businesses.id"))
     user_id = Column(Integer, ForeignKey("users.id"))
@@ -44,12 +45,10 @@ class TeamMember(Base):
     can_manage_inventory = Column(Boolean, default=False)
     can_manage_hr = Column(Boolean, default=False)
     can_manage_accounting = Column(Boolean, default=False)
-    
     business = relationship("Business", back_populates="team")
 
 class Product(Base):
     __tablename__ = "business_products"
-    
     id = Column(Integer, primary_key=True, index=True)
     business_id = Column(Integer, ForeignKey("businesses.id"))
     name = Column(String, nullable=False)
@@ -59,12 +58,10 @@ class Product(Base):
     selling_price = Column(Float, default=0.0)
     stock_qty = Column(Integer, default=0)
     low_stock_threshold = Column(Integer, default=10)
-    
     business = relationship("Business", back_populates="products")
 
 class Invoice(Base):
     __tablename__ = "invoices"
-    
     id = Column(Integer, primary_key=True, index=True)
     business_id = Column(Integer, ForeignKey("businesses.id"))
     invoice_number = Column(String, unique=True, index=True)
@@ -74,12 +71,10 @@ class Invoice(Base):
     status = Column(Enum(InvoiceStatus), default=InvoiceStatus.draft)
     mpesa_receipt = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
     business = relationship("Business", back_populates="invoices")
 
 class Employee(Base):
     __tablename__ = "employees"
-    
     id = Column(Integer, primary_key=True, index=True)
     business_id = Column(Integer, ForeignKey("businesses.id"))
     full_name = Column(String, nullable=False)
@@ -87,12 +82,10 @@ class Employee(Base):
     role = Column(String)
     salary_kes = Column(Float, default=0.0)
     is_active = Column(Boolean, default=True)
-    
     business = relationship("Business", back_populates="employees")
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
-    
     id = Column(Integer, primary_key=True, index=True)
     business_id = Column(Integer, ForeignKey("businesses.id"))
     user_id = Column(Integer, ForeignKey("users.id"))
@@ -101,3 +94,4 @@ class AuditLog(Base):
     entity_id = Column(Integer, nullable=True)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
     details = Column(Text, nullable=True)
+    business = relationship("Business", back_populates="audit_logs") # <-- ADD THIS
