@@ -37,7 +37,7 @@ class Subscription(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class MpesaTransaction(Base):
-    __tablename__ = = "mpesa_transactions"
+    __tablename__ = "mpesa_transactions"
     id = Column(Integer, primary_key=True, index=True)
     checkout_request_id = Column(String)
     result_code = Column(Integer)
