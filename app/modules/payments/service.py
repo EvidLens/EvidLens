@@ -1,24 +1,21 @@
 import os
-from sqlalchemy.orm import Session
-from sqlalchemy import desc
 import requests
 import base64
 from datetime import datetime
 from typing import Dict, Any
+from sqlalchemy.orm import Session
 from .models import Payment, Subscription, MpesaTransaction, PaymentStatus
-from app.modules.db import get_db
 
 MPESA_CONSUMER_KEY = os.getenv("MPESA_CONSUMER_KEY")
 MPESA_CONSUMER_SECRET = os.getenv("MPESA_CONSUMER_SECRET")
 MPESA_SHORTCODE = os.getenv("MPESA_SHORTCODE", "174379")
 MPESA_PASSKEY = os.getenv("MPESA_PASSKEY")
 MPESA_CALLBACK_URL = os.getenv("MPESA_CALLBACK_URL")
+MPESA_INITIATOR_NAME = os.getenv("MPESA_INITIATOR_NAME")
+MPESA_SECURITY_CREDENTIAL = os.getenv("MPESA_SECURITY_CREDENTIAL")
 MPESA_ENV = os.getenv("MPESA_ENV", "sandbox")
 
-if MPESA_ENV == "prod":
-    MPESA_BASE_URL = "https://api.safaricom.co.ke"
-else:
-    MPESA_BASE_URL = "https://sandbox.safaricom.co.ke"
+MPESA_BASE_URL = "https://api.safaricom.co.ke" if MPESA_ENV == "prod" else "https://sandbox.safaricom.co.ke"
 
 def get_access_token() -> str:
     api_url = f"{MPESA_BASE_URL}/oauth/v1/generate?grant_type=client_credentials"
@@ -98,8 +95,8 @@ def process_b2c(db: Session, phone_number: str, amount: float, remarks: str) -> 
     access_token = get_access_token()
     api_url = f"{MPESA_BASE_URL}/mpesa/b2c/v1/paymentrequest"
     payload = {
-        "InitiatorName": os.getenv("MPESA_INITIATOR_NAME"),
-        "SecurityCredential": os.getenv("MPESA_SECURITY_CREDENTIAL"),
+        "InitiatorName": MPESA_INITIATOR_NAME,
+        "SecurityCredential": MPESA_SECURITY_CREDENTIAL,
         "CommandID": "BusinessPayment",
         "Amount": int(amount),
         "PartyA": MPESA_SHORTCODE,
