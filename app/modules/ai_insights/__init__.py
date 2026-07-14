@@ -1,2 +1,4 @@
 from .router import router
 from .service import generate_insights
+
+__all__ = ["router", "generate_insights"]
