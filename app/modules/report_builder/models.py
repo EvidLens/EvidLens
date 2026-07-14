@@ -33,11 +33,16 @@ class Report(Base):
     report_type = Column(Enum(ReportType), nullable=False)
     format = Column(Enum(ReportFormat), default=ReportFormat.PDF)
     status = Column(Enum(ReportStatus), default=ReportStatus.GENERATING)
+    error_message = Column(Text, nullable=True) # For FAILED status debugging
     
-    # Context used to generate
+    # 5-Level Geo Context
     query = Column(String, nullable=True)
     sector = Column(String, nullable=True)
+    country = Column(String, default="Kenya")
     county = Column(String, nullable=True)
+    sub_county = Column(String, nullable=True)
+    ward = Column(String, nullable=True)
+    town = Column(String, nullable=True)
     
     # Files
     file_path = Column(String, nullable=True) # /tmp/ or Cloudflare R2 URL
@@ -47,7 +52,7 @@ class Report(Base):
     # Branding + KRA
     is_branded = Column(Boolean, default=False) # Premium: logo + custom colors
     kra_compliant = Column(Boolean, default=True)
-    report_metadata = Column(JSON, default=dict) # FIXED: was 'metadata' - Stores raw data used for audit
+    report_metadata = Column(JSON, default=dict) # Stores raw data used for audit
     
     # Monetization
     payment_id = Column(Integer, nullable=True) # Link to payments table for KSH 500 reports
@@ -81,4 +86,6 @@ class ReportShare(Base):
     recipient = Column(String, nullable=True) # email or phone
     access_token = Column(String, unique=True, nullable=True)
     
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now()) # FIXED: was cut off
+    
+    report = relationship("Report")
