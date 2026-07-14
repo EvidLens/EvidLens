@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List, Optional
 from .service import fetch_price_trends, fetch_demand_signals, fetch_location_analytics
-from.models import PriceTrend, DemandSignal, LocationMetric, FMCGCatalog
+from .models import PriceTrend, DemandSignal, LocationMetric
 from app.modules.db import get_db
 from app.modules.core.guards import require_module, consume_credits
 
