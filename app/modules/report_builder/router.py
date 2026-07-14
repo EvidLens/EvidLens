@@ -71,7 +71,7 @@ def generate_report(
         "message": "Report is being generated. Check /reports/list for download"
     }
 
-def process_report_generation(db: Session, report_id: int, req: GenerateReportRequest):
+async def process_report_generation(db: Session, report_id: int, req: GenerateReportRequest):
     """Background task to generate PDF/Excel"""
     report = db.query(Report).filter(Report.id==report_id).first()
     try:
