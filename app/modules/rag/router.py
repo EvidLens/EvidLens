@@ -2,10 +2,11 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List
-from.service import run_rag_pipeline
+
+from.service import run_rag_pipeline # fixed relative import
 from app.modules.db import get_db
 
-router = APIRouter()
+router = APIRouter(prefix="/rag", tags=["RAG"]) # add prefix for clarity
 
 class RAGRequest(BaseModel):
     query: str
@@ -24,6 +25,6 @@ def rag_query(req: RAGRequest, db: Session = Depends(get_db)):
 
 @router.post("/load")
 def load_knowledge_base(db: Session = Depends(get_db)):
-    from.loader import load_sector_data
-    load_sector_data(db)
-    return {"status": "loaded", "sectors": 35}
+    from.loader import load_sector_data # fixed relative import
+    count = load_sector_data(db)
+    return {"status": "loaded", "sectors": count}
