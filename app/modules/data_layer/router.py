@@ -1,12 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List, Optional
 from.service import fetch_price_trends, fetch_demand_signals, fetch_location_analytics, seed_fmcg_catalog
 from.models import PriceTrend, DemandSignal, LocationMetric, FMCGCatalog
 from app.modules.db import get_db
+from app.modules.core.guards import require_module, consume_credits
 
-router = APIRouter()
+router = APIRouter(prefix="/market-intel", tags=["Market Intel"])
 
 class PriceTrendResponse(BaseModel):
     product_name: str
@@ -25,73 +26,58 @@ class DemandResponse(BaseModel):
     period: str
 
 @router.get("/prices", response_model=List[PriceTrendResponse])
-def get_price_trends(
-    sector: str = Query(...),
-    product: Optional[str] = Query(None),
-    county: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
-):
-    """Get current KE prices from Jumia/Naivas/Carrefour. Powers Price Arbitrage Maps"""
+@require_module(module_number=1)
+def get_price_trends(request: Request, sector: str = Query(...), product: Optional[str] = Query(None), county: Optional[str] = Query(None), db: Session = Depends(get_db)):
     query = db.query(PriceTrend).filter(PriceTrend.sector == sector)
     if product:
         query = query.filter(PriceTrend.product_name.ilike(f"%{product}%"))
     if county:
         query = query.filter(PriceTrend.county == county)
-
     results = query.order_by(PriceTrend.scraped_at.desc()).limit(100).all()
     if not results:
-        raise HTTPException(status_code=404, detail="No price data. Run /scrape-prices first")
+        raise HTTPException(status_code=404, detail="No price data")
     return results
 
 @router.post("/scrape-prices")
-def trigger_price_scrape(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    """Weekly cron job to scrape Jumia/Naivas/Carrefour"""
+@require_module(module_number=1)
+def trigger_price_scrape(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    user_id = request.state.user.id
+    consume_credits(db, user_id, "api_credits", 2)
     background_tasks.add_task(fetch_price_trends, db)
-    return {"message": "Price scraping started. Data will update in ~5 minutes"}
+    return {"message": "Price scraping started"}
 
 @router.get("/demand", response_model=List[DemandResponse])
-def get_demand_signals(
-    sector: str = Query(...),
-    county: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
-):
-    """Get demand signals from KNBS + Google Trends"""
+@require_module(module_number=1)
+def get_demand_signals(request: Request, sector: str = Query(...), county: Optional[str] = Query(None), db: Session = Depends(get_db)):
     query = db.query(DemandSignal).filter(DemandSignal.sector == sector)
     if county:
         query = query.filter(DemandSignal.county == county)
     return query.order_by(DemandSignal.recorded_at.desc()).limit(50).all()
 
 @router.post("/refresh-demand")
-def refresh_demand(sector: str, db: Session = Depends(get_db)):
-    """Fetch latest demand data"""
+@require_module(module_number=1)
+def refresh_demand(request: Request, sector: str, db: Session = Depends(get_db)):
+    user_id = request.state.user.id
+    consume_credits(db, user_id, "api_credits", 1)
     count = fetch_demand_signals(db, sector)
-    return {"message": f"Fetched {count} new demand signals"}
+    return {"message": f"Fetched {count}"}
 
 @router.get("/location-heatmap")
-def get_location_heatmap(
-    sector: str = Query(...),
-    metric_type: str = Query("business_density"),
-    db: Session = Depends(get_db)
-):
-    """County x Sector data for heatmaps. Powers Lane 6"""
-    data = db.query(LocationMetric).filter(
-        LocationMetric.sector == sector,
-        LocationMetric.metric_type == metric_type
-    ).all()
+@require_module(module_number=1)
+def get_location_heatmap(request: Request, sector: str = Query(...), metric_type: str = Query("business_density"), db: Session = Depends(get_db)):
+    data = db.query(LocationMetric).filter(LocationMetric.sector == sector, LocationMetric.metric_type == metric_type).all()
     return [{"county": d.county, "value": d.metric_value, "lat": d.lat, "lng": d.lng} for d in data]
 
 @router.post("/refresh-location")
-def refresh_location(sector: str, db: Session = Depends(get_db)):
-    """Fetch OSM + LocationIQ data for sector"""
+@require_module(module_number=1)
+def refresh_location(request: Request, sector: str, db: Session = Depends(get_db)):
+    user_id = request.state.user.id
+    consume_credits(db, user_id, "api_credits", 2)
     count = fetch_location_analytics(db, sector)
-    return {"message": f"Updated {count} location metrics"}
+    return {"message": f"Updated {count}"}
 
 @router.get("/fmcg-catalog")
-def get_fmcg_catalog(
-    category: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
-):
-    """Full FMCG catalog. Preloaded for Zero Setup"""
+def get_fmcg_catalog(category: Optional[str] = Query(None), db: Session = Depends(get_db)):
     query = db.query(FMCGCatalog)
     if category:
         query = query.filter(FMCGCatalog.category == category)
@@ -99,6 +85,5 @@ def get_fmcg_catalog(
 
 @router.post("/seed-fmcg")
 def seed_fmcg(db: Session = Depends(get_db)):
-    """One-time seed from OpenFoodFacts API"""
     count = seed_fmcg_catalog(db)
-    return {"message": f"Seeded {count} FMCG products"}
+    return {"message": f"Seeded {count}"}
