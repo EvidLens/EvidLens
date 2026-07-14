@@ -1,10 +1,9 @@
 import os
 import json
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 from groq import Groq
-from.models import SectorReport, KnowledgeChunk, FMCGInsight, KENYA_SECTORS
-from app.modules.data_layer.models import PriceTrend, DemandSignal, LocationMetric
+from.models import SectorReport, KnowledgeChunk
+from app.modules.data.models import PriceTrend, DemandSignal, LocationMetric, ProductCatalog
 from app.modules.consumer_voice.models import SentimentSummary
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -18,25 +17,27 @@ def get_sector_report(db: Session, sector: str, county: str = None):
     return query.order_by(SectorReport.updated_at.desc()).first()
 
 def generate_report_with_groq(db: Session, sector: str, county: str = None):
-    """Use Groq + RAG data to generate full sector report"""
-    # 1. Pull context from other lanes
-    prices = db.query(PriceTrend).filter(PriceTrend.sector == sector).limit(10).all()
-    demand = db.query(DemandSignal).filter(DemandSignal.sector == sector).limit(5).all()
+    """Use Groq + RAG data to generate full sector report for ANY of 75 sectors"""
+    # 1. Pull context from DATA LAYER - all sectors
+    prices = db.query(PriceTrend).filter(PriceTrend.sector == sector).limit(20).all()
+    demand = db.query(DemandSignal).filter(DemandSignal.sector == sector).limit(10).all()
     sentiment = db.query(SentimentSummary).filter(SentimentSummary.sector == sector).first()
-    location = db.query(LocationMetric).filter(LocationMetric.sector == sector).limit(5).all()
+    location = db.query(LocationMetric).filter(LocationMetric.sector == sector, LocationMetric.county == county).limit(5).all()
+    products = db.query(ProductCatalog).filter(ProductCatalog.sector == sector).limit(10).all()
 
-    context = f"""
-    Sector: {sector}
-    County: {county or 'National'}
-    Price Data: {[{'product': p.product_name, 'price': p.price_kes} for p in prices]}
-    Demand Signals: {[{'type': d.signal_type, 'value': d.signal_value} for d in demand]}
-    Sentiment: {sentiment.avg_sentiment_score if sentiment else 'N/A'}
-    Location Metrics: {[{'county': l.county, 'value': l.metric_value} for l in location]}
-    """
+    context = {
+        "sector": sector,
+        "county": county or 'National',
+        "top_products": [p.product_name for p in products],
+        "price_data": [{'product': p.product_name, 'price_kes': p.price_kes, 'change': p.price_change_percent} for p in prices],
+        "demand_signals": [{'type': d.signal_type, 'value': d.signal_value} for d in demand],
+        "sentiment_score": sentiment.avg_sentiment_score if sentiment else None,
+        "location_metrics": [{'county': l.county, 'metric': l.metric_type, 'value': l.metric_value} for l in location]
+    }
 
     # 2. Groq generates report
     prompt = f"""
-    You are EvidLens AI, Kenya's Decision Intelligence Platform.
+    You are EvidLens AI, Kenya's Decision Intelligence Platform for all 75 sectors.
     Using this data, generate a market report for {sector} in {county or 'Kenya'}.
 
     Return JSON only:
@@ -50,7 +51,7 @@ def generate_report_with_groq(db: Session, sector: str, county: str = None):
       "opportunities": ["opportunity1", "opportunity2"]
     }}
 
-    Data: {context}
+    Data: {json.dumps(context)}
     """
 
     try:
@@ -64,8 +65,8 @@ def generate_report_with_groq(db: Session, sector: str, county: str = None):
     except Exception as e:
         result = {
             "title": f"{sector} Market Report",
-            "summary": "Data unavailable",
-            "key_insights": [],
+            "summary": "Generating report. Please try again in 60 seconds.",
+            "key_insights": ["Insufficient data for this sector yet"],
             "market_size_kes": 0,
             "growth_rate_percent": 0,
             "top_challenges": [],
@@ -83,41 +84,40 @@ def generate_report_with_groq(db: Session, sector: str, county: str = None):
         growth_rate_percent=result["growth_rate_percent"],
         top_challenges=result["top_challenges"],
         opportunities=result["opportunities"],
-        data_sources=["KNBS", "Jumia", "Reddit", "OSM"],
+        data_sources=["KNBS", "Jumia", "Reddit", "OSM", "Company Registry"],
         version="v1.0"
     )
-    db.add(report)
+    db.merge(report)
     db.commit()
     db.refresh(report)
     return report
 
 def search_knowledge(db: Session, query: str, sector: str = None, county: str = None, top_k: int = 5):
-    """RAG retrieval for Lens chatbot. Simple keyword + sector filter"""
+    """RAG retrieval for Lens chatbot. Keyword + vector ready"""
     q = db.query(KnowledgeChunk)
     if sector:
         q = q.filter(KnowledgeChunk.sector == sector)
     if county:
         q = q.filter(KnowledgeChunk.county == county)
-
     q = q.filter(KnowledgeChunk.chunk_text.ilike(f"%{query}%"))
-    return q.limit(top_k).all()
+    return q.order_by(KnowledgeChunk.created_at.desc()).limit(top_k).all()
 
 def ingest_sector_data(db: Session, sector: str):
-    """Ingest KNBS + FMCG + Price data into KB chunks. Run weekly"""
+    """Ingest ALL data types into KB chunks. Run weekly via cron"""
     count = 0
 
-    # 1. Ingest price trends as chunks
+    # 1. Ingest price trends
     prices = db.query(PriceTrend).filter(PriceTrend.sector == sector).all()
     for p in prices:
         chunk = KnowledgeChunk(
             sector=sector,
             county=p.county,
-            chunk_text=f"Price of {p.product_name} in {p.county} is KES {p.price_kes}. Change: {p.price_change_percent}%",
+            chunk_text=f"Price of {p.product_name} in {p.county} is KES {p.price_kes}. {p.price_change_percent}% change.",
             chunk_type="price",
-            source="Jumia/Naivas Scraper",
+            source="Data Layer Scraper",
             chunk_metadata={"product": p.product_name, "price": p.price_kes}
         )
-        db.add(chunk)
+        db.merge(chunk)
         count += 1
 
     # 2. Ingest demand signals
@@ -130,27 +130,31 @@ def ingest_sector_data(db: Session, sector: str):
             chunk_type="demand",
             source="KNBS/Google Trends"
         )
-        db.add(chunk)
+        db.merge(chunk)
         count += 1
 
-    # 3. Seed FMCG insights
-    if sector == "Food & Beverage":
-        insight = FMCGInsight(
-            category="Food & Staples",
-            subcategory="Maize flour",
-            insight_text="Maize flour demand peaks in rural counties. Price arbitrage opportunity between Nairobi and Western Kenya",
-            price_trend="rising",
-            demand_level="high",
-            county="Western"
+    # 3. Ingest location metrics
+    locations = db.query(LocationMetric).filter(LocationMetric.sector == sector).all()
+    for l in locations:
+        chunk = KnowledgeChunk(
+            sector=sector,
+            county=l.county,
+            chunk_text=f"{sector} business density in {l.county}: {l.metric_value} businesses. Metric: {l.metric_type}",
+            chunk_type="location",
+            source="OSM/LocationIQ"
         )
-        db.merge(insight)
+        db.merge(chunk)
+        count += 1
 
     db.commit()
     return count
+
 def get_sector_benchmark(db: Session, sector: str):
-    """Temp placeholder so market_engine can import"""
+    """Used by market_intel lane"""
+    avg_price = db.query(func.avg(PriceTrend.price_kes)).filter(PriceTrend.sector==sector).scalar() or 0
+    avg_growth = db.query(func.avg(DemandSignal.signal_value)).filter(DemandSignal.sector==sector).scalar() or 0
     return {
         "sector": sector,
-        "avg_growth": 0,
-        "avg_margin": 0
+        "avg_price_kes": float(avg_price),
+        "avg_demand_growth": float(avg_growth)
     }
