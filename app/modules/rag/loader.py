@@ -1,8 +1,11 @@
-import os, httpx, json
+import os
+import httpx
+import json
+import asyncio
 from upstash_redis import Redis
 from app.modules.db import SessionLocal
-from app.modules.data_layer.service import fetch_demand_signals, seed_fmcg_catalog
-import asyncio
+from app.modules.data_layer.service import fetch_demand_signals
+from app.modules.data_layer.service import seed_fmcg_catalog
 
 redis = Redis(url=os.getenv("UPSTASH_REDIS_URL"), token=os.getenv("UPSTASH_REDIS_TOKEN"))
 
@@ -72,19 +75,22 @@ async def load_reddit_to_rag():
     async with httpx.AsyncClient() as client:
         for sector in KENYA_SECTORS:
             for kw in KEYWORDS.get(sector, [sector.lower()]):
-                res = await client.get(
-                    f"https://www.reddit.com/search.json?q={kw}+Kenya", 
-                    headers={"User-Agent": os.getenv("REDDIT_USER_AGENT")}
-                )
-                posts = res.json().get("data", {}).get("children", [])[:10]
-                texts = [p["data"]["title"] + " + p["data"].get("selftext", "") for p in posts]
-                redis.set(f"rag:reddit:{sector}:{kw}", json.dumps(texts))
+                try:
+                    res = await client.get(
+                        f"https://www.reddit.com/search.json?q={kw}+Kenya",
+                        headers={"User-Agent": os.getenv("REDDIT_USER_AGENT", "EvidLensBot/1.0")}
+                    )
+                    posts = res.json().get("data", {}).get("children", [])[:10]
+                    texts = [p["data"]["title"] + " + p["data"].get("selftext", "") for p in posts]
+                    redis.set(f"rag:reddit:{sector}:{kw}", json.dumps(texts))
+                except Exception as e:
+                    print(f"Reddit error for {kw}: {e}")
 
 async def load_fmcg_to_rag():
     db = SessionLocal()
     seed_fmcg_catalog(db)
     db.close()
-    redis.set("rag:fmcg:catalog", json.dumps({"status": "seeded", "source": "openfoodfacts"}))
+    redis.set("rag:fmcg:catalog", json.dumps({"status": "seeded", "source": "fmcg_catalog.json"}))
 
 async def run_rag_load():
     await asyncio.gather(
@@ -94,3 +100,4 @@ async def run_rag_load():
     )
     redis.set("rag:last_updated", "2026-04-29")
     redis.set("rag:sector_count", len(KENYA_SECTORS))
+    print(f"RAG Load Complete: {len(KENYA_SECTORS)} sectors")
