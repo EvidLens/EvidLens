@@ -6,7 +6,7 @@ from.service import initiate_stk_push, handle_c2b_webhook, verify_payment_status
 from.models import Payment, Subscription, PaymentStatus, SubscriptionTier
 from app.modules.db import get_db
 
-router = APIRouter()
+router = APIRouter(prefix="/payments", tags=["Payments"])
 
 PAID_REPORTS = {}
 
@@ -21,6 +21,21 @@ class SubscriptionRequest(BaseModel):
     tier: SubscriptionTier
     phone_number: str
     auto_renew: bool = True
+
+TIER_PRICES = {
+    SubscriptionTier.FREE: 0,
+    SubscriptionTier.BASIC: 990,
+    SubscriptionTier.SME_PRO: 2990,
+    SubscriptionTier.PROFESSIONAL: 7990,
+    SubscriptionTier.BUSINESS: 19990,
+    SubscriptionTier.ENTERPRISE: 49990
+}
+
+REPORT_PRICES = {
+    "single_report": 1500,
+    "bundle_3": 3990,
+    "bundle_10": 9990
+}
 
 @router.post("/stk-push")
 def stk_push(request: STKPushRequest, db: Session = Depends(get_db)):
@@ -64,24 +79,30 @@ def check_payment(reference: str):
 
 @router.post("/subscribe")
 def subscribe(req: SubscriptionRequest, user_id: int, db: Session = Depends(get_db)):
-    tier_prices = {
-        SubscriptionTier.SME_PRO: 2000,
-        SubscriptionTier.PROFESSIONAL: 5000,
-        SubscriptionTier.BUSINESS: 15000,
-        SubscriptionTier.ENTERPRISE: 40000
-    }
     if req.tier == SubscriptionTier.FREE:
-        sub = create_subscription(db, user_id, req.tier, auto_renew=False)
+        sub = create_subscription(db, user_id, req.tier, 0)
         return {"message": "Free tier activated", "subscription": sub}
-    amount = tier_prices.get(req.tier, 0)
+    amount = TIER_PRICES.get(req.tier, 0)
     stk = initiate_stk_push(
         db=db,
         phone_number=req.phone_number,
         amount=amount,
-        account_reference=f"sub_{user_id}",
+        account_reference=f"sub_{user_id}_{req.tier.value}",
         user_id=user_id
     )
-    return stk
+    return {"success": True, "checkout_request_id": stk.get("CheckoutRequestID"), "amount": amount, "tier": req.tier}
+
+@router.post("/buy-report")
+def buy_report(report_id: str, phone_number: str, bundle: str = "single_report", user_id: int = 0, db: Session = Depends(get_db)):
+    amount = REPORT_PRICES.get(bundle, REPORT_PRICES["single_report"])
+    stk = initiate_stk_push(
+        db=db,
+        phone_number=phone_number,
+        amount=amount,
+        account_reference=f"report_{report_id}_{bundle}",
+        user_id=user_id
+    )
+    return {"success": True, "checkout_request_id": stk.get("CheckoutRequestID"), "amount": amount}
 
 @router.get("/subscription/{user_id}")
 def get_user_subscription(user_id: int, db: Session = Depends(get_db)):
