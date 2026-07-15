@@ -158,3 +158,5 @@ def get_sector_benchmark(db: Session, sector: str):
         "avg_price_kes": float(avg_price),
         "avg_demand_growth": float(avg_growth)
     }
+def get_county_by_name(name: str):
+    return None
