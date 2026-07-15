@@ -1,7 +1,12 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime
-from app.modules.db.base import Base
+# Stub models - no DB dependency
+class PriceTrend: 
+    pass
 
-class PriceTrend(Base): pass
-class DemandSignal(Base): pass  
-class LocationMetric(Base): pass
-class ProductCatalog(Base): pass
+class DemandSignal: 
+    pass
+
+class LocationMetric: 
+    pass
+
+class ProductCatalog: 
+    pass
