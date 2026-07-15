@@ -45,3 +45,10 @@ def seed_product_catalog(db: Session, sector: str, category: str = None) -> int:
     search_term = category if category else sector
     url = f"https://world.openfoodfacts.org/cgi/search.pl?search_terms={search_term}&json=true&page_size=100"
     # Now works for Pharma, Automotive, FMCG, anything
+def get_demand_signal(db: Session, sector: str, product_or_topic: str, county: str = None):
+    """Stub to make market_engine import work"""
+    return {"demand_score": 50, "trend": "stable"}
+
+def get_price_stats(db: Session, sector: str, product_or_topic: str, county: str = None):
+    """Stub to make market_engine import work""" 
+    return {"avg_price": 0, "min_price": 0, "max_price": 0}
