@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List, Optional
-from.service import aggregate_sentiment, fetch_reddit_data
-from.models import ConsumerFeedback, SentimentSummary
+from .service import aggregate_sentiment, fetch_reddit_data
+from .models import ConsumerFeedback, SentimentSummary
 from app.modules.db import get_session as get_db
 from app.modules.core.guards import require_module, consume_credits
 
