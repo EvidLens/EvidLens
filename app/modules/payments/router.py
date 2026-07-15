@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
-from.service import initiate_stk_push, handle_c2b_webhook, verify_payment_status, create_subscription, get_subscription, process_b2c
-from.models import Payment, Subscription, PaymentStatus, SubscriptionTier
+from .service import initiate_stk_push, handle_c2b_webhook, verify_payment_status, create_subscription, get_subscription, process_b2c
+from .models import Payment, Subscription, PaymentStatus, SubscriptionTier
 from app.modules.db import get_session as get_db
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
