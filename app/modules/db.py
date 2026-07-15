@@ -29,3 +29,4 @@ def init_db():
     from app.modules.market_engine.models import MarketSearch, Competitor, MarketMetric
     from app.modules.core.models import Plan, Module, Sector, AddOn, ALCService, UserSubscription, GeoFilter
     Base.metadata.create_all(bind=engine)
+get_db = get_session
