@@ -4,7 +4,7 @@ import httpx
 import os
 import json
 
-from app.modules.knowledge_base.service import get_sector_benchmark, get_county_by_name
+from app.modules.knowledge_base.service import get_sector_benchmark
 from app.modules.data_layer.service import get_aggregated_prices
 
 GROQ_KEY = os.getenv("GROQ_API_KEY")
