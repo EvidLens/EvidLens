@@ -52,3 +52,8 @@ def get_demand_signal(db: Session, sector: str, product_or_topic: str, county: s
 def get_price_stats(db: Session, sector: str, product_or_topic: str, county: str = None):
     """Stub to make market_engine import work""" 
     return {"avg_price": 0, "min_price": 0, "max_price": 0}
+    from sqlalchemy.orm import Session
+from typing import List, Dict, Any
+
+def get_aggregated_prices(db: Session, sector: str, county: str) -> List[Dict[str, Any]]:
+    return []
