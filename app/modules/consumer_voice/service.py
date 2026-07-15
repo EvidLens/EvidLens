@@ -130,3 +130,6 @@ def aggregate_sentiment(db: Session, sector: str, product_or_topic: str, county:
         "top_likes": top_likes,
         "top_complaints": top_complaints
     }
+def get_sentiment_summary(db: Session, sector: str, product_or_topic: str, county: str = None):
+    """Wrapper for aggregate_sentiment so market_engine can import it"""
+    return aggregate_sentiment(db, sector, product_or_topic, county)
