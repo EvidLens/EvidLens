@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import httpx
 
 from .service import generate_market_report_pdf, generate_market_report_excel
-from.models import Report, ReportType, ReportFormat, ReportStatus
+from .models import Report, ReportType, ReportFormat, ReportStatus
 from app.modules.payments.service import get_subscription
 from app.modules.db import get_session as get_dbb
 
