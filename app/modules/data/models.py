@@ -10,3 +10,6 @@ class LocationMetric:
 
 class ProductCatalog: 
     pass
+
+class DataSource:
+    pass
