@@ -25,7 +25,7 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
 #chatInputBox{display:flex; padding:12px; border-top:1px solid #E2E8F0}
 #chatInput{flex:1; border:1px solid #CBD5E1; border-radius:20px; padding:10px 14px; outline:none; font-size:14px}
 #chatSend{background:#F59E0B; color:white; border:none; border-radius:20px; padding:10px 18px; margin-left:8px; font-weight:600; cursor:pointer}
-@media(max-width:768px)chatBox{width:calc(100vw - 32px); right:16px; bottom:80px}}
+@media(max-width:768px){#chatBox{width:calc(100vw - 32px); right:16px; bottom:80px}}
 </style>
 </head>
 <body>
@@ -61,21 +61,7 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
           <div class="flex gap-3"><input name="sector" placeholder="Sector" class="w-1/2 p-3 border rounded-lg text-sm" required><input name="county" placeholder="County" class="w-1/2 p-3 border rounded-lg text-sm" required></div>
           <button class="bg-[#F59E0B] text-white w-full p-3 rounded-lg font-bold hover:opacity-90">Analyze Market</button>
         </form>
-        <div id="result" class="mt-4 text-sm">
-          {% if result %}
-            {% if result.error %}
-              <div class="p-4 bg-red-50 border-red-200 rounded-lg"><p class="font-bold text-red-600">Error</p><pre class="text-xs mt-2">{{result.error}}</pre></div>
-            {% else %}
-              <div class="p-4 bg-green-50 border-green-200 rounded-lg space-y-2">
-                <p class="font-bold text-[#0A1F44]">Results for: {{result.q}} in {{result.county}}</p>
-                <p><b>Sector Benchmark:</b> {{result.benchmark}}</p>
-                <p><b>AI Insight:</b> {{result.ai}}</p>
-                <p><b>Competitors Found:</b> {{result.competitors|length}}</p>
-                <pre class="text-xs mt-2 whitespace-pre-wrap bg-white p-2 rounded">{{result.data}}</pre>
-              </div>
-            {% endif %}
-          {% endif %}
-        </div>
+        <div id="result" class="mt-4 text-sm"></div>
       </div>
       <div class="card">
         <h2 class="font-bold text-xl mb-3" style="color:#0A1F44">Download Full Report</h2>
@@ -93,8 +79,24 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
 <div id="chatWidget"><div id="chatBox"><div id="chatHeader">🤖 Lens AI Assistant</div><div id="chatMessages"><div class="msg bot">Hi! I'm Lens. Ask me anything about Kenya markets.</div></div><div id="chatInputBox"><input id="chatInput" placeholder="Ask Lens anything..."><button id="chatSend">Send</button></div></div><button id="chatBtn">💬</button></div>
 
 <script>
-let lastAnalysis = null;let chatHistory = [];
-async function loadDashboard(){const res = await fetch('/api/dashboard');const data = await res.json();document.getElementById('trendingCategory').innerText = data.trending.category;document.getElementById('trendingHeadline').innerText = '"' + data.trending.headline + '"';const lanesGrid = document.getElementById('lanesGrid');lanesGrid.innerHTML = '';data.lanes.forEach((lane, index) => {let onclick = '';if(index === 4) onclick = 'onclick="downloadPDF()"';lanesGrid.innerHTML += '<div class="card cursor-pointer" ' + onclick + '><div class="lane-icon w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold mb-3 text-lg">' + lane.icon + '</div><p class="font-semibold text-base" style="color:#0A1F44">' + lane.name + '</p><p class="text-sm text-gray-500">' + lane.insights + ' Insights</p><p class="text-sm font-semibold" style="color:#14B8A6">' + lane.growth + '</p>' + (index === 4? '<p class="text-xs font-bold mt-2" style="color:#F59E0B">Download PDF</p>' : '') + '</div>';});}
+let lastAnalysis = null;
+let chatHistory = [];
+
+async function loadDashboard(){
+  try{
+    const res = await fetch('/api/dashboard');
+    const data = await res.json();
+    document.getElementById('trendingCategory').innerText = data.trending.category;
+    document.getElementById('trendingHeadline').innerText = '"' + data.trending.headline + '"';
+    const lanesGrid = document.getElementById('lanesGrid');
+    lanesGrid.innerHTML = '';
+    data.lanes.forEach((lane, index) => {
+      let onclick = '';
+      if(index === 4) onclick = 'onclick="downloadPDF()"';
+      lanesGrid.innerHTML += '<div class="card cursor-pointer" ' + onclick + '><div class="lane-icon w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold mb-3 text-lg">' + lane.icon + '</div><p class="font-semibold text-base" style="color:#0A1F44">' + lane.name + '</p><p class="text-sm text-gray-500">' + lane.insights + ' Insights</p><p class="text-sm font-semibold" style="color:#14B8A6">' + lane.growth + '</p>' + (index === 4? '<p class="text-xs font-bold mt-2" style="color:#F59E0B">Download PDF</p>' : '') + '</div>';
+    });
+  }catch(e){console.log('Dashboard load error', e)}
+}
 loadDashboard();
 
 document.getElementById('searchForm').onsubmit = async (e) => {
@@ -109,7 +111,7 @@ document.getElementById('searchForm').onsubmit = async (e) => {
   document.getElementById('result').innerHTML = doc.getElementById('result').innerHTML;
 }
 
-async function downloadPDF(){
+function downloadPDF(){
   if(!lastAnalysis){ alert('Please run an analysis first'); return; }
   document.getElementById('pdf_q').value = lastAnalysis.q;
   document.getElementById('pdf_sector').value = lastAnalysis.sector;
@@ -117,10 +119,41 @@ async function downloadPDF(){
   document.getElementById('pdfForm').submit();
 }
 
-const chatBtn = document.getElementById('chatBtn');const chatBox = document.getElementById('chatBox');const chatInput = document.getElementById('chatInput');const chatSend = document.getElementById('chatSend');const chatMessages = document.getElementById('chatMessages');
-chatBtn.onclick = () => chatBox.style.display = chatBox.style.display === 'flex'? 'none' : 'flex';
-async function sendChat(){const msg = chatInput.value.trim();if(!msg) return;chatMessages.innerHTML += '<div class="msg user">' + msg + '</div>';chatHistory.push({role: "user", content: msg});chatInput.value = '';chatMessages.innerHTML += '<div class="msg bot" id="typing">Lens is thinking...</div>';chatMessages.scrollTop = chatMessages.scrollHeight;const res = await fetch('/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message: msg, history: chatHistory, context: lastAnalysis})});const data = await res.json();document.getElementById('typing').remove();chatHistory.push({role: "assistant", content: data.reply});chatMessages.innerHTML += '<div class="msg bot">' + data.reply + '</div>';chatMessages.scrollTop = chatMessages.scrollHeight;}
-chatSend.onclick = sendChat;chatInput.onkeypress = (e) => { if(e.key === 'Enter') sendChat(); }
+const chatBtn = document.getElementById('chatBtn');
+const chatBox = document.getElementById('chatBox');
+const chatInput = document.getElementById('chatInput');
+const chatSend = document.getElementById('chatSend');
+const chatMessages = document.getElementById('chatMessages');
+
+chatBtn.onclick = () => {
+  if(chatBox.style.display === 'flex'){
+    chatBox.style.display = 'none';
+  } else {
+    chatBox.style.display = 'flex';
+  }
+};
+
+async function sendChat(){
+  const msg = chatInput.value.trim();
+  if(!msg) return;
+  chatMessages.innerHTML += '<div class="msg user">' + msg + '</div>';
+  chatHistory.push({role: "user", content: msg});
+  chatInput.value = '';
+  chatMessages.innerHTML += '<div class="msg bot" id="typing">Lens is thinking...</div>';
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  try{
+    const res = await fetch('/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message: msg, history: chatHistory, context: lastAnalysis})});
+    const data = await res.json();
+    document.getElementById('typing').remove();
+    chatHistory.push({role: "assistant", content: data.reply});
+    chatMessages.innerHTML += '<div class="msg bot">' + data.reply + '</div>';
+  }catch(e){
+    document.getElementById('typing').innerText = 'Error: Could not reach AI';
+  }
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+chatSend.onclick = sendChat;
+chatInput.onkeypress = (e) => { if(e.key === 'Enter') sendChat(); }
 </script>
 </body>
 </html>
