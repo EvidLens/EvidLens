@@ -23,7 +23,78 @@ def signup_page(request: Request):
 
 @router.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
-    return templates.TemplateResponse("dashboard.html", {"request": request, "result": None})
+    html_content = """
+<!DOCTYPE html>
+<html>
+<head>
+<title>EvidLens</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif}
+.card{background:white; border-radius:16px; padding:20px; box-shadow:0 1px 4px rgba(16,24,40,0.06)}
+.teal-card{border-top:4px solid #14B8A6}
+#chatWidget{position:fixed; bottom:24px; right:24px; z-index:9999}
+#chatBtn{width:56px; height:56px; border-radius:50%; background:linear-gradient(135deg,#0A1F44,#14B8A6); color:white; border:none; font-size:24px; cursor:pointer; box-shadow:0 4px 12px rgba(20,184,166,0.4)}
+#chatBox{width:380px; height:550px; background:white; border-radius:16px; display:none; flex-direction:column; box-shadow:0 8px 24px rgba(0,0,0,0.15)}
+#chatHeader{background:#0A1F44; color:white; padding:14px 16px; font-weight:700}
+#chatMessages{flex:1; overflow-y:auto; padding:16px; background:#F5F7FA}
+.msg{margin-bottom:12px; padding:10px 12px; border-radius:12px; max-width:85%; font-size:14px}
+.msg.user{background:#14B8A6; color:white; margin-left:auto}
+.msg.bot{background:white; color:#0A1F44; border:1px solid #E2E8F0}
+#chatInputBox{display:flex; padding:12px; border-top:1px solid #E2E8F0}
+#chatInput{flex:1; border:1px solid #CBD5E1; border-radius:20px; padding:10px 14px; outline:none}
+#chatSend{background:#F59E0B; color:white; border:none; border-radius:20px; padding:10px 18px; margin-left:8px; font-weight:600; cursor:pointer}
+</style>
+</head>
+<body>
+<header class="text-white px-6 py-4 sticky top-0 shadow-md" style="background:#0A1F44">
+<h1 class="font-bold text-2xl">Evid<span style="color:#14B8A6">Lens</span></h1>
+</header>
+<main class="px-4 py-6 max-w-[1400px] mx-auto">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+<div class="card teal-card"><p class="text-sm text-gray-500">Total Insights</p><p class="text-4xl font-bold" style="color:#0A1F44">198</p></div>
+<div class="card teal-card"><p class="text-sm text-gray-500">Active Lanes</p><p class="text-4xl font-bold" style="color:#0A1F44">9</p></div>
+<div class="card teal-card"><p class="text-sm text-gray-500">Reports</p><p class="text-4xl font-bold" style="color:#0A1F44">74</p></div>
+<div class="card teal-card"><p class="text-sm text-gray-500">AI Queries</p><p class="text-4xl font-bold" style="color:#0A1F44">1.2k</p></div>
+</div>
+<div class="card mb-6">
+<h2 class="font-bold text-xl mb-3" style="color:#0A1F44">Quick Business Analysis</h2>
+<form id="searchForm" class="space-y-3">
+<input name="q" placeholder="e.g maize mill, retail, fintech" class="w-full p-3 border rounded-lg" required>
+<div class="flex gap-3"><input name="sector" placeholder="Sector" class="w-1/2 p-3 border rounded-lg" required><input name="county" placeholder="County" class="w-1/2 p-3 border rounded-lg" required></div>
+<button class="bg-[#F59E0B] text-white w-full p-3 rounded-lg font-bold">Analyze Market</button>
+</form>
+<div id="result" class="mt-4"></div>
+</div>
+<button onclick="downloadPDF()" class="bg-[#14B8A6] text-white w-full p-3 rounded-lg font-bold">Download PDF</button>
+</main>
+<form id="pdfForm" method="POST" action="/download-report" style="display:none">
+<input name="q" id="pdf_q"><input name="sector" id="pdf_sector"><input name="county" id="pdf_county">
+</form>
+<div id="chatWidget">
+<div id="chatBox">
+<div id="chatHeader">🤖 Lens AI Assistant</div>
+<div id="chatMessages"><div class="msg bot">Hi! I'm Lens. Ask me anything about Kenya markets.</div></div>
+<div id="chatInputBox"><input id="chatInput" placeholder="Ask Lens anything..."><button id="chatSend">Send</button></div>
+</div>
+<button id="chatBtn">💬</button>
+</div>
+<script>
+let lastAnalysis = null; let chatHistory = [];
+async function loadDashboard(){ const res = await fetch('/api/dashboard'); const data = await res.json(); }
+loadDashboard();
+document.getElementById('searchForm').onsubmit = async (e) => { e.preventDefault(); const form = new FormData(e.target); lastAnalysis = Object.fromEntries(form); document.getElementById('result').innerHTML = '<p>Analyzing...</p>'; const res = await fetch('/search-market', {method:'POST', body:form}); document.getElementById('result').innerHTML = await res.text(); }
+function downloadPDF(){ if(!lastAnalysis){ alert('Please run an analysis first'); return; } document.getElementById('pdf_q').value = lastAnalysis.q; document.getElementById('pdf_sector').value = lastAnalysis.sector; document.getElementById('pdf_county').value = lastAnalysis.county; document.getElementById('pdfForm').submit(); }
+const chatBtn = document.getElementById('chatBtn'); const chatBox = document.getElementById('chatBox'); const chatInput = document.getElementById('chatInput'); const chatSend = document.getElementById('chatSend'); const chatMessages = document.getElementById('chatMessages');
+chatBtn.onclick = () => { chatBox.style.display = chatBox.style.display === 'flex'? 'none' : 'flex'; };
+async function sendChat(){ const msg = chatInput.value.trim(); if(!msg) return; chatMessages.innerHTML += '<div class="msg user">' + msg + '</div>'; chatHistory.push({role: "user", content: msg}); chatInput.value = ''; chatMessages.innerHTML += '<div class="msg bot" id="typing">Lens is thinking...</div>'; const res = await fetch('/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message: msg, history: chatHistory, context: lastAnalysis})}); const data = await res.json(); document.getElementById('typing').remove(); chatHistory.push({role: "assistant", content: data.reply}); chatMessages.innerHTML += '<div class="msg bot">' + data.reply + '</div>'; }
+chatSend.onclick = sendChat; chatInput.onkeypress = (e) => { if(e.key === 'Enter') sendChat(); }
+</script>
+</body>
+</html>
+"""
+    return HTMLResponse(content=html_content)
 
 @router.get("/api/dashboard")
 def api_dashboard():
@@ -66,28 +137,18 @@ def search_market_ui(request: Request, q: str = Form(...), sector: str = Form(..
     try:
         result_data = search_market(db, q, sector, county)
         if not result_data: result_data = {"message": "No data found yet"}
-
         competitors = get_competitor_overview(db, sector, county)
-        benchmark = get_sector_benchmark(sector) # FIXED: use sector directly
+        benchmark = get_sector_benchmark(sector)
         ai_insights = generate_insights(q, result_data)
-
-        result = {
-            "q": q, "sector": sector, "county": county,
-            "data": result_data,
-            "competitors": competitors,
-            "benchmark": benchmark,
-            "ai": ai_insights
-        }
-
+        result = f"<div class='p-4 bg-green-50 border border-green-200 rounded-lg'><p class='font-bold' style='color:#0A1F44'>Results for: {q} in {county}</p><p><b>Sector Benchmark:</b> {benchmark}</p><p><b>AI Insight:</b> {ai_insights}</p><p><b>Competitors:</b> {len(competitors)}</p></div>"
     except Exception as e:
-        result = {"error": str(e), "q": q, "sector": sector, "county": county}
-
-    return templates.TemplateResponse("dashboard.html", {"request": request, "result": result})
+        result = f"<div class='p-4 bg-red-50 border border-red-200 rounded-lg'><p class='font-bold text-red-600'>Error</p><pre class='text-xs'>{str(e)}</pre></div>"
+    return HTMLResponse(content=result)
 
 @router.post("/pay-report")
 def pay_report(request: Request, phone: str = Form(...), db: Session = Depends(get_db)):
     result = initiate_stk_push(db, phone_number=phone, amount=500, account_reference="report_001", user_id=1)
-    return JSONResponse({"status": "success", "data": result}) # Return JSON for MPESA popup
+    return JSONResponse({"status": "success", "data": result})
 
 @router.post("/download-report")
 def download_report(q: str = Form(...), sector: str = Form(...), county: str = Form(...), db: Session = Depends(get_db)):
