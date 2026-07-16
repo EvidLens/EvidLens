@@ -5,12 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EvidLens - Kenya's Decision Intelligence</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/css/style.css?v=2.0.0">
 </head>
 <body class="bg-gray-50">
     <header class="bg-[#0A1F44] text-white h-16 flex items-center px-6 shadow-md">
-        <img src="/static/logo.png" alt="EvidLens Logo" class="h-10 mr-3">
+        <img src="/static/logo.png?v=2.0.0" alt="EvidLens Logo" class="h-10 mr-3">
         <span class="font-bold text-xl">EvidLens</span>
     </header>
     <main class="p-6 max-w-7xl mx-auto">{% block content %}{% endblock %}</main>
+
+    <div id="chatbot-container"></div>
+    <script src="/static/js/app.js?v=2.0.0"></script>
 </body>
 </html>
