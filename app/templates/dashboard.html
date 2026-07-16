@@ -43,20 +43,20 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
     <div class="card mb-6"><div class="flex items-center gap-3 text-gray-400"><span>🔍</span><input id="searchInput" placeholder="Search insights, lanes, or questions..." class="w-full outline-none text-base bg-transparent"></div></div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-      <div class="card teal-card"><p class="text-sm text-gray-500">Total Insights</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">198</p><p class="text-sm mt-1" style="color:#14B8A6">+18% this week</p></div>
-      <div class="card teal-card"><p class="text-sm text-gray-500">Active Lanes</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">9</p><p class="text-sm mt-1" style="color:#14B8A6">All monitoring</p></div>
-      <div class="card teal-card"><p class="text-sm text-gray-500">Reports Generated</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">74</p><p class="text-sm mt-1" style="color:#14B8A6">+22% this month</p></div>
-      <div class="card teal-card"><p class="text-sm text-gray-500">AI Queries</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">1.2k</p><p class="text-sm mt-1" style="color:#14B8A6">+30% this week</p></div>
+      <div class="card teal-card"><p class="text-sm text-gray-500">Total Insights</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">0</p></div>
+      <div class="card teal-card"><p class="text-sm text-gray-500">Active Lanes</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">0</p></div>
+      <div class="card teal-card"><p class="text-sm text-gray-500">Reports Generated</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">0</p></div>
+      <div class="card teal-card"><p class="text-sm text-gray-500">AI Queries</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">0</p></div>
     </div>
 
-    <div class="mb-8"><h2 class="font-bold text-xl mb-4 flex items-center gap-2" style="color:#0A1F44"><span>🔥</span>Trending Now</h2><div id="trendingCard" class="trending text-white p-6 rounded-2xl"><p class="text-sm font-semibold opacity-90 uppercase" id="trendingCategory">ECONOMY</p><p class="font-semibold text-lg mt-2" id="trendingHeadline">"Kenya inflation drops to 4.2% - Lowest in 18 months"</p></div></div>
+    <div class="mb-8"><h2 class="font-bold text-xl mb-4 flex items-center gap-2" style="color:#0A1F44"><span>🔥</span>Trending Now</h2><div id="trendingCard" class="trending text-white p-6 rounded-2xl"><p class="text-sm font-semibold opacity-90 uppercase" id="trendingCategory">NO DATA</p><p class="font-semibold text-lg mt-2" id="trendingHeadline">Run an analysis to load real trends</p></div></div>
 
     <div class="mb-8"><h2 class="font-bold text-xl mb-4" style="color:#0A1F44">Intelligence Lanes</h2><div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4" id="lanesGrid"></div></div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
       <div class="card">
         <h2 class="font-bold text-xl mb-3" style="color:#0A1F44">Quick Business Analysis</h2>
-        <form id="searchForm" method="POST" action="/search-market" class="space-y-3">
+        <form id="searchForm" class="space-y-3">
           <input name="q" placeholder="e.g maize mill, retail, fintech" class="w-full p-3 border rounded-lg text-sm" required>
           <div class="flex gap-3"><input name="sector" placeholder="Sector" class="w-1/2 p-3 border rounded-lg text-sm" required><input name="county" placeholder="County" class="w-1/2 p-3 border rounded-lg text-sm" required></div>
           <button class="bg-[#F59E0B] text-white w-full p-3 rounded-lg font-bold hover:opacity-90">Analyze Market</button>
@@ -72,7 +72,7 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
   </div>
 </main>
 
-<form id="pdfForm" method="POST" action="/download-report"><input type="hidden" name="q" id="pdf_q"><input type="hidden" name="sector" id="pdf_sector"><input type="hidden" name="county" id="pdf_county"></form>
+<form id="pdfForm" method="POST" action="/download-report" style="display:none"><input type="hidden" name="q" id="pdf_q"><input type="hidden" name="sector" id="pdf_sector"><input type="hidden" name="county" id="pdf_county"></form>
 
 <footer class="footer text-white pt-12 pb-8 mt-12"><div class="max-w-[1400px] mx-auto px-6"><div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8"><div><h3 class="font-bold mb-3" style="color:#14B8A6">Legal</h3><ul class="space-y-2 text-sm"><li><a href="/privacy" class="footer-link">Privacy Policy</a></li><li><a href="/terms" class="footer-link">Terms</a></li></ul></div><div><h3 class="font-bold mb-3" style="color:#14B8A6">Support</h3><ul class="space-y-2 text-sm"><li><a href="/contact" class="footer-link">Contact Us</a></li></ul></div><div><h3 class="font-bold mb-3" style="color:#14B8A6">Product</h3><ul class="space-y-2 text-sm"><li><a href="/pricing" class="footer-link">Pricing</a></li></ul></div><div><h3 class="font-bold mb-3" style="color:#14B8A6">Company</h3><ul class="space-y-2 text-sm"><li><a href="/about" class="footer-link">About</a></li></ul></div></div><div class="border-t border-gray-700 pt-6 text-center text-sm" style="color:#CBD5E1">© 2026 EvidLens. Decision Intelligence for Kenya.</div></div></footer>
 
@@ -87,7 +87,7 @@ async function loadDashboard(){
     const res = await fetch('/api/dashboard');
     const data = await res.json();
     document.getElementById('trendingCategory').innerText = data.trending.category;
-    document.getElementById('trendingHeadline').innerText = '"' + data.trending.headline + '"';
+    document.getElementById('trendingHeadline').innerText = data.trending.headline;
     const lanesGrid = document.getElementById('lanesGrid');
     lanesGrid.innerHTML = '';
     data.lanes.forEach((lane, index) => {
@@ -106,9 +106,7 @@ document.getElementById('searchForm').onsubmit = async (e) => {
   document.getElementById('result').innerHTML = '<p class="text-gray-500">Analyzing...</p>';
   const res = await fetch('/search-market', {method:'POST', body:form});
   const html = await res.text();
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, 'text/html');
-  document.getElementById('result').innerHTML = doc.getElementById('result').innerHTML;
+  document.getElementById('result').innerHTML = html;
 }
 
 function downloadPDF(){
@@ -126,11 +124,7 @@ const chatSend = document.getElementById('chatSend');
 const chatMessages = document.getElementById('chatMessages');
 
 chatBtn.onclick = () => {
-  if(chatBox.style.display === 'flex'){
-    chatBox.style.display = 'none';
-  } else {
-    chatBox.style.display = 'flex';
-  }
+  chatBox.style.display = chatBox.style.display === 'flex'? 'none' : 'flex';
 };
 
 async function sendChat(){
