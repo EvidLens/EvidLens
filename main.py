@@ -33,24 +33,14 @@ from app.modules.business_os.router import router as business_router
 from app.modules.rag.router import router as rag_router
 from app.modules.web import routes as web_routes
 
-app = FastAPI(
-    title="EvidLens API", 
-    version="2.0.0", 
-    description="Kenya's Decision Intelligence Platform - 9 Lanes, 19 Modules. All 75 Sectors."
-)
+app = FastAPI(title="EvidLens API", version="2.0.0", description="Kenya's Decision Intelligence Platform - 9 Lanes, 19 Modules. All 75 Sectors.")
 
 @app.on_event("startup")
 def on_startup():
     init_db()
     start_scheduler()
 
-app.add_middleware(
-    CORSMiddleware, 
-    allow_origins=["*"], 
-    allow_credentials=True, 
-    allow_methods=["*"], 
-    allow_headers=["*"]
-)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates", auto_reload=True)
@@ -92,14 +82,7 @@ def get_current_user(request: Request, session: Session = Depends(get_session)):
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     subscription = session.query(UserSubscription).filter(UserSubscription.user_id == user.id).first()
-    return {
-        "id": user.id,
-        "email": user.email,
-        "name": user.name,
-        "plan": subscription.plan.name if subscription else "FREE",
-        "reports_left": subscription.reports_left if subscription else 1,
-        "avatar": user.avatar_url
-    }
+    return {"id": user.id, "email": user.email, "name": user.name, "plan": subscription.plan.name if subscription else "FREE", "reports_left": subscription.reports_left if subscription else 1, "avatar": user.avatar_url}
 
 @app.get("/api/notifications")
 def get_notifications(request: Request, session: Session = Depends(get_session)):
