@@ -55,6 +55,19 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates", auto_reload=True)
 
+app.include_router(auth_router, prefix="/auth", tags=["Auth"])
+app.include_router(payments_router, prefix="/payments", tags=["Payments"])
+app.include_router(market_router, prefix="/market", tags=["Market Engine"])
+app.include_router(consumer_router, prefix="/voice", tags=["Consumer Voice"])
+app.include_router(data_router, prefix="/data", tags=["Data Layer"])
+app.include_router(ai_router, prefix="/ai", tags=["AI Insights"])
+app.include_router(report_router, prefix="/reports", tags=["Report Builder"])
+app.include_router(location_router, prefix="/location", tags=["Location Intel"])
+app.include_router(knowledge_router, prefix="/kb", tags=["Knowledge Base"])
+app.include_router(business_router, prefix="/os", tags=["Business OS"])
+app.include_router(rag_router, prefix="/api", tags=["RAG"])
+app.include_router(web_routes.router)
+
 @app.exception_handler(500)
 async def internal_error(request: Request, exc):
     return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
@@ -106,21 +119,8 @@ def logout():
     response.delete_cookie("user_id")
     return response
 
-app.include_router(auth_router, prefix="/auth", tags=["Auth"])
-app.include_router(payments_router, prefix="/payments", tags=["Payments"])
-app.include_router(market_router, prefix="/market", tags=["Market Engine"])
-app.include_router(consumer_router, prefix="/voice", tags=["Consumer Voice"])
-app.include_router(data_router, prefix="/data", tags=["Data Layer"])
-app.include_router(ai_router, prefix="/ai", tags=["AI Insights"])
-app.include_router(report_router, prefix="/reports", tags=["Report Builder"])
-app.include_router(location_router, prefix="/location", tags=["Location Intel"])
-app.include_router(knowledge_router, prefix="/kb", tags=["Knowledge Base"])
-app.include_router(business_router, prefix="/os", tags=["Business OS"])
-app.include_router(rag_router, prefix="/api", tags=["RAG"])
-
-app.include_router(web_routes.router)
-
 if __name__ == "__main__":
     import uvicorn
+    import os
     port = int(os.getenv("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
