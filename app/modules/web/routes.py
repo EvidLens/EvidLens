@@ -54,7 +54,7 @@ def do_signup(request: Request, email: str = Form(...), password: str = Form(...
 
 @router.post("/do-login")
 def do_login(request: Request, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
-    result = login_user(db, email, password)
+    result = login_user(next(db), email, password)
     if "error" in result: return templates.TemplateResponse("login.html", {"request": request, "error": result["error"]})
     return RedirectResponse(url="/dashboard", status_code=303)
 
