@@ -1,26 +1,29 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from app.core.db import get_session
+from app.core.db import get_db
 from app.modules.market_engine.service import MarketEngineService
 
-router = APIRouter()
+router = APIRouter(prefix="/api/market", tags=["Market Engine"])
 
-@router.get("/stats")
-async def stats(db: Session = Depends(get_session)):
-    service = MarketEngineService(db)
-    return await service.get_stats()
+def get_service(db: Session = Depends(get_db)):
+    return MarketEngineService(db)
+
+@router.post("/search")
+async def search_market(data: dict, service: MarketEngineService = Depends(get_service)):
+    return await service.search_market(data["q"], data["sector"], data["county"])
+
+@router.post("/analyze")
+async def analyze(data: dict, service: MarketEngineService = Depends(get_service)):
+    return await service.analyze_with_ai(data["sector"], data["county"])
+
+@router.get("/dashboard-stats")
+async def dashboard_stats(service: MarketEngineService = Depends(get_service)):
+    return await service.get_dashboard_stats()
 
 @router.post("/terminal")
-async def terminal(sector: str, county: str = "National", date_range: str = "30d", db: Session = Depends(get_session)):
-    service = MarketEngineService(db)
-    return await service.real_time_market_terminal(sector, county, date_range)
+async def terminal(data: dict, service: MarketEngineService = Depends(get_service)):
+    return await service.get_real_time_terminal(data["sector"], data["county"])
 
-@router.post("/startups")
-async def startups(sector: str, date_range: str = "90d", db: Session = Depends(get_session)):
-    service = MarketEngineService(db)
-    return await service.startup_tech_tracker(sector, date_range)
-
-@router.post("/intent")
-async def intent(sector: str, county: str, keyword: str, db: Session = Depends(get_session)):
-    service = MarketEngineService(db)
-    return await service.b2b_intent_signals(sector, county, keyword)
+@router.post("/competitors")
+async def competitors(data: dict, service: MarketEngineService = Depends(get_service)):
+    return await service.get_competitor_overview(data["sector"], data["county"])
