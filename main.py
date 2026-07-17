@@ -33,7 +33,7 @@ from app.modules.rag.router import router as rag_router
 from app.modules.web import routes as web_routes
 
 # IMPORT THE SERVICE FUNCTIONS
-from app.modules.market_engine.service import search_market, analyze_with_ai, get_dashboard_stats, get_real_time_terminal, call_groq
+from app.modules.market_engine.service import search_market, get_dashboard_stats, get_real_time_terminal, get_competitor_overview, get_location_data
 from app.modules.core.service import get_all_pricing, PRICING, ADDONS, ALC
 
 app = FastAPI(title="EvidLens API", version="2.0.0", description="Kenya's Decision Intelligence Platform - 9 Lanes, 19 Modules. All 75 Sectors.")
