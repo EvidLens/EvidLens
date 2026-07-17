@@ -1,0 +1,38 @@
+<div id="lens-widget" class="fixed bottom-6 right-6 z-50">
+    <button id="lens-toggle" class="bg-[#0A1F44] text-white p-4 rounded-full shadow-2xl hover:bg-[#14B8A6] transition">
+        <span class="font-bold">Lens</span>
+    </button>
+    <div id="lens-chat" class="hidden w-[400px] h-[600px] bg-white rounded-xl shadow-2xl flex-col border">
+        <div class="p-4 bg-[#0A1F44] text-white rounded-t-xl font-bold flex justify-between">
+            Lens AI <span class="text-xs text-[#14B8A6]">Online</span>
+        </div>
+        <div id="lens-messages" class="flex-1 p-4 overflow-y-auto text-sm"></div>
+        <form id="lens-form" class="p-3 border-t flex gap-2">
+            <input id="lens-input" type="text" placeholder="Ask anything about Kenya..." class="flex-1 border rounded-lg px-3 py-2">
+            <button class="bg-[#14B8A6] text-white px-4 rounded-lg font-bold">Send</button>
+        </form>
+    </div>
+</div>
+<script>
+const toggle = document.getElementById('lens-toggle');
+const chat = document.getElementById('lens-chat');
+const form = document.getElementById('lens-form');
+const messages = document.getElementById('lens-messages');
+
+toggle.onclick = () => chat.classList.toggle('hidden');
+
+form.onsubmit = async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById('lens-input').value;
+    if(!msg) return;
+
+    messages.innerHTML += `<div class="mb-2 text-right"><span class="bg-[#14B8A6] text-white p-2 rounded-lg inline-block">${msg}</span></div>`;
+    document.getElementById('lens-input').value = '';
+
+    const res = await fetch('/api/lens/chat', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({message: msg})});
+    const data = await res.json();
+
+    messages.innerHTML += `<div class="mb-2"><span class="bg-gray-100 p-2 rounded-lg inline-block">${data.reply}</span></div>`;
+    messages.scrollTop = messages.scrollHeight;
+}
+</script>
