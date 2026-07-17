@@ -34,6 +34,7 @@ async def call_api(url: str) -> dict:
         r = await client.get(url)
         return r.json() if r.status_code == 200 else {}
 
+# LOCATIONIQ DIRECT API - NO LIB NEEDED
 async def scrape_knbs_prices() -> Dict[str, float]:
     """Scrape real prices from KNBS CPI page. NO HARDCODING"""
     try:
