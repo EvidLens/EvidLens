@@ -34,7 +34,7 @@ from app.modules.web import routes as web_routes
 
 # IMPORT THE SERVICE FUNCTIONS
 from app.modules.market_engine.service import search_market, analyze_with_ai, get_dashboard_stats, get_real_time_terminal, call_groq
-from app.modules.core.service import get_all_pricing, PRICING
+from app.modules.core.service import get_all_pricing, PRICING, ADDONS, ALC
 
 app = FastAPI(title="EvidLens API", version="2.0.0", description="Kenya's Decision Intelligence Platform - 9 Lanes, 19 Modules. All 75 Sectors.")
 
@@ -138,6 +138,18 @@ def checkout(payload: dict, db: Session = Depends(get_session)):
     billing = payload.get("billing") # "monthly" or "annual"
     amount = PRICING[plan_name][billing]
     return {"status": "ok", "plan": plan_name, "billing": billing, "amount": amount, "mpesa_prompt": f"Pay KES {amount:,}"}
+
+@app.post("/api/buy-addon")
+def buy_addon(payload: dict):
+    addon = payload.get("addon")
+    amount = ADDONS[addon].get("annual") or ADDONS[addon].get("one_time") or ADDONS[addon].get("setup")
+    return {"status": "ok", "addon": addon, "amount": amount, "mpesa_prompt": f"Pay KES {amount:,}"}
+
+@app.post("/api/buy-alc")
+def buy_alc(payload: dict):
+    service = payload.get("service")
+    amount = ALC[service]["price"]
+    return {"status": "ok", "service": service, "amount": amount, "mpesa_prompt": f"Pay KES {amount:,}"}
 
 if __name__ == "__main__":
     import uvicorn
