@@ -99,3 +99,12 @@ class MarketEngineService:
         trends = await self.call_api(f"https://serpapi.com/search.json?engine=google_trends&q={keyword} {county}&api_key={SERPAPI_KEY}")
         insight = await self.call_groq(f"Keyword: {keyword}. County: {county}. DB Searches: {len(searches)}. Demand up or down? 2 sentences.")
         return {"keyword": keyword, "county": county, "search_volume_db": len(searches), "trend_data": trends, "ai_insight": insight}
+
+async def search_market(self, q: str, sector: str, county: str) -> Dict[str, Any]:
+        search = MarketSearch(query=q, sector=sector, county=county)
+        self.db.add(search)
+        self.db.commit()
+        similar = self.db.query(MarketSearch).filter(MarketSearch.sector==sector, MarketSearch.county==county).count()
+        market_size = similar * 1000000
+        demand = "High" if similar > 10 else "Medium"
+        return {"query": q, "sector": sector, "county": county, "market_size_kes": market_size, "demand_level": demand}
