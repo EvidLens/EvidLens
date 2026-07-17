@@ -36,11 +36,11 @@ def init_db():
     from app.modules.report_builder.models import Report, ReportTemplate, ReportShare
     from app.modules.market_engine.models import MarketSearch, Competitor, MarketMetric
     # from app.modules.competitive_engine.models import Company, Deal, Funding
-    from app.modules.pricing_engine.models import ProductPrice, RetailOutlet
-    from app.modules.regulatory_engine.models import Regulation, ComplianceDeadline
-    from app.modules.consumer_engine.models import SocialMention, BrandSentiment
-    from app.modules.location_engine.models import LocationDemand, PropertyListing
-    from app.modules.business_os.models import Contact, Battlecard
+    # from app.modules.pricing_engine.models import ProductPrice, RetailOutlet
+    # from app.modules.regulatory_engine.models import Regulation
+    # from app.modules.consumer_engine.models import SocialPost
+    # from app.modules.location_engine.models import Site
+    # from app.modules.business_os.models import Contact
     from app.modules.knowledge_base.models import KnowledgeDocument
     from app.modules.core.models import Plan, Module, AddOn, ALCService, UserSubscription, GeoFilter
     
