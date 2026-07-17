@@ -101,8 +101,22 @@ class MarketEngineService:
         return {"keyword": keyword, "county": county, "search_volume_db": len(searches), "trend_data": trends, "ai_insight": insight}
 
     async def site_demand_mapper(self, sector: str, product: str, county: str) -> Dict[str, Any]:
-        if not LOCATIONIQ_KEY: return {"error": "Set LOCATIONIQ_KEY"}
-        geo = await self.call_api(f"https://us1.locationiq.com/v1/search.php?key={LOCATIONIQ_KEY}&q={county},Kenya&format=json")
-        if not geo: return {"error": "County not found"}
-        lat, lon = geo[0]['lat'], geo[0]['lon']
-        competitors = await self.call_api(f"https://us1.locationiq.com/v
+    if not LOCATIONIQ_KEY: return {"error": "Set LOCATIONIQ_KEY"}
+
+    geo_url = f"https://us1.locationiq.com/v1/search.php?key={LOCATIONIQ_KEY}&q={county},Kenya&format=json"
+    geo = await self.call_api(geo_url)
+    if not geo: return {"error": "County not found"}
+
+    lat, lon = geo[0]['lat'], geo[0]['lon']
+
+    nearby_url = f"https://us1.locationiq.com/v1/nearby.php?key={LOCATIONIQ_KEY}&lat={lat}&lon={lon}&tag=shop&radius=5000&format=json"
+    competitors = await self.call_api(nearby_url)
+
+    analysis = await self.call_groq(f"County: {county}. Sector: {sector}. Product: {product}. Competitors: {len(competitors)}. Good location? 3 bullets.")
+
+    return {
+        "county": county,
+        "coordinates": {"lat": lat, "lon": lon},
+        "competitor_count": len(competitors),
+        "recommendation": analysis
+    }
