@@ -35,7 +35,7 @@ def init_db():
     from app.modules.payments.models import Payment, Subscription, MpesaTransaction
     from app.modules.report_builder.models import Report, ReportTemplate, ReportShare
     from app.modules.market_engine.models import MarketSearch, Competitor, MarketMetric
-    from app.modules.competitive_engine.models import Company, Deal, Funding
+    # from app.modules.competitive_engine.models import Company, Deal, Funding
     from app.modules.pricing_engine.models import ProductPrice, RetailOutlet
     from app.modules.regulatory_engine.models import Regulation, ComplianceDeadline
     from app.modules.consumer_engine.models import SocialMention, BrandSentiment
