@@ -125,7 +125,3 @@ class MarketEngineService:
         raw = await self.call_groq(prompt)
         try:
             competitors = json.loads(raw)
-        except:
-            competitors = [{"error": "AI returned non-JSON", "raw": raw}]
-
-        return {"sector": sector, "county": county, "competitors": competitors}
