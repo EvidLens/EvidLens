@@ -51,7 +51,3 @@ def get_dashboard_stats(db: Session) -> Dict[str, Any]:
     return {"stats": {"insights": insights, "active_products": 21, "sectors": 75, "reports": reports}, "trending": {"category": "LIVE", "headline": trending[0] if trending else "No data"}, "lanes": lanes}
 
 async def get_real_time_terminal(sector: str, county: str) -> Dict[str, Any]:
-    async with httpx.AsyncClient(timeout=30) as client:
-        cbk = await client.get("https://www.centralbank.go.ke/wp-json/wp/v2/rates")
-        news = await client.get(f"https://newsapi.org/v2/everything?q={sector} Kenya&apiKey={NEWS_API_KEY}&pageSize=3")
-    return {"cbk_rates": cbk.json() if cbk.status_code == 200 else [], "news": news.json().get("articles", []) if news.status_code == 200 else []}
