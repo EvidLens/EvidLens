@@ -16,7 +16,7 @@ from app.modules.auth.models import User, UserRole
 from app.modules.models import Sector, County, CoreProduct
 from app.modules.payments.models import Payment, Subscription, MpesaTransaction
 from app.modules.report_builder.models import Report, ReportTemplate, ReportShare
-from app.modules.market_engine.models import MarketSearch, Competitor, MarketMetric
+from app.modules.market_engine.models import MarketSearch, MarketMetric
 from app.modules.core.models import Plan, Module, AddOn, ALCService, UserSubscription, GeoFilter
 
 from app.modules.auth.router import router as auth_router
