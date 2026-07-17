@@ -4,7 +4,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from app.modules.db import get_db
 from app.modules.auth.service import create_user, login_user, get_user_by_email
-from app.modules.market_engine.service import search_market, get_competitor_overview
+from app.modules.market_engine.service import MarketEngineService
 from app.modules.payments.service import initiate_stk_push
 from app.modules.ai_insights.service import generate_insights
 from app.modules.report_builder.service import generate_report_pdf
