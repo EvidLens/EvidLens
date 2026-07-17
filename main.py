@@ -32,8 +32,9 @@ from app.modules.business_os.router import router as business_router
 from app.modules.rag.router import router as rag_router
 from app.modules.web import routes as web_routes
 
-# IMPORT THE 3 FUNCTIONS
+# IMPORT THE SERVICE FUNCTIONS
 from app.modules.market_engine.service import search_market, analyze_with_ai, get_dashboard_stats, get_real_time_terminal, call_groq
+from app.modules.core.service import get_all_pricing, PRICING
 
 app = FastAPI(title="EvidLens API", version="2.0.0", description="Kenya's Decision Intelligence Platform - 9 Lanes, 19 Modules. All 75 Sectors.")
 
@@ -79,7 +80,7 @@ def pricing_page(request: Request):
 
 @app.get("/auth/me")
 def get_current_user(request: Request, session: Session = Depends(get_session)):
-    user_id = request.cookies.get("user_id") or 1 
+    user_id = request.cookies.get("user_id") or 1
     user = session.query(User).filter(User.id == user_id).first()
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
@@ -104,7 +105,7 @@ def logout():
     response.delete_cookie("user_id")
     return response
 
-# ========== 3 ENDPOINTS FOR DASHBOARD ==========
+# ========== DASHBOARD ENDPOINTS ==========
 
 @app.get("/api/dashboard")
 async def dashboard(db: Session = Depends(get_session)):
@@ -125,8 +126,20 @@ async def chat(payload: dict, db: Session = Depends(get_session)):
     reply = await call_groq(prompt)
     return {"reply": reply}
 
+# ========== MONETIZATION ENDPOINTS ==========
+
+@app.get("/api/pricing")
+def api_pricing(db: Session = Depends(get_session)):
+    return get_all_pricing(db)
+
+@app.post("/api/checkout")
+def checkout(payload: dict, db: Session = Depends(get_session)):
+    plan_name = payload.get("plan")
+    billing = payload.get("billing") # "monthly" or "annual"
+    amount = PRICING[plan_name][billing]
+    return {"status": "ok", "plan": plan_name, "billing": billing, "amount": amount, "mpesa_prompt": f"Pay KES {amount:,}"}
+
 if __name__ == "__main__":
     import uvicorn
-    import os
     port = int(os.getenv("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
