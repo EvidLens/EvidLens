@@ -1,19 +1,19 @@
 import os
+import redis
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from typing import Generator
 
 DATABASE_URL = os.getenv("DATABASE_URL")
+REDIS_URL = os.getenv("REDIS_URL")
 
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is not set")
 
-# Fix for Render/Postgres
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-# Engine config
 if "sqlite" in DATABASE_URL:
     engine = create_engine(
         DATABASE_URL, 
@@ -30,6 +30,7 @@ else:
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+redis_client = redis.from_url(REDIS_URL, decode_responses=True) if REDIS_URL else None
 
 def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
@@ -38,8 +39,10 @@ def get_db() -> Generator[Session, None, None]:
     finally:
         db.close()
 
+def get_session():
+    return get_db()
+
 def init_db():
-    # Import ALL models here so Base knows them. NO HARDCODING
     from app.modules.auth.models import User, UserRole
     from app.modules.models import Sector, County, CoreProduct
     from app.modules.payments.models import Payment, Subscription, MpesaTransaction
