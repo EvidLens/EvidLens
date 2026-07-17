@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Depends
+from fastapi import FastAPI, Request, Depends, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -17,8 +17,7 @@ from app.modules.models import Sector, County, CoreProduct
 from app.modules.payments.models import Payment, Subscription, MpesaTransaction
 from app.modules.report_builder.models import Report, ReportTemplate, ReportShare
 from app.modules.market_engine.models import MarketSearch, Competitor, MarketMetric
-
-from app.modules.core.models import Plan, Module, Sector, AddOn, ALCService, UserSubscription, GeoFilter
+from app.modules.core.models import Plan, Module, AddOn, ALCService, UserSubscription, GeoFilter
 
 from app.modules.auth.router import router as auth_router
 from app.modules.payments.router import router as payments_router
@@ -32,6 +31,9 @@ from app.modules.knowledge_base.router import router as knowledge_router
 from app.modules.business_os.router import router as business_router
 from app.modules.rag.router import router as rag_router
 from app.modules.web import routes as web_routes
+
+# IMPORT THE 3 FUNCTIONS
+from app.modules.market_engine.service import search_market, analyze_with_ai, get_dashboard_stats, get_real_time_terminal, call_groq
 
 app = FastAPI(title="EvidLens API", version="2.0.0", description="Kenya's Decision Intelligence Platform - 9 Lanes, 19 Modules. All 75 Sectors.")
 
@@ -101,6 +103,27 @@ def logout():
     response = JSONResponse(content={"status": "logged_out"})
     response.delete_cookie("user_id")
     return response
+
+# ========== 3 ENDPOINTS FOR DASHBOARD ==========
+
+@app.get("/api/dashboard")
+async def dashboard(db: Session = Depends(get_session)):
+    return get_dashboard_stats(db)
+
+@app.post("/search-market")
+async def search(q: str = Form(...), sector: str = Form(...), county: str = Form(...), db: Session = Depends(get_session)):
+    data = search_market(db, q, sector, county)
+    data["ai_insight"] = await analyze_with_ai(data)
+    html = f"<div class='p-3 bg-white rounded border-gray-200'><h3 class='font-bold text-lg' style='color:#0A1F44'>{data['query']}</h3><p>Demand: <b style='color:#14B8A6'>{data['demand_level']}</b></p><p>Market Size: <b>KES {data['market_size_kes']:,}</b></p><p>Avg Price: <b>KES {data['price_range']['avg']:,}</b></p><p>Competitors Found: <b>{data['competitor_count']}</b></p><hr class='my-3'><p style='color:#0A1F44'>{data['ai_insight']}</p></div>"
+    return HTMLResponse(html)
+
+@app.post("/chat")
+async def chat(payload: dict, db: Session = Depends(get_session)):
+    msg = payload.get("message")
+    context = payload.get("context")
+    prompt = f"You are Lens, EvidLens AI. Context: Business={context}. Question: {msg}. Answer in 2-3 sentences with Kenya data."
+    reply = await call_groq(prompt)
+    return {"reply": reply}
 
 if __name__ == "__main__":
     import uvicorn
