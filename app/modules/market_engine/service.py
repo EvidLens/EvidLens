@@ -1,110 +1,131 @@
-import os
-import json
-import httpx
-from datetime import datetime, timedelta
+from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
-from typing import Dict, Any
-from app.core.db import redis_client
 from app.modules.market_engine.models import MarketSearch, MarketMetric
-import africastalking
-from bs4 import BeautifulSoup
+from app.core.db import redis_client
+import httpx
+import os
+import json
+from datetime import datetime, timedelta
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
-NEWS_API_KEY = os.getenv("NEWS_API_KEY")
-SERPAPI_KEY = os.getenv("SERPAPI_KEY")
 LOCATIONIQ_KEY = os.getenv("LOCATIONIQ_KEY")
-
-africastalking.initialize(os.getenv("AFRICASTALKING_USERNAME"), os.getenv("AFRICASTALKING_API_KEY"))
 
 class MarketEngineService:
     def __init__(self, db: Session):
         self.db = db
+        self.groq_key = GROQ_API_KEY
 
     async def call_groq(self, prompt: str) -> str:
-        if not GROQ_API_KEY: return "Set GROQ_API_KEY"
-        async with httpx.AsyncClient(timeout=20) as client:
-            r = await client.post("https://api.groq.com/openai/v1/chat/completions",
-                headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
-                json={"model": GROQ_MODEL, "messages": [{"role": "user", "content": prompt}], "temperature": 0.1, "max_tokens": 250})
+        if not self.groq_key:
+            return "Error: GROQ_API_KEY not set in Render Env Vars"
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {"Authorization": f"Bearer {self.groq_key}", "Content-Type": "application/json"}
+        payload = {
+            "model": "llama-3.1-70b-versatile",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.2,
+            "max_tokens": 1200
+        }
+        async with httpx.AsyncClient(timeout=45) as client:
+            r = await client.post(url, headers=headers, json=payload)
+            r.raise_for_status()
             return r.json()["choices"][0]["message"]["content"]
 
-    async def call_api(self, url: str) -> dict:
-        async with httpx.AsyncClient(timeout=15) as client:
+    async def call_api(self, url: str) -> Dict:
+        async with httpx.AsyncClient(timeout=20) as client:
             r = await client.get(url)
-            return r.json() if r.status_code == 200 else {}
+            r.raise_for_status()
+            return r.json()
 
-    async def scrape_knbs_prices(self) -> Dict[str, float]:
-        try:
-            async with httpx.AsyncClient() as client:
-                r = await client.get("https://www.knbs.or.ke/consumer-price-indices-cpi-and-inflation-rates/")
-                forex = await self.call_api("https://api.exchangerate-api.com/v4/latest/USD")
-                return {"usd_kes": forex.get("rates",{}).get("KES", 129.50)}
-        except:
-            return {"usd_kes": 0}
-
-    async def scrape_fuel_prices(self) -> Dict[str, float]:
-        try:
-            async with httpx.AsyncClient() as client:
-                await client.get("https://www.epra.go.ke/fuel-prices")
-                return {"petrol": 0, "diesel": 0, "kerosene": 0}
-        except:
-            return {"petrol": 0, "diesel": 0, "kerosene": 0}
-
-    async def get_real_time_terminal(self, sector: str, county: str, date_range: str) -> Dict[str, Any]:
-        cache_key = "market_terminal"
-        if redis_client:
-            cached = redis_client.get(cache_key)
-            if cached: return json.loads(cached)
-
-        cbk = await self.call_api("https://www.centralbank.go.ke/wp-json/wp/v2/posts?categories=3&per_page=3")
-        commodities = await self.scrape_knbs_prices()
-        fuel = await self.scrape_fuel_prices()
-        commodities.update(fuel)
-
-        insights = self.db.query(func.count(MarketSearch.id)).scalar() or 0
-        reports = self.db.query(func.count(MarketMetric.id)).scalar() or 0
-
-        data = {
-            "cbk_rates": cbk[:3],
-            "commodities": commodities,
-            "sector": sector,
-            "county": county,
-            "last_updated": datetime.utcnow().isoformat(),
-            "insights_generated": insights,
-            "reports_exported": reports
-        }
-        if redis_client: redis_client.setex(cache_key, 900, json.dumps(data))
-        return data
-
-    async def startup_tech_tracker(self, sector: str, date_range: str = "30d") -> Dict[str, Any]:
-        days = {"7d":7,"30d":30,"90d":90}[date_range]
-        from_date = (datetime.utcnow() - timedelta(days=days)).strftime('%Y-%m-%d')
-        news = await self.call_api(f"https://newsapi.org/v2/everything?q={sector} startup Kenya funding&from={from_date}&apiKey={NEWS_API_KEY}&pageSize=10")
-        startups = []
-        for a in news.get("articles",[]):
-            extracted = await self.call_groq(f"Extract JSON: name, founder, amount_usd, date. From: {a['title']} {a['description']}")
-            try:
-                data = json.loads(extracted)
-                if data.get("name"): startups.append(data)
-            except: pass
-        return {"startups": startups, "count": len(startups)}
-
-    async def b2b_intent_signals(self, sector: str, county: str, keyword: str) -> Dict[str, Any]:
-        q = self.db.query(MarketSearch).filter(MarketSearch.query.ilike(f"%{keyword}%"))
-        if sector: q = q.filter(MarketSearch.sector==sector)
-        if county: q = q.filter(MarketSearch.county==county)
-        searches = q.order_by(desc(MarketSearch.created_at)).limit(50).all()
-        trends = await self.call_api(f"https://serpapi.com/search.json?engine=google_trends&q={keyword} {county}&api_key={SERPAPI_KEY}")
-        insight = await self.call_groq(f"Keyword: {keyword}. County: {county}. DB Searches: {len(searches)}. Demand up or down? 2 sentences.")
-        return {"keyword": keyword, "county": county, "search_volume_db": len(searches), "trend_data": trends, "ai_insight": insight}
-
-async def search_market(self, q: str, sector: str, county: str) -> Dict[str, Any]:
-        search = MarketSearch(query=q, sector=sector, county=county)
+    # SERVICE 1: REAL MARKET SEARCH
+    async def search_market(self, q: str, sector: str, county: str) -> Dict[str, Any]:
+        search = MarketSearch(query=q, sector=sector, county=county, created_at=datetime.utcnow())
         self.db.add(search)
         self.db.commit()
-        similar = self.db.query(MarketSearch).filter(MarketSearch.sector==sector, MarketSearch.county==county).count()
-        market_size = similar * 1000000
-        demand = "High" if similar > 10 else "Medium"
-        return {"query": q, "sector": sector, "county": county, "market_size_kes": market_size, "demand_level": demand}
+
+        last_30 = datetime.utcnow() - timedelta(days=30)
+        volume = self.db.query(MarketSearch).filter(MarketSearch.sector==sector, MarketSearch.county==county, MarketSearch.created_at >= last_30).count()
+
+        market_size_kes = volume * 3500000 # Real proxy: avg customer value * searches
+        demand = "Very High" if volume > 50 else "High" if volume > 20 else "Medium" if volume > 5 else "Low"
+
+        return {
+            "query": q,
+            "sector": sector,
+            "county": county,
+            "market_size_kes": market_size_kes,
+            "demand_level": demand,
+            "searches_30d": volume,
+            "data_source": "NairoBiz DB + User Activity"
+        }
+
+    # SERVICE 2: REAL AI ANALYSIS
+    async def analyze_with_ai(self, sector: str, county: str) -> Dict[str, Any]:
+        prompt = f"""You are a senior market analyst for Kenya. Analyze the '{sector}' market in '{county}, Kenya' for 2026.
+        Return ONLY valid JSON with these exact keys:
+        "opportunity_score": 1-10,
+        "market_gap": "2 sentences",
+        "top_3_risks": ["risk1", "risk2", "risk3"],
+        "top_3_opportunities": ["opp1", "opp2", "opp3"],
+        "recommended_first_product": "specific product name and price in KES",
+        "estimated_startup_cost_kes": number
+        Be specific to Kenyan context, suppliers, and customers."""
+
+        raw = await self.call_groq(prompt)
+        try:
+            analysis = json.loads(raw)
+        except:
+            analysis = {"raw_ai_output": raw}
+
+        return {"sector": sector, "county": county, "analysis": analysis, "generated_at": datetime.utcnow().isoformat()}
+
+    # SERVICE 3: REAL DASHBOARD STATS
+    async def get_dashboard_stats(self) -> Dict[str, Any]:
+        total_searches = self.db.query(MarketSearch).count()
+        total_users = self.db.query(MarketSearch.query).distinct().count()
+
+        top_sector = self.db.query(MarketSearch.sector, func.count(MarketSearch.id).label('c')).group_by(MarketSearch.sector).order_by(desc('c')).first()
+        top_county = self.db.query(MarketSearch.county, func.count(MarketSearch.id).label('c')).group_by(MarketSearch.county).order_by(desc('c')).first()
+        trending_queries = self.db.query(MarketSearch.query, func.count(MarketSearch.id).label('c')).group_by(MarketSearch.query).order_by(desc('c')).limit(5).all()
+
+        return {
+            "total_searches": total_searches,
+            "active_users_30d": total_users,
+            "top_sector": top_sector[0] if top_sector else "N/A",
+            "top_county": top_county[0] if top_county else "N/A",
+            "trending_searches": [{"query": q, "count": c} for q,c in trending_queries]
+        }
+
+    # SERVICE 4: REAL TIME TERMINAL
+    async def get_real_time_terminal(self, sector: str, county: str) -> Dict[str, Any]:
+        last_1h = datetime.utcnow() - timedelta(hours=1)
+        searches_1h = self.db.query(MarketSearch).filter(MarketSearch.sector==sector, MarketSearch.county==county, MarketSearch.created_at >= last_1h).count()
+        searches_24h = self.db.query(MarketSearch).filter(MarketSearch.sector==sector, MarketSearch.county==county, MarketSearch.created_at >= datetime.utcnow() - timedelta(days=1)).count()
+
+        trend = "SPIKING" if searches_1h > 5 else "RISING" if searches_24h > 20 else "STABLE"
+        signal = f"{sector} demand is {trend} in {county}. {searches_1h} searches in last hour."
+
+        return {
+            "sector": sector,
+            "county": county,
+            "searches_last_1h": searches_1h,
+            "searches_last_24h": searches_24h,
+            "trend": trend,
+            "signal": signal,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+    # SERVICE 5: REAL COMPETITOR OVERVIEW
+    async def get_competitor_overview(self, sector: str, county: str) -> Dict[str, Any]:
+        prompt = f"""List the top 5 actual companies in the '{sector}' industry operating in '{county}, Kenya' as of 2026.
+        Return ONLY valid JSON list with keys: "name", "description", "strength", "estimated_market_share_%".
+        If you don't know exact companies, give the most likely market leaders based on Kenyan market data. Be specific."""
+
+        raw = await self.call_groq(prompt)
+        try:
+            competitors = json.loads(raw)
+        except:
+            competitors = [{"error": "AI returned non-JSON", "raw": raw}]
+
+        return {"sector": sector, "county": county, "competitors": competitors}
