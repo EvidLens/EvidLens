@@ -34,7 +34,7 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
 <header class="text-white px-6 py-4 sticky top-0 shadow-md" style="background:#0A1F44">
   <div class="flex items-center justify-between max-w-[1400px] mx-auto">
     <div class="flex items-center gap-3">
-      <img src="/static/logo.png?v=4" alt="EvidLens Logo" class="w-10 h-10 rounded-xl object-contain bg-white p-1">
+      <img src="/static/logo.png?v=5" alt="EvidLens Logo" class="w-10 h-10 rounded-xl object-contain bg-white p-1">
       <div><h1 class="font-bold text-2xl"><span style="color:#FFFFFF">Evid</span><span style="color:#14B8A6">Lens</span></h1><p class="text-xs" style="color:#CBD5E1">Decision Intelligence</p></div>
     </div>
   </div>
@@ -88,18 +88,33 @@ async function loadDashboard(){
   try{
     const res = await fetch('/api/dashboard');
     const data = await res.json();
-    document.querySelectorAll('.card.teal-card p.text-4xl')[0].innerText = data.stats.total_insights || 0;
-    document.querySelectorAll('.card.teal-card p.text-4xl')[1].innerText = data.stats.active_lanes || 0;
-    document.querySelectorAll('.card.teal-card p.text-4xl')[2].innerText = data.stats.reports_generated || 0;
-    document.querySelectorAll('.card.teal-card p.text-4xl')[3].innerText = data.stats.ai_queries || 0;
-    document.getElementById('trendingCategory').innerText = data.trending.category;
-    document.getElementById('trendingHeadline').innerText = data.trending.headline;
+    console.log("API DATA:", data)
+
+    document.querySelectorAll('.card.teal-card p.text-4xl')[0].innerText = data.stats?.total_insights || 0;
+    document.querySelectorAll('.card.teal-card p.text-4xl')[1].innerText = data.stats?.active_lanes || 0;
+    document.querySelectorAll('.card.teal-card p.text-4xl')[2].innerText = data.stats?.reports_generated || 0;
+    document.querySelectorAll('.card.teal-card p.text-4xl')[3].innerText = data.stats?.ai_queries || 0;
+
+    document.getElementById('trendingCategory').innerText = data.trending?.category || "Market Intel";
+    document.getElementById('trendingHeadline').innerText = data.trending?.headline || "Data loaded";
+
     const lanesGrid = document.getElementById('lanesGrid');
     lanesGrid.innerHTML = '';
-    data.modules.forEach((mod) => {
+    
+    const modulesToRender = data.modules || data.lanes || [];
+    console.log("Modules count:", modulesToRender.length)
+
+    if(modulesToRender.length === 0){
+        lanesGrid.innerHTML = '<p class="text-red-500 col-span-3">No modules found. Check /api/dashboard returns "modules":[]</p>'
+    }
+
+    modulesToRender.forEach((mod) => {
       lanesGrid.innerHTML += `<a href="${mod.url}" class="card cursor-pointer block"><div class="lane-icon w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold mb-3 text-lg">${mod.icon}</div><p class="font-semibold text-base" style="color:#0A1F44">${mod.name}</p><p class="text-sm text-gray-500">${mod.insights} Insights</p><p class="text-sm font-semibold" style="color:#14B8A6">${mod.growth}</p><p class="text-xs font-bold mt-2" style="color:#F59E0B">${mod.status}</p></a>`;
     });
-  }catch(e){console.log('Dashboard load error', e)}
+  }catch(e){
+    console.log('Dashboard load error', e)
+    document.getElementById('lanesGrid').innerHTML = '<p class="text-red-500 col-span-3">Error loading modules. Press F12 to see error</p>'
+  }
 }
 loadDashboard();
 
