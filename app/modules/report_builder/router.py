@@ -12,7 +12,7 @@ import httpx
 from .service import generate_market_report_pdf, generate_market_report_excel
 from .models import Report, ReportType, ReportFormat, ReportStatus
 from app.modules.payments.service import get_subscription
-from app.modules.db import get_session as get_db
+from app.modules.database import get_session as get_database
 
 router = APIRouter()
 GROQ_KEY = os.getenv("GROQ_API_KEY")
