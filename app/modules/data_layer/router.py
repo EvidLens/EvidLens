@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from .service import fetch_price_trends, fetch_demand_signals, fetch_location_analytics
 from .models import PriceTrend, DemandSignal, LocationMetric
-from app.modules.database import get_session as get_db
+from app.modules.database import get_session as get_database
 from app.modules.core.guards import require_module, consume_credits
 
 router = APIRouter(prefix="/market-intel", tags=["Market Intel"])
