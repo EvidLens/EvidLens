@@ -9,7 +9,9 @@ import os
 
 load_dotenv()
 
-from app.modules.database import init_database, get_session
+# FIX 1: CORRECT IMPORTS
+from app.modules.db import init_db
+from app.modules.database import get_session
 from app.modules.cron.price_cron import start_scheduler
 
 from app.modules.auth.models import User, UserRole
@@ -17,11 +19,13 @@ from app.modules.models import Sector, County, CoreProduct
 from app.modules.payments.models import Payment, Subscription, MpesaTransaction
 from app.modules.report_builder.models import Report, ReportTemplate, ReportShare
 from app.modules.market_engine.models import MarketSearch, MarketMetric
+from app.modules.competitive_engine.models import Company, FundingDeal, TrafficSnapshot # FIX 2: ADD WAVE 2 MODELS
 from app.modules.core.models import Plan, Module, AddOn, ALCService, UserSubscription, GeoFilter
 
 from app.modules.auth.router import router as auth_router
 from app.modules.payments.router import router as payments_router
 from app.modules.market_engine.router import router as market_router
+from app.modules.competitive_engine.router import router as competitive_router # FIX 3: ADD WAVE 2 ROUTER
 from app.modules.consumer_voice.router import router as consumer_router
 from app.modules.data_layer.router import router as data_router
 from app.modules.ai_insights.router import router as ai_router
@@ -51,6 +55,7 @@ templates = Jinja2Templates(directory="app/templates", auto_reload=True)
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 app.include_router(payments_router, prefix="/payments", tags=["Payments"])
 app.include_router(market_router, prefix="/market", tags=["Market Engine"])
+app.include_router(competitive_router, prefix="/competitive", tags=["Competitive Engine"]) # FIX 3: MOUNT WAVE 2
 app.include_router(consumer_router, prefix="/voice", tags=["Consumer Voice"])
 app.include_router(data_router, prefix="/data", tags=["Data Layer"])
 app.include_router(ai_router, prefix="/ai", tags=["AI Insights"])
