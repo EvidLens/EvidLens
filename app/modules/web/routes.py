@@ -163,3 +163,7 @@ def get_county(db: Session = Depends(get_db)):
         "counties": len(data),
         "data": data
     }
+
+@router.get("/")
+def root():
+    return RedirectResponse(url="/dashboard")
