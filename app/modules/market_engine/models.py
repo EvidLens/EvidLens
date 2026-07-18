@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, Text, DateTime, JSON, Index
 from sqlalchemy.sql import func
-from app.modules.db import Base
+from app.modules.database import Base
 
 class MarketSearch(Base):
     __tablename__ = "market_searches"
