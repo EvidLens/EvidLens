@@ -1,5 +1,5 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from app.modules.db import SessionLocal
+from app.modules.database import SessionLocal
 from app.modules.data_layer.service import fetch_price_trends
 
 scheduler = AsyncIOScheduler()
