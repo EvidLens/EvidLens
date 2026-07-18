@@ -6,7 +6,7 @@ from typing import Optional, List
 from .service import generate_insights
 from app.modules.core.guards import require_module, consume_credits
 from app.modules.core.models import UserSubscription
-from app.modules.db import get_session
+from app.modules.database import get_session
 import json
 import io
 
