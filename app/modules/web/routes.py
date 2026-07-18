@@ -80,3 +80,32 @@ def contact(request: Request): return templates.TemplateResponse("contact.html",
 def pricing(request: Request): return templates.TemplateResponse("pricing.html", {"request": request})
 @router.get("/about")
 def about(request: Request): return templates.TemplateResponse("about.html", {"request": request})
+
+from fastapi import APIRouter, Request
+from fastapi.templating import Jinja2Templates
+
+templates = Jinja2Templates(directory="templates")
+
+MODULES = {
+    "competitive": "Competitive Engine",
+    "price-oracle": "Price Oracle", 
+    "demand": "Demand Radar",
+    "policy": "Policy Watch",
+    "funding": "Funding Radar",
+    "risk": "Risk Sentinel",
+    "export": "Export Navigator",
+    "consumer": "Consumer Pulse",
+    "county": "County Mapper"
+}
+
+@router.get("/{module_slug}")
+async def module_page(request: Request, module_slug: str):
+    if module_slug not in MODULES:
+        return templates.TemplateResponse("404.html", {"request": request})
+    
+    module_name = MODULES[module_slug]
+    return templates.TemplateResponse("module_detail.html", {
+        "request": request, 
+        "module_name": module_name,
+        "module_slug": module_slug
+    })
