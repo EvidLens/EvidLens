@@ -9,7 +9,7 @@ import os
 
 load_dotenv()
 
-from app.modules.database import init_db, get_session
+from app.modules.database import init_database, get_session
 from app.modules.cron.price_cron import start_scheduler
 
 from app.modules.auth.models import User, UserRole
