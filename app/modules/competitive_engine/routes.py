@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
-from sqlmodel import Session  # FIX: was sqlalchemy.orm
+from sqlmodel import Session
 from app.modules.database import get_session
 from app.modules.competitive_engine.service import CompetitiveEngineService
 
