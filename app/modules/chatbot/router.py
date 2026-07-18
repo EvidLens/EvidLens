@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, Depends
 from pydantic import BaseModel
 from typing import List, Optional
 import httpx, os, json
-from app.modules.db import get_session
+from app.modules.database import get_session
 from app.modules.core.guards import require_module, consume_credits
 from sqlmodel import Session
 from app.modules.ai_insights.service import generate_insights
