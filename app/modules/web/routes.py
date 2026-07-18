@@ -167,3 +167,61 @@ def get_county(db: Session = Depends(get_db)):
 @router.get("/")
 def root():
     return RedirectResponse(url="/dashboard")
+
+from fastapi.responses import HTMLResponse, RedirectResponse
+
+@router.get("/", include_in_schema=False)
+def root():
+    return RedirectResponse(url="/dashboard")
+
+@router.get("/dashboard", response_class=HTMLResponse, include_in_schema=False)
+def dashboard():
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>EvidLens Dashboard</title>
+        <style>
+            body{font-family:Arial;padding:40px;background:#0f172a;color:white;margin:0}
+            h1{margin-bottom:30px}
+            .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
+            .card{background:#1e293b;padding:24px;border-radius:16px;cursor:pointer;border:1px solid #334155;transition:0.2s}
+            .card:hover{background:#334155;transform:translateY(-2px)}
+            .card h3{margin:0 0 8px 0;color:#38bdf8}
+            .card p{margin:0;color:#94a3b8;font-size:14px}
+        </style>
+    </head>
+    <body>
+        <h1>EvidLens Market Intelligence</h1>
+        <div class="grid">
+            <div class="card" onclick="window.open('/docs#/default/competitive_engine_api_v1_api_competitive_get','_blank')">
+                <h3>1. Competitive Engine</h3><p>100 real businesses, ratings, locations</p>
+            </div>
+            <div class="card" onclick="window.open('/docs#/default/price_oracle_api_v1_api_price_oracle_get','_blank')">
+                <h3>2. Price Oracle</h3><p>Real KES prices by sector</p>
+            </div>
+            <div class="card" onclick="window.open('/docs#/default/demand_radar_api_v1_api_demand_radar_get','_blank')">
+                <h3>3. Demand Radar</h3><p>Real demand scores per county</p>
+            </div>
+            <div class="card" onclick="window.open('/docs#/default/county_mapper_api_v1_api_county_mapper_get','_blank')">
+                <h3>4. County Mapper</h3><p>Market size KES + growth rate</p>
+            </div>
+            <div class="card" onclick="window.open('/docs#/default/consumer_pulse_api_v1_api_consumer_pulse_get','_blank')">
+                <h3>5. Consumer Pulse</h3><p>Top searched sectors + AI insights</p>
+            </div>
+            <div class="card" onclick="window.open('/docs#/default/risk_sentinel_api_v1_api_risk_sentinel_get','_blank')">
+                <h3>6. Risk Sentinel</h3><p>High opportunity zones</p>
+            </div>
+            <div class="card" onclick="window.open('/docs#/default/policy_advisor_api_v1_api_policy_advisor_get','_blank')">
+                <h3>7. Policy Advisor</h3><p>Regulatory insights</p>
+            </div>
+            <div class="card" onclick="window.open('/docs#/default/funding_matcher_api_v1_api_funding_matcher_get','_blank')">
+                <h3>8. Funding Matcher</h3><p>Funding opportunities</p>
+            </div>
+            <div class="card" onclick="window.open('/docs#/default/export_analyzer_api_v1_api_export_analyzer_get','_blank')">
+                <h3>9. Export Analyzer</h3><p>Export market data</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
