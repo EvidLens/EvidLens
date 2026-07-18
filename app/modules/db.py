@@ -5,6 +5,16 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from typing import Generator
 
+# WAVE 1 MODELS
+from app.modules.market_engine.models import *
+
+# WAVE 2 MODELS - ACTIVATE THIS
+from app.modules.competitive_engine.models import Company, FundingDeal, TrafficSnapshot
+
+# WAVE 3-9 MODELS - KEEP COMMENTED UNTIL FILES EXIST
+# from app.modules.pricing_engine.models import *
+# from app.modules.regulatory_engine.models import *
+
 DATABASE_URL = os.getenv("DATABASE_URL")
 REDIS_URL = os.getenv("REDIS_URL")
 
@@ -30,12 +40,5 @@ def get_db():
     return get_session()
 
 def init_db():
-    # WAVE 1
-    from app.modules.market_engine.models import *
-    
-    # WAVE 2 - ACTIVATE THIS
-    from app.modules.competitive_engine.models import Company, FundingDeal, TrafficSnapshot
-    
-    # Leave others commented until their files are ready
-    
+    # Just create tables. All models are already imported at top
     Base.metadata.create_all(bind=engine)
