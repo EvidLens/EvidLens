@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, Text, JSON
 from datetime import datetime
-from app.modules.db import Base
+from app.modules.database import Base
 
 class Company(Base):
     __tablename__ = "companies"
