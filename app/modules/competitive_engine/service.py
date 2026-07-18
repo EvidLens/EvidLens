@@ -1,36 +1,32 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text, JSON
-from datetime import datetime
-from app.modules.db import Base
+from sqlmodel import Session, select
+from datetime import datetime, timedelta
+from app.modules.company_db.models import Company, FundingDeal
+from app.modules.traffic.models import TrafficSnapshot
 
-class Company(Base):
-    __tablename__ = "companies"
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True, nullable=False)
-    sector = Column(String, index=True)
-    country = Column(String, default="Kenya")
-    county = Column(String)
-    website = Column(String)
-    directors = Column(JSON)
-    valuation = Column(Float)
-    created_at = Column(DateTime, default=datetime.utcnow)
+class CompetitiveEngineService:
+    def __init__(self, db: Session):
+        self.db = db
 
-class FundingDeal(Base):
-    __tablename__ = "funding_deals"
-    id = Column(Integer, primary_key=True, index=True)
-    company_name = Column(String, index=True)
-    founder = Column(String)
-    investor = Column(String, index=True)
-    amount_usd = Column(Float)
-    round_type = Column(String)
-    date = Column(DateTime, index=True)
-    sector = Column(String, index=True)
-    source_url = Column(String)
+    async def company_deal_database(self, sector: str, company_name: str = None):
+        query = select(Company).where(Company.sector == sector)
+        if company_name:
+            query = query.where(Company.name.ilike(f"%{company_name}%"))
+        return self.db.exec(query).all()
 
-class TrafficSnapshot(Base):
-    __tablename__ = "traffic_snapshots"
-    id = Column(Integer, primary_key=True, index=True)
-    competitor = Column(String, index=True)
-    visits = Column(Integer)
-    bounce_rate = Column(Float)
-    top_pages = Column(JSON)
-    date = Column(DateTime, default=datetime.utcnow)
+    async def funding_tracker(self, sector: str, investor: str = None, date_range: str = "90d"):
+        days = int(date_range.replace("d", ""))
+        since = datetime.utcnow() - timedelta(days=days)
+        query = select(FundingDeal).where(FundingDeal.sector == sector, FundingDeal.date >= since)
+        if investor:
+            query = query.where(FundingDeal.investor.ilike(f"%{investor}%"))
+        return self.db.exec(query).all()
+
+    async def digital_traffic_analyzer(self, competitor1: str, competitor2: str, date_range: str = "30d"):
+        query = select(TrafficSnapshot).where(
+            TrafficSnapshot.competitor.in_([competitor1, competitor2])
+        )
+        return self.db.exec(query).all()
+
+    async def competitor_monitor(self, competitor: str, signal_type: str):
+        query = select(Company).where(Company.name.ilike(f"%{competitor}%"))
+        return self.db.exec(query).all()
