@@ -25,7 +25,7 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
 #chatInputBox{display:flex; padding:12px; border-top:1px solid #E2E8F0}
 #chatInput{flex:1; border:1px solid #CBD5E1; border-radius:20px; padding:10px 14px; outline:none; font-size:14px}
 #chatSend{background:#F59E0B; color:white; border:none; border-radius:20px; padding:10px 18px; margin-left:8px; font-weight:600; cursor:pointer}
-@media(max-width:768px)chatBox{width:calc(100vw - 32px); right:16px; bottom:80px}}
+@media(max-width:768px){#chatBox{width:calc(100vw - 32px); right:16px; bottom:80px}}
 </style>
 </head>
 <body>
@@ -49,9 +49,9 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
       <div class="card teal-card"><p class="text-sm text-gray-500">AI Queries</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">0</p></div>
     </div>
 
-    <div class="mb-8"><h2 class="font-bold text-xl mb-4 flex items-center gap-2" style="color:#0A1F44"><span></span>Trending Now</h2><div id="trendingCard" class="trending text-white p-6 rounded-2xl"><p class="text-sm font-semibold opacity-90 uppercase" id="trendingCategory">NO DATA</p><p class="font-semibold text-lg mt-2" id="trendingHeadline">Run an analysis to load real trends</p></div></div>
+    <div class="mb-8"><h2 class="font-bold text-xl mb-4 flex items-center gap-2" style="color:#0A1F44"><span></span>Trending Now</h2><div id="trendingCard" class="trending text-white p-6 rounded-2xl"><p class="text-sm font-semibold opacity-90 uppercase" id="trendingCategory">LOADING...</p><p class="font-semibold text-lg mt-2" id="trendingHeadline">Loading real trends</p></div></div>
 
-    <div class="mb-8"><h2 class="font-bold text-xl mb-4" style="color:#0A1F44">Intelligence Lanes</h2><div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4" id="lanesGrid"></div></div>
+    <div class="mb-8"><h2 class="font-bold text-xl mb-4" style="color:#0A1F44">WAVE 2 Intelligence Modules</h2><div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4" id="lanesGrid"></div></div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
       <div class="card">
@@ -86,14 +86,30 @@ async function loadDashboard(){
   try{
     const res = await fetch('/api/dashboard');
     const data = await res.json();
+
+    // UPDATE STATS
+    document.querySelectorAll('.card.teal-card p.text-4xl')[0].innerText = data.stats.total_insights || 0;
+    document.querySelectorAll('.card.teal-card p.text-4xl')[1].innerText = data.stats.active_lanes || 0;
+    document.querySelectorAll('.card.teal-card p.text-4xl')[2].innerText = data.stats.reports_generated || 0;
+    document.querySelectorAll('.card.teal-card p.text-4xl')[3].innerText = data.stats.ai_queries || 0;
+
+    // UPDATE TRENDING
     document.getElementById('trendingCategory').innerText = data.trending.category;
     document.getElementById('trendingHeadline').innerText = data.trending.headline;
+
+    // RENDER ALL 9 WAVE 2 MODULES
     const lanesGrid = document.getElementById('lanesGrid');
     lanesGrid.innerHTML = '';
-    data.lanes.forEach((lane, index) => {
-      let onclick = '';
-      if(index === 4) onclick = 'onclick="downloadPDF()"';
-      lanesGrid.innerHTML += '<div class="card cursor-pointer" ' + onclick + '><div class="lane-icon w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold mb-3 text-lg">' + lane.icon + '</div><p class="font-semibold text-base" style="color:#0A1F44">' + lane.name + '</p><p class="text-sm text-gray-500">' + lane.insights + ' Insights</p><p class="text-sm font-semibold" style="color:#14B8A6">' + lane.growth + '</p>' + (index === 4? '<p class="text-xs font-bold mt-2" style="color:#F59E0B">Download PDF</p>' : '') + '</div>';
+    data.modules.forEach((mod) => {
+      lanesGrid.innerHTML += `
+        <a href="${mod.url}" class="card cursor-pointer block">
+          <div class="lane-icon w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold mb-3 text-lg">${mod.icon}</div>
+          <p class="font-semibold text-base" style="color:#0A1F44">${mod.name}</p>
+          <p class="text-sm text-gray-500">${mod.insights} Insights</p>
+          <p class="text-sm font-semibold" style="color:#14B8A6">${mod.growth}</p>
+          <p class="text-xs font-bold mt-2" style="color:#F59E0B">${mod.status}</p>
+        </a>
+      `;
     });
   }catch(e){console.log('Dashboard load error', e)}
 }
