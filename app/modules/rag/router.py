@@ -4,9 +4,9 @@ from pydantic import BaseModel
 from typing import List
 
 from.service import run_rag_pipeline # fixed relative import
-from app.modules.database import get_db as get_database
+from app.modules.database import get_db
 
-router = APIRouter(prefix="/rag", tags=["RAG"]) # add prefix for clarity
+router = APIRouter(prefix="/rag", tags=["RAG"])
 
 class RAGRequest(BaseModel):
     query: str
