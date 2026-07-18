@@ -3,7 +3,7 @@ import json
 from sqlalchemy.orm import Session
 from groq import Groq
 from.models import SectorReport, KnowledgeChunk
-from app.modules.data.models import PriceTrend, DemandSignal, LocationMetric, ProductCatalog
+from app.modules.market_engine.models import PriceTrend, LocationMetric
 from app.modules.consumer_voice.models import SentimentSummary
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
