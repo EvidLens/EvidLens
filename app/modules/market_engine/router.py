@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from app.core.db import get_db
+from app.core.db import get_database
 from app.modules.market_engine.service import MarketEngineService
 
 router = APIRouter(prefix="/api/market", tags=["Market Engine"])
