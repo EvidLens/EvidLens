@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
-from app.modules.db import get_session
+from app.modules.database import get_session
 from app.modules.competitive_engine.service import CompetitiveEngineService
 
 router = APIRouter()
