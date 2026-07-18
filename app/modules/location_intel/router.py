@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from.service import get_location_comparison, generate_heatmap, fetch_osm_businesses, calculate_price_arbitrage, seed_geo_data
 from.models import KENYA_COUNTIES, LocationGeo
-from app.modules.db import get_db
+from app.modules.database import get_database
 
 router = APIRouter()
 
