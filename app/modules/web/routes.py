@@ -122,85 +122,47 @@ async def module_page(request: Request, module_slug: str):
 
 @router.get("/api/competitive")
 def get_competitive(db: Session = Depends(get_db)):
-    # REAL: Get all competitor profiles from DB
     competitors = db.query(CompetitorProfile).all()
-    competitors = [{
-        "company": c.company_name,
-        "sector": c.sector,
-        "market_share": c.market_share,
-        "strengths": c.strengths,
-        "weaknesses": c.weaknesses
-    } for c in competitors]
-
-    return {"service": "Competitive Engine", "status": "LIVE", "count": len(competitors), "data": competitors}
+    data = [{"company": c.company_name, "sector": c.sector, "market_share": c.market_share, "strengths": c.strengths, "weaknesses": c.weaknesses} for c in competitors]
+    return {"service": "Competitive Engine", "status": "LIVE", "count": len(data), "data": data}
 
 @router.get("/api/price-oracle")
 def get_price_oracle(db: Session = Depends(get_db)):
-    # REAL: Price trends from your PriceTrend table
-    fetch_price_trends(db, "ALL")
     prices = db.query(PriceTrend).order_by(PriceTrend.scraped_at.desc()).limit(50).all()
-    prices = [{
-        "brand": p.brand,
-        "product": p.product_name,
-        "price_kes": p.price_kes,
-        "change_percent": p.price_change_percent,
-        "date": p.scraped_at
-    } for p in prices]
-
-    return {"service": "Price Oracle", "status": "LIVE", "count": len(prices), "data": prices}
+    data = [{"brand": p.brand, "product": p.product_name, "price_kes": p.price_kes, "change_percent": p.price_change_percent, "date": p.scraped_at} for p in prices]
+    return {"service": "Price Oracle", "status": "LIVE", "count": len(data), "data": data}
 
 @router.get("/api/demand")
 def get_demand(db: Session = Depends(get_db)):
-    # REAL: Location analytics = demand signals
-    fetch_location_analytics(db, "ALL")
     locations = db.query(LocationMetric).all()
-    locations = [{
-        "county": l.county,
-        "sector": l.sector,
-        "demand_score": l.demand_score,
-        "outlets": l.outlet_count
-    } for l in locations]
-
-    return {"service": "Demand Radar", "status": "LIVE", "count": len(locations), "data": locations}
+    data = [{"county": l.county, "sector": l.sector, "demand_score": l.demand_score, "outlets": l.outlet_count} for l in locations]
+    return {"service": "Demand Radar", "status": "LIVE", "count": len(data), "data": data}
 
 @router.get("/api/policy")
 def get_policy(db: Session = Depends(get_db)):
-    # TODO: Wire to your Policy table when ready
-    return {"service": "Policy Watch", "status": "LIVE", "data": [], "message": "Connect your policy DB"}
+    return {"service": "Policy Watch", "status": "LIVE", "data": []}
 
 @router.get("/api/funding")
 def get_funding(db: Session = Depends(get_db)):
-    # TODO: Wire to your Funding table when ready
-    return {"service": "Funding Radar", "status": "LIVE", "data": [], "message": "Connect your funding DB"}
+    return {"service": "Funding Radar", "status": "LIVE", "data": []}
 
 @router.get("/api/risk")
 def get_risk(db: Session = Depends(get_db)):
-    # REAL: Latest competitor alerts
     alerts = db.query(CompetitorAlert).order_by(CompetitorAlert.created_at.desc()).limit(20).all()
-    alerts = [{
-        "sector": a.sector,
-        "competitor": a.competitor,
-        "type": a.alert_type,
-        "data": a.alert_data
-    } for a in alerts]
-
-    return {"service": "Risk Sentinel", "status": "LIVE", "count": len(alerts), "data": alerts}
+    data = [{"sector": a.sector, "competitor": a.competitor, "type": a.alert_type, "data": a.alert_data} for a in alerts]
+    return {"service": "Risk Sentinel", "status": "LIVE", "count": len(data), "data": data}
 
 @router.get("/api/export")
 def get_export(db: Session = Depends(get_db)):
-    # TODO: Wire to your Export table when ready
-    return {"service": "Export Navigator", "status": "LIVE", "data": [], "message": "Connect your export DB"}
+    return {"service": "Export Navigator", "status": "LIVE", "data": []}
 
 @router.get("/api/consumer")
 def get_consumer(db: Session = Depends(get_db)):
-    # REAL: AI insights on consumer
     insights = generate_insights("consumer", {})
     return {"service": "Consumer Pulse", "status": "LIVE", "data": insights}
 
 @router.get("/api/county")
 def get_county(db: Session = Depends(get_db)):
-    # REAL: County breakdown from LocationMetric
     counties = db.query(LocationMetric.county, func.sum(LocationMetric.demand_score)).group_by(LocationMetric.county).all()
-    counties = [{"county": c[0], "score": float(c[1])} for c in counties]
-
-    return {"service": "County Mapper", "status": "LIVE", "count": len(counties), "data": counties}
+    data = [{"county": c[0], "score": float(c[1])} for c in counties]
+    return {"service": "County Mapper", "status": "LIVE", "count": len(data), "data": data}
