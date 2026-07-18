@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import List
 
 from.service import run_rag_pipeline # fixed relative import
-from app.modules.db import get_db
+from app.modules.database import get_database
 
 router = APIRouter(prefix="/rag", tags=["RAG"]) # add prefix for clarity
 
