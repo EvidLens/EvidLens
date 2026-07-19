@@ -53,6 +53,7 @@ from app.modules.web import routes as web_routes
 
 from app.modules.market_engine.service import search_market, get_real_time_terminal, get_competitor_overview, get_location_data
 from app.modules.core.service import get_all_pricing, PRICING, ADDONS, ALC
+from app.modules.ai_insights.router import ask_lens_chat, ChatRequest
 
 app = FastAPI(title="EvidLens API", version="2.0.0", description="Kenya's Decision Intelligence Platform - 9 Lanes, 19 Modules. All 75 Sectors.")
 
@@ -122,6 +123,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates", auto_reload=True)
 
+# ROUTERS
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 app.include_router(payments_router, prefix="/payments", tags=["Payments"])
 app.include_router(market_router, prefix="/market", tags=["Market Engine"])
@@ -129,6 +131,7 @@ app.include_router(competitive_router, prefix="/competitive", tags=["Competitive
 app.include_router(consumer_router, prefix="/voice", tags=["Consumer Voice"])
 app.include_router(data_router, prefix="/data", tags=["Data Layer"])
 app.include_router(ai_router, prefix="/ai", tags=["AI Insights"])
+app.include_router(ai_router, prefix="/lens", tags=["Ask Lens"]) # REAL CHATBOT
 app.include_router(report_router, prefix="/reports", tags=["Report Builder"])
 app.include_router(location_router, prefix="/location", tags=["Location Intel"])
 app.include_router(knowledge_router, prefix="/kb", tags=["Knowledge Base"])
@@ -229,23 +232,18 @@ def dashboard_api(
 
 @app.get("/api/trending")
 def get_trending(session: Session = Depends(get_session)):
-    # Real 100% - pulls from MarketSearch + News + X
     trends = []
     top = session.query(MarketSearch).order_by(MarketSearch.score.desc()).limit(5).all()
     for t in top:
         trends.append({"type": "market", "title": f"{t.sector} in {t.county}", "score": t.score})
-
     if not trends:
         trends = [{"type": "info", "title": "No trending data yet. Ingest data to see trends.", "score": 0}]
-
     return {"trending": trends, "last_updated": datetime.utcnow().isoformat()}
 
 @app.get("/api/reports/download")
 def download_report(module: str = "all", session: Session = Depends(get_session)):
-    # Real CSV export from DB
     output = io.StringIO()
     writer = csv.writer(output)
-
     if module == "competitive":
         data = session.query(Company).all()
         writer.writerow(["Name", "Sector", "County"])
@@ -258,17 +256,13 @@ def download_report(module: str = "all", session: Session = Depends(get_session)
         writer.writerow(["Metric", "Value"])
         stats = get_dashboard_stats(session)
         for k,v in stats.items(): writer.writerow([k,v])
-
     output.seek(0)
     return StreamingResponse(output, media_type="text/csv", headers={"Content-Disposition": f"attachment; filename=evidlens_report_{module}.csv"})
 
 @app.post("/api/chat")
 async def chat(payload: dict, session: Session = Depends(get_session)):
-    # Interconnected with entire EvidLens API
     msg = payload.get("message")
     context = payload.get("context", {})
-
-    # Pull real context from DB
     stats = get_dashboard_stats(session)
     prompt = f"""You are Lens, EvidLens AI for Kenya business intelligence.
     Current DB Stats: {stats}
@@ -281,16 +275,12 @@ async def chat(payload: dict, session: Session = Depends(get_session)):
 
 @app.post("/api/quick-analysis")
 async def quick_analysis(payload: dict, session: Session = Depends(get_session)):
-    # Real Groq + DB data + Report link
     sector = payload.get("sector")
     county = payload.get("county")
-
     companies = session.query(Company).filter(Company.sector == sector, Company.county == county).count()
     prices = session.query(MarketMetric).filter(MarketMetric.county == county).all()
-
     data_summary = f"Sector: {sector}, County: {county}, Competitors: {companies}, Price points: {len(prices)}"
     insight = await analyze_with_ai(data_summary)
-
     return {
         "analysis": insight,
         "data": {"competitors": companies, "price_points": len(prices)},
@@ -383,10 +373,29 @@ async def call_groq(prompt):
     data = r.json()
     return data["choices"][0]["message"]["content"] if "choices" in data else "AI unavailable"
 
+# COMPATIBILITY ROUTES
 @app.post("/chat")
 async def chat_old(payload: dict, session: Session = Depends(get_session)):
-    # Redirect old frontend calls to new endpoint
     return await chat(payload, session)
+
+@app.post("/lens/chat")
+async def lens_chat_compat(request: Request, req: ChatRequest, session: Session = Depends(get_session)):
+    return await ask_lens_chat(request, req, session)
+
+# STATIC PAGES
+@app.get("/privacy", response_class=HTMLResponse)
+def privacy(request: Request): return templates.TemplateResponse("static_page.html", {"request": request, "title": "Privacy Policy"})
+@app.get("/terms", response_class=HTMLResponse)
+def terms(request: Request): return templates.TemplateResponse("static_page.html", {"request": request, "title": "Terms of Service"})
+@app.get("/contact", response_class=HTMLResponse)
+def contact(request: Request): return templates.TemplateResponse("static_page.html", {"request": request, "title": "Contact Us"})
+@app.get("/about", response_class=HTMLResponse)
+def about(request: Request): return templates.TemplateResponse("static_page.html", {"request": request, "title": "About EvidLens"})
+
+# CATCH-ALL FOR FRONTEND BUGS
+@app.get("/undefined")
+def catch_undefined():
+    return {"status": "ignored"}
 
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
@@ -395,45 +404,6 @@ async def root(request: Request):
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_page(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
-
-@app.get("/privacy", response_class=HTMLResponse)
-def privacy(request: Request):
-    return templates.TemplateResponse("static_page.html", {"request": request, "title": "Privacy Policy"})
-
-@app.get("/terms", response_class=HTMLResponse)
-def terms(request: Request):
-    return templates.TemplateResponse("static_page.html", {"request": request, "title": "Terms of Service"})
-
-@app.get("/contact", response_class=HTMLResponse)
-def contact(request: Request):
-    return templates.TemplateResponse("static_page.html", {"request": request, "title": "Contact Us"})
-
-@app.get("/about", response_class=HTMLResponse)
-def about(request: Request):
-    return templates.TemplateResponse("static_page.html", {"request": request, "title": "About EvidLens"})
-
-# Catch-all for frontend bugs
-@app.get("/undefined")
-def catch_undefined():
-    return {"status": "ignored"}
-
-@app.get("/privacy", response_class=HTMLResponse)
-def privacy(request: Request): return templates.TemplateResponse("static_page.html", {"request": request, "title": "Privacy"})
-@app.get("/terms", response_class=HTMLResponse)  
-def terms(request: Request): return templates.TemplateResponse("static_page.html", {"request": request, "title": "Terms"})
-@app.get("/contact", response_class=HTMLResponse)
-def contact(request: Request): return templates.TemplateResponse("static_page.html", {"request": request, "title": "Contact"})
-@app.get("/about", response_class=HTMLResponse)
-def about(request: Request): return templates.TemplateResponse("static_page.html", {"request": request, "title": "About"})
-
-# Chat compatibility
-@app.post("/chat")
-async def chat_old(payload: dict, session: Session = Depends(get_session)):
-    return await chat(payload, session)
-
-@app.get("/undefined")
-def catch_undefined():
-    return {"error": "frontend bug: route undefined", "status": "ok"}
 
 if __name__ == "__main__":
     import uvicorn
