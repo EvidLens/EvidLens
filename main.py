@@ -403,6 +403,58 @@ async def root(request: Request):
 async def dashboard_page(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
 
+import os
+import httpx
+
+GROQ_KEY = os.getenv("GROQ_API_KEY")
+
+async def call_groq(message: str, stats: dict):
+    if not GROQ_KEY:
+        return "AI offline. Please add GROQ_API_KEY to Render Env Vars"
+
+    system = f"""You are Ask Lens, EvidLens AI for Kenya.
+    Be brief. Use KES, Counties. Data: {stats.get('answer', 'No data yet')}
+    """
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        res = await client.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {GROQ_KEY}"},
+            json={
+                "model": "llama-3.1-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": message}
+                ],
+                "max_tokens": 400,
+                "temperature": 0.3
+            }
+        )
+    data = res.json()
+    return data["choices"][0]["message"]["content"]
+
+@app.post("/api/chat")
+async def chat(payload: dict, session: Session = Depends(get_session)):
+    try:
+        user_msg = payload.get("message", "")
+        user_id = payload.get("user_id", 1)
+
+        # 1. Get DB stats from your existing function
+        stats = generate_insights(user_msg, {}, user_id)
+
+        # 2. Call Groq
+        groq_reply = await call_groq(user_msg, stats) # <-- note the await
+
+        # 3. RETURN THIS EXACT SHAPE so widget stops saying "undefined"
+        return {
+            "reply": groq_reply,
+            "sources": stats.get("sources", ["EvidLens 9 Lanes"]),
+            "credits_used": 1
+        }
+    except Exception as e:
+        print(f"CHAT ERROR: {e}")
+        return {"reply": "AI unavailable. Please try again.", "error": str(e)}
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
