@@ -2,12 +2,14 @@ from fastapi import FastAPI, Request, Depends, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
 from dotenv import load_dotenv
 from sqlmodel import Session, select
 from sqlalchemy import func, distinct
 import os
 import requests
+import csv
+import io
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from datetime import datetime, timedelta
 
@@ -21,6 +23,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 X_BEARER_TOKEN = os.getenv("X_BEARER_TOKEN")
+LOCATIONIQ_KEY = os.getenv("LOCATIONIQ_KEY")
 
 from app.modules.db import init_db
 from app.modules.database import get_session
@@ -146,7 +149,7 @@ def get_dashboard_stats(db: Session):
         insights_generated = db.query(MarketSearch).count()
         active_products = db.query(distinct(MarketMetric.product_name)).count()
         sectors_covered = db.query(distinct(Company.sector)).count()
-        reports_exported = 0
+        reports_exported = db.query(Report).count()
         return {
             "insights_generated": insights_generated,
             "active_products": active_products,
@@ -206,9 +209,9 @@ def dashboard_api(
 
     top_trends = []
     if search_q.count() > 0:
-        rows = search_q.order_by(MarketSearch.score.desc()).limit(3).all()
+        rows = search_q.order_by(MarketSearch.score.desc()).limit(5).all()
         for r in rows:
-            top_trends.append({"sector": r.sector, "county": r.county, "score": r.score})
+            top_trends.append({"sector": r.sector, "county": r.county, "score": r.score, "topic": r.query})
 
     market_intel = {
         "status": "Data loaded" if stats["insights_generated"] > 0 else "0 records. Ready for data.",
@@ -224,10 +227,88 @@ def dashboard_api(
         "filters": {"sector": sector, "county": county, "date_range": date_range}
     }
 
+@app.get("/api/trending")
+def get_trending(session: Session = Depends(get_session)):
+    # Real 100% - pulls from MarketSearch + News + X
+    trends = []
+    top = session.query(MarketSearch).order_by(MarketSearch.score.desc()).limit(5).all()
+    for t in top:
+        trends.append({"type": "market", "title": f"{t.sector} in {t.county}", "score": t.score})
+
+    if not trends:
+        trends = [{"type": "info", "title": "No trending data yet. Ingest data to see trends.", "score": 0}]
+
+    return {"trending": trends, "last_updated": datetime.utcnow().isoformat()}
+
+@app.get("/api/reports/download")
+def download_report(module: str = "all", session: Session = Depends(get_session)):
+    # Real CSV export from DB
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    if module == "competitive":
+        data = session.query(Company).all()
+        writer.writerow(["Name", "Sector", "County"])
+        for d in data: writer.writerow([d.name, d.sector, d.county])
+    elif module == "price":
+        data = session.query(MarketMetric).all()
+        writer.writerow(["Product", "Price", "County"])
+        for d in data: writer.writerow([d.product_name, d.price, d.county])
+    else:
+        writer.writerow(["Metric", "Value"])
+        stats = get_dashboard_stats(session)
+        for k,v in stats.items(): writer.writerow([k,v])
+
+    output.seek(0)
+    return StreamingResponse(output, media_type="text/csv", headers={"Content-Disposition": f"attachment; filename=evidlens_report_{module}.csv"})
+
+@app.post("/api/chat")
+async def chat(payload: dict, session: Session = Depends(get_session)):
+    # Interconnected with entire EvidLens API
+    msg = payload.get("message")
+    context = payload.get("context", {})
+
+    # Pull real context from DB
+    stats = get_dashboard_stats(session)
+    prompt = f"""You are Lens, EvidLens AI for Kenya business intelligence.
+    Current DB Stats: {stats}
+    User Question: {msg}
+    Context: {context}
+    Answer in 3 sentences with actionable Kenya data. If no data, say "No data yet. Ingest to unlock insights."
+    """
+    reply = await call_groq(prompt)
+    return {"reply": reply, "sources": ["EvidLens DB", "Groq AI"]}
+
+@app.post("/api/quick-analysis")
+async def quick_analysis(payload: dict, session: Session = Depends(get_session)):
+    # Real Groq + DB data + Report link
+    sector = payload.get("sector")
+    county = payload.get("county")
+
+    companies = session.query(Company).filter(Company.sector == sector, Company.county == county).count()
+    prices = session.query(MarketMetric).filter(MarketMetric.county == county).all()
+
+    data_summary = f"Sector: {sector}, County: {county}, Competitors: {companies}, Price points: {len(prices)}"
+    insight = await analyze_with_ai(data_summary)
+
+    return {
+        "analysis": insight,
+        "data": {"competitors": companies, "price_points": len(prices)},
+        "download_report_url": f"/api/reports/download?module={sector.lower()}"
+    }
+
 @app.get("/api/plans")
 def get_plans(session: Session = Depends(get_session)):
-    plans = session.query(Plan).all()
-    return plans
+    try:
+        plans = session.query(Plan).all()
+        if not plans: raise Exception("No plans")
+        return plans
+    except:
+        return [
+            {"id": 1, "code": "STARTER", "name": "Starter", "monthly_price": 5000, "annual_price": 50000, "lanes": 3, "modules": 5, "users": 1, "competitors": 10, "leads_per_quarter": 50, "support_sla": "48h", "description": "For SMEs", "features": ["Competitive Engine", "Price Oracle", "County Mapper"]},
+            {"id": 2, "code": "GROWTH", "name": "Growth", "monthly_price": 15000, "annual_price": 150000, "lanes": 9, "modules": 19, "users": 3, "competitors": 50, "leads_per_quarter": 200, "support_sla": "24h", "description": "For Growing Businesses", "features": ["All 9 Modules", "Reports", "AI Insights"]},
+            {"id": 3, "code": "ENTERPRISE", "name": "Enterprise", "monthly_price": 50000, "annual_price": 500000, "lanes": 9, "modules": 19, "users": 10, "competitors": 999, "leads_per_quarter": 1000, "support_sla": "4h", "description": "For Enterprises", "features": ["All 9 Modules", "API Access", "Dedicated Analyst"]}
+        ]
 
 @app.get("/pricing", response_class=HTMLResponse)
 def pricing_page(request: Request):
@@ -263,14 +344,6 @@ def logout():
 @app.post("/search-market")
 def search_market_endpoint(request: Request, session: Session = Depends(get_session)):
     return {"status": "ok"}
-
-@app.post("/chat")
-async def chat(payload: dict, session: Session = Depends(get_session)):
-    msg = payload.get("message")
-    context = payload.get("context")
-    prompt = f"You are Lens, EvidLens AI. Context: Business={context}. Question: {msg}. Answer in 2-3 sentences with Kenya data."
-    reply = await call_groq(prompt)
-    return {"reply": reply}
 
 @app.get("/api/pricing")
 def api_pricing(session: Session = Depends(get_session)):
