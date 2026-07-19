@@ -1,21 +1,52 @@
-<!DOCTYPE html><html><head><title>EvidLens Pricing</title><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-gray-50">
+<!DOCTYPE html>
+<html>
+<head>
+<title>EvidLens Pricing</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
 <section class="py-16"><div class="max-w-7xl mx-auto px-4">
 <h1 class="text-4xl font-bold text-center">Choose Your Plan</h1>
-<p class="text-center text-gray-600">ALL PAID TIERS GET: 9 Lanes, 19 Modules, Kenya-First Data, Exportable Reports</p>
-<div class="grid md:grid-cols-4 gap-6 mt-12">
-<div class="bg-white p-6 rounded-2xl shadow"><h3 class="font-bold text-lg">EV-SME</h3><p class="text-2xl font-bold">Ksh 20,000<span class="text-sm">/mo</span></p><ul id="sme-features" class="text-sm mt-4 space-y-1"></ul><button class="mt-4 w-full bg-[#14B8A6] text-white py-2 rounded">Get Started</button></div>
-<div class="bg-white p-6 rounded-2xl shadow border-4 border-[#14B8A6]"><h3 class="font-bold text-lg">EV-GROWTH</h3><p class="text-2xl font-bold">Ksh 50,000<span class="text-sm">/mo</span></p><ul id="growth-features" class="text-sm mt-4 space-y-1"></ul><button class="mt-4 w-full bg-[#14B8A6] text-white py-2 rounded">Get Started</button></div>
-<div class="bg-white p-6 rounded-2xl shadow"><h3 class="font-bold text-lg">EV-PRO</h3><p class="text-2xl font-bold">Ksh 100,000<span class="text-sm">/mo</span></p><ul id="pro-features" class="text-sm mt-4 space-y-1"></ul><button class="mt-4 w-full bg-[#14B8A6] text-white py-2 rounded">Get Started</button></div>
-<div class="bg-white p-6 rounded-2xl shadow border-2 border-[#F59E0B]"><h3 class="font-bold text-lg">EV-ENT</h3><p class="text-2xl font-bold">Ksh 200,000<span class="text-sm">/mo</span></p><ul id="ent-features" class="text-sm mt-4 space-y-1"></ul><button class="mt-4 w-full bg-[#F59E0B] text-white py-2 rounded">Contact Sales</button></div>
+<p class="text-center text-gray-600 mt-2">Kenya-First Data. 9 Lanes. 19 Modules. Exportable Reports</p>
+<div class="grid md:grid-cols-3 lg:grid-cols-6 gap-6 mt-12" id="plans-grid">
 </div>
-<h2 class="mt-12 text-2xl font-bold">Add-Ons: Slack, CRM, API, Analyst WA</h2>
-<h2 class="mt-4 text-2xl font-bold">À La Carte: Benchmark, Due Diligence, Lead Lists</h2>
+<div class="mt-12 text-center">
+<h2 class="text-xl font-bold">Add-Ons</h2>
+<p class="text-gray-600">Slack Alerts, CRM Sync, API Access, Analyst WhatsApp</p>
+<h2 class="mt-4 text-xl font-bold">À La Carte</h2>
+<p class="text-gray-600">Benchmark Report, Due Diligence, B2B Lead Lists</p>
+</div>
 </div></section>
 <script>
-fetch('/api/plans').then(r=>r.json()).then(plans=>{
-  plans.forEach(p=>{
-    const ul = document.getElementById(p.code.toLowerCase().replace('ev-','')+'-features');
-    JSON.parse(p.features).forEach(f=>{ul.innerHTML += `<li>✓ ${f}</li>`})
-  })
+const plans = [
+  {name: "FREE", price: "KES 0", sub: "", features: ["3 Searches/mo", "1 Report/mo"]},
+  {name: "SME STARTER", price: "KES 500", sub: "per Report", features: ["Pay as you go", "Full PDF Report"]},
+  {name: "SME PRO", price: "KES 2,000", sub: "/month", features: ["10 Reports", "50 Searches", "Email Support"]},
+  {name: "PROFESSIONAL", price: "KES 5,000", sub: "/month", features: ["30 Reports", "200 Searches", "API Access"]},
+  {name: "BUSINESS", price: "KES 15,000", sub: "/month", features: ["100 Reports", "Unlimited Searches"]},
+  {name: "ENTERPRISE", price: "KES 40,000+", sub: "/month", features: ["Unlimited", "Custom Data", "Dedicated Analyst"]},
+];
+
+const grid = document.getElementById('plans-grid');
+plans.forEach(p=>{
+  const isPopular = p.name === "PROFESSIONAL";
+  const isEnterprise = p.name === "ENTERPRISE";
+  grid.innerHTML += `
+  <div class="bg-white p-6 rounded-2xl shadow ${isPopular ? 'border-4 border-[#14B8A6]' : ''} ${isEnterprise ? 'border-2 border-[#F59E0B]' : ''}">
+    <h3 class="font-bold text-lg">${p.name}</h3>
+    <p class="text-2xl font-bold mt-2">${p.price}<span class="text-sm font-normal text-gray-500">${p.sub}</span></p>
+    <ul class="text-sm mt-4 space-y-2">
+      ${p.features.map(f=>`<li>✓ ${f}</li>`).join('')}
+    </ul>
+    <button onclick="checkout('${p.name}')" class="mt-4 w-full ${isEnterprise ? 'bg-[#F59E0B]' : 'bg-[#14B8A6]'} text-white py-2 rounded font-semibold">
+      ${isEnterprise ? 'Contact Sales' : 'Get Started'}
+    </button>
+  </div>`
 })
+
+function checkout(plan){
+  if(plan === "ENTERPRISE") window.location.href = "/contact";
+  else fetch('/api/checkout', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({plan, billing: 'monthly'})})
+  .then(r=>r.json()).then(d=>alert(d.mpesa_prompt))
+}
 </script></body></html>
