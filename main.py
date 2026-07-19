@@ -6,10 +6,12 @@ from fastapi.responses import JSONResponse, HTMLResponse
 from dotenv import load_dotenv
 from sqlmodel import Session
 import os
+import requests
+import sqlite3
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 load_dotenv()
 
-# FIX 1: CORRECT IMPORTS
 from app.modules.db import init_db
 from app.modules.database import get_session
 from app.modules.cron.price_cron import start_scheduler
@@ -19,13 +21,13 @@ from app.modules.models import Sector, County, CoreProduct
 from app.modules.payments.models import Payment, Subscription, MpesaTransaction
 from app.modules.report_builder.models import Report, ReportTemplate, ReportShare
 from app.modules.market_engine.models import MarketSearch, MarketMetric
-from app.modules.competitive_engine.models import Company, FundingDeal, TrafficSnapshot # FIX 2: ADD WAVE 2 MODELS
+from app.modules.competitive_engine.models import Company, FundingDeal, TrafficSnapshot
 from app.modules.core.models import Plan, Module, AddOn, ALCService, UserSubscription, GeoFilter
 
 from app.modules.auth.router import router as auth_router
 from app.modules.payments.router import router as payments_router
 from app.modules.market_engine.router import router as market_router
-from app.modules.competitive_engine.router import router as competitive_router # FIX 3: ADD WAVE 2 ROUTER
+from app.modules.competitive_engine.router import router as competitive_router
 from app.modules.consumer_voice.router import router as consumer_router
 from app.modules.data_layer.router import router as data_router
 from app.modules.ai_insights.router import router as ai_router
@@ -36,16 +38,78 @@ from app.modules.business_os.router import router as business_router
 from app.modules.rag.router import router as rag_router
 from app.modules.web import routes as web_routes
 
-# IMPORT THE SERVICE FUNCTIONS
 from app.modules.market_engine.service import search_market, get_dashboard_stats, get_real_time_terminal, get_competitor_overview, get_location_data
 from app.modules.core.service import get_all_pricing, PRICING, ADDONS, ALC
 
 app = FastAPI(title="EvidLens API", version="2.0.0", description="Kenya's Decision Intelligence Platform - 9 Lanes, 19 Modules. All 75 Sectors.")
 
+AIT_KEY = os.getenv("AT_API_KEY")
+AIT_USER = os.getenv("AT_USERNAME")
+NEWS_KEY = os.getenv("NEWS_API_KEY")
+GROQ_KEY = os.getenv("GROQ_API_KEY")
+X_BEARER = os.getenv("X_BEARER_TOKEN")
+RESEND_KEY = os.getenv("RESEND_API_KEY")
+
+scheduler = AsyncIOScheduler()
+
+async def fetch_prices_from_AIT():
+    try:
+        url = "https://api.africastalking.com/version1/ussd"
+        headers = {"apiKey": AIT_KEY, "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"}
+        data = {"username": AIT_USER, "phoneNumber": "+254700000", "serviceCode": "*384*1#"}
+        requests.post(url, headers=headers, data=data, timeout=15)
+    except:
+        pass
+
+async def fetch_news_from_NEWSAPI():
+    try:
+        url = f"https://newsapi.org/v2/everything?q=Kenya agriculture OR maize OR milk&language=en&sortBy=publishedAt&apiKey={NEWS_KEY}&pageSize=20"
+        requests.get(url, timeout=10)
+    except:
+        pass
+
+async def fetch_tweets_from_X():
+    try:
+        if not X_BEARER:
+            return
+        url = "https://api.twitter.com/2/tweets/search/recent"
+        headers = {"Authorization": f"Bearer {X_BEARER}"}
+        params = {"query": "Kenya agriculture OR maize price OR unga OR milk -is:retweet lang:en", "tweet.fields": "author_id,created_at", "max_results": 20}
+        requests.get(url, headers=headers, params=params, timeout=10)
+    except:
+        pass
+
+async def run_groq_analysis():
+    try:
+        prompt = "Summarize Kenyan agriculture market trends in 3 bullets for business owners"
+        headers = {"Authorization": f"Bearer {GROQ_KEY}", "Content-Type": "application/json"}
+        data = {"model": "llama3-8b-8192", "messages": [{"role": "user", "content": prompt}]}
+        requests.post("https://api.groq.com/openai/v1/chat/completions", json=data, headers=headers, timeout=15)
+    except:
+        pass
+
+async def send_email_resend(to, subject, html):
+    try:
+        url = "https://api.resend.com/emails"
+        headers = {"Authorization": f"Bearer {RESEND_KEY}", "Content-Type": "application/json"}
+        data = {"from": "EvidLens <noreply@evidlens.com>", "to": [to], "subject": subject, "html": html}
+        requests.post(url, headers=headers, json=data, timeout=10)
+    except:
+        pass
+
+async def fetch_all_data():
+    await fetch_prices_from_AIT()
+    await fetch_news_from_NEWSAPI()
+    await fetch_tweets_from_X()
+    await run_groq_analysis()
+
 @app.on_event("startup")
-def on_startup():
+async def on_startup():
     init_db()
     start_scheduler()
+    await fetch_all_data()
+    scheduler.add_job(fetch_all_data, "interval", hours=1)
+    scheduler.start()
 
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
@@ -55,7 +119,7 @@ templates = Jinja2Templates(directory="app/templates", auto_reload=True)
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 app.include_router(payments_router, prefix="/payments", tags=["Payments"])
 app.include_router(market_router, prefix="/market", tags=["Market Engine"])
-app.include_router(competitive_router, prefix="/competitive", tags=["Competitive Engine"]) # FIX 3: MOUNT WAVE 2
+app.include_router(competitive_router, prefix="/competitive", tags=["Competitive Engine"])
 app.include_router(consumer_router, prefix="/voice", tags=["Consumer Voice"])
 app.include_router(data_router, prefix="/data", tags=["Data Layer"])
 app.include_router(ai_router, prefix="/ai", tags=["AI Insights"])
@@ -110,8 +174,6 @@ def logout():
     response.delete_cookie("user_id")
     return response
 
-# ========== DASHBOARD ENDPOINTS ==========
-
 @app.get("/api/dashboard")
 async def dashboard(db: Session = Depends(get_session)):
     return get_dashboard_stats(db)
@@ -131,8 +193,6 @@ async def chat(payload: dict, db: Session = Depends(get_session)):
     reply = await call_groq(prompt)
     return {"reply": reply}
 
-# ========== MONETIZATION ENDPOINTS ==========
-
 @app.get("/api/pricing")
 def api_pricing(db: Session = Depends(get_session)):
     return get_all_pricing(db)
@@ -140,7 +200,7 @@ def api_pricing(db: Session = Depends(get_session)):
 @app.post("/api/checkout")
 def checkout(payload: dict, db: Session = Depends(get_session)):
     plan_name = payload.get("plan")
-    billing = payload.get("billing") # "monthly" or "annual"
+    billing = payload.get("billing")
     amount = PRICING[plan_name][billing]
     return {"status": "ok", "plan": plan_name, "billing": billing, "amount": amount, "mpesa_prompt": f"Pay KES {amount:,}"}
 
@@ -155,6 +215,19 @@ def buy_alc(payload: dict):
     service = payload.get("service")
     amount = ALC[service]["price"]
     return {"status": "ok", "service": service, "amount": amount, "mpesa_prompt": f"Pay KES {amount:,}"}
+
+async def analyze_with_ai(data):
+    prompt = f"Analyze this Kenyan market data: {data}. Give 2 sentence insight."
+    headers = {"Authorization": f"Bearer {GROQ_KEY}", "Content-Type": "application/json"}
+    payload = {"model": "llama3-8b-8192", "messages": [{"role": "user", "content": prompt}]}
+    r = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=15)
+    return r.json()["choices"][0]["message"]["content"]
+
+async def call_groq(prompt):
+    headers = {"Authorization": f"Bearer {GROQ_KEY}", "Content-Type": "application/json"}
+    data = {"model": "llama3-8b-8192", "messages": [{"role": "user", "content": prompt}]}
+    r = requests.post("https://api.groq.com/openai/v1/chat/completions", json=data, headers=headers, timeout=15)
+    return r.json()["choices"][0]["message"]["content"]
 
 if __name__ == "__main__":
     import uvicorn
