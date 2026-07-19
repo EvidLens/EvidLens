@@ -12,6 +12,19 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 load_dotenv()
 
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+AT_API_KEY = os.getenv("AT_API_KEY")
+AT_USERNAME = os.getenv("AT_USERNAME")
+DATABASE_URL = os.getenv("DATABASE_URL")
+ENV = os.getenv("ENV", "development")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+NEWS_API_KEY = os.getenv("NEWS_API_KEY")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+X_BEARER_TOKEN = os.getenv("X_BEARER_TOKEN")
+
 from app.modules.db import init_db
 from app.modules.database import get_session
 from app.modules.cron.price_cron import start_scheduler
