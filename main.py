@@ -15,6 +15,21 @@ from datetime import datetime, timedelta
 
 load_dotenv()
 
+PRICING = {
+    "BASIC": {
+        "monthly": 500,
+        "yearly": 5000
+    },
+    "PROFESSIONAL":
+        "monthly": 1500,
+        "yearly": 15000
+    },
+    "ENTERPRISE": {
+        "monthly": 5000,
+        "yearly": 50000
+    }
+}
+
 AT_API_KEY = os.getenv("AT_API_KEY")
 AT_USERNAME = os.getenv("AT_USERNAME")
 DATABASE_URL = os.getenv("DATABASE_URL")
