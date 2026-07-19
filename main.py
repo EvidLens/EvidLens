@@ -289,16 +289,14 @@ async def quick_analysis(payload: dict, session: Session = Depends(get_session))
 
 @app.get("/api/plans")
 def get_plans(session: Session = Depends(get_session)):
-    try:
-        plans = session.query(Plan).all()
-        if not plans: raise Exception("No plans")
-        return plans
-    except:
-        return [
-            {"id": 1, "code": "STARTER", "name": "Starter", "monthly_price": 5000, "annual_price": 50000, "lanes": 3, "modules": 5, "users": 1, "competitors": 10, "leads_per_quarter": 50, "support_sla": "48h", "description": "For SMEs", "features": ["Competitive Engine", "Price Oracle", "County Mapper"]},
-            {"id": 2, "code": "GROWTH", "name": "Growth", "monthly_price": 15000, "annual_price": 150000, "lanes": 9, "modules": 19, "users": 3, "competitors": 50, "leads_per_quarter": 200, "support_sla": "24h", "description": "For Growing Businesses", "features": ["All 9 Modules", "Reports", "AI Insights"]},
-            {"id": 3, "code": "ENTERPRISE", "name": "Enterprise", "monthly_price": 50000, "annual_price": 500000, "lanes": 9, "modules": 19, "users": 10, "competitors": 999, "leads_per_quarter": 1000, "support_sla": "4h", "description": "For Enterprises", "features": ["All 9 Modules", "API Access", "Dedicated Analyst"]}
-        ]
+    return [
+        {"id": 1, "code": "FREE", "name": "FREE", "monthly_price": 0, "annual_price": 0, "lanes": 3, "modules": 5, "users": 1, "reports": 1, "searches": 3, "description": "For Testing", "features": ["3 Searches/mo", "1 Report/mo"]},
+        {"id": 2, "code": "SME_STARTER", "name": "SME STARTER", "monthly_price": 500, "annual_price": 500, "lanes": 9, "modules": 19, "users": 1, "reports": 1, "searches": 1, "description": "Pay as you go", "features": ["Pay as you go", "Full PDF Report"]},
+        {"id": 3, "code": "SME_PRO", "name": "SME PRO", "monthly_price": 2000, "annual_price": 20000, "lanes": 9, "modules": 19, "users": 1, "reports": 10, "searches": 50, "description": "For Growing SMEs", "features": ["10 Reports", "50 Searches", "Email Support"]},
+        {"id": 4, "code": "PROFESSIONAL", "name": "PROFESSIONAL", "monthly_price": 5000, "annual_price": 50000, "lanes": 9, "modules": 19, "users": 3, "reports": 30, "searches": 200, "description": "For Teams", "features": ["30 Reports", "200 Searches", "API Access"]},
+        {"id": 5, "code": "BUSINESS", "name": "BUSINESS", "monthly_price": 15000, "annual_price": 150000, "lanes": 9, "modules": 19, "users": 5, "reports": 100, "searches": 9999, "description": "For Companies", "features": ["100 Reports", "Unlimited Searches"]},
+        {"id": 6, "code": "ENTERPRISE", "name": "ENTERPRISE", "monthly_price": 40000, "annual_price": 400000, "lanes": 9, "modules": 19, "users": 10, "reports": 9999, "searches": 9999, "description": "Custom", "features": ["Unlimited", "Custom Data", "Dedicated Analyst"]}
+    ]
 
 @app.get("/pricing", response_class=HTMLResponse)
 def pricing_page(request: Request):
