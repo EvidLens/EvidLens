@@ -176,7 +176,7 @@ def logout():
 
 @app.get("/api/dashboard")
 async def dashboard(db: Session = Depends(get_session)):
-    return get_dashboard_stats(db)
+    def get_dashboard_stats(db: Session):
 
 @app.post("/search-market")
 async def search(q: str = Form(...), sector: str = Form(...), county: str = Form(...), db: Session = Depends(get_session)):
