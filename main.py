@@ -187,16 +187,35 @@ def logout():
     response.delete_cookie("user_id")
     return response
 
-@app.get("/api/dashboard")
-async def dashboard(db: Session = Depends(get_session)):
-    def get_dashboard_stats(db: Session):
+from sqlalchemy import func, distinct
+from datetime import datetime, timedelta
+
+def get_dashboard_stats(db: Session):
+    try:
+        insights_generated = db.query(MarketSearch).count()
+        active_products = db.query(distinct(MarketMetric.product_name)).count()
+        sectors_covered = db.query(distinct(Competitor.sector)).count()
+        reports_exported = 0
+
+        return {
+            "insights_generated": insights_generated,
+            "active_products": active_products,
+            "sectors_covered": sectors_covered,
+            "reports_exported": reports_exported
+        }
+    except Exception as e:
+        print("Dashboard stats error:", e)
+        return {
+            "insights_generated": 0,
+            "active_products": 0,
+            "sectors_covered": 0,
+            "reports_exported": 0
+        }
+
 
 @app.post("/search-market")
-async def search(q: str = Form(...), sector: str = Form(...), county: str = Form(...), db: Session = Depends(get_session)):
-    data = search_market(db, q, sector, county)
-    data["ai_insight"] = await analyze_with_ai(data)
-    html = f"<div class='p-3 bg-white rounded border-gray-200'><h3 class='font-bold text-lg' style='color:#0A1F44'>{data['query']}</h3><p>Demand: <b style='color:#14B8A6'>{data['demand_level']}</b></p><p>Market Size: <b>KES {data['market_size_kes']:,}</b></p><p>Avg Price: <b>KES {data['price_range']['avg']:,}</b></p><p>Competitors Found: <b>{data['competitor_count']}</b></p><hr class='my-3'><p style='color:#0A1F44'>{data['ai_insight']}</p></div>"
-    return HTMLResponse(html)
+def search_market(request: Request, db: Session = Depends(get_db)):
+    pass
 
 @app.post("/chat")
 async def chat(payload: dict, db: Session = Depends(get_session)):
