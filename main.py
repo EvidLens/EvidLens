@@ -20,7 +20,7 @@ PRICING = {
         "monthly": 500,
         "yearly": 5000
     },
-    "PROFESSIONAL":
+    "PROFESSIONAL": { 
         "monthly": 1500,
         "yearly": 15000
     },
