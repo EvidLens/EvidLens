@@ -229,6 +229,13 @@ async def call_groq(prompt):
     r = requests.post("https://api.groq.com/openai/v1/chat/completions", json=data, headers=headers, timeout=15)
     return r.json()["choices"][0]["message"]["content"]
 
+@app.get("/", response_class=HTMLResponse)
+async def root(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request})
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard_page(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request})
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
