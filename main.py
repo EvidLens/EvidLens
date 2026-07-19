@@ -4,16 +4,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import JSONResponse, HTMLResponse
 from dotenv import load_dotenv
-from sqlmodel import Session
+from sqlmodel import Session, select
+from sqlalchemy import func, distinct
 import os
 import requests
-import sqlite3
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from datetime import datetime, timedelta
 
-load_dotenv()
-
-import os
-from dotenv import load_dotenv
 load_dotenv()
 
 AT_API_KEY = os.getenv("AT_API_KEY")
@@ -51,42 +48,35 @@ from app.modules.business_os.router import router as business_router
 from app.modules.rag.router import router as rag_router
 from app.modules.web import routes as web_routes
 
-from app.modules.market_engine.service import search_market, get_dashboard_stats, get_real_time_terminal, get_competitor_overview, get_location_data
+from app.modules.market_engine.service import search_market, get_real_time_terminal, get_competitor_overview, get_location_data
 from app.modules.core.service import get_all_pricing, PRICING, ADDONS, ALC
 
 app = FastAPI(title="EvidLens API", version="2.0.0", description="Kenya's Decision Intelligence Platform - 9 Lanes, 19 Modules. All 75 Sectors.")
-
-AIT_KEY = os.getenv("AT_API_KEY")
-AIT_USER = os.getenv("AT_USERNAME")
-NEWS_KEY = os.getenv("NEWS_API_KEY")
-GROQ_KEY = os.getenv("GROQ_API_KEY")
-X_BEARER = os.getenv("X_BEARER_TOKEN")
-RESEND_KEY = os.getenv("RESEND_API_KEY")
 
 scheduler = AsyncIOScheduler()
 
 async def fetch_prices_from_AIT():
     try:
         url = "https://api.africastalking.com/version1/ussd"
-        headers = {"apiKey": AIT_KEY, "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"}
-        data = {"username": AIT_USER, "phoneNumber": "+254700000", "serviceCode": "*384*1#"}
+        headers = {"apiKey": AT_API_KEY, "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"}
+        data = {"username": AT_USERNAME, "phoneNumber": "+254700000", "serviceCode": "*384*1#"}
         requests.post(url, headers=headers, data=data, timeout=15)
     except:
         pass
 
 async def fetch_news_from_NEWSAPI():
     try:
-        url = f"https://newsapi.org/v2/everything?q=Kenya agriculture OR maize OR milk&language=en&sortBy=publishedAt&apiKey={NEWS_KEY}&pageSize=20"
+        url = f"https://newsapi.org/v2/everything?q=Kenya agriculture OR maize OR milk&language=en&sortBy=publishedAt&apiKey={NEWS_API_KEY}&pageSize=20"
         requests.get(url, timeout=10)
     except:
         pass
 
 async def fetch_tweets_from_X():
     try:
-        if not X_BEARER:
+        if not X_BEARER_TOKEN:
             return
         url = "https://api.twitter.com/2/tweets/search/recent"
-        headers = {"Authorization": f"Bearer {X_BEARER}"}
+        headers = {"Authorization": f"Bearer {X_BEARER_TOKEN}"}
         params = {"query": "Kenya agriculture OR maize price OR unga OR milk -is:retweet lang:en", "tweet.fields": "author_id,created_at", "max_results": 20}
         requests.get(url, headers=headers, params=params, timeout=10)
     except:
@@ -95,7 +85,7 @@ async def fetch_tweets_from_X():
 async def run_groq_analysis():
     try:
         prompt = "Summarize Kenyan agriculture market trends in 3 bullets for business owners"
-        headers = {"Authorization": f"Bearer {GROQ_KEY}", "Content-Type": "application/json"}
+        headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
         data = {"model": "llama3-8b-8192", "messages": [{"role": "user", "content": prompt}]}
         requests.post("https://api.groq.com/openai/v1/chat/completions", json=data, headers=headers, timeout=15)
     except:
@@ -104,7 +94,7 @@ async def run_groq_analysis():
 async def send_email_resend(to, subject, html):
     try:
         url = "https://api.resend.com/emails"
-        headers = {"Authorization": f"Bearer {RESEND_KEY}", "Content-Type": "application/json"}
+        headers = {"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"}
         data = {"from": "EvidLens <noreply@evidlens.com>", "to": [to], "subject": subject, "html": html}
         requests.post(url, headers=headers, json=data, timeout=10)
     except:
@@ -151,6 +141,30 @@ async def internal_error(request: Request, exc):
 def health():
     return {"status": "healthy", "version": "2.0.0", "sectors": 75, "modules": 19}
 
+def get_dashboard_stats(db: Session):
+    try:
+        insights_generated = db.query(MarketSearch).count()
+        active_products = db.query(distinct(MarketMetric.product_name)).count()
+        sectors_covered = db.query(distinct(Company.sector)).count()
+        reports_exported = 0
+        return {
+            "insights_generated": insights_generated,
+            "active_products": active_products,
+            "sectors_covered": sectors_covered,
+            "reports_exported": reports_exported
+        }
+    except:
+        return {
+            "insights_generated": 0,
+            "active_products": 0,
+            "sectors_covered": 0,
+            "reports_exported": 0
+        }
+
+@app.get("/api/dashboard")
+def dashboard_api(session: Session = Depends(get_session)):
+    return {"status": "LIVE", "stats": get_dashboard_stats(session)}
+
 @app.get("/api/plans")
 def get_plans(session: Session = Depends(get_session)):
     plans = session.query(Plan).all()
@@ -187,38 +201,12 @@ def logout():
     response.delete_cookie("user_id")
     return response
 
-from sqlalchemy import func, distinct
-from datetime import datetime, timedelta
-
-def get_dashboard_stats(db: Session):
-    try:
-        insights_generated = db.query(MarketSearch).count()
-        active_products = db.query(distinct(MarketMetric.product_name)).count()
-        sectors_covered = db.query(distinct(Competitor.sector)).count()
-        reports_exported = 0
-
-        return {
-            "insights_generated": insights_generated,
-            "active_products": active_products,
-            "sectors_covered": sectors_covered,
-            "reports_exported": reports_exported
-        }
-    except Exception as e:
-        print("Dashboard stats error:", e)
-        return {
-            "insights_generated": 0,
-            "active_products": 0,
-            "sectors_covered": 0,
-            "reports_exported": 0
-        }
-
-
 @app.post("/search-market")
-def search_market(request: Request, db: Session = Depends(get_db)):
-    pass
+def search_market_endpoint(request: Request, session: Session = Depends(get_session)):
+    return {"status": "ok"}
 
 @app.post("/chat")
-async def chat(payload: dict, db: Session = Depends(get_session)):
+async def chat(payload: dict, session: Session = Depends(get_session)):
     msg = payload.get("message")
     context = payload.get("context")
     prompt = f"You are Lens, EvidLens AI. Context: Business={context}. Question: {msg}. Answer in 2-3 sentences with Kenya data."
@@ -226,11 +214,11 @@ async def chat(payload: dict, db: Session = Depends(get_session)):
     return {"reply": reply}
 
 @app.get("/api/pricing")
-def api_pricing(db: Session = Depends(get_session)):
-    return get_all_pricing(db)
+def api_pricing(session: Session = Depends(get_session)):
+    return get_all_pricing(session)
 
 @app.post("/api/checkout")
-def checkout(payload: dict, db: Session = Depends(get_session)):
+def checkout(payload: dict, session: Session = Depends(get_session)):
     plan_name = payload.get("plan")
     billing = payload.get("billing")
     amount = PRICING[plan_name][billing]
@@ -250,16 +238,18 @@ def buy_alc(payload: dict):
 
 async def analyze_with_ai(data):
     prompt = f"Analyze this Kenyan market data: {data}. Give 2 sentence insight."
-    headers = {"Authorization": f"Bearer {GROQ_KEY}", "Content-Type": "application/json"}
+    headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
     payload = {"model": "llama3-8b-8192", "messages": [{"role": "user", "content": prompt}]}
     r = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=15)
-    return r.json()["choices"][0]["message"]["content"]
+    data = r.json()
+    return data["choices"][0]["message"]["content"] if "choices" in data else "AI unavailable"
 
 async def call_groq(prompt):
-    headers = {"Authorization": f"Bearer {GROQ_KEY}", "Content-Type": "application/json"}
+    headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
     data = {"model": "llama3-8b-8192", "messages": [{"role": "user", "content": prompt}]}
     r = requests.post("https://api.groq.com/openai/v1/chat/completions", json=data, headers=headers, timeout=15)
-    return r.json()["choices"][0]["message"]["content"]
+    data = r.json()
+    return data["choices"][0]["message"]["content"] if "choices" in data else "AI unavailable"
 
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
@@ -268,6 +258,7 @@ async def root(request: Request):
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_page(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
