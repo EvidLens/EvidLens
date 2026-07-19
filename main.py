@@ -162,8 +162,67 @@ def get_dashboard_stats(db: Session):
         }
 
 @app.get("/api/dashboard")
-def dashboard_api(session: Session = Depends(get_session)):
-    return {"status": "LIVE", "stats": get_dashboard_stats(session)}
+def dashboard_api(
+    sector: str = None,
+    county: str = None,
+    date_range: str = "30d",
+    session: Session = Depends(get_session)
+):
+    days_map = {"7d": 7, "30d": 30, "90d": 90, "1y": 365}
+    days = days_map.get(date_range, 30)
+    since = datetime.utcnow() - timedelta(days=days)
+
+    stats = get_dashboard_stats(session)
+
+    company_q = session.query(Company)
+    metric_q = session.query(MarketMetric)
+    search_q = session.query(MarketSearch)
+    funding_q = session.query(FundingDeal)
+
+    if sector:
+        company_q = company_q.filter(Company.sector == sector)
+        metric_q = metric_q.filter(MarketMetric.sector == sector)
+        search_q = search_q.filter(MarketSearch.sector == sector)
+        funding_q = funding_q.filter(FundingDeal.sector == sector)
+    if county:
+        company_q = company_q.filter(Company.county == county)
+        metric_q = metric_q.filter(MarketMetric.county == county)
+        search_q = search_q.filter(MarketSearch.county == county)
+        funding_q = funding_q.filter(FundingDeal.county == county)
+    search_q = search_q.filter(MarketSearch.created_at >= since)
+    metric_q = metric_q.filter(MarketMetric.updated_at >= since)
+
+    modules = [
+        {"id": 1, "name": "Competitive Engine", "icon": "🎯", "count": company_q.count(), "route": "/competitive"},
+        {"id": 2, "name": "Price Oracle", "icon": "💰", "count": metric_q.count(), "route": "/market/prices"},
+        {"id": 3, "name": "Demand Radar", "icon": "📈", "count": search_q.count(), "route": "/market/demand"},
+        {"id": 4, "name": "County Mapper", "icon": "🗺️", "count": session.query(County).count(), "route": "/location/counties"},
+        {"id": 5, "name": "Consumer Pulse", "icon": "👥", "count": 0, "route": "/voice"},
+        {"id": 6, "name": "Risk Sentinel", "icon": "⚠️", "count": 0, "route": "/market/risk"},
+        {"id": 7, "name": "Policy Watch", "icon": "📜", "count": 0, "route": "/kb/policy"},
+        {"id": 8, "name": "Funding Radar", "icon": "🏦", "count": funding_q.count(), "route": "/reports/funding"},
+        {"id": 9, "name": "Export Navigator", "icon": "🚢", "count": 0, "route": "/market/export"}
+    ]
+
+    top_trends = []
+    if search_q.count() > 0:
+        rows = search_q.order_by(MarketSearch.score.desc()).limit(3).all()
+        for r in rows:
+            top_trends.append({"sector": r.sector, "county": r.county, "score": r.score})
+
+    market_intel = {
+        "status": "Data loaded" if stats["insights_generated"] > 0 else "0 records. Ready for data.",
+        "last_updated": datetime.utcnow().isoformat(),
+        "top_trends": top_trends
+    }
+
+    return {
+        "status": "LIVE",
+        "stats": stats,
+        "modules": modules,
+        "market_intel": market_intel,
+        "filters": {"sector": sector, "county": county, "date_range": date_range}
+    }
 
 @app.get("/api/plans")
 def get_plans(session: Session = Depends(get_session)):
