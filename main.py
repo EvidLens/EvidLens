@@ -383,6 +383,11 @@ async def call_groq(prompt):
     data = r.json()
     return data["choices"][0]["message"]["content"] if "choices" in data else "AI unavailable"
 
+@app.post("/chat")
+async def chat_old(payload: dict, session: Session = Depends(get_session)):
+    # Redirect old frontend calls to new endpoint
+    return await chat(payload, session)
+
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
@@ -390,6 +395,45 @@ async def root(request: Request):
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_page(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
+
+@app.get("/privacy", response_class=HTMLResponse)
+def privacy(request: Request):
+    return templates.TemplateResponse("static_page.html", {"request": request, "title": "Privacy Policy"})
+
+@app.get("/terms", response_class=HTMLResponse)
+def terms(request: Request):
+    return templates.TemplateResponse("static_page.html", {"request": request, "title": "Terms of Service"})
+
+@app.get("/contact", response_class=HTMLResponse)
+def contact(request: Request):
+    return templates.TemplateResponse("static_page.html", {"request": request, "title": "Contact Us"})
+
+@app.get("/about", response_class=HTMLResponse)
+def about(request: Request):
+    return templates.TemplateResponse("static_page.html", {"request": request, "title": "About EvidLens"})
+
+# Catch-all for frontend bugs
+@app.get("/undefined")
+def catch_undefined():
+    return {"status": "ignored"}
+
+@app.get("/privacy", response_class=HTMLResponse)
+def privacy(request: Request): return templates.TemplateResponse("static_page.html", {"request": request, "title": "Privacy"})
+@app.get("/terms", response_class=HTMLResponse)  
+def terms(request: Request): return templates.TemplateResponse("static_page.html", {"request": request, "title": "Terms"})
+@app.get("/contact", response_class=HTMLResponse)
+def contact(request: Request): return templates.TemplateResponse("static_page.html", {"request": request, "title": "Contact"})
+@app.get("/about", response_class=HTMLResponse)
+def about(request: Request): return templates.TemplateResponse("static_page.html", {"request": request, "title": "About"})
+
+# Chat compatibility
+@app.post("/chat")
+async def chat_old(payload: dict, session: Session = Depends(get_session)):
+    return await chat(payload, session)
+
+@app.get("/undefined")
+def catch_undefined():
+    return {"error": "frontend bug: route undefined", "status": "ok"}
 
 if __name__ == "__main__":
     import uvicorn
