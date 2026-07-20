@@ -449,8 +449,9 @@ def run_scraper():
 
 @app.on_event("startup")
 async def start_scraper():
-    scheduler.add_job(scrape_kpin_prices, "cron", hour=6)
-    scheduler.start()
+    if not scheduler.running:
+        scheduler.add_job(scrape_kpin_prices, "cron", hour=6)
+        scheduler.start()
 
 from app.modules.data_layer.db import create_db_and_tables
 
