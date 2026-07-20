@@ -1,3 +1,4 @@
+from app.scheduler import scheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -413,11 +414,25 @@ def dashboard_api(session: Session = Depends(get_session)):
         "active_products": product_count
     }
 
-    top_demand = session.exec(select(MarketMetric).order_by(desc(MarketMetric.demand_score)).limit(1)).first()
-    trending = {
-    "category": getattr(top_demand, 'sector', getattr(top_demand, 'category', 'Agriculture')) if top_demand else "Agriculture",
-    "headline": f"{top_demand.product_name} demand up in {top_demand.county}" if top_demand else "No data yet"
-}
+   # Pull top 3 trending instead of just 1
+top_demands = session.exec(
+    select(MarketMetric).order_by(desc(MarketMetric.demand_score)).limit(3)
+).all()
+
+trending = []
+for d in top_demands:
+    trending.append({
+        "category": getattr(d, 'sector', getattr(d, 'category', 'Agriculture')),
+        "headline": f"{d.product_name} demand up in {d.county}",
+        "score": d.demand_score,
+        "product": d.product_name,
+        "county": d.county,
+        "updated": d.updated_at.isoformat() if d.updated_at else ""
+    })
+
+# Fallback if no data
+if not trending:
+    trending = [{"category": "Agriculture", "headline": "No data yet", "score": 0}]
 
     return {
         "stats": stats,
