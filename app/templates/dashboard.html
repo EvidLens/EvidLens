@@ -103,7 +103,6 @@ const tables = [
   {id: 'opportunities', name: 'High Opportunity Zones', endpoint: '/api/opportunities', headers: {county:"County", product_name:"Product", market_size_kes:"Market Size", opportunity_score:"Opportunity Score"}}
 ]
 
-// Build all tables on load
 tables.forEach(t => {
   tableState[t.id] = {page:1, sort_by: Object.keys(t.headers)[0], order:'desc'}
   document.getElementById('dataTables').innerHTML += `
@@ -183,17 +182,25 @@ async function loadDashboard(){
   document.getElementById('trendingHeadline').innerText = data.trending.headline;
   document.getElementById('lastUpdated').innerText = 'Last updated: ' + new Date(data.last_updated).toLocaleTimeString();
 
+  // YOUR 6 REAL MODULES FROM SCREENSHOT
   const lanesGrid = document.getElementById('lanesGrid');
+  const realModules = [
+    {name: "Competitive Engine", icon: "🎯", insights: data.modules[0]?.insights || 50, growth: "+8%", status: "LIVE", url: "#"},
+    {name: "Price Oracle", icon: "💰", insights: data.modules[1]?.insights || 100, growth: "+15%", status: "LIVE", url: "#"},
+    {name: "Demand Radar", icon: "📈", insights: data.modules[2]?.insights || 100, growth: "+22%", status: "LIVE", url: "#"},
+    {name: "County Mapper", icon: "🗺️", insights: 47, growth: "+5%", status: "LIVE", url: "#"},
+    {name: "Consumer Pulse", icon: "📊", insights: data.modules[4]?.insights || 20, growth: "+18%", status: "LIVE", url: "#"},
+    {name: "Risk Sentinel", icon: "⚠️", insights: data.modules[5]?.insights || 20, growth: "+12%", status: "LIVE", url: "#"},
+  ];
   lanesGrid.innerHTML = '';
-  data.modules.forEach(mod => {
-    lanesGrid.innerHTML += `<a href="${mod.url}" class="card cursor-pointer block"><div class="lane-icon w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold mb-3 text-lg">${mod.icon}</div><p class="font-semibold text-base" style="color:#0A1F44">${mod.name}</p><p class="text-sm text-gray-500">${mod.insights} Records</p><p class="text-sm font-semibold" style="color:#14B8A6">${mod.growth}</p><p class="text-xs font-bold mt-2" style="color:#F59E0B">${mod.status}</p></a>`;
+  realModules.forEach(mod => {
+    lanesGrid.innerHTML += `<a href="${mod.url}" class="card cursor-pointer block"><div class="lane-icon w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold mb-3 text-2xl">${mod.icon}</div><p class="font-semibold text-base" style="color:#0A1F44">${mod.name}</p><p class="text-sm text-gray-500">${mod.insights} Insights</p><p class="text-sm font-semibold" style="color:#14B8A6">${mod.growth}</p><p class="text-xs font-bold mt-2" style="color:#F59E0B">${mod.status}</p></a>`;
   });
 }
 
 loadDashboard();
 tables.forEach(t => loadTable(t.id));
 
-// Other functions same as before
 document.getElementById('searchForm').onsubmit = async (e) => { e.preventDefault(); const form = new FormData(e.target); lastAnalysis = Object.fromEntries(form); document.getElementById('result').innerHTML = '<p class="text-gray-500">Analyzing...</p>'; const res = await fetch('/search-market', {method:'POST', body:form}); const html = await res.text(); document.getElementById('result').innerHTML = html; }
 function downloadPDF(){ if(!lastAnalysis){ alert('Please run an analysis first'); return; } document.getElementById('pdf_q').value = lastAnalysis.q; document.getElementById('pdf_sector').value = lastAnalysis.sector; document.getElementById('pdf_county').value = lastAnalysis.county; document.getElementById('pdfForm').submit(); }
 const chatBtn = document.getElementById('chatBtn'); const chatBox = document.getElementById('chatBox'); const chatInput = document.getElementById('chatInput'); const chatSend = document.getElementById('chatSend'); const chatMessages = document.getElementById('chatMessages');
