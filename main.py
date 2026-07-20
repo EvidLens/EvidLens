@@ -4,8 +4,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
 from dotenv import load_dotenv
-from sqlmodel import SQLModel, Field, Session, select, create_engine
-from sqlalchemy import func, distinct
+from sqlmodel import SQLModel, Field, Session, select, create_engine, or_
+from sqlalchemy import func, distinct, desc, asc
 import os
 import requests
 import csv
@@ -23,7 +23,7 @@ load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(DATABASE_URL, echo=False) if DATABASE_URL else create_engine("sqlite:///./evidlens.db", connect_args={"check_same_thread": False})
 
-app = FastAPI(title="EvidLens API", version="2.2.0", description="Kenya's Decision Intelligence Platform - 9 Lanes, 19 Modules. All 75 Sectors.")
+app = FastAPI(title="EvidLens API", version="2.4.0", description="Kenya's Decision Intelligence Platform - 9 Lanes, 19 Modules. All 75 Sectors.")
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
@@ -200,7 +200,6 @@ def seed_data(db: Session):
     sectors = ["Agriculture", "Retail", "Manufacturing", "Health", "Education", "ICT", "Logistics", "Finance", "Hospitality", "Construction"]
     products = ["maize", "beans", "milk", "unga", "potatoes", "rice", "tomatoes", "onions", "sugar", "tea"]
 
-    # 50 Companies
     for i in range(50):
         db.add(Company(
             name=f"{random.choice(sectors)} Ltd {i+1}",
@@ -213,7 +212,6 @@ def seed_data(db: Session):
             lng=round(random.uniform(36.0, 40.0), 4)
         ))
 
-    # Market Metrics for all 47 counties x 10 products
     for county in counties:
         for product in products:
             demand = random.randint(40, 95)
@@ -221,7 +219,7 @@ def seed_data(db: Session):
             volume = random.randint(1000, 50000)
             market_size = price * volume
             growth = round(random.uniform(-5, 25), 2)
-            opportunity = round((demand * price) / (volume/1000 + 1), 2) # Low competition algo
+            opportunity = round((demand * price) / (volume/1000 + 1), 2)
 
             db.add(MarketMetric(
                 product_name=product,
@@ -291,50 +289,127 @@ templates = Jinja2Templates(directory="app/templates", auto_reload=True)
 @app.post("/chat")
 async def chat(payload: dict, user_id: int = Depends(get_current_user), db: Session = Depends(get_db)):
     check_subscription(user_id, db)
-    db.add(MarketSearch(query=payload["message"], sector="All", county="Kenya", score=random.randint(50,100))) # LOG SEARCH
+    db.add(MarketSearch(query=payload["message"], sector="All", county="Kenya", score=random.randint(50,100)))
     db.commit()
     ai_response = generate_insights(payload["message"])
     log_query(db, user_id)
     return {"response": ai_response}
 
-@app.get("/api/companies") # 1. 50+ Businesses
-def get_companies(sector: str = None, county: str = None, session: Session = Depends(get_session)):
-    q = select(Company).order_by(Company.rating.desc()).limit(50)
-    if sector: q = q.where(Company.sector == sector)
-    if county: q = q.where(Company.county == county)
-    return {"companies": [c.dict() for c in session.exec(q).all()]}
+# ================== HELPER FOR SORT ==================
+def apply_sort(q, model, sort_by: str, order: str):
+    if not sort_by or not hasattr(model, sort_by): return q
+    col = getattr(model, sort_by)
+    return q.order_by(desc(col) if order == "desc" else asc(col))
 
-@app.get("/api/prices") # 2. Live KES Prices Top 50
-def get_prices(product: str = None, county: str = None, session: Session = Depends(get_session)):
-    q = select(MarketPrice).order_by(MarketPrice.price.desc()).limit(50)
-    if product: q = q.where(MarketPrice.product == product)
-    if county: q = q.where(MarketPrice.county == county)
-    return {"prices": [p.dict() for p in session.exec(q).all()]}
+# ================== 6 MODULES WITH PAGINATION + SEARCH + SORT ==================
+@app.get("/api/companies")
+def get_companies(search: str = "", page: int = 1, limit: int = 10, sort_by: str = "rating", order: str = "desc", session: Session = Depends(get_session)):
+    q = select(Company)
+    if search: q = q.where(or_(Company.name.contains(search), Company.sector.contains(search), Company.county.contains(search)))
+    total = len(session.exec(q).all())
+    q = apply_sort(q, Company, sort_by, order)
+    data = session.exec(q.offset((page-1)*limit).limit(limit)).all()
+    return {"companies": [c.dict() for c in data], "total": total, "page": page}
 
-@app.get("/api/demand") # 3. Top Demand Scores
-def get_demand(session: Session = Depends(get_session)):
-    q = select(MarketMetric).order_by(MarketMetric.demand_score.desc()).limit(50)
-    return {"demand": [m.dict() for m in session.exec(q).all()]}
+@app.get("/api/prices")
+def get_prices(search: str = "", page: int = 1, limit: int = 10, sort_by: str = "price", order: str = "desc", session: Session = Depends(get_session)):
+    q = select(MarketPrice)
+    if search: q = q.where(or_(MarketPrice.product.contains(search), MarketPrice.county.contains(search)))
+    total = len(session.exec(q).all())
+    q = apply_sort(q, MarketPrice, sort_by, order)
+    data = session.exec(q.offset((page-1)*limit).limit(limit)).all()
+    return {"prices": [p.dict() for p in data], "total": total, "page": page}
 
-@app.get("/api/county-stats") # 4. Every County Market Size
-def get_county_stats(session: Session = Depends(get_session)):
+@app.get("/api/demand")
+def get_demand(search: str = "", page: int = 1, limit: int = 10, sort_by: str = "demand_score", order: str = "desc", session: Session = Depends(get_session)):
+    q = select(MarketMetric)
+    if search: q = q.where(or_(MarketMetric.product_name.contains(search), MarketMetric.county.contains(search)))
+    total = len(session.exec(q).all())
+    q = apply_sort(q, MarketMetric, sort_by, order)
+    data = session.exec(q.offset((page-1)*limit).limit(limit)).all()
+    return {"demand": [m.dict() for m in data], "total": total, "page": page}
+
+@app.get("/api/county-stats")
+def get_county_stats(search: str = "", page: int = 1, limit: int = 47, sort_by: str = "market_size", order: str = "desc", session: Session = Depends(get_session)):
     q = select(
         MarketMetric.county,
         func.sum(MarketMetric.market_size_kes).label("market_size"),
         func.avg(MarketMetric.growth_percent).label("growth"),
         func.sum(MarketMetric.volume).label("volume")
     ).group_by(MarketMetric.county)
-    return {"stats": [dict(r._mapping) for r in session.exec(q).all()]}
+    if search: q = q.where(MarketMetric.county.contains(search))
+    data = session.exec(q.offset((page-1)*limit).limit(limit)).all()
+    stats = [dict(r._mapping) for r in data]
+    stats.sort(key=lambda x: x.get(sort_by, 0), reverse=(order=="desc"))
+    return {"stats": stats, "total": 47, "page": page}
 
-@app.get("/api/top-sectors") # 5. Top 50 Sectors Searched
-def get_top_sectors(session: Session = Depends(get_session)):
-    q = select(MarketSearch.sector, func.count(MarketSearch.id).label("count")).group_by(MarketSearch.sector).order_by(func.count(MarketSearch.id).desc()).limit(50)
-    return {"sectors": [dict(r._mapping) for r in session.exec(q).all()]}
+@app.get("/api/top-sectors")
+def get_top_sectors(search: str = "", page: int = 1, limit: int = 10, session: Session = Depends(get_session)):
+    q = select(MarketSearch.sector, func.count(MarketSearch.id).label("count")).group_by(MarketSearch.sector)
+    if search: q = q.where(MarketSearch.sector.contains(search))
+    total = len(session.exec(q).all())
+    data = session.exec(q.order_by(func.count(MarketSearch.id).desc()).offset((page-1)*limit).limit(limit)).all()
+    return {"sectors": [dict(r._mapping) for r in data], "total": total, "page": page}
 
-@app.get("/api/opportunities") # 6. High Opportunity Zones
-def get_opportunities(session: Session = Depends(get_session)):
-    q = select(MarketMetric).order_by(MarketMetric.opportunity_score.desc()).limit(50)
-    return {"opportunities": [m.dict() for m in session.exec(q).all()]}
+@app.get("/api/opportunities")
+def get_opportunities(search: str = "", page: int = 1, limit: int = 10, sort_by: str = "opportunity_score", order: str = "desc", session: Session = Depends(get_session)):
+    q = select(MarketMetric)
+    if search: q = q.where(or_(MarketMetric.product_name.contains(search), MarketMetric.county.contains(search)))
+    total = len(session.exec(q).all())
+    q = apply_sort(q, MarketMetric, sort_by, order)
+    data = session.exec(q.offset((page-1)*limit).limit(limit)).all()
+    return {"opportunities": [m.dict() for m in data], "total": total, "page": page}
+
+# ================== CSV EXPORT ==================
+@app.get("/api/export/{table}")
+def export_csv(table: str, search: str = "", session: Session = Depends(get_session)):
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    if table == "companies":
+        q = select(Company)
+        if search: q = q.where(or_(Company.name.contains(search), Company.sector.contains(search), Company.county.contains(search)))
+        data = session.exec(q).all()
+        writer.writerow(["Name", "Sector", "County", "Rating", "Reviews", "Address", "Lat", "Lng"])
+        for r in data: writer.writerow([r.name, r.sector, r.county, r.rating, r.reviews, r.address, r.lat, r.lng])
+    
+    elif table == "prices":
+        q = select(MarketPrice)
+        if search: q = q.where(or_(MarketPrice.product.contains(search), MarketPrice.county.contains(search)))
+        data = session.exec(q).all()
+        writer.writerow(["Product", "Price", "County", "Market", "Source", "FetchedAt"])
+        for r in data: writer.writerow([r.product, r.price, r.county, r.market, r.source, r.fetched_at])
+
+    elif table == "demand":
+        q = select(MarketMetric)
+        if search: q = q.where(or_(MarketMetric.product_name.contains(search), MarketMetric.county.contains(search)))
+        data = session.exec(q).all()
+        writer.writerow(["Product", "Sector", "County", "DemandScore", "MarketSizeKES", "Growth%", "Volume", "OpportunityScore"])
+        for r in data: writer.writerow([r.product_name, r.sector, r.county, r.demand_score, r.market_size_kes, r.growth_percent, r.volume, r.opportunity_score])
+
+    elif table == "county-stats":
+        q = select(MarketMetric.county, func.sum(MarketMetric.market_size_kes), func.avg(MarketMetric.growth_percent), func.sum(MarketMetric.volume)).group_by(MarketMetric.county)
+        if search: q = q.where(MarketMetric.county.contains(search))
+        data = session.exec(q).all()
+        writer.writerow(["County", "MarketSizeKES", "Growth%", "Volume"])
+        for r in data: writer.writerow([r[0], r[1], r[2], r[3]])
+
+    elif table == "sectors":
+        q = select(MarketSearch.sector, func.count(MarketSearch.id)).group_by(MarketSearch.sector)
+        if search: q = q.where(MarketSearch.sector.contains(search))
+        data = session.exec(q).all()
+        writer.writerow(["Sector", "SearchCount"])
+        for r in data: writer.writerow([r[0], r[1]])
+
+    elif table == "opportunities":
+        q = select(MarketMetric)
+        if search: q = q.where(or_(MarketMetric.product_name.contains(search), MarketMetric.county.contains(search)))
+        data = session.exec(q).all()
+        writer.writerow(["Product", "County", "MarketSizeKES", "DemandScore", "OpportunityScore"])
+        for r in data: writer.writerow([r.product_name, r.county, r.market_size_kes, r.demand_score, r.opportunity_score])
+
+    output.seek(0)
+    return StreamingResponse(output, media_type="text/csv", headers={"Content-Disposition": f"attachment; filename=evidlens_{table}.csv"})
 
 @app.get("/api/social-feed")
 def get_social_feed(platform: str = "all", session: Session = Depends(get_session)):
@@ -351,9 +426,20 @@ def get_dashboard_stats(db: Session):
         return {"insights_generated": db.query(MarketSearch).count(), "active_products": db.query(distinct(MarketMetric.product_name)).count(), "sectors_covered": db.query(distinct(Company.sector)).count(), "reports_exported": db.query(Subscription).count()}
     except: return {"insights_generated": 0, "active_products": 0, "sectors_covered": 0, "reports_exported": 0}
 
+# ================== FIXED DASHBOARD ==================
 @app.get("/api/dashboard")
-def dashboard_api(sector: str = None, county: str = None, date_range: str = "30d", session: Session = Depends(get_session)):
-    return {"status": "LIVE"}
+def dashboard_api(session: Session = Depends(get_session)):
+    stats = get_dashboard_stats(session)
+    trending = {"category": "Agriculture", "headline": "Maize prices up 12% in Nairobi this week"}
+    modules = [
+        {"name": "Competitive Engine", "icon": "1", "insights": session.exec(select(Company)).count(), "growth": "+8%", "status": "LIVE", "url": "#"},
+        {"name": "Price Intel", "icon": "2", "insights": session.exec(select(MarketPrice)).count(), "growth": "+15%", "status": "LIVE", "url": "#"},
+        {"name": "Demand Heatmap", "icon": "3", "insights": session.exec(select(MarketMetric)).count(), "growth": "+22%", "status": "LIVE", "url": "#"},
+        {"name": "County Analytics", "icon": "4", "insights": 47, "growth": "+5%", "status": "LIVE", "url": "#"},
+        {"name": "Opportunity Finder", "icon": "5", "insights": session.exec(select(MarketMetric)).count(), "growth": "+18%", "status": "LIVE", "url": "#"},
+        {"name": "Search Trends", "icon": "6", "insights": session.exec(select(MarketSearch)).count(), "growth": "+30%", "status": "LIVE", "url": "#"},
+    ]
+    return {"stats": stats, "trending": trending, "modules": modules, "last_updated": datetime.utcnow().isoformat()}
 
 @app.get("/api/pricing")
 def api_pricing():
@@ -364,7 +450,7 @@ def mpesa_stk_push(payload: dict, user_id: int = Depends(get_current_user)):
     plan = payload.get("plan")
     billing = payload.get("billing")
     phone = payload.get("phone")
-    amount = PRICING[billing]
+    amount = PRICING[plan][billing]
     token = get_mpesa_token()
     timestamp = get_timestamp()
     password = get_password(MPESA_SHORTCODE, MPESA_PASSKEY, timestamp)
@@ -413,7 +499,7 @@ def about(request: Request): return templates.TemplateResponse("about.html", {"r
 def pricing_page(request: Request): return templates.TemplateResponse("pricing.html", {"request": request, "plans": PRICING, "addons": ADDONS, "alc": ALC})
 
 @app.get("/health")
-def health(): return {"status": "healthy", "version": "2.2.0", "sectors": 75, "modules": 19}
+def health(): return {"status": "healthy", "version": "2.4.0", "sectors": 75, "modules": 19}
 @app.get("/undefined")
 def catch_undefined(): return {"status": "ignored"}
 @app.get("/", response_class=HTMLResponse)
