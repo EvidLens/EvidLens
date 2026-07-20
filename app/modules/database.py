@@ -47,3 +47,8 @@ class Notification(Base):
     channel = Column(String) # in_app, email, sms, whatsapp
     status = Column(String) # sent, failed, in_app_saved
     created_at = Column(DateTime, default=datetime.utcnow)
+
+from sqlmodel import SQLModel
+
+def create_db_and_tables():
+    SQLModel.metadata.create_all(engine)
