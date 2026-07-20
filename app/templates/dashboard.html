@@ -41,7 +41,7 @@ tbody tr:hover{background:#F5F7FA}
       <img src="/static/logo.png?v=5" alt="EvidLens Logo" class="w-10 h-10 rounded-xl object-contain bg-white p-1">
       <div><h1 class="font-bold text-2xl"><span style="color:#FFFFFF">Evid</span><span style="color:#14B8A6">Lens</span></h1><p class="text-xs" style="color:#CBD5E1">Decision Intelligence</p></div>
     </div>
-    <p class="text-xs" id="lastUpdated">Last updated: --</p>
+    <p class="text-xs" id="lastUpdated">Last updated: {{ data.last_updated }}</p>
   </div>
 </header>
 
@@ -50,15 +50,24 @@ tbody tr:hover{background:#F5F7FA}
     <div class="card mb-6"><div class="flex items-center gap-3 text-gray-400"><span>🔍</span><input id="searchInput" placeholder="Search insights, lanes, or questions..." class="w-full outline-none text-base bg-transparent"></div></div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-      <div class="card teal-card"><p class="text-sm text-gray-500">Total Insights</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44" id="stat1">0</p></div>
-      <div class="card teal-card"><p class="text-sm text-gray-500">Active Lanes</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44" id="stat2">0</p></div>
-      <div class="card teal-card"><p class="text-sm text-gray-500">Reports Generated</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44" id="stat3">0</p></div>
-      <div class="card teal-card"><p class="text-sm text-gray-500">AI Queries</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44" id="stat4">0</p></div>
+      <div class="card teal-card"><p class="text-sm text-gray-500">Total Insights</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">{{ data.stats.insights_generated }}</p></div>
+      <div class="card teal-card"><p class="text-sm text-gray-500">Active Lanes</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">{{ data.modules | length }}</p></div>
+      <div class="card teal-card"><p class="text-sm text-gray-500">Reports Generated</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">{{ data.stats.reports_exported }}</p></div>
+      <div class="card teal-card"><p class="text-sm text-gray-500">AI Queries</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">{{ data.stats.insights_generated }}</p></div>
     </div>
 
-    <div class="mb-8"><h2 class="font-bold text-xl mb-4 flex items-center gap-2" style="color:#0A1F44">Trending Now</h2><div id="trendingCard" class="trending text-white p-6 rounded-2xl"><p class="text-sm font-semibold opacity-90 uppercase" id="trendingCategory">LOADING...</p><p class="font-semibold text-lg mt-2" id="trendingHeadline">Loading real trends</p></div></div>
+    <div class="mb-8"><h2 class="font-bold text-xl mb-4 flex items-center gap-2" style="color:#0A1F44">Trending Now</h2><div id="trendingCard" class="trending text-white p-6 rounded-2xl"><p class="text-sm font-semibold opacity-90 uppercase">{{ data.trending.category }}</p><p class="font-semibold text-lg mt-2">{{ data.trending.headline }}</p></div></div>
 
-    <div class="mb-8"><h2 class="font-bold text-xl mb-4" style="color:#0A1F44">WAVE 2 Intelligence Modules</h2><div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4" id="lanesGrid"></div></div>
+    <div class="mb-8"><h2 class="font-bold text-xl mb-4" style="color:#0A1F44">WAVE 2 Intelligence Modules</h2><div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4">
+      {% for module in data.modules %}
+      <a href="{{ module.route }}" class="card cursor-pointer block">
+        <div class="lane-icon w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold mb-3 text-2xl">{{ module.icon }}</div>
+        <p class="font-semibold text-base" style="color:#0A1F44">{{ module.name }}</p>
+        <p class="text-sm text-gray-500">{{ module.count }} Records</p>
+        <p class="text-xs font-bold mt-2" style="color:#F59E0B">LIVE</p>
+      </a>
+      {% endfor %}
+    </div></div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
       <div class="card">
@@ -84,7 +93,6 @@ tbody tr:hover{background:#F5F7FA}
       </div>
     </div>
 
-    <!-- 6 DATA TABLES WITH CSV + SORT -->
     <div class="grid grid-cols-1 gap-6 mb-10" id="dataTables"></div>
 
   </div>
@@ -190,37 +198,9 @@ async function loadDropdowns(){
   }
 }
 
-async function loadDashboard(){
-  const res = await fetch('/api/dashboard');
-  const data = await res.json();
-  document.getElementById('stat1').innerText = data.stats.insights_generated;
-  document.getElementById('stat2').innerText = data.stats.sectors_covered;
-  document.getElementById('stat3').innerText = data.stats.reports_exported;
-  document.getElementById('stat4').innerText = data.stats.active_products;
-  document.getElementById('trendingCategory').innerText = data.trending.category;
-  document.getElementById('trendingHeadline').innerText = data.trending.headline;
-  document.getElementById('lastUpdated').innerText = 'Last updated: ' + new Date(data.last_updated).toLocaleTimeString();
-
-  const lanesGrid = document.getElementById('lanesGrid');
-  const realModules = [
-    {name: "Competitive Engine", icon: "🎯", insights: data.modules[0]?.insights || 50, growth: "+8%", status: "LIVE", url: "#companies"},
-    {name: "Price Oracle", icon: "💰", insights: data.modules[1]?.insights || 100, growth: "+15%", status: "LIVE", url: "#prices"},
-    {name: "Demand Radar", icon: "📈", insights: data.modules[2]?.insights || 100, growth: "+22%", status: "LIVE", url: "#demand"},
-    {name: "County Mapper", icon: "🗺️", insights: 47, growth: "+5%", status: "LIVE", url: "#county-stats"},
-    {name: "Consumer Pulse", icon: "📊", insights: data.modules[4]?.insights || 20, growth: "+18%", status: "LIVE", url: "#"},
-    {name: "Risk Sentinel", icon: "⚠️", insights: data.modules[5]?.insights || 20, growth: "+12%", status: "LIVE", url: "#"},
-  ];
-  lanesGrid.innerHTML = '';
-  realModules.forEach(mod => {
-    lanesGrid.innerHTML += `<a href="${mod.url}" class="card cursor-pointer block"><div class="lane-icon w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold mb-3 text-2xl">${mod.icon}</div><p class="font-semibold text-base" style="color:#0A1F44">${mod.name}</p><p class="text-sm text-gray-500">${mod.insights} Insights</p><p class="text-sm font-semibold" style="color:#14B8A6">${mod.growth}</p><p class="text-xs font-bold mt-2" style="color:#F59E0B">${mod.status}</p></a>`;
-  });
-}
-
-loadDashboard();
 loadDropdowns();
 tables.forEach(t => loadTable(t.id));
 
-// FIXED: Now calls /api/analyze-detailed
 document.getElementById('searchForm').onsubmit = async (e) => { 
   e.preventDefault(); 
   const form = new FormData(e.target); 
@@ -234,7 +214,7 @@ document.getElementById('searchForm').onsubmit = async (e) => {
 function downloadPDF(){ if(!lastAnalysis){ alert('Please run an analysis first'); return; } document.getElementById('pdf_q').value = lastAnalysis.product; document.getElementById('pdf_sector').value = lastAnalysis.sector; document.getElementById('pdf_county').value = lastAnalysis.county; document.getElementById('pdfForm').submit(); }
 const chatBtn = document.getElementById('chatBtn'); const chatBox = document.getElementById('chatBox'); const chatInput = document.getElementById('chatInput'); const chatSend = document.getElementById('chatSend'); const chatMessages = document.getElementById('chatMessages');
 chatBtn.onclick = () => { chatBox.style.display = chatBox.style.display === 'flex'? 'none' : 'flex'; };
-async function sendChat(){ const msg = chatInput.value.trim(); if(!msg) return; chatMessages.innerHTML += '<div class="msg user">' + msg + '</div>'; chatHistory.push({role: "user", content: msg}); chatInput.value = ''; chatMessages.innerHTML += '<div class="msg bot" id="typing">Lens is thinking...</div>'; chatMessages.scrollTop = chatMessages.scrollHeight; try{ const res = await fetch('/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message: msg, history: chatHistory, context: lastAnalysis})}); const data = await res.json(); document.getElementById('typing').remove(); chatHistory.push({role: "assistant", content: data.response}); chatMessages.innerHTML += '<div class="msg bot">' + data.response + '</div>'; }catch(e){ document.getElementById('typing').innerText = 'Error: Could not reach AI'; } chatMessages.scrollTop = chatMessages.scrollHeight; }
+async function sendChat(){ const msg = chatInput.value.trim(); if(!msg) return; chatMessages.innerHTML += '<div class="msg user">' + msg + '</div>'; chatHistory.push({role: "user", content: msg}); chatInput.value = ''; chatMessages.innerHTML += '<div class="msg bot" id="typing">Lens is thinking...</div>'; chatMessages.scrollTop = chatMessages.scrollHeight; try{ const res = await fetch('/lens/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message: msg, history: chatHistory, context: lastAnalysis})}); const data = await res.json(); document.getElementById('typing').remove(); chatHistory.push({role: "assistant", content: data.reply}); chatMessages.innerHTML += '<div class="msg bot">' + data.reply + '</div>'; }catch(e){ document.getElementById('typing').innerText = 'Error: Could not reach AI'; } chatMessages.scrollTop = chatMessages.scrollHeight; }
 chatSend.onclick = sendChat; chatInput.onkeypress = (e) => { if(e.key === 'Enter') sendChat(); }
 </script>
 </body>
