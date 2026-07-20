@@ -1,7 +1,7 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime
 from sqlmodel import Session, select, func
-from app.db import engine
+from app.modules.database import engine
 from app.models import MarketMetric, PriceData, NewsArticle, SocialMention
 
 scheduler = BackgroundScheduler()
