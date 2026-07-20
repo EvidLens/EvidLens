@@ -78,3 +78,45 @@ class MarketMetric(Base):
     __table_args__ = (
         Index('ix_metric_geo_type', 'sector', 'metric_type', 'county', 'sub_county'),
     )
+
+# KB DATA TABLES - Added to unblock knowledge_base service
+class PriceTrend(Base):
+    __tablename__ = "price_trends"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    sector = Column(String(100), nullable=False, index=True)
+    county = Column(String(100), nullable=False, index=True)
+    product_name = Column(String(255), nullable=False)
+    price_kes = Column(Float, nullable=False)
+    price_change_percent = Column(Float, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class DemandSignal(Base):
+    __tablename__ = "demand_signals"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    sector = Column(String(100), nullable=False, index=True)
+    county = Column(String(100), nullable=False, index=True)
+    signal_type = Column(String(100), nullable=False)
+    signal_value = Column(Float, nullable=False)
+    period = Column(String(20), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class LocationMetric(Base):
+    __tablename__ = "location_metrics"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    sector = Column(String(100), nullable=False, index=True)
+    county = Column(String(100), nullable=False, index=True)
+    metric_type = Column(String(100), nullable=False)
+    metric_value = Column(Float, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class ProductCatalog(Base):
+    __tablename__ = "product_catalog"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    sector = Column(String(100), nullable=False, index=True)
+    product_name = Column(String(255), nullable=False)
+    category = Column(String(100), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
