@@ -266,11 +266,62 @@ def get_news_feed(session: Session = Depends(get_session)):
 
 @app.get("/api/dashboard")
 def dashboard_api(session: Session = Depends(get_session)):
-    stats = {"insights_generated": session.exec(select(MarketSearch)).count(),"sectors_covered": session.exec(select(Sector)).count(),"reports_exported": session.exec(select(Subscription)).count(),"active_products": session.exec(select(FMCGProduct)).count()}
+    # Fast counts using func.count
+    company_count = session.exec(select(func.count(Company.id))).one()
+    metric_count = session.exec(select(func.count(MarketMetric.id))).one()
+    search_count = session.exec(select(func.count(MarketSearch.id))).one()
+    county_count = session.exec(select(func.count(County.id))).one()
+    social_count = session.exec(select(func.count(SocialPost.id))).one()
+    news_count = session.exec(select(func.count(NewsArticle.id))).one()
+    sector_count = session.exec(select(func.count(Sector.id))).one()
+    product_count = session.exec(select(func.count(FMCGProduct.id))).one()
+    subscription_count = session.exec(select(func.count(Subscription.id))).one()
+    
+    # Funding = companies in Financial sectors
+    funding_count = session.exec(
+        select(func.count(Company.id)).where(
+            or_(
+                Company.sector.contains("Financial"),
+                Company.sector.contains("Banking"),
+                Company.sector.contains("Insurance"),
+                Company.sector.contains("SACCO"),
+                Company.sector.contains("Microfinance"),
+                Company.sector.contains("FinTech")
+            )
+        )
+    ).one()
+
+    modules = [
+        {"id": 1, "name": "Competitive Engine", "icon": "🎯", "count": company_count, "route": "/competitive"},
+        {"id": 2, "name": "Price Oracle", "icon": "💰", "count": metric_count, "route": "/market/prices"},
+        {"id": 3, "name": "Demand Radar", "icon": "📈", "count": search_count, "route": "/market/demand"},
+        {"id": 4, "name": "County Mapper", "icon": "🗺️", "count": county_count, "route": "/location/counties"},
+        {"id": 5, "name": "Consumer Pulse", "icon": "👥", "count": social_count, "route": "/voice"},
+        {"id": 6, "name": "Risk Sentinel", "icon": "⚠️", "count": news_count, "route": "/market/risk"},
+        {"id": 7, "name": "Policy Watch", "icon": "📜", "count": 0, "route": "/kb/policy"}, # no table yet
+        {"id": 8, "name": "Funding Radar", "icon": "🏦", "count": funding_count, "route": "/reports/funding"},
+        {"id": 9, "name": "Export Navigator", "icon": "🚢", "count": 0, "route": "/market/export"} # no table yet
+    ]
+
+    stats = {
+        "insights_generated": search_count,
+        "sectors_covered": sector_count,
+        "reports_exported": subscription_count,
+        "active_products": product_count
+    }
+
     top_demand = session.exec(select(MarketMetric).order_by(desc(MarketMetric.demand_score)).limit(1)).first()
-    trending = {"category": top_demand.sector if top_demand else "Agriculture","headline": f"{top_demand.product_name} demand up in {top_demand.county}" if top_demand else "No data yet"}
-    modules = [{"name": "Competitive Engine","icon": "🎯","insights": session.exec(select(Company)).count(),"growth": "+8%","status": "LIVE","url": "#"},{"name": "Price Oracle","icon": "💰","insights": session.exec(select(MarketPrice)).count(),"growth": "+15%","status": "LIVE","url": "#"},{"name": "Demand Radar","icon": "📈","insights": session.exec(select(MarketMetric)).count(),"growth": "+22%","status": "LIVE","url": "#"},{"name": "County Mapper","icon": "🗺️","insights": session.exec(select(County)).count(),"growth": "+5%","status": "LIVE","url": "#"},{"name": "Consumer Pulse","icon": "📊","insights": session.exec(select(SocialPost)).count(),"growth": "+18%","status": "LIVE","url": "#"},{"name": "Risk Sentinel","icon": "⚠️","insights": session.exec(select(NewsArticle)).count(),"growth": "+12%","status": "LIVE","url": "#"}]
-    return {"stats": stats,"trending": trending,"modules": modules,"last_updated": datetime.utcnow().isoformat()}
+    trending = {
+        "category": top_demand.sector if top_demand else "Agriculture",
+        "headline": f"{top_demand.product_name} demand up in {top_demand.county}" if top_demand else "No data yet"
+    }
+
+    return {
+        "stats": stats,
+        "trending": trending, 
+        "modules": modules,
+        "last_updated": datetime.utcnow().isoformat()
+    }
 
 @app.get("/api/pricing")
 def api_pricing(): return {"plans": PRICING,"addons": ADDONS,"alc": ALC}
