@@ -261,7 +261,6 @@ def health(): return {"status": "healthy", "version": "2.5.2"}
 def pricing_page(request: Request): return templates.TemplateResponse("pricing.html", {"request": request, "plans": PRICING, "addons": ADDONS, "alc": ALC})
 @app.get("/privacy", response_class=HTMLResponse)
 def privacy(request: Request): return templates.TemplateResponse("privacy.html", {"request": request})
-@app.get("/terms", response_class=
 @app.get("/terms", response_class=HTMLResponse)
 def terms(request: Request): return templates.TemplateResponse("terms.html", {"request": request})
 @app.get("/contact", response_class=HTMLResponse)
