@@ -3,6 +3,8 @@ from typing import Optional
 from datetime import datetime
 
 class GeoFilter(SQLModel, table=True):
+    __tablename__ = "geofilter"
+    __table_args__ = {"extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
     country: str = "Kenya"
     county: Optional[str] = Field(index=True, default=None)
@@ -11,6 +13,8 @@ class GeoFilter(SQLModel, table=True):
     sector_id: int = Field(foreign_key="sector.id")
 
 class Plan(SQLModel, table=True):
+    __tablename__ = "plan"
+    __table_args__ = {"extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
     code: str = Field(index=True, unique=True)
     name: str
@@ -23,9 +27,11 @@ class Plan(SQLModel, table=True):
     leads_per_quarter: int
     support_sla: str
     description: str
-    features: str # JSON list of "What you get"
+    features: str
 
 class Module(SQLModel, table=True):
+    __tablename__ = "module"
+    __table_args__ = {"extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
     module_number: int
     lane: str
@@ -37,12 +43,16 @@ class Module(SQLModel, table=True):
     geo_enabled: bool = True
 
 class Sector(SQLModel, table=True):
+    __tablename__ = "sector"
+    __table_args__ = {"extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
     sector_number: int = Field(index=True, unique=True)
     name: str
     parent_category: str
 
 class AddOn(SQLModel, table=True):
+    __tablename__ = "addon"
+    __table_args__ = {"extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
     code: str = Field(index=True, unique=True)
     name: str
@@ -51,6 +61,8 @@ class AddOn(SQLModel, table=True):
     best_for: str
 
 class ALCService(SQLModel, table=True):
+    __tablename__ = "alcservice"
+    __table_args__ = {"extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
     code: str = Field(index=True, unique=True)
     name: str
@@ -58,6 +70,8 @@ class ALCService(SQLModel, table=True):
     best_for: str
 
 class UserSubscription(SQLModel, table=True):
+    __tablename__ = "usersubscription"
+    __table_args__ = {"extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(index=True)
     plan_code: str
