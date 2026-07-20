@@ -1,3 +1,9 @@
+from app.modules.competitive.router import router as competitive_router
+from app.modules.market_intel.router import router as market_router
+from app.modules.location.router import router as location_router
+from app.modules.voice.router import router as voice_router
+from app.modules.kb.router import router as kb_router
+from app.modules.reports.router import router as reports_router
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
@@ -30,6 +36,12 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(DATABASE_URL, echo=False) if DATABASE_URL else create_engine("sqlite:///./evidlens.db", connect_args={"check_same_thread": False})
 
 app = FastAPI(title="EvidLens API", version="2.5.3")
+app.include_router(competitive_router, prefix="/competitive", tags=["Competitive"])
+app.include_router(market_router, prefix="/market", tags=["Market"])
+app.include_router(location_router, prefix="/location", tags=["Location"])
+app.include_router(voice_router, prefix="/voice", tags=["Voice"])
+app.include_router(kb_router, prefix="/kb", tags=["KB"])
+app.include_router(reports_router, prefix="/reports", tags=["Reports"])
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 PRICING = {"BASIC": {"monthly": 500, "yearly": 5000},"PROFESSIONAL": {"monthly": 1500, "yearly": 15000},"ENTERPRISE": {"monthly": 5000, "yearly": 50000}}
@@ -145,13 +157,18 @@ def get_products(search: str = "", session: Session = Depends(get_session)):
     if search: q = q.where(FMCGProduct.name.contains(search))
     return {"products": [p.name for p in session.exec(q).all()]}
 
+from fastapi import Depends
+from sqlalchemy import select, or_
+from sqlmodel import Session
+
 @app.get("/api/companies")
 def get_companies(search: str = "", sector: str = "", county: str = "", page: int = 1, limit: int = 10, sort_by: str = "rating", order: str = "desc", session: Session = Depends(get_session)):
     q = select(Company)
-    if search: q = q.where(or_(Company.name.contains(search), Company.sector.contains(search), Company.county.contains(search)))
+    if search: q = q.where(or_(Company.name.ilike(f"%{search}%"), Company.sector.ilike(f"%{search}%"), Company.county.ilike(f"%{search}%")))
     if sector: q = q.where(Company.sector == sector)
     if county: q = q.where(Company.county == county)
-    total = len(session.exec(q).all())
+    all_data = session.exec(q).all()
+    total = len(all_data)
     q = apply_sort(q, Company, sort_by, order)
     data = session.exec(q.offset((page-1)*limit).limit(limit)).all()
     return {"companies": [c.dict() for c in data], "total": total, "page": page}
