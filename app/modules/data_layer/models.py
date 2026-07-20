@@ -215,3 +215,36 @@ class CompanyProfile(SQLModel, table=True):
     website: str = Field(None, max_length=255)
     source: DataSource = Field(default=DataSource.company_registry, sa_column=Column(Enum(DataSource)))
     last_updated: datetime = Field(default_factory=datetime.utcnow)
+
+class PolicyWatch(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    title: str = Field(index=True)
+    country: str = Field(default="Kenya", index=True)
+    category: str = Field(index=True)
+    sector: str = Field(default="All", index=True)
+    impact_level: str = Field(default="Medium")
+    effective_date: Optional[date] = Field(default=None)
+    summary: str
+    source: str
+    source_url: str
+    status: str = Field(default="Active")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class ExportOpportunity(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    product: str = Field(index=True)
+    sector: str = Field(index=True)
+    origin_country: str = Field(default="Kenya")
+    destination_country: str = Field(index=True)
+    destination_region: Optional[str] = Field(default=None)
+    hs_code: Optional[str] = Field(default=None)
+    demand_score: int = Field(default=50)
+    avg_price_usd: Optional[float] = Field(default=None)
+    market_size_usd: Optional[float] = Field(default=None)
+    growth_percent: Optional[float] = Field(default=None)
+    tariff_percent: Optional[float] = Field(default=None)
+    competitors: Optional[str] = Field(default=None)
+    requirements: Optional[str] = Field(default=None)
+    opportunity_score: int = Field(default=50)
+    last_updated: datetime = Field(default_factory=datetime.utcnow)
