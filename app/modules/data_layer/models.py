@@ -1,3 +1,4 @@
+from typing import Optional
 from sqlmodel import SQLModel, Field, Index
 from sqlalchemy import Column, Enum, JSON, Text
 from datetime import datetime, date
