@@ -51,7 +51,7 @@ class Sector(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
     id: int = Field(default=None, primary_key=True)
     sector_number: int = Field(default=0)
-    parent_category: str = Field(default="General")  # matches DB NOT NULL
+    parent_category: str = Field(default="General")
     name: str = Field(unique=True)
 
 class County(SQLModel, table=True):
@@ -190,7 +190,7 @@ class LocationMetric(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 class ProductCatalog(SQLModel, table=True):
-    __tablename__ = = "product_catalog"
+    __tablename__ = "product_catalog"  # FIXED: was = =
     __table_args__ = {"extend_existing": True}
     id: int = Field(default=None, primary_key=True)
     sector: str = Field(index=True, max_length=100)
