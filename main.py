@@ -358,7 +358,9 @@ def about(request: Request): return templates.TemplateResponse("about.html", {"r
 @app.get("/undefined")
 def catch_undefined(): return {"status": "ignored"}
 @app.get("/", response_class=HTMLResponse)
-async def root(request: Request): return templates.TemplateResponse("dashboard.html", {"request": request})
+async def root(request: Request, session: Session = Depends(get_session)):
+    data = dashboard_api(session)
+    return templates.TemplateResponse("dashboard.html", {"request": request, "data": data})
 
 from app.modules.chatbot.router import router as chatbot_router
 app.include_router(chatbot_router)
