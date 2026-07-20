@@ -14,6 +14,12 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
 .footer{background:#0A1F44}
 .footer-link{color:#CBD5E1}
 .footer-link:hover{color:#14B8A6}
+table{width:100%; font-size:13px}
+th{background:#F5F7FA; color:#0A1F44; font-weight:600; padding:10px; text-align:left; cursor:pointer}
+th:hover{background:#E2E8F0}
+td{padding:10px; border-bottom:1px solid #E2E8F0}
+tbody tr:hover{background:#F5F7FA}
+.sort-icon{font-size:10px; margin-left:4px; opacity:0.5}
 #chatWidget{position:fixed; bottom:24px; right:24px; z-index:9999}
 #chatBtn{width:56px; height:56px; border-radius:50%; background:linear-gradient(135deg,#0A1F44,#14B8A6); color:white; border:none; font-size:24px; cursor:pointer; box-shadow:0 4px 12px rgba(20,184,166,0.4)}
 #chatBox{width:380px; height:550px; background:white; border-radius:16px; box-shadow:0 8px 24px rgba(0,0,0,0.15); display:none; flex-direction:column; overflow:hidden}
@@ -25,9 +31,7 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
 #chatInputBox{display:flex; padding:12px; border-top:1px solid #E2E8F0}
 #chatInput{flex:1; border:1px solid #CBD5E1; border-radius:20px; padding:10px 14px; outline:none; font-size:14px}
 #chatSend{background:#F59E0B; color:white; border:none; border-radius:20px; padding:10px 18px; margin-left:8px; font-weight:600; cursor:pointer}
-@media(max-width:768px){
-  #chatBox{width:calc(100vw - 32px); right:16px; bottom:80px;}
-}
+@media(max-width:768px){ #chatBox{width:calc(100vw - 32px); right:16px; bottom:80px;} }
 </style>
 </head>
 <body>
@@ -37,6 +41,7 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
       <img src="/static/logo.png?v=5" alt="EvidLens Logo" class="w-10 h-10 rounded-xl object-contain bg-white p-1">
       <div><h1 class="font-bold text-2xl"><span style="color:#FFFFFF">Evid</span><span style="color:#14B8A6">Lens</span></h1><p class="text-xs" style="color:#CBD5E1">Decision Intelligence</p></div>
     </div>
+    <p class="text-xs" id="lastUpdated">Last updated: --</p>
   </div>
 </header>
 
@@ -45,10 +50,10 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
     <div class="card mb-6"><div class="flex items-center gap-3 text-gray-400"><span>🔍</span><input id="searchInput" placeholder="Search insights, lanes, or questions..." class="w-full outline-none text-base bg-transparent"></div></div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-      <div class="card teal-card"><p class="text-sm text-gray-500">Total Insights</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">0</p></div>
-      <div class="card teal-card"><p class="text-sm text-gray-500">Active Lanes</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">0</p></div>
-      <div class="card teal-card"><p class="text-sm text-gray-500">Reports Generated</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">0</p></div>
-      <div class="card teal-card"><p class="text-sm text-gray-500">AI Queries</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">0</p></div>
+      <div class="card teal-card"><p class="text-sm text-gray-500">Total Insights</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44" id="stat1">0</p></div>
+      <div class="card teal-card"><p class="text-sm text-gray-500">Active Lanes</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44" id="stat2">0</p></div>
+      <div class="card teal-card"><p class="text-sm text-gray-500">Reports Generated</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44" id="stat3">0</p></div>
+      <div class="card teal-card"><p class="text-sm text-gray-500">AI Queries</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44" id="stat4">0</p></div>
     </div>
 
     <div class="mb-8"><h2 class="font-bold text-xl mb-4 flex items-center gap-2" style="color:#0A1F44">Trending Now</h2><div id="trendingCard" class="trending text-white p-6 rounded-2xl"><p class="text-sm font-semibold opacity-90 uppercase" id="trendingCategory">LOADING...</p><p class="font-semibold text-lg mt-2" id="trendingHeadline">Loading real trends</p></div></div>
@@ -71,6 +76,10 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
         <button onclick="downloadPDF()" class="bg-[#14B8A6] text-white w-full p-3 rounded-lg font-bold hover:opacity-90">Download PDF</button>
       </div>
     </div>
+
+    <!-- 6 DATA TABLES WITH CSV + SORT -->
+    <div class="grid grid-cols-1 gap-6 mb-10" id="dataTables"></div>
+
   </div>
 </main>
 
@@ -83,90 +92,114 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
 <script>
 let lastAnalysis = null;
 let chatHistory = [];
+let tableState = {}
+
+const tables = [
+  {id: 'companies', name: '50+ Real Businesses', endpoint: '/api/companies', headers: {name:"Name", sector:"Sector", county:"County", rating:"Rating", reviews:"Reviews", address:"Address"}},
+  {id: 'prices', name: 'Live KES Prices', endpoint: '/api/prices', headers: {product:"Product", price:"Price", county:"County", market:"Market", fetched_at:"Updated"}},
+  {id: 'demand', name: 'Top Demand Scores', endpoint: '/api/demand', headers: {product_name:"Product", sector:"Sector", county:"County", demand_score:"Demand", volume:"Volume"}},
+  {id: 'county-stats', name: 'Every County - Market Size', endpoint: '/api/county-stats', headers: {county:"County", market_size:"Market Size KES", growth:"Growth %", volume:"Volume"}},
+  {id: 'sectors', name: 'Top Sectors Searched', endpoint: '/api/top-sectors', headers: {sector:"Sector", count:"Search Count"}},
+  {id: 'opportunities', name: 'High Opportunity Zones', endpoint: '/api/opportunities', headers: {county:"County", product_name:"Product", market_size_kes:"Market Size", opportunity_score:"Opportunity Score"}}
+]
+
+// Build all tables on load
+tables.forEach(t => {
+  tableState[t.id] = {page:1, sort_by: Object.keys(t.headers)[0], order:'desc'}
+  document.getElementById('dataTables').innerHTML += `
+  <div class="card">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-3 gap-2">
+      <h2 class="font-bold text-xl" style="color:#0A1F44">${t.name}</h2>
+      <div class="flex gap-2">
+        <input onkeyup="loadTable('${t.id}')" id="${t.id}-search" placeholder="Search..." class="border rounded-lg px-3 py-2 text-sm w-48">
+        <button onclick="exportCSV('${t.id}')" class="bg-[#14B8A6] text-white px-4 py-2 rounded-lg text-sm font-semibold">Export CSV</button>
+      </div>
+    </div>
+    <div class="overflow-x-auto"><table id="${t.id}-table"></table></div>
+    <div class="flex justify-between items-center mt-3" id="${t.id}-pagination"></div>
+  </div>`
+})
+
+function renderTable(id, headers, rows){
+    const table = document.getElementById(id+"-table");
+    let thead = `<thead><tr>`
+    Object.keys(headers).forEach(key => {
+      thead += `<th onclick="sortTable('${id}','${key}')">${headers[key]} <span class="sort-icon">${tableState[id].sort_by==key? (tableState[id].order=='asc'?'▲':'▼') : ''}</span></th>`
+    })
+    thead += `</tr></thead>`
+    let tbody = `<tbody>`
+    rows.forEach(r => tbody += `<tr>${r.map(cell=>`<td>${cell}</td>`).join('')}</tr>`)
+    tbody += `</tbody>`
+    table.innerHTML = thead + tbody;
+}
+
+function renderPagination(id, total, page){
+    const limit = 10;
+    const pages = Math.ceil(total / limit);
+    document.getElementById(id+"-pagination").innerHTML = `
+      <p class="text-sm text-gray-500">Showing ${((page-1)*limit)+1} - ${Math.min(page*limit, total)} of ${total}</p>
+      <div class="flex gap-2">
+        <button onclick="changePage('${id}', ${page-1})" ${page==1?'disabled':''} class="px-3 py-1 border rounded text-sm ${page==1?'opacity-50':''}">Prev</button>
+        <button onclick="changePage('${id}', ${page+1})" ${page==pages?'disabled':''} class="px-3 py-1 border rounded text-sm ${page==pages?'opacity-50':''}">Next</button>
+      </div>
+    `
+}
+
+function changePage(id, page){ if(page < 1) return; tableState[id].page = page; loadTable(id); }
+function sortTable(id, key){ 
+  if(tableState[id].sort_by == key) tableState[id].order = tableState[id].order=='asc'?'desc':'asc';
+  else {tableState[id].sort_by = key; tableState[id].order='desc'}
+  loadTable(id);
+}
+function exportCSV(id){ window.location = `/api/export/${id}?search=${document.getElementById(id+'-search').value}` }
+
+async function loadTable(id){
+  const t = tables.find(x=>x.id==id);
+  const state = tableState[id];
+  const search = document.getElementById(id+"-search").value;
+  const res = await fetch(`${t.endpoint}?search=${search}&page=${state.page}&limit=10&sort_by=${state.sort_by}&order=${state.order}`);
+  const data = await res.json();
+  
+  let rows = [];
+  if(id=='companies') rows = data.companies.map(c => [c.name, c.sector, c.county, c.rating, c.reviews, c.address])
+  if(id=='prices') rows = data.prices.map(p => [p.product, `KES ${p.price}`, p.county, p.market, p.fetched_at.split('T')[0]])
+  if(id=='demand') rows = data.demand.map(d => [d.product_name, d.sector, d.county, d.demand_score, d.volume.toLocaleString()])
+  if(id=='county-stats') rows = data.stats.map(s => [s.county, `KES ${Number(s.market_size).toLocaleString()}`, `${Number(s.growth).toFixed(2)}%`, Number(s.volume).toLocaleString()])
+  if(id=='sectors') rows = data.sectors.map(s => [s.sector, s.count])
+  if(id=='opportunities') rows = data.opportunities.map(o => [o.county, o.product_name, `KES ${Number(o.market_size_kes).toLocaleString()}`, o.opportunity_score])
+  
+  renderTable(id, t.headers, rows);
+  renderPagination(id, data.total, state.page);
+}
 
 async function loadDashboard(){
-  try{
-    const res = await fetch('/api/dashboard');
-    const data = await res.json();
-    console.log("API DATA:", data)
+  const res = await fetch('/api/dashboard');
+  const data = await res.json();
+  document.getElementById('stat1').innerText = data.stats.insights_generated;
+  document.getElementById('stat2').innerText = data.stats.sectors_covered;
+  document.getElementById('stat3').innerText = data.stats.reports_exported;
+  document.getElementById('stat4').innerText = data.stats.active_products;
+  document.getElementById('trendingCategory').innerText = data.trending.category;
+  document.getElementById('trendingHeadline').innerText = data.trending.headline;
+  document.getElementById('lastUpdated').innerText = 'Last updated: ' + new Date(data.last_updated).toLocaleTimeString();
 
-    document.querySelectorAll('.card.teal-card p.text-4xl')[0].innerText = data.stats?.total_insights || 0;
-    document.querySelectorAll('.card.teal-card p.text-4xl')[1].innerText = data.stats?.active_lanes || 0;
-    document.querySelectorAll('.card.teal-card p.text-4xl')[2].innerText = data.stats?.reports_generated || 0;
-    document.querySelectorAll('.card.teal-card p.text-4xl')[3].innerText = data.stats?.ai_queries || 0;
-
-    document.getElementById('trendingCategory').innerText = data.trending?.category || "Market Intel";
-    document.getElementById('trendingHeadline').innerText = data.trending?.headline || "Data loaded";
-
-    const lanesGrid = document.getElementById('lanesGrid');
-    lanesGrid.innerHTML = '';
-    
-    const modulesToRender = data.modules || data.lanes || [];
-    console.log("Modules count:", modulesToRender.length)
-
-    if(modulesToRender.length === 0){
-        lanesGrid.innerHTML = '<p class="text-red-500 col-span-3">No modules found. Check /api/dashboard returns "modules":[]</p>'
-    }
-
-    modulesToRender.forEach((mod) => {
-      lanesGrid.innerHTML += `<a href="${mod.url}" class="card cursor-pointer block"><div class="lane-icon w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold mb-3 text-lg">${mod.icon}</div><p class="font-semibold text-base" style="color:#0A1F44">${mod.name}</p><p class="text-sm text-gray-500">${mod.insights} Insights</p><p class="text-sm font-semibold" style="color:#14B8A6">${mod.growth}</p><p class="text-xs font-bold mt-2" style="color:#F59E0B">${mod.status}</p></a>`;
-    });
-  }catch(e){
-    console.log('Dashboard load error', e)
-    document.getElementById('lanesGrid').innerHTML = '<p class="text-red-500 col-span-3">Error loading modules. Press F12 to see error</p>'
-  }
+  const lanesGrid = document.getElementById('lanesGrid');
+  lanesGrid.innerHTML = '';
+  data.modules.forEach(mod => {
+    lanesGrid.innerHTML += `<a href="${mod.url}" class="card cursor-pointer block"><div class="lane-icon w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold mb-3 text-lg">${mod.icon}</div><p class="font-semibold text-base" style="color:#0A1F44">${mod.name}</p><p class="text-sm text-gray-500">${mod.insights} Records</p><p class="text-sm font-semibold" style="color:#14B8A6">${mod.growth}</p><p class="text-xs font-bold mt-2" style="color:#F59E0B">${mod.status}</p></a>`;
+  });
 }
+
 loadDashboard();
+tables.forEach(t => loadTable(t.id));
 
-document.getElementById('searchForm').onsubmit = async (e) => {
-  e.preventDefault();
-  const form = new FormData(e.target);
-  lastAnalysis = Object.fromEntries(form);
-  document.getElementById('result').innerHTML = '<p class="text-gray-500">Analyzing...</p>';
-  const res = await fetch('/search-market', {method:'POST', body:form});
-  const html = await res.text();
-  document.getElementById('result').innerHTML = html;
-}
-
-function downloadPDF(){
-  if(!lastAnalysis){ alert('Please run an analysis first'); return; }
-  document.getElementById('pdf_q').value = lastAnalysis.q;
-  document.getElementById('pdf_sector').value = lastAnalysis.sector;
-  document.getElementById('pdf_county').value = lastAnalysis.county;
-  document.getElementById('pdfForm').submit();
-}
-
-const chatBtn = document.getElementById('chatBtn');
-const chatBox = document.getElementById('chatBox');
-const chatInput = document.getElementById('chatInput');
-const chatSend = document.getElementById('chatSend');
-const chatMessages = document.getElementById('chatMessages');
-
-chatBtn.onclick = () => {
-  chatBox.style.display = chatBox.style.display === 'flex'? 'none' : 'flex';
-};
-
-async function sendChat(){
-  const msg = chatInput.value.trim();
-  if(!msg) return;
-  chatMessages.innerHTML += '<div class="msg user">' + msg + '</div>';
-  chatHistory.push({role: "user", content: msg});
-  chatInput.value = '';
-  chatMessages.innerHTML += '<div class="msg bot" id="typing">Lens is thinking...</div>';
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-  try{
-    const res = await fetch('/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message: msg, history: chatHistory, context: lastAnalysis})});
-    const data = await res.json();
-    document.getElementById('typing').remove();
-    chatHistory.push({role: "assistant", content: data.reply});
-    chatMessages.innerHTML += '<div class="msg bot">' + data.reply + '</div>';
-  }catch(e){
-    document.getElementById('typing').innerText = 'Error: Could not reach AI';
-  }
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-chatSend.onclick = sendChat;
-chatInput.onkeypress = (e) => { if(e.key === 'Enter') sendChat(); }
+// Other functions same as before
+document.getElementById('searchForm').onsubmit = async (e) => { e.preventDefault(); const form = new FormData(e.target); lastAnalysis = Object.fromEntries(form); document.getElementById('result').innerHTML = '<p class="text-gray-500">Analyzing...</p>'; const res = await fetch('/search-market', {method:'POST', body:form}); const html = await res.text(); document.getElementById('result').innerHTML = html; }
+function downloadPDF(){ if(!lastAnalysis){ alert('Please run an analysis first'); return; } document.getElementById('pdf_q').value = lastAnalysis.q; document.getElementById('pdf_sector').value = lastAnalysis.sector; document.getElementById('pdf_county').value = lastAnalysis.county; document.getElementById('pdfForm').submit(); }
+const chatBtn = document.getElementById('chatBtn'); const chatBox = document.getElementById('chatBox'); const chatInput = document.getElementById('chatInput'); const chatSend = document.getElementById('chatSend'); const chatMessages = document.getElementById('chatMessages');
+chatBtn.onclick = () => { chatBox.style.display = chatBox.style.display === 'flex'? 'none' : 'flex'; };
+async function sendChat(){ const msg = chatInput.value.trim(); if(!msg) return; chatMessages.innerHTML += '<div class="msg user">' + msg + '</div>'; chatHistory.push({role: "user", content: msg}); chatInput.value = ''; chatMessages.innerHTML += '<div class="msg bot" id="typing">Lens is thinking...</div>'; chatMessages.scrollTop = chatMessages.scrollHeight; try{ const res = await fetch('/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message: msg, history: chatHistory, context: lastAnalysis})}); const data = await res.json(); document.getElementById('typing').remove(); chatHistory.push({role: "assistant", content: data.response}); chatMessages.innerHTML += '<div class="msg bot">' + data.response + '</div>'; }catch(e){ document.getElementById('typing').innerText = 'Error: Could not reach AI'; } chatMessages.scrollTop = chatMessages.scrollHeight; }
+chatSend.onclick = sendChat; chatInput.onkeypress = (e) => { if(e.key === 'Enter') sendChat(); }
 </script>
 </body>
 </html>
