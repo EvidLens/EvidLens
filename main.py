@@ -266,7 +266,6 @@ def get_news_feed(session: Session = Depends(get_session)):
 
 @app.get("/api/dashboard")
 def dashboard_api(session: Session = Depends(get_session)):
-    # Fast counts using func.count
     company_count = session.exec(select(func.count(Company.id))).one()
     metric_count = session.exec(select(func.count(MarketMetric.id))).one()
     search_count = session.exec(select(func.count(MarketSearch.id))).one()
@@ -276,8 +275,9 @@ def dashboard_api(session: Session = Depends(get_session)):
     sector_count = session.exec(select(func.count(Sector.id))).one()
     product_count = session.exec(select(func.count(FMCGProduct.id))).one()
     subscription_count = session.exec(select(func.count(Subscription.id))).one()
+    policy_count = session.exec(select(func.count(PolicyWatch.id))).one()  # NEW
+    export_count = session.exec(select(func.count(ExportOpportunity.id))).one() # NEW
     
-    # Funding = companies in Financial sectors
     funding_count = session.exec(
         select(func.count(Company.id)).where(
             or_(
@@ -298,11 +298,11 @@ def dashboard_api(session: Session = Depends(get_session)):
         {"id": 4, "name": "County Mapper", "icon": "🗺️", "count": county_count, "route": "/location/counties"},
         {"id": 5, "name": "Consumer Pulse", "icon": "👥", "count": social_count, "route": "/voice"},
         {"id": 6, "name": "Risk Sentinel", "icon": "⚠️", "count": news_count, "route": "/market/risk"},
-        {"id": 7, "name": "Policy Watch", "icon": "📜", "count": 0, "route": "/kb/policy"}, # no table yet
+        {"id": 7, "name": "Policy Watch", "icon": "📜", "count": policy_count, "route": "/kb/policy"},
         {"id": 8, "name": "Funding Radar", "icon": "🏦", "count": funding_count, "route": "/reports/funding"},
-        {"id": 9, "name": "Export Navigator", "icon": "🚢", "count": 0, "route": "/market/export"} # no table yet
+        {"id": 9, "name": "Export Navigator", "icon": "🚢", "count": export_count, "route": "/market/export"}
     ]
-
+    
     stats = {
         "insights_generated": search_count,
         "sectors_covered": sector_count,
