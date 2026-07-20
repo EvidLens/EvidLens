@@ -1,3 +1,4 @@
+from app.modules.data_layer.models import *
 from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -36,33 +37,6 @@ def get_mpesa_token():
     return r.json()["access_token"]
 def get_timestamp(): return datetime.now().strftime('%Y%m%d%H%M%S')
 def get_password(shortcode, passkey, timestamp): return base64.b64encode((shortcode + passkey + timestamp).encode()).decode('utf-8')
-
-class Subscription(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True); user_id: int; plan: str; status: str; expires_at: datetime; mpesa_receipt: str = None
-class QueryLog(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True); user_id: int; date: date
-class MpesaTransaction(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True); user_id: int; phone: str; amount: float; receipt: str; checkout_id: str; plan: str; status: str; created_at: datetime = Field(default_factory=datetime.utcnow)
-class Sector(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True); name: str = Field(unique=True)
-class County(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True); name: str = Field(unique=True)
-class SubCounty(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True); name: str; county_id: int = Field(foreign_key="county.id")
-class FMCGProduct(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True); name: str = Field(unique=True); category: str
-class Company(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True); name: str; sector: str; county: str; subcounty: str = None; rating: float = 0; reviews: int = 0; address: str; lat: float; lng: float
-class MarketMetric(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True); product_name: str; sector: str; county: str; subcounty: str = "All"; demand_score: int; market_size_kes: float; growth_percent: float; volume: int; opportunity_score: float = 0
-class MarketSearch(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True); query: str; sector: str; county: str; score: int; created_at: datetime = Field(default_factory=datetime.utcnow)
-class SocialPost(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True); platform: str; post_id: str; text: str; author: str; created_at: datetime; keywords: str; sentiment: str = "neutral"; created_at_db: datetime = Field(default_factory=datetime.utcnow)
-class MarketPrice(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True); product: str; price: float; county: str; market: str; source: str = "AIT"; fetched_at: datetime = Field(default_factory=datetime.utcnow)
-class NewsArticle(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True); title: str; url: str; source: str; published_at: datetime; summary: str; keywords: str; fetched_at: datetime = Field(default_factory=datetime.utcnow)
 
 AT_API_KEY = os.getenv("AT_API_KEY"); AT_USERNAME = os.getenv("AT_USERNAME"); NEWS_API_KEY = os.getenv("NEWS_API_KEY"); RESEND_API_KEY = os.getenv("RESEND_API_KEY"); X_BEARER_TOKEN = os.getenv("X_BEARER_TOKEN"); GROQ_API_KEY = os.getenv("GROQ_API_KEY"); MPESA_CALLBACK_URL = os.getenv("MPESA_CALLBACK_URL"); MPESA_CONSUMER_KEY = os.getenv("MPESA_CONSUMER_KEY"); MPESA_CONSUMER_SECRET = os.getenv("MPESA_CONSUMER_SECRET"); MPESA_ENV = os.getenv("MPESA_ENV", "sandbox"); MPESA_PASSKEY = os.getenv("MPESA_PASSKEY"); MPESA_SHORTCODE = os.getenv("MPESA_SHORTCODE")
 
