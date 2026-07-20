@@ -34,6 +34,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from app.modules.database import create_db_and_tables
+from app.scheduler import scheduler
+
+@app.on_event("startup")
+def on_startup():
+    create_db_and_tables()
+    scheduler.start()
+
 app.include_router(competitive_router, tags=["Competitive"])
 app.include_router(market_router, prefix="/market", tags=["Market"])
 app.include_router(location_router, prefix="/location", tags=["Location"])
