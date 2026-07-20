@@ -4,7 +4,6 @@ from datetime import datetime
 from app.modules.competitive_engine.service import CompetitiveEngineService
 from app.modules.market_engine.service import MarketEngineService
 from app.modules.lens_engine.service import LensEngineService
-from app.modules.voice_engine.service import VoiceEngineService
 
 class APIService:
     def __init__(self, db: Session):
@@ -12,7 +11,6 @@ class APIService:
         self.competitive = CompetitiveEngineService(db)
         self.market = MarketEngineService(db)
         self.lens = LensEngineService(db)
-        self.voice = VoiceEngineService(db)
 
     async def get_competitive(self, sector: str, county: str = None) -> Dict[str, Any]:
         data = await self.competitive.company_deal_database(sector)
@@ -37,15 +35,15 @@ class APIService:
 
     async def get_risk(self, business: str, county: str) -> Dict[str, Any]:
         data = await self.lens.viability_check(business, county)
-        return {"service": "Risk Sentinel", "business": business, "county": county, "risks": data, "timestamp": datetime.utcnow().isoformat()}
+        return {"service": "Risk Sentinel", "business": business, "county": county, "risk": data, "timestamp": datetime.utcnow().isoformat()}
 
     async def get_export(self, sector: str) -> Dict[str, Any]:
         return {"service": "Export Navigator", "sector": sector, "exports": [], "timestamp": datetime.utcnow().isoformat()}
 
     async def get_consumer(self, sector: str, county: str = None) -> Dict[str, Any]:
-        data = await self.voice.analyze_feedback(sector)
+        data = await self.lens.generate_sector_insights(sector, county)
         return {"service": "Consumer Pulse", "sector": sector, "county": county, "insights": data, "timestamp": datetime.utcnow().isoformat()}
 
     async def get_county(self, county: str) -> Dict[str, Any]:
         data = await self.lens.generate_sector_insights("General", county)
-        return {"service": "County Mapper", "county": county, "counties": data, "timestamp": datetime.utcnow().isoformat()}
+        return {"service": "County Mapper", "county": county, "data": data, "timestamp": datetime.utcnow().isoformat()}
