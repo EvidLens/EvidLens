@@ -415,9 +415,9 @@ def dashboard_api(session: Session = Depends(get_session)):
 
     top_demand = session.exec(select(MarketMetric).order_by(desc(MarketMetric.demand_score)).limit(1)).first()
     trending = {
-        "category": top_demand.sector if top_demand else "Agriculture",
-        "headline": f"{top_demand.product_name} demand up in {top_demand.county}" if top_demand else "No data yet"
-    }
+    "category": getattr(top_demand, 'sector', getattr(top_demand, 'category', 'Agriculture')) if top_demand else "Agriculture",
+    "headline": f"{top_demand.product_name} demand up in {top_demand.county}" if top_demand else "No data yet"
+}
 
     return {
         "stats": stats,
