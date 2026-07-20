@@ -50,21 +50,19 @@ class MpesaTransaction(SQLModel, table=True):
 class Sector(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
     id: int = Field(default=None, primary_key=True)
-    sector_number: int = Field(default=0) # <-- FIX: matches DB
+    sector_number: int = Field(default=0) # ONLY sector has this in DB
     name: str = Field(unique=True)
 
 class County(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
     id: int = Field(default=None, primary_key=True)
-    county_number: int = Field(default=0) # <-- FIX: matches DB
-    name: str = Field(unique=True)
+    name: str = Field(unique=True) # REMOVED county_number
 
 class SubCounty(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
     id: int = Field(default=None, primary_key=True)
-    subcounty_number: int = Field(default=0) # <-- FIX: matches DB
     name: str
-    county_id: int = Field(foreign_key="county.id")
+    county_id: int = Field(foreign_key="county.id") # REMOVED subcounty_number
 
 # ============ MARKET DATA ============
 class FMCGProduct(SQLModel, table=True):
