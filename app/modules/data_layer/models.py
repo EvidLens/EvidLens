@@ -20,6 +20,7 @@ class DataSource(str, enum.Enum):
 
 # ============ BILLING / CORE ============
 class Subscription(SQLModel, table=True):
+    __table_args__ = {"extend_existing": True}
     id: int = Field(default=None, primary_key=True)
     user_id: int
     plan: str
@@ -28,11 +29,13 @@ class Subscription(SQLModel, table=True):
     mpesa_receipt: str = None
 
 class QueryLog(SQLModel, table=True):
+    __table_args__ = {"extend_existing": True}
     id: int = Field(default=None, primary_key=True)
     user_id: int
     date: date
 
 class MpesaTransaction(SQLModel, table=True):
+    __table_args__ = {"extend_existing": True}
     id: int = Field(default=None, primary_key=True)
     user_id: int
     phone: str
@@ -45,25 +48,33 @@ class MpesaTransaction(SQLModel, table=True):
 
 # ============ GEO / MASTER DATA ============
 class Sector(SQLModel, table=True):
+    __table_args__ = {"extend_existing": True}
     id: int = Field(default=None, primary_key=True)
+    sector_number: int = Field(default=0) # <-- FIX: matches DB
     name: str = Field(unique=True)
 
 class County(SQLModel, table=True):
+    __table_args__ = {"extend_existing": True}
     id: int = Field(default=None, primary_key=True)
+    county_number: int = Field(default=0) # <-- FIX: matches DB
     name: str = Field(unique=True)
 
 class SubCounty(SQLModel, table=True):
+    __table_args__ = {"extend_existing": True}
     id: int = Field(default=None, primary_key=True)
+    subcounty_number: int = Field(default=0) # <-- FIX: matches DB
     name: str
     county_id: int = Field(foreign_key="county.id")
 
 # ============ MARKET DATA ============
 class FMCGProduct(SQLModel, table=True):
+    __table_args__ = {"extend_existing": True}
     id: int = Field(default=None, primary_key=True)
     name: str = Field(unique=True)
     category: str
 
 class Company(SQLModel, table=True):
+    __table_args__ = {"extend_existing": True}
     id: int = Field(default=None, primary_key=True)
     name: str
     sector: str
@@ -76,6 +87,7 @@ class Company(SQLModel, table=True):
     lng: float
 
 class MarketMetric(SQLModel, table=True):
+    __table_args__ = {"extend_existing": True}
     id: int = Field(default=None, primary_key=True)
     product_name: str
     sector: str
@@ -88,6 +100,7 @@ class MarketMetric(SQLModel, table=True):
     opportunity_score: float = 0
 
 class MarketSearch(SQLModel, table=True):
+    __table_args__ = {"extend_existing": True}
     id: int = Field(default=None, primary_key=True)
     query: str
     sector: str
@@ -96,6 +109,7 @@ class MarketSearch(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class MarketPrice(SQLModel, table=True):
+    __table_args__ = {"extend_existing": True}
     id: int = Field(default=None, primary_key=True)
     product: str
     price: float
@@ -105,6 +119,7 @@ class MarketPrice(SQLModel, table=True):
     fetched_at: datetime = Field(default_factory=datetime.utcnow)
 
 class NewsArticle(SQLModel, table=True):
+    __table_args__ = {"extend_existing": True}
     id: int = Field(default=None, primary_key=True)
     title: str
     url: str
@@ -115,6 +130,7 @@ class NewsArticle(SQLModel, table=True):
     fetched_at: datetime = Field(default_factory=datetime.utcnow)
 
 class SocialPost(SQLModel, table=True):
+    __table_args__ = {"extend_existing": True}
     id: int = Field(default=None, primary_key=True)
     platform: str
     post_id: str
