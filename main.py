@@ -1,3 +1,6 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 from app.modules.competitive_engine.router import router as competitive_router
 from app.modules.market_engine.router import router as market_router
 from app.modules.location_intel.router import router as location_router
@@ -15,6 +18,16 @@ from app.modules.lens_engine.router import router as lens_router
 from app.modules.core.router import router as core_router
 from app.modules.notifications.router import router as notifications_router
 from app.modules.storage.router import router as storage_router
+
+app = FastAPI(title="EvidLens API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(competitive_router, tags=["Competitive"])
 app.include_router(market_router, prefix="/market", tags=["Market"])
