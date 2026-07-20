@@ -1,3 +1,4 @@
+from datetime import datetime
 from app.scheduler import scheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -434,12 +435,12 @@ for d in top_demands:
 if not trending:
     trending = [{"category": "Agriculture", "headline": "No data yet", "score": 0}]
 
-    return {
-        "stats": stats,
-        "trending": trending, 
-        "modules": modules,
-        "last_updated": datetime.utcnow().isoformat()
-    }
+return {
+    "stats": stats,
+    "trending": trending,
+    "modules": modules,
+    "last_updated": datetime.utcnow().isoformat()
+}
 
 @app.get("/api/pricing")
 def api_pricing(): return {"plans": PRICING,"addons": ADDONS,"alc": ALC}
