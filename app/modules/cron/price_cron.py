@@ -2,7 +2,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.modules.database import SessionLocal
 from app.modules.data_layer.service import fetch_price_trends
 from sqlmodel import Session, select
-from app.main import NewsArticle, SocialPost # import models from main.py
+from app.modules.data_layer.models import NewsArticle, SocialPost # FIXED: was from app.main
 from datetime import datetime
 import os
 import requests
@@ -85,18 +85,17 @@ def run_social_job():
     finally:
         db.close()
 
-
 # ============== START ALL SCHEDULERS ==============
 def start_scheduler():
     if not scheduler.running:
         # 1. Price: Every Monday 3AM
         scheduler.add_job(run_price_job, 'cron', day_of_week='mon', hour=3, minute=0)
-        
+
         # 2. News: Every 6 hours
         scheduler.add_job(run_news_job, 'interval', hours=6)
-        
+
         # 3. Social: Every 1 hour
         scheduler.add_job(run_social_job, 'interval', hours=1)
-        
+
         scheduler.start()
         print("EvidLens Scheduler started: Price[Mon 3AM] News[6h] Social[1h]")
