@@ -1,7 +1,9 @@
 import os
 import httpx
-from typing import Dict, Any
+from typing import Dict, Any, List
 from sqlalchemy.orm import Session
+from datetime import datetime
+from app.modules.database import User, Notification # we will create these 2 models next
 
 RESEND_KEY = os.getenv("RESEND_API_KEY")
 FROM_EMAIL = os.getenv("FROM_EMAIL", "noreply@evidlens.com")
@@ -18,24 +20,41 @@ class NotificationService:
         self.db = db
 
     async def send(self, user_id: int, message: str, type: str = "info", channel: str = "in_app") -> Dict[str, Any]:
-        # TODO: Lookup user email/phone from DB. For now just log
-        result = {"user_id": user_id, "channel": channel, "status": "sent"}
+        # 1. GET REAL USER
+        user = self.db.query(User).filter(User.id == user_id).first()
+        if not user: 
+            return {"error": "User not found"}
+
+        status = "in_app_saved"
         
-        if channel == "email":
-            await self.send_email("test@evidlens.com", f"EvidLens Alert: {type}", message)
-            result["status"] = "email_sent"
-        elif channel == "sms":
-            await self.send_sms("+254700000", message)
-            result["status"] = "sms_sent"
-        elif channel == "whatsapp":
-            await self.send_whatsapp("+254700000000", message)
-            result["status"] = "whatsapp_sent"
+        # 2. SEND VIA CHANNEL
+        if channel == "email" and user.email:
+            await self.send_email(user.email, f"EvidLens Alert: {type}", message)
+            status = "email_sent"
+        elif channel == "sms" and user.phone:
+            await self.send_sms(user.phone, message)
+            status = "sms_sent"
+        elif channel == "whatsapp" and user.phone:
+            await self.send_whatsapp(user.phone, message)
+            status = "whatsapp_sent"
         
-        return result
+        # 3. SAVE TO DB
+        notif = Notification(
+            user_id=user_id, message=message, type=type, channel=channel, 
+            status=status, created_at=datetime.utcnow()
+        )
+        self.db.add(notif)
+        self.db.commit()
+        self.db.refresh(notif)
+
+        return {"id": notif.id, "user_id": user_id, "channel": channel, "status": status}
 
     async def get_for_user(self, user_id: int) -> Dict[str, Any]:
-        # TODO: Query notifications table
-        return {"user_id": user_id, "notifications": [], "count": 0}
+        notifs: List[Notification] = self.db.query(Notification)\
+           .filter(Notification.user_id == user_id)\
+           .order_by(Notification.created_at.desc())\
+           .limit(20).all()
+        return {"user_id": user_id, "notifications": notifs, "count": len(notifs)}
 
     async def send_email(self, to_email: str, subject: str, content: str):
         if not RESEND_KEY: return
@@ -51,7 +70,7 @@ class NotificationService:
         async with httpx.AsyncClient() as client:
             await client.post(
                 "https://api.africastalking.com/version1/messaging", 
-                headers={"apiKey": AT_KEY}, 
+                headers={"apiKey": AT_KEY, "Accept": "application/json", "Content-Type": "application/x-www-form-urlencoded"}, 
                 data={"username": AT_USER, "to": phone, "message": body}
             )
 
