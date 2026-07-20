@@ -1,3 +1,8 @@
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from datetime import datetime
 from app.modules.data_layer.models import *
 from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -210,6 +215,44 @@ class DetailedAnalysisRequest(BaseModel):
     budget_kes: float = 0
     business_model: str = "Retail"
 
+def scrape_kpin_prices():
+    url = "https://www.kpin.go.ke/market-prices"
+    session = Session(engine)
+
+    try:
+        r = requests.get(url, timeout=30)
+        soup = BeautifulSoup(r.text, 'html.parser')
+        table = soup.find('table')
+        df = pd.read_html(str(table))[0]
+        df.columns = ['date', 'county', 'market', 'product', 'price', 'unit']
+        df['price'] = df['price'].str.replace(',', '').astype(float)
+
+        for _, row in df.iterrows():
+            existing = session.exec(select(MarketPrice).where(
+                MarketPrice.product == row['product'],
+                MarketPrice.county == row['county'],
+                MarketPrice.market == row['market'],
+                func.date(MarketPrice.fetched_at) == datetime.utcnow().date()
+            )).first()
+
+            if not existing:
+                session.add(MarketPrice(
+                    product=row['product'],
+                    price=row['price'],
+                    county=row['county'],
+                    market=row['market'],
+                    unit=row['unit'],
+                    fetched_at=datetime.utcnow()
+                ))
+                # NO MarketMetric insert here. Because we have no real demand/volume data
+
+        session.commit()
+        print(f"KPIN Scrape Complete: {len(df)} real records")
+    except Exception as e:
+        print("Scrape Error:", e)
+    finally:
+        session.close()
+
 @app.post("/api/analyze-detailed")
 async def analyze_detailed(req: DetailedAnalysisRequest, user_id: int = Depends(get_current_user), db: Session = Depends(get_db)):
     check_subscription(user_id, db)
@@ -364,6 +407,50 @@ async def root(request: Request, session: Session = Depends(get_session)):
 
 from app.modules.chatbot.router import router as chatbot_router
 app.include_router(chatbot_router)
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from sqlmodel import func
+
+scheduler = AsyncIOScheduler()
+
+def scrape_kpin_prices():
+    url = "https://www.kpin.go.ke/market-prices"
+    session = Session(engine)
+    try:
+        r = requests.get(url, timeout=30)
+        df = pd.read_html(r.text)[0]
+        df.columns = ['date', 'county', 'market', 'product', 'price', 'unit']
+        df['price'] = df['price'].str.replace(',', '').astype(float)
+        for _, row in df.iterrows():
+            existing = session.exec(select(MarketPrice).where(
+                MarketPrice.product == row['product'],
+                MarketPrice.county == row['county'],
+                MarketPrice.market == row['market'],
+                func.date(MarketPrice.fetched_at) == datetime.utcnow().date()
+            )).first()
+            if not existing:
+                session.add(MarketPrice(
+                    product=row['product'], price=row['price'], county=row['county'],
+                    market=row['market'], unit=row['unit'], fetched_at=datetime.utcnow()
+                ))
+        session.commit()
+        print(f"KPIN Scrape Complete: {len(df)} real records")
+    except Exception as e:
+        print("Scrape Error:", e)
+    finally:
+        session.close()
+
+@app.post("/api/run-scraper")
+def run_scraper():
+    scrape_kpin_prices()
+    return {"status": "scraper ran. DB updated with real prices"}
+
+@app.on_event("startup")
+async def start_scraper():
+    scheduler.add_job(scrape_kpin_prices, "cron", hour=6)
+    scheduler.start()
 
 if __name__ == "__main__":
     import uvicorn
