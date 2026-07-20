@@ -14,7 +14,6 @@ class AIInsightsService:
         county = market_data.get('county', 'Unknown')
         sub_county = market_data.get('sub_county', '')
         ward = market_data.get('ward', '')
-
         geo = f"{ward}, {sub_county}, {county}, Kenya" if sub_county else f"{county}, Kenya"
 
         system_prompt = f"""
@@ -22,7 +21,7 @@ class AIInsightsService:
         Context: Sector={sector}, Location={geo}
         You have access to 9 Lanes of real-time Kenya data: CBK, KNBS, KRA, eCitizen, KEBS, NSE, Consumer Voice, Market Engine, Location Intel.
         Always cite sources. Always be specific to Kenya counties.
-        Return ONLY valid JSON with these exact keys.
+        Return ONLY valid JSON with these exact keys: answer, verdict, chart, table, map, sources
         """
 
         user_prompt = f"""
@@ -40,24 +39,13 @@ class AIInsightsService:
 
         try:
             chat_completion = self.client.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                model="llama-3.1-70b-versatile",
-                temperature=0.2,
-                max_tokens=1200,
-                response_format={"type": "json_object"}
+                messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+                model="llama-3.1-70b-versatile", temperature=0.2, max_tokens=1200, response_format={"type": "json_object"}
             )
             result = chat_completion.choices[0].message.content
             return json.loads(result)
-
         except Exception as e:
             return {
                 "answer": f"Lens is temporarily down. Fallback: Validate demand for '{query}' in {geo} manually.",
-                "verdict": "Needs Research",
-                "chart": None,
-                "table": [],
-                "map": None,
-                "sources": ["EvidLens Fallback"]
+                "verdict": "Needs Research", "chart": None, "table": [], "map": None, "sources": ["EvidLens Fallback"]
             }
