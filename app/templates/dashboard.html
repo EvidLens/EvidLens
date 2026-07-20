@@ -64,8 +64,15 @@ tbody tr:hover{background:#F5F7FA}
       <div class="card">
         <h2 class="font-bold text-xl mb-3" style="color:#0A1F44">Quick Business Analysis</h2>
         <form id="searchForm" class="space-y-3">
-          <input name="q" placeholder="e.g maize mill, retail, fintech" class="w-full p-3 border rounded-lg text-sm" required>
-          <div class="flex gap-3"><input name="sector" placeholder="Sector" class="w-1/2 p-3 border rounded-lg text-sm" required><input name="county" placeholder="County" class="w-1/2 p-3 border rounded-lg text-sm" required></div>
+          <input name="product" placeholder="e.g maize flour, milk, soap" class="w-full p-3 border rounded-lg text-sm" required>
+          <div class="flex gap-3">
+            <select name="sector" id="sectorSelect" class="w-1/2 p-3 border rounded-lg text-sm" required><option value="">Select Sector</option></select>
+            <select name="county" id="countySelect" class="w-1/2 p-3 border rounded-lg text-sm" required><option value="">Select County</option></select>
+          </div>
+          <div class="flex gap-3">
+            <select name="subcounty" id="subcountySelect" class="w-1/2 p-3 border rounded-lg text-sm"><option value="">All Subcounties</option></select>
+            <input name="budget_kes" type="number" placeholder="Budget KES" class="w-1/2 p-3 border rounded-lg text-sm">
+          </div>
           <button class="bg-[#F59E0B] text-white w-full p-3 rounded-lg font-bold hover:opacity-90">Analyze Market</button>
         </form>
         <div id="result" class="mt-4 text-sm"></div>
@@ -106,7 +113,7 @@ const tables = [
 tables.forEach(t => {
   tableState[t.id] = {page:1, sort_by: Object.keys(t.headers)[0], order:'desc'}
   document.getElementById('dataTables').innerHTML += `
-  <div class="card">
+  <div class="card" id="${t.id}">
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-3 gap-2">
       <h2 class="font-bold text-xl" style="color:#0A1F44">${t.name}</h2>
       <div class="flex gap-2">
@@ -171,6 +178,18 @@ async function loadTable(id){
   renderPagination(id, data.total, state.page);
 }
 
+async function loadDropdowns(){
+  const [s, c] = await Promise.all([fetch('/api/sectors'), fetch('/api/counties')]);
+  const sectors = await s.json(); const counties = await c.json();
+  document.getElementById('sectorSelect').innerHTML += sectors.sectors.map(x=>`<option>${x}</option>`).join('');
+  document.getElementById('countySelect').innerHTML += counties.counties.map(x=>`<option>${x}</option>`).join('');
+  document.getElementById('countySelect').onchange = async (e) => {
+    const res = await fetch(`/api/subcounties?county=${e.target.value}`);
+    const subs = await res.json();
+    document.getElementById('subcountySelect').innerHTML = '<option value="">All Subcounties</option>' + subs.subcounties.map(x=>`<option>${x}</option>`).join('');
+  }
+}
+
 async function loadDashboard(){
   const res = await fetch('/api/dashboard');
   const data = await res.json();
@@ -182,13 +201,12 @@ async function loadDashboard(){
   document.getElementById('trendingHeadline').innerText = data.trending.headline;
   document.getElementById('lastUpdated').innerText = 'Last updated: ' + new Date(data.last_updated).toLocaleTimeString();
 
-  // YOUR 6 REAL MODULES FROM SCREENSHOT
   const lanesGrid = document.getElementById('lanesGrid');
   const realModules = [
-    {name: "Competitive Engine", icon: "🎯", insights: data.modules[0]?.insights || 50, growth: "+8%", status: "LIVE", url: "#"},
-    {name: "Price Oracle", icon: "💰", insights: data.modules[1]?.insights || 100, growth: "+15%", status: "LIVE", url: "#"},
-    {name: "Demand Radar", icon: "📈", insights: data.modules[2]?.insights || 100, growth: "+22%", status: "LIVE", url: "#"},
-    {name: "County Mapper", icon: "🗺️", insights: 47, growth: "+5%", status: "LIVE", url: "#"},
+    {name: "Competitive Engine", icon: "🎯", insights: data.modules[0]?.insights || 50, growth: "+8%", status: "LIVE", url: "#companies"},
+    {name: "Price Oracle", icon: "💰", insights: data.modules[1]?.insights || 100, growth: "+15%", status: "LIVE", url: "#prices"},
+    {name: "Demand Radar", icon: "📈", insights: data.modules[2]?.insights || 100, growth: "+22%", status: "LIVE", url: "#demand"},
+    {name: "County Mapper", icon: "🗺️", insights: 47, growth: "+5%", status: "LIVE", url: "#county-stats"},
     {name: "Consumer Pulse", icon: "📊", insights: data.modules[4]?.insights || 20, growth: "+18%", status: "LIVE", url: "#"},
     {name: "Risk Sentinel", icon: "⚠️", insights: data.modules[5]?.insights || 20, growth: "+12%", status: "LIVE", url: "#"},
   ];
@@ -199,10 +217,21 @@ async function loadDashboard(){
 }
 
 loadDashboard();
+loadDropdowns();
 tables.forEach(t => loadTable(t.id));
 
-document.getElementById('searchForm').onsubmit = async (e) => { e.preventDefault(); const form = new FormData(e.target); lastAnalysis = Object.fromEntries(form); document.getElementById('result').innerHTML = '<p class="text-gray-500">Analyzing...</p>'; const res = await fetch('/search-market', {method:'POST', body:form}); const html = await res.text(); document.getElementById('result').innerHTML = html; }
-function downloadPDF(){ if(!lastAnalysis){ alert('Please run an analysis first'); return; } document.getElementById('pdf_q').value = lastAnalysis.q; document.getElementById('pdf_sector').value = lastAnalysis.sector; document.getElementById('pdf_county').value = lastAnalysis.county; document.getElementById('pdfForm').submit(); }
+// FIXED: Now calls /api/analyze-detailed
+document.getElementById('searchForm').onsubmit = async (e) => { 
+  e.preventDefault(); 
+  const form = new FormData(e.target); 
+  lastAnalysis = Object.fromEntries(form); 
+  document.getElementById('result').innerHTML = '<p class="text-gray-500">Analyzing...</p>'; 
+  const res = await fetch('/api/analyze-detailed', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(lastAnalysis)}); 
+  const data = await res.json(); 
+  document.getElementById('result').innerHTML = `<pre class="whitespace-pre-wrap bg-gray-50 p-3 rounded">${data.summary}</pre>`; 
+}
+
+function downloadPDF(){ if(!lastAnalysis){ alert('Please run an analysis first'); return; } document.getElementById('pdf_q').value = lastAnalysis.product; document.getElementById('pdf_sector').value = lastAnalysis.sector; document.getElementById('pdf_county').value = lastAnalysis.county; document.getElementById('pdfForm').submit(); }
 const chatBtn = document.getElementById('chatBtn'); const chatBox = document.getElementById('chatBox'); const chatInput = document.getElementById('chatInput'); const chatSend = document.getElementById('chatSend'); const chatMessages = document.getElementById('chatMessages');
 chatBtn.onclick = () => { chatBox.style.display = chatBox.style.display === 'flex'? 'none' : 'flex'; };
 async function sendChat(){ const msg = chatInput.value.trim(); if(!msg) return; chatMessages.innerHTML += '<div class="msg user">' + msg + '</div>'; chatHistory.push({role: "user", content: msg}); chatInput.value = ''; chatMessages.innerHTML += '<div class="msg bot" id="typing">Lens is thinking...</div>'; chatMessages.scrollTop = chatMessages.scrollHeight; try{ const res = await fetch('/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message: msg, history: chatHistory, context: lastAnalysis})}); const data = await res.json(); document.getElementById('typing').remove(); chatHistory.push({role: "assistant", content: data.response}); chatMessages.innerHTML += '<div class="msg bot">' + data.response + '</div>'; }catch(e){ document.getElementById('typing').innerText = 'Error: Could not reach AI'; } chatMessages.scrollTop = chatMessages.scrollHeight; }
