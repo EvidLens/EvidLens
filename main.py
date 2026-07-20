@@ -1,9 +1,9 @@
-from app.modules.competitive.router import router as competitive_router
-from app.modules.market_intel.router import router as market_router
-from app.modules.location.router import router as location_router
-from app.modules.voice.router import router as voice_router
-from app.modules.kb.router import router as kb_router
-from app.modules.reports.router import router as reports_router
+from app.modules.competitive_engine.router import router as competitive_router
+from app.modules.market_engine.router import router as market_router
+from app.modules.location_intel.router import router as location_router
+from app.modules.consumer_voice.router import router as voice_router
+from app.modules.knowledge_base.router import router as kb_router
+from app.modules.report_builder.router import router as reports_router
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
@@ -36,7 +36,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(DATABASE_URL, echo=False) if DATABASE_URL else create_engine("sqlite:///./evidlens.db", connect_args={"check_same_thread": False})
 
 app = FastAPI(title="EvidLens API", version="2.5.3")
-app.include_router(competitive_router, prefix="/competitive", tags=["Competitive"])
+app.include_router(competitive_router, tags=["Competitive"])
 app.include_router(market_router, prefix="/market", tags=["Market"])
 app.include_router(location_router, prefix="/location", tags=["Location"])
 app.include_router(voice_router, prefix="/voice", tags=["Voice"])
