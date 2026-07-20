@@ -360,6 +360,9 @@ def catch_undefined(): return {"status": "ignored"}
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request): return templates.TemplateResponse("dashboard.html", {"request": request})
 
+from app.modules.chatbot.router import router as chatbot_router
+app.include_router(chatbot_router)
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
