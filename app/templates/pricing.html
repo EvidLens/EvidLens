@@ -9,13 +9,12 @@
 <h1 class="text-4xl font-bold text-center" style="color:#0A1F44">Choose Your Plan</h1>
 <p class="text-center text-gray-600 mt-2">Kenya-First Data. 9 Lanes. 19 Modules. Exportable Reports</p>
 
-<!-- MONTHLY/YEARLY TOGGLE -->
 <div class="flex justify-center items-center gap-4 mt-8">
-  <span class="font-semibold" id="monthlyLabel">Monthly</span>
+  <span class="font-semibold" id="monthlyLabel" style="color:#0A1F44">Monthly</span>
   <button id="billingToggle" onclick="toggleBilling()" class="relative w-14 h-7 bg-gray-300 rounded-full transition">
     <span id="toggleCircle" class="absolute left-1 top-1 w-5 h-5 bg-white rounded-full transition"></span>
   </button>
-  <span class="font-semibold" id="yearlyLabel">Yearly <span class="text-xs text-[#14B8A6]">Save 17%</span></span>
+  <span class="font-semibold text-gray-400" id="yearlyLabel">Yearly <span class="text-xs text-[#14B8A6]">Save 17%</span></span>
 </div>
 
 <div class="grid md:grid-cols-3 gap-6 mt-8" id="plans-grid"></div>
@@ -23,16 +22,15 @@
 <div class="mt-12">
   <h2 class="text-xl font-bold text-center mb-4" style="color:#0A1F44">Add-Ons</h2>
   <div class="grid md:grid-cols-4 gap-4" id="addons-grid"></div>
-  
+
   <h2 class="mt-8 text-xl font-bold text-center mb-4" style="color:#0A1F44">À La Carte Services</h2>
   <div class="grid md:grid-cols-3 gap-4" id="alc-grid"></div>
 </div>
 </div></section>
 
 <script>
-let billing = 'monthly'; // default
+let billing = 'monthly';
 
-// MUST MATCH main.py EXACTLY
 const PRICING = {
   "BASIC": {"monthly": 500, "yearly": 5000},
   "PROFESSIONAL": {"monthly": 1500, "yearly": 15000},
@@ -83,9 +81,11 @@ function renderPlans(){
 }
 
 function renderAddons(){
+  const grid = document.getElementById('addons-grid');
+  grid.innerHTML = '';
   addons.forEach(a=>{
     const priceText = a.type === 'monthly'? formatKES(a.price)+'/mo' : formatKES(a.price);
-    document.getElementById('addons-grid').innerHTML += `
+    grid.innerHTML += `
     <div class="bg-white p-4 rounded-lg border flex justify-between items-center">
       <div><p class="font-semibold">${a.name}</p><p class="text-sm text-gray-600">${priceText}</p></div>
       <button onclick="checkoutAddon('${a.key}')" class="bg-[#14B8A6] text-white px-3 py-1 rounded text-sm">Add</button>
@@ -94,8 +94,10 @@ function renderAddons(){
 }
 
 function renderALC(){
+  const grid = document.getElementById('alc-grid');
+  grid.innerHTML = '';
   alc.forEach(a=>{
-    document.getElementById('alc-grid').innerHTML += `
+    grid.innerHTML += `
     <div class="bg-white p-4 rounded-lg border flex justify-between items-center">
       <div><p class="font-semibold">${a.name}</p><p class="text-sm text-gray-600">${formatKES(a.price)}</p></div>
       <button onclick="contactSales('${a.key}')" class="bg-[#F59E0B] text-white px-3 py-1 rounded text-sm">Contact</button>
@@ -114,28 +116,37 @@ function toggleBilling(){
 async function checkout(plan){
   const phone = prompt("Enter M-PESA phone: 2547XXXXXXXX");
   if(!phone) return;
+  const btn = event.target;
+  btn.innerText = "Processing...";
+  btn.disabled = true;
   const res = await fetch('/api/checkout', {
-    method: 'POST', 
-    headers: {'Content-Type':'application/json'}, 
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
     body: JSON.stringify({plan, billing, phone})
   })
   const data = await res.json();
-  alert(data.ResponseDescription || data.request_id? "STK Push sent to " + phone : JSON.stringify(data))
+  btn.innerText = "Get Started";
+  btn.disabled = false;
+  alert(data.ResponseDescription || data.message || JSON.stringify(data))
 }
 
 async function checkoutAddon(key){
   const phone = prompt("Enter M-PESA phone for " + key + ": 2547XXXXXXXX");
   if(!phone) return;
-  alert("Addon checkout: " + key + ". Integrate with /api/checkout-addon when ready.")
+  const res = await fetch('/api/checkout-addon', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({addon_key: key, phone})
+  })
+  const data = await res.json();
+  alert(data.ResponseDescription || data.message || JSON.stringify(data))
 }
 
 function contactSales(key){
   window.location.href = "/contact?service=" + key;
 }
 
-// Init
 renderPlans();
 renderAddons();
 renderALC();
-toggleBilling(); toggleBilling(); // set to monthly on load
 </script></body></html>
