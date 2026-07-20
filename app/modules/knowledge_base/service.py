@@ -1,13 +1,34 @@
 import os
 import json
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from groq import Groq
+from dotenv import load_dotenv
+
 from.models import SectorReport, KnowledgeChunk
-from app.modules.market_engine.models import MarketMetric
+from app.modules.market_engine.models import PriceTrend, DemandSignal, LocationMetric, ProductCatalog
 from app.modules.consumer_voice.models import SentimentSummary
 
+load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 groq_client = Groq(api_key=GROQ_API_KEY)
+
+class KnowledgeBaseService:
+    def __init__(self, db: Session = None):
+        self.db = db
+
+    def get_sector_benchmark(self, sector: str) -> dict:
+        """Used by market_intel lane and reports. Returns avg price + demand"""
+        if not self.db:
+            return {"sector": sector, "avg_price_kes": 0, "avg_demand_growth": 0}
+
+        avg_price = self.db.query(func.avg(PriceTrend.price_kes)).filter(PriceTrend.sector==sector).scalar() or 0
+        avg_growth = self.db.query(func.avg(DemandSignal.signal_value)).filter(DemandSignal.sector==sector).scalar() or 0
+        return {
+            "sector": sector,
+            "avg_price_kes": float(avg_price),
+            "avg_demand_growth": float(avg_growth)
+        }
 
 def get_sector_report(db: Session, sector: str, county: str = None):
     """Fetch prebuilt report. Powers dashboard auto-load"""
@@ -106,42 +127,33 @@ def ingest_sector_data(db: Session, sector: str):
     """Ingest ALL data types into KB chunks. Run weekly via cron"""
     count = 0
 
-    # 1. Ingest price trends
     prices = db.query(PriceTrend).filter(PriceTrend.sector == sector).all()
     for p in prices:
         chunk = KnowledgeChunk(
-            sector=sector,
-            county=p.county,
+            sector=sector, county=p.county,
             chunk_text=f"Price of {p.product_name} in {p.county} is KES {p.price_kes}. {p.price_change_percent}% change.",
-            chunk_type="price",
-            source="Data Layer Scraper",
+            chunk_type="price", source="Data Layer Scraper",
             chunk_metadata={"product": p.product_name, "price": p.price_kes}
         )
         db.merge(chunk)
         count += 1
 
-    # 2. Ingest demand signals
     demands = db.query(DemandSignal).filter(DemandSignal.sector == sector).all()
     for d in demands:
         chunk = KnowledgeChunk(
-            sector=sector,
-            county=d.county,
+            sector=sector, county=d.county,
             chunk_text=f"Demand signal for {sector}: {d.signal_type} = {d.signal_value} in {d.period}",
-            chunk_type="demand",
-            source="KNBS/Google Trends"
+            chunk_type="demand", source="KNBS/Google Trends"
         )
         db.merge(chunk)
         count += 1
 
-    # 3. Ingest location metrics
     locations = db.query(LocationMetric).filter(LocationMetric.sector == sector).all()
     for l in locations:
         chunk = KnowledgeChunk(
-            sector=sector,
-            county=l.county,
+            sector=sector, county=l.county,
             chunk_text=f"{sector} business density in {l.county}: {l.metric_value} businesses. Metric: {l.metric_type}",
-            chunk_type="location",
-            source="OSM/LocationIQ"
+            chunk_type="location", source="OSM/LocationIQ"
         )
         db.merge(chunk)
         count += 1
@@ -150,13 +162,9 @@ def ingest_sector_data(db: Session, sector: str):
     return count
 
 def get_sector_benchmark(db: Session, sector: str):
-    """Used by market_intel lane"""
-    avg_price = db.query(func.avg(PriceTrend.price_kes)).filter(PriceTrend.sector==sector).scalar() or 0
-    avg_growth = db.query(func.avg(DemandSignal.signal_value)).filter(DemandSignal.sector==sector).scalar() or 0
-    return {
-        "sector": sector,
-        "avg_price_kes": float(avg_price),
-        "avg_demand_growth": float(avg_growth)
-    }
+    """Backward compatible function export"""
+    service = KnowledgeBaseService(db)
+    return service.get_sector_benchmark(sector)
+
 def get_county_by_name(name: str):
     return None
