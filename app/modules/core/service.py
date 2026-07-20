@@ -54,3 +54,15 @@ class CoreService:
 
     def health_check(self) -> Dict[str, Any]:
         return {"status": "ok", "service": "evidlens-api"}
+
+# MODULE LEVEL ALIASES - for backward compatibility
+_core = CoreService()
+
+def get_all_pricing(db: Session) -> Dict[str, Any]:
+    return _core.get_all_pricing(db)
+
+def get_platform_stats(db: Session) -> Dict[str, int]:
+    return _core.get_platform_stats(db)
+
+def check_access(db: Session, user_id: int, area_name: str) -> Dict[str, Any]:
+    return _core.check_access(db, user_id, area_name)
