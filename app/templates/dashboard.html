@@ -93,7 +93,24 @@ tbody tr:hover{background:#F5F7FA}
       </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-6 mb-10" id="dataTables"></div>
+    <div class="card mb-10">
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-3">
+        <div class="flex gap-3 w-full md:w-auto">
+          <select id="tableSelector" class="border rounded-lg px-4 py-2 text-sm font-semibold" style="color:#0A1F44">
+            <option value="prices">Live KES Prices</option>
+            <option value="demand">Top Demand Scores</option>
+            <option value="companies">50+ Real Businesses</option>
+            <option value="county-stats">County Market Size</option>
+            <option value="sectors">Top Sectors</option>
+            <option value="opportunities">High Opportunity Zones</option>
+          </select>
+          <input id="globalSearch" placeholder="Search products, counties..." class="border rounded-lg px-4 py-2 text-sm w-full md:w-64">
+        </div>
+        <button onclick="exportCurrentTable()" class="bg-[#14B8A6] text-white px-4 py-2 rounded-lg text-sm font-semibold">Export CSV</button>
+      </div>
+      <div class="overflow-x-auto"><table id="active-table"></table></div>
+      <div class="flex justify-between items-center mt-3" id="active-pagination"></div>
+    </div>
 
   </div>
 </main>
@@ -107,38 +124,25 @@ tbody tr:hover{background:#F5F7FA}
 <script>
 let lastAnalysis = null;
 let chatHistory = [];
-let tableState = {}
+let activeTable = 'prices';
+let tableConfig = {
+  'prices': {name: 'Live KES Prices', endpoint: '/api/prices', headers: {product:"Product", price:"Price", county:"County", market:"Market", fetched_at:"Updated"}},
+  'demand': {name: 'Top Demand Scores', endpoint: '/api/demand', headers: {product_name:"Product", sector:"Sector", county:"County", demand_score:"Demand", volume:"Volume"}},
+  'companies': {name: '50+ Real Businesses', endpoint: '/api/companies', headers: {name:"Name", sector:"Sector", county:"County", rating:"Rating", reviews:"Reviews", address:"Address"}},
+  'county-stats': {name: 'County Market Size', endpoint: '/api/county-stats', headers: {county:"County", market_size:"Market Size KES", growth:"Growth %", volume:"Volume"}},
+  'sectors': {name: 'Top Sectors', endpoint: '/api/top-sectors', headers: {sector:"Sector", count:"Search Count"}},
+  'opportunities': {name: 'High Opportunity Zones', endpoint: '/api/opportunities', headers: {county:"County", product_name:"Product", destination_country:"Export To", market_size_kes:"Market Size", demand_score:"Opportunity Score"}}
+}
+let state = {page:1, sort_by: 'id', order:'desc', search:''}
 
-const tables = [
-  {id: 'companies', name: '50+ Real Businesses', endpoint: '/api/companies', headers: {name:"Name", sector:"Sector", county:"County", rating:"Rating", reviews:"Reviews", address:"Address"}},
-  {id: 'prices', name: 'Live KES Prices', endpoint: '/api/prices', headers: {product:"Product", price:"Price", county:"County", market:"Market", fetched_at:"Updated"}},
-  {id: 'demand', name: 'Top Demand Scores', endpoint: '/api/demand', headers: {product_name:"Product", sector:"Sector", county:"County", demand_score:"Demand", volume:"Volume"}},
-  {id: 'county-stats', name: 'Every County - Market Size', endpoint: '/api/county-stats', headers: {county:"County", market_size:"Market Size KES", growth:"Growth %", volume:"Volume"}},
-  {id: 'sectors', name: 'Top Sectors Searched', endpoint: '/api/top-sectors', headers: {sector:"Sector", count:"Search Count"}},
-  {id: 'opportunities', name: 'High Opportunity Zones', endpoint: '/api/opportunities', headers: {county:"County", product_name:"Product", market_size_kes:"Market Size", opportunity_score:"Opportunity Score"}}
-]
+document.getElementById('tableSelector').onchange = (e) => { activeTable = e.target.value; state.page = 1; loadActiveTable(); }
+document.getElementById('globalSearch').onkeyup = (e) => { state.search = e.target.value; state.page = 1; loadActiveTable(); }
 
-tables.forEach(t => {
-  tableState[t.id] = {page:1, sort_by: Object.keys(t.headers)[0], order:'desc'}
-  document.getElementById('dataTables').innerHTML += `
-  <div class="card" id="${t.id}">
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-3 gap-2">
-      <h2 class="font-bold text-xl" style="color:#0A1F44">${t.name}</h2>
-      <div class="flex gap-2">
-        <input onkeyup="loadTable('${t.id}')" id="${t.id}-search" placeholder="Search..." class="border rounded-lg px-3 py-2 text-sm w-48">
-        <button onclick="exportCSV('${t.id}')" class="bg-[#14B8A6] text-white px-4 py-2 rounded-lg text-sm font-semibold">Export CSV</button>
-      </div>
-    </div>
-    <div class="overflow-x-auto"><table id="${t.id}-table"></table></div>
-    <div class="flex justify-between items-center mt-3" id="${t.id}-pagination"></div>
-  </div>`
-})
-
-function renderTable(id, headers, rows){
-    const table = document.getElementById(id+"-table");
+function renderActiveTable(headers, rows){
+    const table = document.getElementById('active-table');
     let thead = `<thead><tr>`
     Object.keys(headers).forEach(key => {
-      thead += `<th onclick="sortTable('${id}','${key}')">${headers[key]} <span class="sort-icon">${tableState[id].sort_by==key? (tableState[id].order=='asc'?'▲':'▼') : ''}</span></th>`
+      thead += `<th onclick="sortActive('${key}')">${headers[key]} <span class="sort-icon">${state.sort_by==key? (state.order=='asc'?'▲':'▼') : ''}</span></th>`
     })
     thead += `</tr></thead>`
     let tbody = `<tbody>`
@@ -147,43 +151,41 @@ function renderTable(id, headers, rows){
     table.innerHTML = thead + tbody;
 }
 
-function renderPagination(id, total, page){
-    const limit = 10;
+function renderActivePagination(total, page){
+    const limit = 15;
     const pages = Math.ceil(total / limit);
-    document.getElementById(id+"-pagination").innerHTML = `
+    document.getElementById('active-pagination').innerHTML = `
       <p class="text-sm text-gray-500">Showing ${((page-1)*limit)+1} - ${Math.min(page*limit, total)} of ${total}</p>
       <div class="flex gap-2">
-        <button onclick="changePage('${id}', ${page-1})" ${page==1?'disabled':''} class="px-3 py-1 border rounded text-sm ${page==1?'opacity-50':''}">Prev</button>
-        <button onclick="changePage('${id}', ${page+1})" ${page==pages?'disabled':''} class="px-3 py-1 border rounded text-sm ${page==pages?'opacity-50':''}">Next</button>
+        <button onclick="changeActivePage(${page-1})" ${page==1?'disabled':''} class="px-3 py-1 border rounded text-sm ${page==1?'opacity-50':''}">Prev</button>
+        <button onclick="changeActivePage(${page+1})" ${page==pages?'disabled':''} class="px-3 py-1 border rounded text-sm ${page==pages?'opacity-50':''}">Next</button>
       </div>
     `
 }
 
-function changePage(id, page){ if(page < 1) return; tableState[id].page = page; loadTable(id); }
-function sortTable(id, key){ 
-  if(tableState[id].sort_by == key) tableState[id].order = tableState[id].order=='asc'?'desc':'asc';
-  else {tableState[id].sort_by = key; tableState[id].order='desc'}
-  loadTable(id);
+function changeActivePage(page){ if(page < 1) return; state.page = page; loadActiveTable(); }
+function sortActive(key){ 
+  if(state.sort_by == key) state.order = state.order=='asc'?'desc':'asc';
+  else {state.sort_by = key; state.order='desc'}
+  loadActiveTable();
 }
-function exportCSV(id){ window.location = `/api/export/${id}?search=${document.getElementById(id+'-search').value}` }
+function exportCurrentTable(){ window.location = `/api/export/${activeTable}?search=${state.search}` }
 
-async function loadTable(id){
-  const t = tables.find(x=>x.id==id);
-  const state = tableState[id];
-  const search = document.getElementById(id+"-search").value;
-  const res = await fetch(`${t.endpoint}?search=${search}&page=${state.page}&limit=10&sort_by=${state.sort_by}&order=${state.order}`);
+async function loadActiveTable(){
+  const t = tableConfig[activeTable];
+  const res = await fetch(`${t.endpoint}?search=${state.search}&page=${state.page}&limit=15&sort_by=${state.sort_by}&order=${state.order}`);
   const data = await res.json();
   
   let rows = [];
-  if(id=='companies') rows = data.companies.map(c => [c.name, c.sector, c.county, c.rating, c.reviews, c.address])
-  if(id=='prices') rows = data.prices.map(p => [p.product, `KES ${p.price}`, p.county, p.market, p.fetched_at.split('T')[0]])
-  if(id=='demand') rows = data.demand.map(d => [d.product_name, d.sector, d.county, d.demand_score, d.volume.toLocaleString()])
-  if(id=='county-stats') rows = data.stats.map(s => [s.county, `KES ${Number(s.market_size).toLocaleString()}`, `${Number(s.growth).toFixed(2)}%`, Number(s.volume).toLocaleString()])
-  if(id=='sectors') rows = data.sectors.map(s => [s.sector, s.count])
-  if(id=='opportunities') rows = data.opportunities.map(o => [o.county, o.product_name, `KES ${Number(o.market_size_kes).toLocaleString()}`, o.opportunity_score])
+  if(activeTable=='prices') rows = data.prices.map(p => [p.product, `KES ${p.price}`, p.county, p.market, p.fetched_at.split('T')[0]])
+  if(activeTable=='demand') rows = data.demand.map(d => [d.product_name, d.sector, d.county, d.demand_score, d.volume.toLocaleString()])
+  if(activeTable=='companies') rows = data.companies.map(c => [c.name, c.sector, c.county, c.rating, c.reviews, c.address])
+  if(activeTable=='county-stats') rows = data.stats.map(s => [s.county, `KES ${Number(s.market_size).toLocaleString()}`, `${Number(s.growth).toFixed(2)}%`, Number(s.volume).toLocaleString()])
+  if(activeTable=='sectors') rows = data.sectors.map(s => [s.sector, s.count])
+  if(activeTable=='opportunities') rows = data.opportunities.map(o => [o.county, o.product_name, o.destination_country, `KES ${Number(o.market_size_kes).toLocaleString()}`, o.demand_score])
   
-  renderTable(id, t.headers, rows);
-  renderPagination(id, data.total, state.page);
+  renderActiveTable(t.headers, rows);
+  renderActivePagination(data.total, state.page);
 }
 
 async function loadDropdowns(){
@@ -199,7 +201,7 @@ async function loadDropdowns(){
 }
 
 loadDropdowns();
-tables.forEach(t => loadTable(t.id));
+loadActiveTable();
 
 document.getElementById('searchForm').onsubmit = async (e) => { 
   e.preventDefault(); 
