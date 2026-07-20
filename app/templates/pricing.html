@@ -6,47 +6,136 @@
 </head>
 <body class="bg-gray-50">
 <section class="py-16"><div class="max-w-7xl mx-auto px-4">
-<h1 class="text-4xl font-bold text-center">Choose Your Plan</h1>
+<h1 class="text-4xl font-bold text-center" style="color:#0A1F44">Choose Your Plan</h1>
 <p class="text-center text-gray-600 mt-2">Kenya-First Data. 9 Lanes. 19 Modules. Exportable Reports</p>
-<div class="grid md:grid-cols-3 lg:grid-cols-6 gap-6 mt-12" id="plans-grid">
+
+<!-- MONTHLY/YEARLY TOGGLE -->
+<div class="flex justify-center items-center gap-4 mt-8">
+  <span class="font-semibold" id="monthlyLabel">Monthly</span>
+  <button id="billingToggle" onclick="toggleBilling()" class="relative w-14 h-7 bg-gray-300 rounded-full transition">
+    <span id="toggleCircle" class="absolute left-1 top-1 w-5 h-5 bg-white rounded-full transition"></span>
+  </button>
+  <span class="font-semibold" id="yearlyLabel">Yearly <span class="text-xs text-[#14B8A6]">Save 17%</span></span>
 </div>
-<div class="mt-12 text-center">
-<h2 class="text-xl font-bold">Add-Ons</h2>
-<p class="text-gray-600">Slack Alerts, CRM Sync, API Access, Analyst WhatsApp</p>
-<h2 class="mt-4 text-xl font-bold">À La Carte</h2>
-<p class="text-gray-600">Benchmark Report, Due Diligence, B2B Lead Lists</p>
+
+<div class="grid md:grid-cols-3 gap-6 mt-8" id="plans-grid"></div>
+
+<div class="mt-12">
+  <h2 class="text-xl font-bold text-center mb-4" style="color:#0A1F44">Add-Ons</h2>
+  <div class="grid md:grid-cols-4 gap-4" id="addons-grid"></div>
+  
+  <h2 class="mt-8 text-xl font-bold text-center mb-4" style="color:#0A1F44">À La Carte Services</h2>
+  <div class="grid md:grid-cols-3 gap-4" id="alc-grid"></div>
 </div>
 </div></section>
+
 <script>
-const plans = [
-  {name: "FREE", price: "KES 0", sub: "", features: ["3 Searches/mo", "1 Report/mo"]},
-  {name: "SME STARTER", price: "KES 500", sub: "per Report", features: ["Pay as you go", "Full PDF Report"]},
-  {name: "SME PRO", price: "KES 2,000", sub: "/month", features: ["10 Reports", "50 Searches", "Email Support"]},
-  {name: "PROFESSIONAL", price: "KES 5,000", sub: "/month", features: ["30 Reports", "200 Searches", "API Access"]},
-  {name: "BUSINESS", price: "KES 15,000", sub: "/month", features: ["100 Reports", "Unlimited Searches"]},
-  {name: "ENTERPRISE", price: "KES 40,000+", sub: "/month", features: ["Unlimited", "Custom Data", "Dedicated Analyst"]},
+let billing = 'monthly'; // default
+
+// MUST MATCH main.py EXACTLY
+const PRICING = {
+  "BASIC": {"monthly": 500, "yearly": 5000},
+  "PROFESSIONAL": {"monthly": 1500, "yearly": 15000},
+  "ENTERPRISE": {"monthly": 5000, "yearly": 50000}
+};
+
+const plansMeta = [
+  {key: "BASIC", name: "BASIC", features: ["3 Free Queries/mo", "Email Support", "Export to PDF"]},
+  {key: "PROFESSIONAL", name: "PROFESSIONAL", features: ["100 Queries/mo", "API Access", "Priority Support", "CSV Export"]},
+  {key: "ENTERPRISE", name: "ENTERPRISE", features: ["Unlimited Queries", "Dedicated Analyst", "Custom Data", "SLA"]},
 ];
 
-const grid = document.getElementById('plans-grid');
-plans.forEach(p=>{
-  const isPopular = p.name === "PROFESSIONAL";
-  const isEnterprise = p.name === "ENTERPRISE";
-  grid.innerHTML += `
-  <div class="bg-white p-6 rounded-2xl shadow ${isPopular ? 'border-4 border-[#14B8A6]' : ''} ${isEnterprise ? 'border-2 border-[#F59E0B]' : ''}">
-    <h3 class="font-bold text-lg">${p.name}</h3>
-    <p class="text-2xl font-bold mt-2">${p.price}<span class="text-sm font-normal text-gray-500">${p.sub}</span></p>
-    <ul class="text-sm mt-4 space-y-2">
-      ${p.features.map(f=>`<li>✓ ${f}</li>`).join('')}
-    </ul>
-    <button onclick="checkout('${p.name}')" class="mt-4 w-full ${isEnterprise ? 'bg-[#F59E0B]' : 'bg-[#14B8A6]'} text-white py-2 rounded font-semibold">
-      ${isEnterprise ? 'Contact Sales' : 'Get Started'}
-    </button>
-  </div>`
-})
+const addons = [
+  {key: "EXTRA_REPORTS_10", name: "10 Extra Reports", price: 1000, type: "one_time"},
+  {key: "API_ACCESS", name: "API Access", price: 2000, type: "monthly"},
+  {key: "TEAM_SEAT", name: "Extra Team Seat", price: 500, type: "monthly"},
+  {key: "DATA_EXPORT", name: "Bulk Data Export", price: 5000, type: "one_time"}
+];
 
-function checkout(plan){
-  if(plan === "ENTERPRISE") window.location.href = "/contact";
-  else fetch('/api/checkout', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({plan, billing: 'monthly'})})
-  .then(r=>r.json()).then(d=>alert(d.mpesa_prompt))
+const alc = [
+  {key: "CUSTOM_REPORT", name: "Custom Market Report", price: 25000},
+  {key: "DATA_ONBOARDING", name: "Data Onboarding", price: 50000},
+  {key: "TRAINING", name: "Team Training", price: 15000}
+];
+
+function formatKES(n){ return 'KES ' + n.toLocaleString() }
+
+function renderPlans(){
+  const grid = document.getElementById('plans-grid');
+  grid.innerHTML = '';
+  plansMeta.forEach(p=>{
+    const price = PRICING[p.key][billing];
+    const sub = billing === 'monthly'? '/month' : '/year';
+    const isPopular = p.key === "PROFESSIONAL";
+    grid.innerHTML += `
+    <div class="bg-white p-6 rounded-2xl shadow ${isPopular? 'border-4 border-[#14B8A6]' : 'border border-gray-200'}">
+      ${isPopular? '<p class="text-xs bg-[#14B8A6] text-white px-2 py-1 rounded-full inline-block mb-2">MOST POPULAR</p>' : ''}
+      <h3 class="font-bold text-lg" style="color:#0A1F44">${p.name}</h3>
+      <p class="text-3xl font-bold mt-2" style="color:#0A1F44">${formatKES(price)}<span class="text-sm font-normal text-gray-500">${sub}</span></p>
+      <ul class="text-sm mt-4 space-y-2 text-gray-700">
+        ${p.features.map(f=>`<li>✓ ${f}</li>`).join('')}
+      </ul>
+      <button onclick="checkout('${p.key}')" class="mt-4 w-full bg-[#14B8A6] hover:bg-[#0D9488] text-white py-3 rounded-lg font-semibold">
+        Get Started
+      </button>
+    </div>`
+  })
 }
+
+function renderAddons(){
+  addons.forEach(a=>{
+    const priceText = a.type === 'monthly'? formatKES(a.price)+'/mo' : formatKES(a.price);
+    document.getElementById('addons-grid').innerHTML += `
+    <div class="bg-white p-4 rounded-lg border flex justify-between items-center">
+      <div><p class="font-semibold">${a.name}</p><p class="text-sm text-gray-600">${priceText}</p></div>
+      <button onclick="checkoutAddon('${a.key}')" class="bg-[#14B8A6] text-white px-3 py-1 rounded text-sm">Add</button>
+    </div>`
+  })
+}
+
+function renderALC(){
+  alc.forEach(a=>{
+    document.getElementById('alc-grid').innerHTML += `
+    <div class="bg-white p-4 rounded-lg border flex justify-between items-center">
+      <div><p class="font-semibold">${a.name}</p><p class="text-sm text-gray-600">${formatKES(a.price)}</p></div>
+      <button onclick="contactSales('${a.key}')" class="bg-[#F59E0B] text-white px-3 py-1 rounded text-sm">Contact</button>
+    </div>`
+  })
+}
+
+function toggleBilling(){
+  billing = billing === 'monthly'? 'yearly' : 'monthly';
+  document.getElementById('toggleCircle').style.left = billing === 'yearly'? '2.25rem' : '0.25rem';
+  document.getElementById('monthlyLabel').style.color = billing === 'monthly'? '#0A1F44' : '#9CA3AF';
+  document.getElementById('yearlyLabel').style.color = billing === 'yearly'? '#0A1F44' : '#9CA3AF';
+  renderPlans();
+}
+
+async function checkout(plan){
+  const phone = prompt("Enter M-PESA phone: 2547XXXXXXXX");
+  if(!phone) return;
+  const res = await fetch('/api/checkout', {
+    method: 'POST', 
+    headers: {'Content-Type':'application/json'}, 
+    body: JSON.stringify({plan, billing, phone})
+  })
+  const data = await res.json();
+  alert(data.ResponseDescription || data.request_id? "STK Push sent to " + phone : JSON.stringify(data))
+}
+
+async function checkoutAddon(key){
+  const phone = prompt("Enter M-PESA phone for " + key + ": 2547XXXXXXXX");
+  if(!phone) return;
+  alert("Addon checkout: " + key + ". Integrate with /api/checkout-addon when ready.")
+}
+
+function contactSales(key){
+  window.location.href = "/contact?service=" + key;
+}
+
+// Init
+renderPlans();
+renderAddons();
+renderALC();
+toggleBilling(); toggleBilling(); // set to monthly on load
 </script></body></html>
