@@ -4,6 +4,36 @@ from app.modules.location_intel.router import router as location_router
 from app.modules.consumer_voice.router import router as voice_router
 from app.modules.knowledge_base.router import router as kb_router
 from app.modules.report_builder.router import router as reports_router
+from app.modules.ai_insights.router import router as ai_insights_router
+from app.modules.business_os.router import router as business_os_router
+from app.modules.auth.router import router as auth_router
+from app.modules.rag.router import router as rag_router
+from app.modules.payments.router import router as payments_router
+from app.modules.api.routes import router as api_router
+from app.modules.cron.router import router as cron_router
+from app.modules.lens_engine.router import router as lens_router
+from app.modules.core.router import router as core_router
+from app.modules.notifications.router import router as notifications_router
+from app.modules.storage.router import router as storage_router
+
+app.include_router(competitive_router, tags=["Competitive"])
+app.include_router(market_router, prefix="/market", tags=["Market"])
+app.include_router(location_router, prefix="/location", tags=["Location"])
+app.include_router(voice_router, prefix="/voice", tags=["Voice"])
+app.include_router(kb_router, prefix="/kb", tags=["KB"])
+app.include_router(reports_router, prefix="/reports", tags=["Reports"])
+app.include_router(ai_insights_router, prefix="/ai", tags=["AI Insights"])
+app.include_router(business_os_router, prefix="/business", tags=["Business OS"])
+app.include_router(auth_router, prefix="/auth", tags=["Auth"])
+app.include_router(rag_router, prefix="/rag", tags=["RAG"])
+app.include_router(payments_router, prefix="/payments", tags=["Payments"])
+app.include_router(api_router, prefix="/api", tags=["API"])
+app.include_router(cron_router, tags=["Cron"])
+app.include_router(lens_router, tags=["Lens"])
+app.include_router(core_router, tags=["Core"])
+app.include_router(notifications_router, tags=["Notifications"])
+app.include_router(storage_router, tags=["Storage"])
+
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
