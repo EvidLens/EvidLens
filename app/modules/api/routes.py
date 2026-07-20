@@ -1,37 +1,51 @@
-@router.get("/api/competitive")
-async def get_competitive():
-    # CALL YOUR REAL COMPETITIVE ENGINE SERVICE HERE
-    return {"service": "Competitive Engine", "competitors": [], "status": "LIVE"}
+from fastapi import APIRouter, Depends
+from sqlmodel import Session
+from app.modules.database import get_session
+from app.modules.api.service import APIService
 
-@router.get("/api/price-oracle")
-async def get_price_oracle():
-    # CALL YOUR REAL PRICE ORACLE SERVICE HERE
-    return {"service": "Price Oracle", "prices": [], "status": "LIVE"}
+router = APIRouter()
 
-@router.get("/api/demand")
-async def get_demand():
-    return {"service": "Demand Radar", "demand": [], "status": "LIVE"}
+@router.get("/competitive")
+async def get_competitive(sector: str, county: str = None, db: Session = Depends(get_session)):
+    service = APIService(db)
+    return await service.get_competitive(sector, county)
 
-@router.get("/api/policy")
-async def get_policy():
-    return {"service": "Policy Watch", "policies": [], "status": "LIVE"}
+@router.get("/price-oracle")
+async def get_price_oracle(sector: str, county: str = None, db: Session = Depends(get_session)):
+    service = APIService(db)
+    return await service.get_price_oracle(sector, county)
 
-@router.get("/api/funding")
-async def get_funding():
-    return {"service": "Funding Radar", "funding": [], "status": "LIVE"}
+@router.get("/demand")
+async def get_demand(sector: str, county: str = None, db: Session = Depends(get_session)):
+    service = APIService(db)
+    return await service.get_demand(sector, county)
 
-@router.get("/api/risk")
-async def get_risk():
-    return {"service": "Risk Sentinel", "risks": [], "status": "LIVE"}
+@router.get("/policy")
+async def get_policy(sector: str = None, db: Session = Depends(get_session)):
+    service = APIService(db)
+    return await service.get_policy(sector)
 
-@router.get("/api/export")
-async def get_export():
-    return {"service": "Export Navigator", "exports": [], "status": "LIVE"}
+@router.get("/funding")
+async def get_funding(sector: str, db: Session = Depends(get_session)):
+    service = APIService(db)
+    return await service.get_funding(sector)
 
-@router.get("/api/consumer")
-async def get_consumer():
-    return {"service": "Consumer Pulse", "insights": [], "status": "LIVE"}
+@router.get("/risk")
+async def get_risk(business: str, county: str, db: Session = Depends(get_session)):
+    service = APIService(db)
+    return await service.get_risk(business, county)
 
-@router.get("/api/county")
-async def get_county():
-    return {"service": "County Mapper", "counties": [], "status": "LIVE"}
+@router.get("/export")
+async def get_export(sector: str, db: Session = Depends(get_session)):
+    service = APIService(db)
+    return await service.get_export(sector)
+
+@router.get("/consumer")
+async def get_consumer(sector: str, county: str = None, db: Session = Depends(get_session)):
+    service = APIService(db)
+    return await service.get_consumer(sector, county)
+
+@router.get("/county")
+async def get_county(county: str, db: Session = Depends(get_session)):
+    service = APIService(db)
+    return await service.get_county(county)
