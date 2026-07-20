@@ -452,6 +452,12 @@ async def start_scraper():
     scheduler.add_job(scrape_kpin_prices, "cron", hour=6)
     scheduler.start()
 
+from app.modules.data_layer.db import create_db_and_tables
+
+@app.on_event("startup")
+def on_startup():
+    create_db_and_tables()
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
