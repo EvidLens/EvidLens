@@ -50,7 +50,7 @@ class MpesaTransaction(SQLModel, table=True):
 class Sector(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
     id: int = Field(default=None, primary_key=True)
-    sector_number: int = Field(default=0)
+    sector_number: int  # <- NO DEFAULT HERE ANYMORE
     parent_category: str = Field(default="General")
     name: str = Field(unique=True)
 
@@ -190,7 +190,7 @@ class LocationMetric(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 class ProductCatalog(SQLModel, table=True):
-    __tablename__ = "product_catalog"  # FIXED: was = =
+    __tablename__ = "product_catalog"
     __table_args__ = {"extend_existing": True}
     id: int = Field(default=None, primary_key=True)
     sector: str = Field(index=True, max_length=100)
