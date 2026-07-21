@@ -1,10 +1,16 @@
 from datetime import datetime
 from sqlalchemy import select, func, desc, or_
-from fastapi import Depends
-from app.modules.database import get_session
-from app.scheduler import scheduler
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlmodel import Session, SQLModel
+
+from app.modules.database import engine
+from app.modules.db import init_db
+from app.modules.data_layer.seed import seed_data
+from app.modules.cron.price_cron import start_scheduler
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+scheduler = AsyncIOScheduler()
 
 from app.modules.competitive_engine.router import router as competitive_router
 from app.modules.market_engine.router import router as market_router
@@ -168,13 +174,23 @@ def generate_insights(user_message: str):
         return completion.choices[0].message.content
     except Exception as e: return f"AI Error: {str(e)}. Please try again."
 
+from sqlmodel import Session
+from app.modules.database import engine
+from app.modules.data_layer.seed import seed_data
 from app.modules.db import init_db
 from app.modules.cron.price_cron import start_scheduler
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
 scheduler = AsyncIOScheduler()
 @app.on_event("startup")
-async def on_startup():
-    init_db(); SQLModel.metadata.create_all(engine); db = Session(engine); seed_data(db); db.close(); start_scheduler(); scheduler.add_job(lambda: None, "interval", hours=1); scheduler.start()
-
+def on_startup():
+    init_db()
+    db = Session(engine)
+    seed_data(db)
+    db.close()
+    start_scheduler()
+    scheduler.add_job(lambda: None, "interval", hours=1)
+    scheduler.start()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates", auto_reload=True)
