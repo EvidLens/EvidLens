@@ -1,22 +1,24 @@
-from sqlalchemy import Column, Integer, String, Boolean, Enum, DateTime
-import enum
 from datetime import datetime
-from app.modules.db import Base
+from typing import Optional
+from sqlmodel import SQLModel, Field
+from sqlalchemy.sql import func
+import enum
 
 class UserRole(str, enum.Enum):
     USER = "USER"
     ADMIN = "ADMIN"
     STAFF = "STAFF"
 
-class User(Base):
+class User(SQLModel, table=True):
     __tablename__ = "users"
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True, nullable=False)
-    phone = Column(String, unique=True, index=True, nullable=True)
-    full_name = Column(String, nullable=False)
-    hashed_password = Column(String, nullable=False)
-    sector = Column(String, nullable=True)
-    county = Column(String, nullable=True)
-    role = Column(Enum(UserRole), default=UserRole.USER)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    email: str = Field(unique=True, index=True)
+    phone: Optional[str] = Field(default=None, unique=True, index=True)
+    full_name: str
+    hashed_password: str
+    sector: Optional[str] = Field(default=None)
+    county: Optional[str] = Field(default=None)
+    role: UserRole = Field(default=UserRole.USER)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
