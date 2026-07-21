@@ -406,7 +406,6 @@ def dashboard_api(session: Session):
     if not trending:
         trending = [{"category": "Agriculture", "headline": "No data yet", "score": 0}]
     return {"stats": stats,"trending": trending,"modules": modules,"last_updated": datetime.utcnow().isoformat()}
-
 @app.get("/api/pricing")
 def api_pricing():
     return {"plans": PRICING,"addons": ADDONS,"alc": ALC}
