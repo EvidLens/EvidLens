@@ -1,7 +1,20 @@
-import boto3, os
-R2 = boto3.client("s3", endpoint_url=f"https://{os.getenv('R2_ACCOUNT_ID')}.r2.cloudflarestorage.com", aws_access_key_id=os.getenv("R2_ACCESS_KEY_ID"), aws_secret_access_key=os.getenv("R2_SECRET_ACCESS_KEY"))
-BUCKET = os.getenv("R2_BUCKET_NAME")
+import os
+from supabase import create_client, Client
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY")
+BUCKET = "evidlens-files"
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 async def upload_report_pdf(file_bytes, filename):
-    R2.put_object(Bucket=BUCKET, Key=filename, Body=file_bytes)
-    return f"https://{BUCKET}.{os.getenv('R2_ACCOUNT_ID')}.r2.dev/{filename}"
+    # Upload to Supabase Storage
+    res = supabase.storage.from_(BUCKET).upload(
+        path=filename,
+        file=file_bytes,
+        file_options={"content-type": "application/pdf", "upsert": "true"}
+    )
+    
+    # Get public URL
+    url_data = supabase.storage.from_(BUCKET).get_public_url(filename)
+    return url_data
