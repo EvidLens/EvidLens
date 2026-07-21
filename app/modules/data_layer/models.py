@@ -4,7 +4,6 @@ from sqlalchemy import Column, Enum, JSON, Text
 from datetime import datetime, date
 import enum
 
-# ============ ENUMS ============
 class DataSource(str, enum.Enum):
     jumia = "jumia"
     naivas = "naivas"
@@ -19,7 +18,6 @@ class DataSource(str, enum.Enum):
     twitter = "twitter"
     news = "news"
 
-# ============ BILLING / CORE ============
 class Subscription(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
     id: int = Field(default=None, primary_key=True)
@@ -47,11 +45,10 @@ class MpesaTransaction(SQLModel, table=True):
     status: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-# ============ GEO / MASTER DATA ============
 class Sector(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
     id: int = Field(default=None, primary_key=True)
-    sector_number: int  # <- NO DEFAULT HERE ANYMORE
+    sector_number: int
     parent_category: str = Field(default="General")
     name: str = Field(unique=True)
 
@@ -66,7 +63,6 @@ class SubCounty(SQLModel, table=True):
     name: str
     county_id: int = Field(foreign_key="county.id")
 
-# ============ MARKET DATA ============
 class FMCGProduct(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
     id: int = Field(default=None, primary_key=True)
@@ -98,6 +94,7 @@ class MarketMetric(SQLModel, table=True):
     growth_percent: float
     volume: int
     opportunity_score: float = 0
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 class MarketSearch(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
@@ -111,7 +108,7 @@ class MarketSearch(SQLModel, table=True):
 class MarketPrice(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
     id: int = Field(default=None, primary_key=True)
-    product: str
+    product_name: str
     price: float
     county: str
     market: str
@@ -141,7 +138,6 @@ class SocialPost(SQLModel, table=True):
     sentiment: str = "neutral"
     created_at_db: datetime = Field(default_factory=datetime.utcnow)
 
-# ============ ADVANCED DATA LAYER ============
 class PriceTrend(SQLModel, table=True):
     __tablename__ = "price_trends"
     __table_args__ = (
