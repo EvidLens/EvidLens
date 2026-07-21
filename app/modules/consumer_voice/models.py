@@ -1,7 +1,8 @@
 from datetime import datetime
 from typing import Optional
-from sqlmodel import SQLModel, Field, Column, JSON, UniqueConstraint
+from sqlmodel import SQLModel, Field, Column
 from sqlalchemy.sql import func
+from sqlalchemy import Enum as SQLEnum
 import enum
 
 class Sentiment(str, enum.Enum):
@@ -24,12 +25,12 @@ class ConsumerFeedback(SQLModel, table=True):
     sector: str = Field(index=True)
     county: Optional[str] = Field(default=None, index=True)
     product_or_topic: str = Field(index=True)
-    source: Source = Field(default=Source.reddit, sa_column=Column(enum.Enum(Source)))
+    source: Source = Field(default=Source.reddit, sa_column=Column(SQLEnum(Source)))
     source_url: Optional[str] = Field(default=None, index=True, unique=True)
     author: Optional[str] = Field(default=None)
 
     content: str
-    sentiment: Sentiment = Field(default=Sentiment.neutral, sa_column=Column(enum.Enum(Sentiment)))
+    sentiment: Sentiment = Field(default=Sentiment.neutral, sa_column=Column(SQLEnum(Sentiment)))
     sentiment_score: float = Field(default=0.0)
 
     likes_mentioned: Optional[str] = Field(default=None)
@@ -56,5 +57,3 @@ class SentimentSummary(SQLModel, table=True):
 
     created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
     last_updated: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now(), "onupdate": func.now()})
-
-    __table_args__ = (UniqueConstraint('sector', 'county', 'product_or_topic', name='uq_sector_county_topic'),)
