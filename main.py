@@ -92,7 +92,7 @@ def on_startup():
     init_db()
     create_db_and_tables()
     db = Session(engine)
-    seed_data(db)
+    seed_data()
     db.close()
     start_scheduler()
     scheduler.add_job(scrape_kpin_prices, "cron", hour=6)
