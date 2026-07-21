@@ -13,7 +13,6 @@ import base64
 import random
 import requests
 from requests.auth import HTTPBasicAuth
-from bs4 import BeautifulSoup
 import pandas as pd
 from groq import Groq
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -91,9 +90,7 @@ from app.modules.chatbot.router import router as chatbot_router
 def on_startup():
     init_db()
     create_db_and_tables()
-    db = Session(engine)
     seed_data()
-    db.close()
     start_scheduler()
     scheduler.add_job(scrape_kpin_prices, "cron", hour=6)
     scheduler.start()
@@ -184,15 +181,15 @@ def scrape_kpin_prices():
         df['price'] = df['price'].str.replace(',', '').astype(float)
         for _, row in df.iterrows():
             existing = session.exec(select(MarketPrice).where(
-                MarketPrice.product == row['product'],
+                MarketPrice.product_name == row['product'],
                 MarketPrice.county == row['county'],
                 MarketPrice.market == row['market'],
                 func.date(MarketPrice.fetched_at) == datetime.utcnow().date()
             )).first()
             if not existing:
                 session.add(MarketPrice(
-                    product=row['product'], price=row['price'], county=row['county'],
-                    market=row['market'], unit=row['unit'], fetched_at=datetime.utcnow()
+                    product_name=row['product'], price=row['price'], county=row['county'],
+                    market=row['market'], fetched_at=datetime.utcnow()
                 ))
         session.commit()
     except Exception:
@@ -268,9 +265,9 @@ def get_companies(search: str = "", sector: str = "", county: str = "", page: in
 def get_prices(search: str = "", product: str = "", county: str = "", page: int = 1, limit: int = 10, sort_by: str = "price", order: str = "desc", session: Session = Depends(get_session)):
     q = select(MarketPrice)
     if search:
-        q = q.where(or_(MarketPrice.product.contains(search), MarketPrice.county.contains(search)))
+        q = q.where(or_(MarketPrice.product_name.contains(search), MarketPrice.county.contains(search)))
     if product:
-        q = q.where(MarketPrice.product == product)
+        q = q.where(MarketPrice.product_name == product)
     if county:
         q = q.where(MarketPrice.county == county)
     total = len(session.exec(q).all())
@@ -337,7 +334,7 @@ class DetailedAnalysisRequest(BaseModel):
 async def analyze_detailed(req: DetailedAnalysisRequest, user_id: int = Depends(get_current_user), db: Session = Depends(get_db)):
     check_subscription(user_id, db)
     competitors = db.exec(select(Company).where(Company.sector==req.sector, Company.county==req.county).limit(10)).all()
-    prices = db.exec(select(MarketPrice).where(MarketPrice.product.contains(req.product), MarketPrice.county==req.county).limit(5)).all()
+    prices = db.exec(select(MarketPrice).where(MarketPrice.product_name.contains(req.product), MarketPrice.county==req.county).limit(5)).all()
     demand = db.exec(select(MarketMetric).where(MarketMetric.product_name.contains(req.product), MarketMetric.county==req.county).first())
     prompt = f"Product: {req.product} Sector: {req.sector} Location: {req.subcounty}, {req.county} Budget: KES {req.budget_kes} Model: {req.business_model} Competitors: {[c.name for c in competitors]} Avg Price: {[p.price for p in prices]} Demand Score: {demand.demand_score if demand else 'N/A'} Market Size: KES {demand.market_size_kes if demand else 'N/A'}"
     ai_response = generate_insights(prompt)
@@ -357,7 +354,7 @@ def export_csv(table: str, search: str = "", session: Session = Depends(get_sess
         q = select(MarketPrice)
         data = session.exec(q).all()
         writer.writerow(["Product","Price","County","Market","Source","FetchedAt"])
-        [writer.writerow([r.product,r.price,r.county,r.market,r.source,r.fetched_at]) for r in data]
+        [writer.writerow([r.product_name,r.price,r.county,r.market,r.source,r.fetched_at]) for r in data]
     elif table == "demand":
         q = select(MarketMetric)
         data = session.exec(q).all()
@@ -390,12 +387,22 @@ def dashboard_api(session: Session):
     policy_count = session.exec(select(func.count(PolicyWatch.id))).one()
     export_count = session.exec(select(func.count(ExportOpportunity.id))).one()
     funding_count = session.exec(select(func.count(Company.id)).where(or_(Company.sector.contains("Financial"),Company.sector.contains("Banking"),Company.sector.contains("Insurance"),Company.sector.contains("SACCO"),Company.sector.contains("Microfinance"),Company.sector.contains("FinTech")))).one()
-    modules = [{"id": 1, "name": "Competitive Engine", "icon": "🎯", "count": company_count, "route": "/competitive"},{"id": 2, "name": "Price Oracle", "icon": "💰", "count": metric_count, "route": "/market/prices"},{"id": 3, "name": "Demand Radar", "icon": "📈", "count": search_count, "route": "/market/demand"},{"id": 4, "name": "County Mapper", "icon": "🗺️", "count": county_count, "route": "/location/counties"},{"id": 5, "name": "Consumer Pulse", "icon": "👥", "count": social_count, "route": "/voice"},{"id": 6, "name": "Risk Sentinel", "icon": "⚠️", "count": news_count, "route": "/market/risk"},{"id": 7, "name": "Policy Watch", "icon": "📜", "count": policy_count, "route": "/kb/policy"},{"id": 8, "name": "Funding Radar", "icon": "🏦", "count": funding_count, "route": "/reports/funding"},{"id": 9, "name": "Export Navigator", "icon": "🚢", "count": export_count, "route": "/market/export"}]
+    modules = [
+        {"id": 1, "name": "Competitive Engine", "icon": "🎯", "count": company_count, "route": "/competitive"},
+        {"id": 2, "name": "Price Oracle", "icon": "💰", "count": metric_count, "route": "/market/prices"},
+        {"id": 3, "name": "Demand Radar", "icon": "📈", "count": search_count, "route": "/market/demand"},
+        {"id": 4, "name": "County Mapper", "icon": "🗺️", "count": county_count, "route": "/location/counties"},
+        {"id": 5, "name": "Consumer Pulse", "icon": "👥", "count": social_count, "route": "/voice"},
+        {"id": 6, "name": "Risk Sentinel", "icon": "⚠️", "count": news_count, "route": "/market/risk"},
+        {"id": 7, "name": "Policy Watch", "icon": "📜", "count": policy_count, "route": "/kb/policy"},
+        {"id": 8, "name": "Funding Radar", "icon": "🏦", "count": funding_count, "route": "/reports/funding"},
+        {"id": 9, "name": "Export Navigator", "icon": "🚢", "count": export_count, "route": "/market/export"}
+    ]
     stats = {"insights_generated": search_count,"sectors_covered": sector_count,"reports_exported": subscription_count,"active_products": product_count}
-    top_demands = session.exec(select(MarketMetric).order_by(desc(MarketMetric.demand_score)).limit(3)).all()
+    top_demands = session.exec(select(MarketMetric.product_name, MarketMetric.county, MarketMetric.sector, MarketMetric.demand_score, MarketMetric.updated_at).order_by(desc(MarketMetric.demand_score)).limit(3)).all()
     trending = []
     for d in top_demands:
-        trending.append({"category": getattr(d, 'sector', getattr(d, 'category', 'Agriculture')),"headline": f"{d.product_name} demand up in {d.county}","score": d.demand_score,"product": d.product_name,"county": d.county,"updated": d.updated_at.isoformat() if d.updated_at else ""})
+        trending.append({"category": d.sector or 'Agriculture',"headline": f"{d.product_name} demand up in {d.county}","score": d.demand_score,"product": d.product_name,"county": d.county,"updated": d.updated_at.isoformat() if d.updated_at else ""})
     if not trending:
         trending = [{"category": "Agriculture", "headline": "No data yet", "score": 0}]
     return {"stats": stats,"trending": trending,"modules": modules,"last_updated": datetime.utcnow().isoformat()}
@@ -409,7 +416,7 @@ def mpesa_stk_push(payload: dict, user_id: int = Depends(get_current_user)):
     plan = payload.get("plan")
     billing = payload.get("billing")
     phone = payload.get("phone")
-    amount = PRICING[plan][billing]
+    amount = PRICING[billing]
     token = get_mpesa_token()
     timestamp = get_timestamp()
     password = get_password(MPESA_SHORTCODE, MPESA_PASSKEY, timestamp)
