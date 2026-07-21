@@ -387,6 +387,7 @@ def dashboard_api(session: Session):
     policy_count = session.exec(select(func.count(PolicyWatch.id))).one()
     export_count = session.exec(select(func.count(ExportOpportunity.id))).one()
     funding_count = session.exec(select(func.count(Company.id)).where(or_(Company.sector.contains("Financial"),Company.sector.contains("Banking"),Company.sector.contains("Insurance"),Company.sector.contains("SACCO"),Company.sector.contains("Microfinance"),Company.sector.contains("FinTech")))).one()
+    
     modules = [
         {"id": 1, "name": "Competitive Engine", "icon": "🎯", "count": company_count, "route": "/competitive"},
         {"id": 2, "name": "Price Oracle", "icon": "💰", "count": metric_count, "route": "/market/prices"},
@@ -399,7 +400,9 @@ def dashboard_api(session: Session):
         {"id": 9, "name": "Export Navigator", "icon": "🚢", "count": export_count, "route": "/market/export"}
     ]
     stats = {"insights_generated": search_count,"sectors_covered": sector_count,"reports_exported": subscription_count,"active_products": product_count}
+    
     top_demands = session.exec(select(MarketMetric.product_name, MarketMetric.county, MarketMetric.sector, MarketMetric.demand_score).order_by(desc(MarketMetric.demand_score)).limit(3)).all()
+    
     trending = []
     for d in top_demands:
         trending.append({"category": d.sector or 'Agriculture',"headline": f"{d.product_name} demand up in {d.county}","score": d.demand_score,"product": d.product_name,"county": d.county,"updated": ""})
