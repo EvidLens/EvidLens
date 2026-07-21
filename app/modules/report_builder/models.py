@@ -1,8 +1,9 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Enum, JSON, Text
+from datetime import datetime
+from typing import Optional, List, Dict
+from sqlmodel import SQLModel, Field, Column, JSON, Relationship
 from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
+from sqlalchemy import Enum as SQLEnum
 import enum
-from app.modules.db import Base
 
 class ReportType(str, enum.Enum):
     MARKET_FEASIBILITY = "market_feasibility"
@@ -22,70 +23,72 @@ class ReportStatus(str, enum.Enum):
     FAILED = "failed"
     EXPIRED = "expired"
 
-class Report(Base):
+class Report(SQLModel, table=True):
     __tablename__ = "reports"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=False, index=True)
-    
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(index=True)
+
     # Report Details
-    title = Column(String, nullable=False)
-    report_type = Column(Enum(ReportType), nullable=False)
-    format = Column(Enum(ReportFormat), default=ReportFormat.PDF)
-    status = Column(Enum(ReportStatus), default=ReportStatus.GENERATING)
-    error_message = Column(Text, nullable=True) # For FAILED status debugging
-    
+    title: str
+    report_type: ReportType = Field(sa_column=Column(SQLEnum(ReportType)))
+    format: ReportFormat = Field(default=ReportFormat.PDF, sa_column=Column(SQLEnum(ReportFormat)))
+    status: ReportStatus = Field(default=ReportStatus.GENERATING, sa_column=Column(SQLEnum(ReportStatus)))
+    error_message: Optional[str] = Field(default=None)
+
     # 5-Level Geo Context
-    query = Column(String, nullable=True)
-    sector = Column(String, nullable=True)
-    country = Column(String, default="Kenya")
-    county = Column(String, nullable=True)
-    sub_county = Column(String, nullable=True)
-    ward = Column(String, nullable=True)
-    town = Column(String, nullable=True)
-    
+    query: Optional[str] = Field(default=None)
+    sector: Optional[str] = Field(default=None)
+    country: str = Field(default="Kenya")
+    county: Optional[str] = Field(default=None)
+    sub_county: Optional[str] = Field(default=None)
+    ward: Optional[str] = Field(default=None)
+    town: Optional[str] = Field(default=None)
+
     # Files
-    file_path = Column(String, nullable=True) # /tmp/ or Cloudflare R2 URL
-    file_size_kb = Column(Integer, nullable=True)
-    download_count = Column(Integer, default=0)
-    
+    file_path: Optional[str] = Field(default=None)
+    file_size_kb: Optional[int] = Field(default=None)
+    download_count: int = Field(default=0)
+
     # Branding + KRA
-    is_branded = Column(Boolean, default=False) # Premium: logo + custom colors
-    kra_compliant = Column(Boolean, default=True)
-    report_metadata = Column(JSON, default=dict) # Stores raw data used for audit
-    
+    is_branded: bool = Field(default=False)
+    kra_compliant: bool = Field(default=True)
+    report_metadata: Dict = Field(default={}, sa_column=Column(JSON))
+
     # Monetization
-    payment_id = Column(Integer, nullable=True) # Link to payments table for KSH 500 reports
-    is_auto_weekly = Column(Boolean, default=False) # SME Pro+ feature
-    
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    expires_at = Column(DateTime(timezone=True), nullable=True) # Free reports expire in 7 days
+    payment_id: Optional[int] = Field(default=None)
+    is_auto_weekly: bool = Field(default=False)
 
-class ReportTemplate(Base):
+    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
+    expires_at: Optional[datetime] = Field(default=None)
+
+    shares: List["ReportShare"] = Relationship(back_populates="report")
+
+class ReportTemplate(SQLModel, table=True):
     __tablename__ = "report_templates"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)
-    report_type = Column(Enum(ReportType), nullable=False)
-    
-    # Template config
-    sections = Column(JSON, default=list) # ["executive_summary", "market_metrics", "risk"]
-    is_premium = Column(Boolean, default=False) # Pitch Deck, Bank Loan Pack are premium
-    
-    description = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-class ReportShare(Base):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    report_type: ReportType = Field(sa_column=Column(SQLEnum(ReportType)))
+
+    # Template config
+    sections: List = Field(default=[], sa_column=Column(JSON))
+    is_premium: bool = Field(default=False)
+
+    description: Optional[str] = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
+
+class ReportShare(SQLModel, table=True):
     __tablename__ = "report_shares"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    report_id = Column(Integer, ForeignKey("reports.id"), nullable=False)
-    shared_by_user_id = Column(Integer, nullable=False)
-    
-    share_type = Column(String, default="link") # link, email, whatsapp
-    recipient = Column(String, nullable=True) # email or phone
-    access_token = Column(String, unique=True, nullable=True)
-    
-    created_at = Column(DateTime(timezone=True), server_default=func.now()) # FIXED: was cut off
-    
-    report = relationship("Report")
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    report_id: int = Field(foreign_key="reports.id")
+    shared_by_user_id: int
+
+    share_type: str = Field(default="link")
+    recipient: Optional[str] = Field(default=None)
+    access_token: Optional[str] = Field(default=None, unique=True)
+
+    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
+
+    report: Optional[Report] = Relationship(back_populates="shares")
