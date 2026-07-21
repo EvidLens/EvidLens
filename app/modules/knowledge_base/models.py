@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Float, JSON, Index
+from datetime import datetime
+from typing import Optional, List, Dict
+from sqlmodel import SQLModel, Field, Column, JSON, Index
 from sqlalchemy.sql import func
-from app.modules.db import Base
 
 KENYA_SECTORS = [
     "Banks", "Microfinance Institutions", "Insurance & HMOs", "Fintechs & Mobile Money",
@@ -34,42 +35,42 @@ KENYA_SECTORS = [
     "Waste Management & Recycling", "Environmental & Climate Services"
 ]
 
-class SectorReport(Base):
+class SectorReport(SQLModel, table=True):
     __tablename__ = "sector_reports"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    sector = Column(String(100), nullable=False, index=True)
-    county = Column(String(50), nullable=True, index=True)
-    title = Column(String(255), nullable=False)
-    summary = Column(Text, nullable=False)
-    key_insights = Column(JSON, default=list)
-    market_size_kes = Column(Float, nullable=True)
-    growth_rate_percent = Column(Float, nullable=True)
-    top_challenges = Column(JSON, default=list)
-    opportunities = Column(JSON, default=list)
-    data_sources = Column(JSON, default=list)
-    generated_by = Column(String(100), default="EvidLens AI RAG")
-    version = Column(String(20), default="v1.0")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    sector: str = Field(index=True, max_length=100)
+    county: Optional[str] = Field(default=None, index=True, max_length=50)
+    title: str = Field(max_length=255)
+    summary: str
+    key_insights: List[dict] = Field(default=[], sa_column=Column(JSON))
+    market_size_kes: Optional[float] = Field(default=None)
+    growth_rate_percent: Optional[float] = Field(default=None)
+    top_challenges: List[dict] = Field(default=[], sa_column=Column(JSON))
+    opportunities: List[dict] = Field(default=[], sa_column=Column(JSON))
+    data_sources: List[dict] = Field(default=[], sa_column=Column(JSON))
+    generated_by: str = Field(default="EvidLens AI RAG", max_length=100)
+    version: str = Field(default="v1.0", max_length=20)
+    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
+    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now(), "onupdate": func.now()})
+
     __table_args__ = (
         Index('ix_sector_county', 'sector', 'county'),
     )
 
-class KnowledgeChunk(Base):
+class KnowledgeChunk(SQLModel, table=True):
     __tablename__ = "knowledge_chunks"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    sector = Column(String(100), nullable=False, index=True)
-    county = Column(String(50), nullable=True, index=True)
-    chunk_text = Column(Text, nullable=False)
-    chunk_type = Column(String(50), nullable=False)
-    source = Column(String(100), nullable=False)
-    embedding = Column(JSON, nullable=True)
-    chunk_metadata = Column(JSON, default=dict)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    sector: str = Field(index=True, max_length=100)
+    county: Optional[str] = Field(default=None, index=True, max_length=50)
+    chunk_text: str
+    chunk_type: str = Field(max_length=50)
+    source: str = Field(max_length=100)
+    embedding: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
+    chunk_metadata: Dict = Field(default={}, sa_column=Column(JSON))
+    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
+
     __table_args__ = (
         Index('ix_chunk_sector_type', 'sector', 'chunk_type'),
     )
