@@ -399,10 +399,10 @@ def dashboard_api(session: Session):
         {"id": 9, "name": "Export Navigator", "icon": "🚢", "count": export_count, "route": "/market/export"}
     ]
     stats = {"insights_generated": search_count,"sectors_covered": sector_count,"reports_exported": subscription_count,"active_products": product_count}
-    top_demands = session.exec(select(MarketMetric.product_name, MarketMetric.county, MarketMetric.sector, MarketMetric.demand_score, MarketMetric.updated_at).order_by(desc(MarketMetric.demand_score)).limit(3)).all()
+    top_demands = session.exec(select(MarketMetric.product_name, MarketMetric.county, MarketMetric.sector, MarketMetric.demand_score).order_by(desc(MarketMetric.demand_score)).limit(3)).all()
     trending = []
     for d in top_demands:
-        trending.append({"category": d.sector or 'Agriculture',"headline": f"{d.product_name} demand up in {d.county}","score": d.demand_score,"product": d.product_name,"county": d.county,"updated": d.updated_at.isoformat() if d.updated_at else ""})
+        trending.append({"category": d.sector or 'Agriculture',"headline": f"{d.product_name} demand up in {d.county}","score": d.demand_score,"product": d.product_name,"county": d.county,"updated": ""})
     if not trending:
         trending = [{"category": "Agriculture", "headline": "No data yet", "score": 0}]
     return {"stats": stats,"trending": trending,"modules": modules,"last_updated": datetime.utcnow().isoformat()}
