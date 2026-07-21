@@ -1,6 +1,8 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Enum, ForeignKey
+from datetime import datetime
+from typing import Optional
+from sqlmodel import SQLModel, Field, Column, ForeignKey
 from sqlalchemy.sql import func
-from app.modules.db import Base
+from sqlalchemy import Enum as SQLEnum
 import enum
 
 class PaymentStatus(str, enum.Enum):
@@ -16,30 +18,33 @@ class SubscriptionTier(str, enum.Enum):
     BUSINESS = "business"
     ENTERPRISE = "enterprise"
 
-class Payment(Base):
+class Payment(SQLModel, table=True):
     __tablename__ = "payments"
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    amount_kes = Column(Float)
-    payment_type = Column(String)
-    checkout_request_id = Column(String, unique=True, index=True)
-    mpesa_receipt_number = Column(String, nullable=True)
-    status = Column(Enum(PaymentStatus), default=PaymentStatus.pending)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-class Subscription(Base):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id")
+    amount_kes: float
+    payment_type: str
+    checkout_request_id: str = Field(unique=True, index=True)
+    mpesa_receipt_number: Optional[str] = Field(default=None)
+    status: PaymentStatus = Field(default=PaymentStatus.pending, sa_column=Column(SQLEnum(PaymentStatus)))
+    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
+
+class Subscription(SQLModel, table=True):
     __tablename__ = "subscriptions"
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), unique=True)
-    tier = Column(Enum(SubscriptionTier), default=SubscriptionTier.FREE)
-    amount_kes = Column(Float)
-    auto_renew = Column(Integer, default=1)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-class MpesaTransaction(Base):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", unique=True)
+    tier: SubscriptionTier = Field(default=SubscriptionTier.FREE, sa_column=Column(SQLEnum(SubscriptionTier)))
+    amount_kes: float
+    auto_renew: int = Field(default=1)
+    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
+
+class MpesaTransaction(SQLModel, table=True):
     __tablename__ = "mpesa_transactions"
-    id = Column(Integer, primary_key=True, index=True)
-    checkout_request_id = Column(String)
-    result_code = Column(Integer)
-    result_desc = Column(String)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    checkout_request_id: str
+    result_code: int
+    result_desc: str
+    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
