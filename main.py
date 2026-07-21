@@ -21,7 +21,7 @@ from app.modules.api.routes import router as api_router
 from app.modules.cron.router import router as cron_router
 from app.modules.lens_engine.router import router as lens_router
 from app.modules.core.router import router as core_router
-from app.modules.notifications.router import router as notifications_router
+# from app.modules.notifications.router import router as notifications_router
 from app.modules.storage.router import router as storage_router
 
 app = FastAPI(title="EvidLens API")
@@ -57,7 +57,7 @@ app.include_router(api_router, prefix="/api", tags=["API"])
 app.include_router(cron_router, tags=["Cron"])
 app.include_router(lens_router, tags=["Lens"])
 app.include_router(core_router, tags=["Core"])
-app.include_router(notifications_router, tags=["Notifications"])
+# app.include_router(notifications_router, tags=["Notifications"])
 app.include_router(storage_router, tags=["Storage"])
 
 import requests
