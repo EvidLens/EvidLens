@@ -3,12 +3,15 @@ from supabase import create_client, Client
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("APP_SUPABASE_KEY")
+
+print("DEBUG KEY:", SUPABASE_KEY[:10])
+
 BUCKET = "evidlens-files"
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 async def upload_report_pdf(file_bytes, filename):
-    # Upload to Supabase Storage
+     # Upload to Supabase Storage
     res = supabase.storage.from_(BUCKET).upload(
         path=filename,
         file=file_bytes,
