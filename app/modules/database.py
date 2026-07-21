@@ -25,6 +25,8 @@ def get_session() -> Generator[Session, None, None]:
 def get_db():
     return get_session()
 
+SessionLocal = Session
+
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
 
