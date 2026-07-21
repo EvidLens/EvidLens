@@ -1,11 +1,8 @@
+from app.modules.database import MarketMetric, PriceData, NewsArticle, SocialMention
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime
 from sqlmodel import Session, select, func
 from app.modules.database import engine
-from app.modules.database import MarketMetric
-from app.modules.news import NewsArticle
-from app.modules.social import SocialMention
-from app.modules.pricing import PriceData
 
 scheduler = BackgroundScheduler()
 
