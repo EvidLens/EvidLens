@@ -1,17 +1,18 @@
 import os
 from supabase import create_client, Client
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("APP_SUPABASE_KEY")
-
-print("DEBUG KEY:", SUPABASE_KEY[:10])
+def get_supabase_client():
+    url = os.getenv("SUPABASE_URL")
+    key = os.getenv("APP_SUPABASE_KEY")
+    print("DEBUG URL:", url)
+    print("DEBUG KEY:", key[:10] if key else "NONE")
+    return create_client(url, key)
 
 BUCKET = "evidlens-files"
-
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase: Client = get_supabase_client()  # <-- this line calls the function above
 
 async def upload_report_pdf(file_bytes, filename):
-     # Upload to Supabase Storage
+    # Upload to Supabase Storage
     res = supabase.storage.from_(BUCKET).upload(
         path=filename,
         file=file_bytes,
