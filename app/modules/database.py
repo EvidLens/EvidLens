@@ -16,6 +16,8 @@ if DATABASE_URL.startswith("postgres://"):
 engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=10, max_overflow=20)
 redis_client = redis.from_url(REDIS_URL, decode_responses=True) if REDIS_URL else None
 
+Base = SQLModel.metadata
+
 def get_session() -> Generator[Session, None, None]:
     with Session(engine) as session:
         yield session
@@ -45,6 +47,7 @@ class MarketMetric(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     product: str
     county: str
+    sector: str
     demand_score: float = 0.0
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
@@ -52,6 +55,7 @@ class PriceData(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     product_name: str
     county: str
+    sector: str
     price: float
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
