@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Enum, Text, UniqueConstraint
+from datetime import datetime
+from typing import Optional
+from sqlmodel import SQLModel, Field, Column, JSON, UniqueConstraint
 from sqlalchemy.sql import func
-from app.modules.db import Base
 import enum
 
 class Sentiment(str, enum.Enum):
@@ -16,44 +17,44 @@ class Source(str, enum.Enum):
     twitter = "twitter"
     manual = "manual"
 
-class ConsumerFeedback(Base):
+class ConsumerFeedback(SQLModel, table=True):
     __tablename__ = "consumer_feedback"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    sector = Column(String, nullable=False, index=True)
-    county = Column(String, nullable=True, index=True)
-    product_or_topic = Column(String, nullable=False, index=True)
-    source = Column(Enum(Source), default=Source.reddit, index=True)
-    source_url = Column(String, nullable=True, unique=True, index=True)
-    author = Column(String, nullable=True)
-    
-    content = Column(Text, nullable=False)
-    sentiment = Column(Enum(Sentiment), default=Sentiment.neutral, index=True)
-    sentiment_score = Column(Float, default=0.0)
-    
-    likes_mentioned = Column(Text, nullable=True)
-    complaints_mentioned = Column(Text, nullable=True)
-    
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-class SentimentSummary(Base):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    sector: str = Field(index=True)
+    county: Optional[str] = Field(default=None, index=True)
+    product_or_topic: str = Field(index=True)
+    source: Source = Field(default=Source.reddit, sa_column=Column(enum.Enum(Source)))
+    source_url: Optional[str] = Field(default=None, index=True, unique=True)
+    author: Optional[str] = Field(default=None)
+
+    content: str
+    sentiment: Sentiment = Field(default=Sentiment.neutral, sa_column=Column(enum.Enum(Sentiment)))
+    sentiment_score: float = Field(default=0.0)
+
+    likes_mentioned: Optional[str] = Field(default=None)
+    complaints_mentioned: Optional[str] = Field(default=None)
+
+    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
+
+class SentimentSummary(SQLModel, table=True):
     __tablename__ = "sentiment_summary"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    sector = Column(String, nullable=False, index=True)
-    county = Column(String, nullable=True, index=True)
-    product_or_topic = Column(String, nullable=False, index=True)
-    
-    total_mentions = Column(Integer, default=0)
-    positive_count = Column(Integer, default=0)
-    neutral_count = Column(Integer, default=0)
-    negative_count = Column(Integer, default=0)
-    avg_sentiment_score = Column(Float, default=0.0)
-    
-    top_likes = Column(Text, nullable=True)
-    top_complaints = Column(Text, nullable=True)
-    
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    last_updated = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
-    __table_args__ = (UniqueConstraint('sector', 'county', 'product_or_topic', name='uix_sector_county_product'),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    sector: str = Field(index=True)
+    county: Optional[str] = Field(default=None, index=True)
+    product_or_topic: str = Field(index=True)
+
+    total_mentions: int = Field(default=0)
+    positive_count: int = Field(default=0)
+    neutral_count: int = Field(default=0)
+    negative_count: int = Field(default=0)
+    avg_sentiment_score: float = Field(default=0.0)
+
+    top_likes: Optional[str] = Field(default=None)
+    top_complaints: Optional[str] = Field(default=None)
+
+    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
+    last_updated: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now(), "onupdate": func.now()})
+
+    __table_args__ = (UniqueConstraint('sector', 'county', 'product_or_topic', name='uq_sector_county_topic'),)
