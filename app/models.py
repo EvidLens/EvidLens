@@ -42,4 +42,31 @@ class SocialMention(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     product: str
     platform: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow) # fixed: added )
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+class Tenant(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    name: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class LensBusiness(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    tenant_id: int = Field(index=True)
+    name: str
+    sector: str
+    county: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class LensSurvey(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    business_id: int = Field(index=True)
+    title: str
+    status: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class LensResponse(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    survey_id: int = Field(index=True)
+    respondent_phone: str | None = None
+    data: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
