@@ -176,3 +176,59 @@ def embed_widget(module: str, api_key: str, session: Session = Depends(get_sessi
     sub = session.exec(select(LensSubscription).where(LensSubscription.api_key == api_key)).first()
     data = query_aggregate(session, sub.tenant_id, module, "sector")
     return {"data": data, "branding": sub.metadata.get("logo")}
+
+from fastapi import Request, Response
+from fastapi.templating import Jinja2Templates
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+import json
+
+templates = Jinja2Templates(directory="App/kenyalensiq/templates")
+limiter = Limiter(key_func=lambda req: req.query_params.get("api_key", get_remote_address(req)))
+
+# 1. USER MANAGEMENT
+@router.get("/team")
+def get_team(tenant_id: str, session: Session = Depends(get_session)):
+    return session.exec(select(LensMember).where(LensMember.tenant_id == tenant_id)).all()
+@router.post("/team/invite")
+def invite_member(tenant_id: str, email: str, role: str, user_id: str, session: Session = Depends(get_session)):
+    member = LensMember(tenant_id=tenant_id, email=email, role=role, invited_by=user_id, user_id="pending")
+    session.add(member); session.commit()
+    return {"status": "invited"}
+@router.delete("/team/{member_id}")
+def remove_member(member_id: int, session: Session = Depends(get_session)):
+    member = session.get(LensMember, member_id)
+    session.delete(member); session.commit()
+    return {"status": "removed"}
+
+# 2. CUSTOM REPORT BUILDER
+@router.post("/report/build")
+def build_report(tenant_id: str, payload: dict, session: Session = Depends(get_session)):
+    check_module_access(session, tenant_id, payload["module"])
+    data = query_aggregate(session, tenant_id, payload["module"], payload["metric"])
+    return {"data": data, "filters": payload.get("filters", {})}
+
+# 3. WHITE-LABEL EMBED + 4. RATE LIMITING
+@router.get("/embed/{module}")
+@limiter.limit("100/hour") # 100 requests per hour per api_key
+def embed_widget(module: str, request: Request, api_key: str, session: Session = Depends(get_session)):
+    sub = session.exec(select(LensSubscription).where(LensSubscription.api_key == api_key)).first()
+    if not sub: return templates.TemplateResponse("embed_locked.html", {"reason": "Invalid API Key"})
+    if datetime.utcnow() > sub.expires_at or sub.plan == "Trial": return templates.TemplateResponse("embed_locked.html", {"reason": "Upgrade Required"})
+    if module not in sub.modules: return templates.TemplateResponse("embed_locked.html", {"reason": f"Upgrade to unlock {module}"})
+    session.add(LensApiUsage(api_key=api_key, endpoint=module)); session.commit()
+    data = query_aggregate(session, sub.tenant_id, module, "sector")
+    branding = sub.metadata or {}
+    return templates.TemplateResponse("embed.html", {"request": request, "data": data, "logo": branding.get("logo")})
+
+# 5. PESAPAL WEBHOOK
+@router.post("/webhooks/payment")
+async def payment_webhook(req: Request, session: Session = Depends(get_session)):
+    payload = await req.json()
+    if payload.get("payment_status") == "Completed":
+        tenant_id = payload.get("merchant_reference")
+        sub = get_subscription(session, tenant_id) or LensSubscription(tenant_id=tenant_id)
+        sub.plan = "Pro"; sub.modules = ["core","health","money","brand","demand","behavior","policy","capital","trade"]
+        sub.expires_at = datetime.utcnow() + timedelta(days=30)
+        session.add(sub); session.commit()
+    return {"status": "ok"}
