@@ -1,4 +1,6 @@
-from sqlmodel import SQLModel, Field, Relationship, Column, JSON, Index
+from sqlmodel import SQLModel, Field, Relationship, Column
+from sqlalchemy import Index
+from sqlalchemy.dialects.postgresql import JSONB
 from typing import Optional, Dict, List
 from datetime import datetime
 import uuid
@@ -8,13 +10,13 @@ class LensSubscription(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     tenant_id: str = Field(index=True, unique=True)
     plan: str = Field(default="Starter")
-    modules: List[str] = Field(default=["core", "health"], sa_column=Column(JSON))
-    regions: List[str] = Field(default=["Nairobi"], sa_column=Column(JSON))
-    sectors: List[str] = Field(default=[], sa_column=Column(JSON))
+    modules: List[str] = Field(default_factory=lambda: ["core", "health"], sa_column=Column(JSONB))
+    regions: List[str] = Field(default_factory=list, sa_column=Column(JSONB))
+    sectors: List[str] = Field(default_factory=list, sa_column=Column(JSONB))
     role: str = Field(default="viewer")
     expires_at: datetime
     api_key: str = Field(default_factory=lambda: str(uuid.uuid4()), index=True, unique=True)
-    extra_data: Dict = Field(default={}, sa_column=Column(JSON))
+    extra_data: Dict = Field(default_factory=dict, sa_column=Column(JSONB))
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class LensAlert(SQLModel, table=True):
@@ -26,7 +28,7 @@ class LensAlert(SQLModel, table=True):
     title: str = Field(default="")
     message: str = Field(default="")
     link: str = Field(default="")
-    condition: Dict = Field(default={}, sa_column=Column(JSON))
+    condition: Dict = Field(default_factory=dict, sa_column=Column(JSONB))
     destination: str = Field(default="email")
     is_active: bool = True
     last_triggered: Optional[datetime] = None
@@ -40,7 +42,7 @@ class LensAudit(SQLModel, table=True):
     action: str
     module: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
-    payload: Dict = Field(default={}, sa_column=Column(JSON))
+    payload: Dict = Field(default_factory=dict, sa_column=Column(JSONB))
 
 class LensBusiness(SQLModel, table=True):
     __tablename__ = "lens_businesses"
@@ -52,19 +54,19 @@ class LensBusiness(SQLModel, table=True):
     sector: Optional[str] = Field(default=None, index=True)
     size_category: Optional[str] = Field(default=None, index=True)
     employees_total: Optional[int] = None
-    extra_data: Dict = Field(default={}, sa_column=Column(JSON))
+    extra_data: Dict = Field(default_factory=dict, sa_column=Column(JSONB))
     updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     surveys: List["LensSurvey"] = Relationship(back_populates="business")
 
 class LensSurvey(SQLModel, table=True):
     __tablename__ = "lens_surveys"
-    __table_args__ = (Index('ix_lens_data_gin', 'data'),)
+    __table_args__ = (Index('ix_lens_data_gin', 'data', postgresql_using='gin'),)
     id: Optional[int] = Field(default=None, primary_key=True)
     business_id: int = Field(foreign_key="lens_businesses.id", index=True)
     collected_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     source: str = Field(default="api")
     module: str = Field(default="core", index=True)
-    data: Dict = Field(default={}, sa_column=Column(JSON))
+    data: Dict = Field(default_factory=dict, sa_column=Column(JSONB))
     business: LensBusiness = Relationship(back_populates="surveys")
 
 class LensMember(SQLModel, table=True):
