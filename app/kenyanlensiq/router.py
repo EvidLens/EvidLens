@@ -142,3 +142,21 @@ def grant_access(tenant_id: str, plan: str, session: Session = Depends(get_sessi
     services.log_audit(session, tenant_id, "admin", "grant_plan", "kenyalensiq", {"plan": plan})
     session.commit()
     return {"status": "granted", "tenant_id": tenant_id, "plan": plan}
+
+@router.get("/team")
+def get_team(tenant_id: str, session: Session = Depends(get_session)):
+    return session.exec(select(LensMember).where(LensMember.tenant_id == tenant_id)).all()
+
+@router.post("/team/invite")
+def invite_member(tenant_id: str, email: str, role: str, user_id: str, session: Session = Depends(get_session)):
+    member = LensMember(tenant_id=tenant_id, email=email, role=role, invited_by=user_id, user_id="pending")
+    session.add(member)
+    session.commit()
+    return {"status": "invited"}
+
+@router.delete("/team/{member_id}")
+def remove_member(member_id: int, session: Session = Depends(get_session)):
+    member = session.get(LensMember, member_id)
+    session.delete(member)
+    session.commit()
+    return {"status": "removed"}
