@@ -11,7 +11,7 @@ import csv
 
 from app.modules.kenyalensiq.mpesa import stk_push
 from app.modules.database import get_session
-from app.modules.data_layer.models import LensSubscription, LensAlert, LensMember, LensApiUsage
+from app.modules.data_layer.models import Subscription, QueryLog, MpesaTransaction
 from app.modules.kenyalensiq import services
 from app.modules.kenyalensiq import connectors
 
