@@ -1,0 +1,4 @@
+<!DOCTYPE html><html><head><title>Consumer Pulse</title></head>
+<body><h1>Social Posts</h1>
+{% for p in posts %}<div><b>{{p.platform}}</b>: {{p.content}} - {{p.sentiment}}</div><br>{% endfor %}
+</body></html>
