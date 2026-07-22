@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, HTTPException, Depends
 from sqlmodel import Session
 from App.kenyalensiq import services
-from App.kenyalensiq.models import LensSubscription
+from App.kenyalensiq.models import Subscription
 from App.db import get_session
 from datetime import datetime, timedelta
 
@@ -18,7 +18,7 @@ async def payment_webhook(req: Request, session: Session = Depends(get_session))
         raise HTTPException(400, "tenant_id required")
 
     if event == "payment.success":
-        sub = services.get_subscription(session, tenant_id) or LensSubscription(tenant_id=tenant_id)
+        sub = services.get_subscription(session, tenant_id) or Subscription(tenant_id=tenant_id)
             
         sub.plan = plan
         sub.modules = ["core","health","money","brand","demand","behavior","policy","capital","trade"]
