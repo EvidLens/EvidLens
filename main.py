@@ -20,13 +20,15 @@ from pydantic import BaseModel
 
 load_dotenv()
 
+load_dotenv()
+
 from app.modules.database import engine, create_db_and_tables
 from app.modules.db import init_db
 from app.modules.data_layer.seed import seed_data
 from app.modules.data_layer.models import *
 from app.modules.cron.price_cron import start_scheduler
-from app.kenyalensiq.router import router as kenyalensiq_router
-from App.auth import require_active_subscription
+from app.modules.kenyalensiq.router import router as kenyalensiq_router
+from app.auth import require_active_subscription
 
 scheduler = AsyncIOScheduler()
 
