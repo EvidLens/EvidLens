@@ -104,3 +104,10 @@ function PaymentPrompt() {
     </div>
   )
 }
+{/* Show if trial and < 2 days left */}
+{sub.is_trial && sub.days_left < 2 && (
+  <div className="bg-red-50 border border-red-200 p-3 rounded-lg mb-4">
+    Your trial expires in {sub.days_left} day. 
+    <a href="/billing/checkout?product=kenyalensiq&plan=Pro" className="text-red-600 font-bold ml-2">Upgrade</a>
+  </div>
+)}
