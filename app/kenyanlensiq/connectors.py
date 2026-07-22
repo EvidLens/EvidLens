@@ -34,3 +34,12 @@ async def auto_ingest_worker(session: Session, tenant_id: str):
     """Runs every 1 hour via cron/celery"""
     for source in ["kra", "cbk", "nbs"]: # APIs you have access to
         await run_connector(session, tenant_id, source)
+@router.post("/connectors/run")
+def run_connectors(session: Session = Depends(get_session)):
+    # existing data pulls
+    run_all_connectors(session) 
+    
+    # new: trial alerts
+    services.check_trial_expiry_alerts(session)
+    
+    return {"status": "ok"}
