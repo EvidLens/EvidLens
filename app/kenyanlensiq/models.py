@@ -75,3 +75,21 @@ class LensMember(SQLModel, table=True):
     role: str = Field(default="viewer") # viewer, editor, admin
     invited_by: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+import secrets
+class LensMember(SQLModel, table=True):
+    __tablename__ = "lens_members"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    tenant_id: str = Field(index=True)
+    user_id: str = Field(index=True)
+    email: str = Field(index=True)
+    role: str = Field(default="viewer")
+    invited_by: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class LensApiUsage(SQLModel, table=True):
+    __tablename__ = "lens_api_usage"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    api_key: str = Field(index=True)
+    endpoint: str
+    ts: datetime = Field(default_factory=datetime.utcnow)
