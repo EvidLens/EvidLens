@@ -103,3 +103,17 @@ class User(SQLModel, table=True):
     email: str = Field(index=True, unique=True)
     is_admin: bool = False
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class LensResponse(SQLModel, table=True):
+    __tablename__ = "lens_responses"
+    __table_args__ = (Index('ix_lens_response_data_gin', 'data', postgresql_using='gin'),)
+    
+    id: Optional[int] = Field(default=None, primary_key=True)
+    survey_id: int = Field(foreign_key="lens_surveys.id", index=True)
+    business_id: int = Field(foreign_key="lens_businesses.id", index=True)
+    tenant_id: str = Field(index=True)
+    respondent_id: Optional[str] = Field(default=None, index=True)
+    collected_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    source: str = Field(default="web")
+    data: Dict = Field(default_factory=dict, sa_column=Column(JSONB))
+    created_at: datetime = Field(default_factory=datetime.utcnow)
