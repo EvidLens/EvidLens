@@ -85,3 +85,12 @@ async def run_connectors(bg: BackgroundTasks, tenant_id: str = Depends(get_tenan
     """Hit this with cron every 1 hour. Or use Celery Beat"""
     bg.add_task(connectors.auto_ingest_worker, session, tenant_id)
     return {"status": "connectors started"}
+def require_active_subscription(tenant_id: str = Depends(get_tenant), session: Session = Depends(get_session)):
+    sub = services.get_subscription(session, tenant_id) # already exists in services.py
+    return sub
+
+# Then update all routes like this:
+@router.get("/core")
+def core(sub: LensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
+    services.log_audit(session, sub.tenant_id, sub.tenant_id, "view", "core")
+    return services.query_aggregate(session, sub.tenant_id, "core", "sector")
