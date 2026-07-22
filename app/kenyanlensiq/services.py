@@ -63,3 +63,31 @@ def query_aggregate(session: Session, tenant_id: str, module: str, json_key: str
     if sub.sectors: stmt = stmt.where(LensBusiness.sector.in_(sub.sectors))
     stmt = stmt.where(LensSurvey.collected_at > datetime.utcnow() - timedelta(days=90))
     return [{"label": k, "value": c} for k, c in session.exec(stmt.group_by(LensSurvey.data[json_key].astext)).all() if k]
+def get_subscription(session: Session, tenant_id: str) -> LensSubscription | None:
+    sub = session.exec(select(LensSubscription).where(LensSubscription.tenant_id == tenant_id)).first()
+    
+    # If no sub, check if they already used trial
+    if not sub:
+        used_trial = session.exec(select(LensAudit).where(LensAudit.tenant_id == tenant_id, LensAudit.action == "trial_start")).first()
+        if used_trial:
+            return None # trial already used
+        
+    # If sub exists but expired, check if within 7 day trial
+    if sub and sub.expires_at < datetime.utcnow():
+        if sub.plan == "Trial":
+            return None # trial expired
+    
+    return sub
+
+def start_trial(session: Session, tenant_id: str):
+    sub = LensSubscription(
+        tenant_id=tenant_id,
+        plan="Trial",
+        modules="core,health", # Starter modules only
+        regions="Nairobi",
+        expires_at=datetime.utcnow() + timedelta(days=7)
+    )
+    session.add(sub)
+    log_audit(session, tenant_id, "system", "trial_start", "kenyalensiq")
+    session.commit()
+    return sub
