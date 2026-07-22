@@ -692,8 +692,7 @@ def dashboard_api(session: Session):
         )
     ).one()
 
-lens_count = session.exec(select(func.count()).select_from(LensSurvey)).one()
-    
+    lens_count = session.exec(select(func.count()).select_from(LensSurvey)).one()
     modules = [
     {"id": 1, "name": "Competitive Engine", "icon": "🎯", "count": company_count, "route": "/competitive"},
     {"id": 2, "name": "Price Oracle", "icon": "💰", "count": metric_count, "route": "/market/prices"},
