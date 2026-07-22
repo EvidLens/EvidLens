@@ -275,8 +275,7 @@ def risk_sentinel(session: Session = Depends(get_session)):
             NewsArticle.fetched_at
         ).order_by(NewsArticle.published_at.desc()).limit(10)
     ).all()
-    return {"risk_alerts": [n._mapping for n in news]}
-
+    return {"risk_alerts": [dict(n._mapping) for n in news]}
 @app.get("/market/export")
 def export_navigator(session: Session = Depends(get_session)):
     exports = session.exec(select(ExportOpportunity).limit(20)).all()
@@ -854,33 +853,75 @@ async def root(request: Request, session: Session = Depends(get_session)):
     )
 
 @app.get("/competitive", response_class=HTMLResponse)
-def competitive_page(request: Request):
-    return templates.TemplateResponse("competitive.html", {"request": request})
+def competitive_page(request: Request, session: Session = Depends(get_session)):
+    companies = session.exec(select(Company).limit(50)).all()
+    return templates.TemplateResponse(
+        "competitive.html", 
+        {"request": request, "companies": companies}
+    )
 
 @app.get("/market/prices", response_class=HTMLResponse)  
-def prices_page(request: Request):
-    return templates.TemplateResponse("dashboard.html", {"request": request})
+def prices_page(request: Request, session: Session = Depends(get_session)):
+    prices = session.exec(select(MarketPrice).order_by(MarketPrice.fetched_at.desc()).limit(100)).all()
+    return templates.TemplateResponse(
+        "prices.html", 
+        {"request": request, "prices": prices}
+    )
 
 @app.get("/market/demand", response_class=HTMLResponse)
-def demand_page(request: Request):
-    return templates.TemplateResponse("dashboard.html", {"request": request})
+def demand_page(request: Request, session: Session = Depends(get_session)):
+    demand = session.exec(select(MarketMetric).order_by(desc(MarketMetric.demand_score)).limit(100)).all()
+    return templates.TemplateResponse(
+        "demand.html", 
+        {"request": request, "demand": demand}
+    )
 
 @app.get("/location/counties", response_class=HTMLResponse)
-def counties_page(request: Request):
-    return templates.TemplateResponse("dashboard.html", {"request": request})
+def counties_page(request: Request, session: Session = Depends(get_session)):
+    counties = session.exec(select(County)).all()
+    stats = session.exec(
+        select(
+            MarketMetric.county,
+            func.sum(MarketMetric.market_size_kes).label("market_size")
+        ).group_by(MarketMetric.county)
+    ).all()
+    return templates.TemplateResponse(
+        "counties.html", 
+        {"request": request, "counties": counties, "stats": [dict(s._mapping) for s in stats]}
+    )
 
 @app.get("/voice", response_class=HTMLResponse)
-def voice_page(request: Request):
-    return templates.TemplateResponse("dashboard.html", {"request": request})
+def voice_page(request: Request, session: Session = Depends(get_session)):
+    posts = session.exec(select(SocialPost).order_by(SocialPost.created_at.desc()).limit(50)).all()
+    return templates.TemplateResponse(
+        "voice.html", 
+        {"request": request, "posts": posts}
+    )
 
 @app.get("/kb/policy", response_class=HTMLResponse)
-def policy_page(request: Request):
-    return templates.TemplateResponse("dashboard.html", {"request": request})
+def policy_page(request: Request, session: Session = Depends(get_session)):
+    policies = session.exec(select(PolicyWatch).order_by(PolicyWatch.published_at.desc()).limit(20)).all()
+    return templates.TemplateResponse(
+        "policy.html", 
+        {"request": request, "policies": policies}
+    )
 
 @app.get("/reports/funding", response_class=HTMLResponse)
-def funding_page(request: Request):
-    return templates.TemplateResponse("dashboard.html", {"request": request})
-
+def funding_page(request: Request, session: Session = Depends(get_session)):
+    funders = session.exec(
+        select(Company).where(
+            or_(
+                Company.sector.contains("Financial"),
+                Company.sector.contains("Banking"),
+                Company.sector.contains("Insurance"),
+                Company.sector.contains("SACCO")
+            )
+        ).limit(50)
+    ).all()
+    return templates.TemplateResponse(
+        "funding.html", 
+        {"request": request, "funders": funders}
+    )
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
