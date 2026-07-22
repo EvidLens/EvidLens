@@ -1,0 +1,4 @@
+<!DOCTYPE html><html><head><title>Funding Radar</title></head>
+<body><h1>Banks, SACCOs, Investors</h1>
+<table border="1">{% for f in funders %}<tr><td>{{f.name}}</td><td>{{f.sector}}</td><td>{{f.county}}</td><td>Rating: {{f.rating}}</td></tr>{% endfor %}</table>
+</body></html>
