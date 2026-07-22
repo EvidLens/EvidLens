@@ -153,3 +153,12 @@ def check_trial_expiry_alerts(session: Session):
                 body=f"Hi {user.name}, Your KenyaLensIQ free trial ends tomorrow. Upgrade now: /billing/checkout?product=kenyalensiq&plan=Pro"
             )
         log_audit(session, sub.tenant_id, "system", "trial_24h_alert_sent", "kenyalensiq")
+def start_paid_plan(session: Session, tenant_id: str, plan: str):
+    sub = get_subscription(session, tenant_id) or LensSubscription(tenant_id=tenant_id)
+    sub.plan = plan
+    sub.modules = ["core","health","money","brand","demand","behavior","policy","capital","trade"]
+    sub.expires_at = datetime.utcnow() + timedelta(days=30 if plan == "Pro" else 365)
+    session.add(sub)
+    log_audit(session, tenant_id, "admin", "grant_plan", "kenyalensiq", {"plan": plan})
+    session.commit()
+    return sub
