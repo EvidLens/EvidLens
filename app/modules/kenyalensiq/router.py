@@ -9,14 +9,14 @@ from slowapi.util import get_remote_address
 import io
 import csv
 
-from.mpesa import stk_push
-from.models import get_session, LensSubscription, LensAlert, LensMember, LensApiUsage
-from App.kenyalensiq import services
-from App.kenyalensiq import connectors
+from app.mpesa import stk_push
+from app.models import get_session, LensSubscription, LensAlert, LensMember, LensApiUsage
+from app.modules.kenyalensiq import services
+from app.modules.kenyalensiq import connectors
 
 router = APIRouter()
 
-templates = Jinja2Templates(directory="App/kenyalensiq/templates")
+templates = Jinja2Templates(directory="app/modules/kenyalensiq/templates")
 limiter = Limiter(key_func=lambda req: req.query_params.get("api_key", get_remote_address(req)))
 
 def get_tenant(authorization: str = Header(...)) -> str:
@@ -43,24 +43,19 @@ def mpesa_stk(tenant_id: str, amount: int, phone: str):
 async def mpesa_callback(req: Request, session: Session = Depends(get_session)):
     body = await req.json()
     callback = body.get("Body", {}).get("stkCallback", {})
-
     if callback.get("ResultCode")!= 0:
         return {"ResultCode": 0}
-
     items = {i["Name"]: i["Value"] for i in callback["CallbackMetadata"]["Item"]}
     tenant_id = str(items["AccountReference"])
     receipt = items["MpesaReceiptNumber"]
-
     exists = session.exec(
         select(LensSubscription).where(LensSubscription.metadata.contains({"last_payment": receipt}))
     ).first()
     if exists:
         return {"ResultCode": 0, "ResultDesc": "Already processed"}
-
     sub = session.exec(select(LensSubscription).where(LensSubscription.tenant_id == tenant_id)).first()
     if not sub:
         sub = LensSubscription(tenant_id=tenant_id)
-
     amount = items["Amount"]
     sub.plan = "Pro" if amount == 5000 else "Enterprise"
     sub.modules = ["core", "health", "money", "brand", "demand", "behavior", "policy", "capital", "trade"]
@@ -199,7 +194,6 @@ def grant_access(tenant_id: str, plan: str, session: Session = Depends(get_sessi
     sub = services.get_subscription(session, tenant_id)
     if not sub:
         sub = LensSubscription(tenant_id=tenant_id)
-
     if plan == "Pro":
         sub.plan = "Pro"
         sub.modules = ["core", "health", "money", "brand", "demand", "behavior", "policy", "capital", "trade"]
@@ -208,7 +202,6 @@ def grant_access(tenant_id: str, plan: str, session: Session = Depends(get_sessi
         sub.plan = "Enterprise"
         sub.modules = ["core", "health", "money", "brand", "demand", "behavior", "policy", "capital", "trade"]
         sub.expires_at = datetime.utcnow() + timedelta(days=365)
-
     session.add(sub)
     services.log_audit(session, tenant_id, "admin", "grant_plan", "kenyalensiq", {"plan": plan})
     session.commit()
@@ -256,4 +249,4 @@ def embed_widget(module: str, request: Request, api_key: str, session: Session =
     session.commit()
     data = services.query_aggregate(session, sub.tenant_id, module, "sector")
     branding = sub.metadata or {}
-    return templates.TemplateResponse("embed.html", {"request": request, "data": data, "logo": branding.get("logo")})
+    return templates.TemplateResponse("embed.html", {"request": request, "data": data, "branding": branding})
