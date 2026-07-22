@@ -69,6 +69,20 @@ tbody tr:hover{background:#F5F7FA}
       {% endfor %}
     </div></div>
 
+    <div class="mb-8">
+      <h2 class="font-bold text-xl mb-4" style="color:#0A1F44">KenyaLensIQ Live Data</h2>
+      <div class="card">
+        <div class="flex justify-between items-center mb-3">
+          <p class="font-semibold" style="color:#0A1F44">Money Module - Sector Breakdown</p>
+          <span class="text-xs px-2 py-1 rounded-full bg-teal-100 text-teal-700">LIVE</span>
+        </div>
+        <iframe
+          src="/kenyalensiq/embed/money?api_key={{current_user.api_key}}"
+          style="width:100%; height:400px; border:none; border-radius:12px;">
+        </iframe>
+      </div>
+    </div>
+
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
       <div class="card">
         <h2 class="font-bold text-xl mb-3" style="color:#0A1F44">Quick Business Analysis</h2>
@@ -164,7 +178,7 @@ function renderActivePagination(total, page){
 }
 
 function changeActivePage(page){ if(page < 1) return; state.page = page; loadActiveTable(); }
-function sortActive(key){ 
+function sortActive(key){
   if(state.sort_by == key) state.order = state.order=='asc'?'desc':'asc';
   else {state.sort_by = key; state.order='desc'}
   loadActiveTable();
@@ -175,7 +189,7 @@ async function loadActiveTable(){
   const t = tableConfig[activeTable];
   const res = await fetch(`${t.endpoint}?search=${state.search}&page=${state.page}&limit=15&sort_by=${state.sort_by}&order=${state.order}`);
   const data = await res.json();
-  
+
   let rows = [];
   if(activeTable=='prices') rows = data.prices.map(p => [p.product, `KES ${p.price}`, p.county, p.market, p.fetched_at.split('T')[0]])
   if(activeTable=='demand') rows = data.demand.map(d => [d.product_name, d.sector, d.county, d.demand_score, d.volume.toLocaleString()])
@@ -183,7 +197,7 @@ async function loadActiveTable(){
   if(activeTable=='county-stats') rows = data.stats.map(s => [s.county, `KES ${Number(s.market_size).toLocaleString()}`, `${Number(s.growth).toFixed(2)}%`, Number(s.volume).toLocaleString()])
   if(activeTable=='sectors') rows = data.sectors.map(s => [s.sector, s.count])
   if(activeTable=='opportunities') rows = data.opportunities.map(o => [o.county, o.product_name, o.destination_country, `KES ${Number(o.market_size_kes).toLocaleString()}`, o.demand_score])
-  
+
   renderActiveTable(t.headers, rows);
   renderActivePagination(data.total, state.page);
 }
@@ -203,14 +217,14 @@ async function loadDropdowns(){
 loadDropdowns();
 loadActiveTable();
 
-document.getElementById('searchForm').onsubmit = async (e) => { 
-  e.preventDefault(); 
-  const form = new FormData(e.target); 
-  lastAnalysis = Object.fromEntries(form); 
-  document.getElementById('result').innerHTML = '<p class="text-gray-500">Analyzing...</p>'; 
-  const res = await fetch('/api/analyze-detailed', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(lastAnalysis)}); 
-  const data = await res.json(); 
-  document.getElementById('result').innerHTML = `<pre class="whitespace-pre-wrap bg-gray-50 p-3 rounded">${data.summary}</pre>`; 
+document.getElementById('searchForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const form = new FormData(e.target);
+  lastAnalysis = Object.fromEntries(form);
+  document.getElementById('result').innerHTML = '<p class="text-gray-500">Analyzing...</p>';
+  const res = await fetch('/api/analyze-detailed', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(lastAnalysis)});
+  const data = await res.json();
+  document.getElementById('result').innerHTML = `<pre class="whitespace-pre-wrap bg-gray-50 p-3 rounded">${data.summary}</pre>`;
 }
 
 function downloadPDF(){ if(!lastAnalysis){ alert('Please run an analysis first'); return; } document.getElementById('pdf_q').value = lastAnalysis.product; document.getElementById('pdf_sector').value = lastAnalysis.sector; document.getElementById('pdf_county').value = lastAnalysis.county; document.getElementById('pdfForm').submit(); }
