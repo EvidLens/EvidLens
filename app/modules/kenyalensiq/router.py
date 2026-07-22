@@ -10,7 +10,7 @@ import io
 import csv
 
 from app.modules.kenyalensiq.mpesa import stk_push
-from app.modules.db import get_session
+from app.modules.database import get_session
 from app.modules.data_layer.models import LensSubscription, LensAlert, LensMember, LensApiUsage
 from app.modules.kenyalensiq import services
 from app.modules.kenyalensiq import connectors
