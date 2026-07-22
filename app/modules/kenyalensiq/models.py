@@ -2,11 +2,9 @@ from sqlmodel import SQLModel, Field, Relationship, Column, JSON, Index
 from typing import Optional, Dict, List
 from datetime import datetime
 import uuid
-import secrets
 
 class LensSubscription(SQLModel, table=True):
     __tablename__ = "lens_subscriptions"
-
     id: Optional[int] = Field(default=None, primary_key=True)
     tenant_id: str = Field(index=True, unique=True)
     plan: str = Field(default="Starter")
@@ -16,12 +14,11 @@ class LensSubscription(SQLModel, table=True):
     role: str = Field(default="viewer")
     expires_at: datetime
     api_key: str = Field(default_factory=lambda: str(uuid.uuid4()), index=True, unique=True)
-    metadata: Dict = Field(default={}, sa_column=Column(JSON))
+    extra_data: Dict = Field(default={}, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class LensAlert(SQLModel, table=True):
     __tablename__ = "lens_alerts"
-
     id: Optional[int] = Field(default=None, primary_key=True)
     tenant_id: str = Field(index=True)
     name: str
@@ -37,7 +34,6 @@ class LensAlert(SQLModel, table=True):
 
 class LensAudit(SQLModel, table=True):
     __tablename__ = "lens_audit"
-
     id: Optional[int] = Field(default=None, primary_key=True)
     tenant_id: str = Field(index=True)
     user_id: str
@@ -48,7 +44,6 @@ class LensAudit(SQLModel, table=True):
 
 class LensBusiness(SQLModel, table=True):
     __tablename__ = "lens_businesses"
-
     id: Optional[int] = Field(default=None, primary_key=True)
     external_id: str = Field(index=True, unique=True)
     name: Optional[str] = Field(default=None, index=True)
@@ -57,14 +52,13 @@ class LensBusiness(SQLModel, table=True):
     sector: Optional[str] = Field(default=None, index=True)
     size_category: Optional[str] = Field(default=None, index=True)
     employees_total: Optional[int] = None
-    metadata: Dict = Field(default={}, sa_column=Column(JSON))
+    extra_data: Dict = Field(default={}, sa_column=Column(JSON))
     updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     surveys: List["LensSurvey"] = Relationship(back_populates="business")
 
 class LensSurvey(SQLModel, table=True):
     __tablename__ = "lens_surveys"
     __table_args__ = (Index('ix_lens_data_gin', 'data'),)
-
     id: Optional[int] = Field(default=None, primary_key=True)
     business_id: int = Field(foreign_key="lens_businesses.id", index=True)
     collected_at: datetime = Field(default_factory=datetime.utcnow, index=True)
@@ -75,7 +69,6 @@ class LensSurvey(SQLModel, table=True):
 
 class LensMember(SQLModel, table=True):
     __tablename__ = "lens_members"
-
     id: Optional[int] = Field(default=None, primary_key=True)
     tenant_id: str = Field(index=True)
     user_id: str = Field(index=True)
@@ -86,7 +79,6 @@ class LensMember(SQLModel, table=True):
 
 class LensApiUsage(SQLModel, table=True):
     __tablename__ = "lens_api_usage"
-
     id: Optional[int] = Field(default=None, primary_key=True)
     api_key: str = Field(index=True)
     endpoint: str
@@ -94,7 +86,6 @@ class LensApiUsage(SQLModel, table=True):
 
 class Tenant(SQLModel, table=True):
     __tablename__ = "tenants"
-
     id: Optional[int] = Field(default=None, primary_key=True)
     tenant_id: str = Field(index=True, unique=True)
     name: str
@@ -103,7 +94,6 @@ class Tenant(SQLModel, table=True):
 
 class User(SQLModel, table=True):
     __tablename__ = "users"
-
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: str = Field(index=True, unique=True)
     tenant_id: str = Field(index=True)
