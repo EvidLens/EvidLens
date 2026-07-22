@@ -91,6 +91,7 @@ from app.modules.lens_engine.router import router as lens_router
 from app.modules.core.router import router as core_router
 from app.modules.storage.router import router as storage_router
 from app.modules.chatbot.router import router as chatbot_router
+from App.kenyalensiq import router as lens_router
 
 @app.on_event("startup")
 def on_startup():
@@ -118,6 +119,7 @@ app.include_router(lens_router, tags=["Lens"])
 app.include_router(core_router, tags=["Core"])
 app.include_router(storage_router, tags=["Storage"])
 app.include_router(chatbot_router)
+app.include_router(lens_router.router)
 
 PRICING = {
     "BASIC": {"monthly": 500, "yearly": 5000},
