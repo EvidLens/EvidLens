@@ -25,6 +25,8 @@ from app.modules.db import init_db
 from app.modules.data_layer.seed import seed_data
 from app.modules.data_layer.models import *
 from app.modules.cron.price_cron import start_scheduler
+from App.kenyalensiq.router import router as kenyalensiq_router
+from App.auth import require_active_subscription
 
 scheduler = AsyncIOScheduler()
 
@@ -91,7 +93,6 @@ from app.modules.lens_engine.router import router as lens_router
 from app.modules.core.router import router as core_router
 from app.modules.storage.router import router as storage_router
 from app.modules.chatbot.router import router as chatbot_router
-from App.kenyalensiq import router as lens_router
 
 @app.on_event("startup")
 def on_startup():
@@ -119,7 +120,19 @@ app.include_router(lens_router, tags=["Lens"])
 app.include_router(core_router, tags=["Core"])
 app.include_router(storage_router, tags=["Storage"])
 app.include_router(chatbot_router)
-app.include_router(lens_router.router)
+app.include_router(kenyalensiq_router, prefix="/kenyalensiq", tags=["kenyalensiq"])
+
+@app.get("/dashboard")
+def dashboard(
+    request: Request,
+    sub: LensSubscription = Depends(require_active_subscription)
+):
+    data = get_dashboard_data()
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request,
+        "data": data,
+        "current_user": {"api_key": sub.api_key}
+    })
 
 PRICING = {
     "BASIC": {"monthly": 500, "yearly": 5000},
