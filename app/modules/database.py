@@ -13,6 +13,7 @@ if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=10, max_overflow=20)
+SessionLocal = Session
 redis_client = redis.from_url(REDIS_URL, decode_responses=True) if REDIS_URL else None
 
 Base = SQLModel.metadata
@@ -25,8 +26,5 @@ def get_db():
     return get_session()
 
 def create_db_and_tables():
-    from app.models import User, Notification, MarketMetric, PriceData, NewsArticle, SocialMention
-    from app.modules.data_layer.models import LensBusiness, LensSurvey, LensResponse, Tenant
-    from app.modules.market_engine.models import MarketSearch, MarketMetric, PriceTrend, DemandSignal, LocationMetric, ProductCatalog
-    from app.modules.report_builder.models import Report
+    from app.models import *
     SQLModel.metadata.create_all(engine)
