@@ -1,3 +1,4 @@
+from app.modules.kenyalensiq.models import LensAlert, LensSubscription, LensMember, LensApiUsage
 from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect, Header, BackgroundTasks, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from fastapi.templating import Jinja2Templates
