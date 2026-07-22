@@ -160,3 +160,13 @@ def remove_member(member_id: int, session: Session = Depends(get_session)):
     session.delete(member)
     session.commit()
     return {"status": "removed"}
+
+@router.post("/report/build")
+def build_report(tenant_id: str, payload: dict, session: Session = Depends(get_session)):
+    sub = check_module_access(session, tenant_id, payload["module"])
+    data = query_aggregate(session, tenant_id, payload["module"], payload["metric"])
+    return {"data": data, "filters": payload["filters"]}
+    
+@router.get("/report/export/{report_id}")
+def export_report(report_id: str):
+    return Response(content="csv_data", media_type="text/csv")
