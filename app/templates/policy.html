@@ -1,0 +1,4 @@
+<!DOCTYPE html><html><head><title>Policy Watch</title></head>
+<body><h1>Policy Updates</h1>
+{% for pol in policies %}<div><b>{{pol.title}}</b><br>{{pol.summary}}<br><a href="{{pol.url}}">Read More</a></div><hr>{% endfor %}
+</body></html>
