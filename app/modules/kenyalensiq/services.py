@@ -1,6 +1,6 @@
 from sqlmodel import Session, select, func
 from typing import Dict, Any, List
-from App.kenyalensiq.models import *
+from app.modules.kenyalensiq.models import *
 from datetime import datetime, timedelta
 from fastapi import WebSocket, HTTPException
 import httpx
@@ -134,9 +134,9 @@ def check_trial_expiry_alerts(session: Session):
     tomorrow = datetime.utcnow() + timedelta(days=1)
     expiring_trials = session.exec(
         select(LensSubscription)
-      .where(LensSubscription.plan == "Trial")
-      .where(LensSubscription.expires_at <= tomorrow)
-      .where(LensSubscription.expires_at > datetime.utcnow())
+     .where(LensSubscription.plan == "Trial")
+     .where(LensSubscription.expires_at <= tomorrow)
+     .where(LensSubscription.expires_at > datetime.utcnow())
     ).all()
 
     for sub in expiring_trials:
