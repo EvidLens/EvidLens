@@ -21,7 +21,7 @@ load_dotenv()
 
 from app.modules.database import engine, create_db_and_tables
 from app.models import User, Notification, MarketMetric, PriceData, NewsArticle, SocialMention
-from app.modules.data_layer.models import LensBusiness, LensSurvey, LensResponse, Tenant
+from app.models import LensBusiness, LensSurvey, LensResponse, Tenant
 
 from app.modules.db import init_db
 from app.modules.data_layer.seed import seed_data
