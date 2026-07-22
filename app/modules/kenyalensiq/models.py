@@ -63,7 +63,7 @@ class LensBusiness(SQLModel, table=True):
 
 class LensSurvey(SQLModel, table=True):
     __tablename__ = "lens_surveys"
-    __table_args__ = (Index('ix_lens_data_gin', 'data', postgresql_using='gin'),)
+    __table_args__ = (Index('ix_lens_data_gin', 'data'),)
 
     id: Optional[int] = Field(default=None, primary_key=True)
     business_id: int = Field(foreign_key="lens_businesses.id", index=True)
@@ -110,4 +110,4 @@ class User(SQLModel, table=True):
     name: str
     email: str = Field(index=True, unique=True)
     is_admin: bool = False
-    created_at: datetime = Field(default_factory=datetime.u
+    created_at: datetime = Field(default_factory=datetime.utcnow)
