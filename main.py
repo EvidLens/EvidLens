@@ -1,6 +1,6 @@
 from fastapi import Depends
 from sqlmodel import Session, select, func
-from app.models import LensBusiness, LensSurvey, LensResponse, Tenant, User
+from models import LensBusiness, LensSurvey, LensResponse, Tenant, User
 from datetime import datetime, timedelta, date
 from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
