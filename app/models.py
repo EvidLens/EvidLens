@@ -1,5 +1,6 @@
 from sqlmodel import SQLModel, Field
 from datetime import datetime
+from typing import Optional
 
 class User(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
@@ -70,3 +71,11 @@ class LensResponse(SQLModel, table=True):
     respondent_phone: str | None = None
     data: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class Subscription(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id")
+    plan: str
+    status: str = "active"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    expires_at: Optional[datetime] = None
