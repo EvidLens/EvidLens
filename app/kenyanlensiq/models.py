@@ -7,9 +7,9 @@ class LensSubscription(SQLModel, table=True):
     __tablename__ = "lens_subscriptions"
     id: Optional[int] = Field(default=None, primary_key=True)
     tenant_id: str = Field(index=True, unique=True)
-    plan: str = Field(default="starter")
-    modules: List[str] = Field(default=["core"], sa_column=Column(JSON))
-    regions: List[str] = Field(default=[], sa_column=Column(JSON))
+    plan: str = Field(default="Starter")
+    modules: List[str] = Field(default=["core", "health"], sa_column=Column(JSON))
+    regions: List[str] = Field(default=["Nairobi"], sa_column=Column(JSON))
     sectors: List[str] = Field(default=[], sa_column=Column(JSON))
     role: str = Field(default="viewer")
     expires_at: datetime
@@ -21,10 +21,15 @@ class LensAlert(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     tenant_id: str = Field(index=True)
     name: str
-    condition: Dict = Field(sa_column=Column(JSON))
-    destination: str
+    type: str = Field(default="custom")
+    title: str = Field(default="")
+    message: str = Field(default="")
+    link: str = Field(default="")
+    condition: Dict = Field(default={}, sa_column=Column(JSON))
+    destination: str = Field(default="email")
     is_active: bool = True
     last_triggered: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class LensAudit(SQLModel, table=True):
     __tablename__ = "lens_audit"
@@ -35,16 +40,6 @@ class LensAudit(SQLModel, table=True):
     module: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     payload: Dict = Field(default={}, sa_column=Column(JSON))
-
-class LensSurvey(SQLModel, table=True):
-    __tablename__ = "lens_surveys"
-    __table_args__ = (Index('ix_lens_data_gin', 'data', postgresql_using='gin'),)
-    id: Optional[int] = Field(default=None, primary_key=True)
-    business_id: int = Field(foreign_key="lens_businesses.id", index=True)
-    collected_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-    source: str = Field(default="api")
-    data: Dict = Field(default={}, sa_column=Column(JSON))
-    business: "LensBusiness" = Relationship(back_populates="surveys")
 
 class LensBusiness(SQLModel, table=True):
     __tablename__ = "lens_businesses"
@@ -57,5 +52,16 @@ class LensBusiness(SQLModel, table=True):
     size_category: Optional[str] = Field(default=None, index=True)
     employees_total: Optional[int] = None
     metadata: Dict = Field(default={}, sa_column=Column(JSON))
-    surveys: List[LensSurvey] = Relationship(back_populates="business")
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    surveys: List["LensSurvey"] = Relationship(back_populates="business")
+
+class LensSurvey(SQLModel, table=True):
+    __tablename__ = "lens_surveys"
+    __table_args__ = (Index('ix_lens_data_gin', 'data', postgresql_using='gin'),)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="lens_businesses.id", index=True)
+    collected_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    source: str = Field(default="api")
+    module: str = Field(default="core", index=True)
+    data: Dict = Field(default={}, sa_column=Column(JSON))
+    business: LensBusiness = Relationship(back_populates="surveys")
