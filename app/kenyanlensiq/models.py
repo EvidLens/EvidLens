@@ -15,6 +15,9 @@ class LensSubscription(SQLModel, table=True):
     expires_at: datetime
     api_key: str = Field(default_factory=lambda: str(uuid.uuid4()), index=True, unique=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    <div style="border:2px dashed #ccc;padding:40px;text-align:center;border-radius:12px">
+🔒 {{reason}}<br/><a href="https://mydomain.com/billing" style="background:#000;color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none">Upgrade Now</a>
+</div>
 
 class LensAlert(SQLModel, table=True):
     __tablename__ = "lens_alerts"
