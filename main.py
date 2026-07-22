@@ -1,6 +1,6 @@
 from fastapi import Depends
 from sqlmodel import Session, select, func
-from app.modules.lens.models import LensBusiness, LensSurvey, Tenant, User
+from app.modules.lens.models import LensBusiness, LensSurvey, LensResponse, Tenant, User
 from datetime import datetime, timedelta, date
 from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -950,6 +950,7 @@ def funding_page(request: Request, session: Session = Depends(get_session)):
 def kenyalsiq_dashboard(session: Session = Depends(get_session)):
     business_count = session.exec(select(func.count()).select_from(LensBusiness)).one()
     survey_count = session.exec(select(func.count()).select_from(LensSurvey)).one()
+    response_count = session.exec(select(func.count()).select_from(LensResponse)).one() # <-- 5th count
     tenant_count = session.exec(select(func.count()).select_from(Tenant)).one()
     user_count = session.exec(select(func.count()).select_from(User)).one()
 
@@ -958,10 +959,12 @@ def kenyalsiq_dashboard(session: Session = Depends(get_session)):
         "modules": [
             {"id": 1, "name": "Businesses", "icon": "🏢", "count": business_count, "route": "/businesses"},
             {"id": 2, "name": "Surveys", "icon": "📋", "count": survey_count, "route": "/surveys"},
-            {"id": 3, "name": "Tenants", "icon": "🏛️", "count": tenant_count, "route": "/tenants"},
-            {"id": 4, "name": "Users", "icon": "👥", "count": user_count, "route": "/users"},
+            {"id": 3, "name": "Responses", "icon": "📝", "count": response_count, "route": "/responses"},
+            {"id": 4, "name": "Tenants", "icon": "🏛️", "count": tenant_count, "route": "/tenants"},
+            {"id": 5, "name": "Users", "icon": "👥", "count": user_count, "route": "/users"},
         ]
     }
+    
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
