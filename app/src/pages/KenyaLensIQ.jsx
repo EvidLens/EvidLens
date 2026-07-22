@@ -47,3 +47,46 @@ function PaymentPrompt() {
     </div>
   )
 }
+export default function KenyaLensIQ() {
+  const [loading, setLoading] = useState(true);
+  const [hasAccess, setHasAccess] = useState(false);
+  const [sub, setSub] = useState(null);
+
+  useEffect(() => {
+    fetch('/kenyalensiq/me', { headers: { Authorization: `Bearer ${localStorage.token}` }})
+      .then(res => {
+        if(res.status === 403) { setHasAccess(false) }
+        else { 
+          setHasAccess(true)
+          return res.json()
+        }
+      })
+      .then(data => setSub(data))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if(loading) return <div>Loading...</div>
+  if(!hasAccess) return <PaymentPrompt />
+
+  return (
+    <>
+      {sub.is_trial && <TrialBanner days={sub.days_left} />}
+      <LensDashboardTabs allowedModules={sub.modules} />
+    </>
+  )
+}
+
+function TrialBanner({ days }) {
+  const urgency = days <= 2 ? "bg-red-600" : "bg-orange-500"
+  return (
+    <div className={`${urgency} text-white p-3 text-center font-semibold`}>
+      ⚠️ {days} {days === 1 ? "day" : "days"} left in your free trial. 
+      <button 
+        onClick={() => window.location = `/billing/checkout?product=kenyalensiq&plan=Pro`}
+        className="ml-3 underline font-bold"
+      >
+        Upgrade Now
+      </button>
+    </div>
+  )
+}
