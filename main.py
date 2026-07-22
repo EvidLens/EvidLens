@@ -1,13 +1,9 @@
-from fastapi import Depends
-from sqlmodel import Session, select, func
-from app.models import LensBusiness, LensSurvey, LensResponse, Tenant, User
-from datetime import datetime, timedelta, date
 from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, StreamingResponse
-from sqlmodel import Session, SQLModel, select, func, or_, desc, asc
+from sqlmodel import Session, select, func, or_, desc, asc
 from dotenv import load_dotenv
 import os
 import csv
@@ -23,22 +19,36 @@ from pydantic import BaseModel
 
 load_dotenv()
 
-load_dotenv()
-
 from app.modules.database import engine, create_db_and_tables
+from app.models import User, Notification, MarketMetric, PriceData, NewsArticle, SocialMention
+from app.modules.data_layer.models import LensBusiness, LensSurvey, LensResponse, Tenant
+
 from app.modules.db import init_db
 from app.modules.data_layer.seed import seed_data
-from app.modules.data_layer.models import *
-from app.modules.cron.price_cron import start_scheduler
+from app.modules.cron.price_cron import start_scheduler, scrape_kpin_prices
 from app.modules.kenyalensiq.router import router as kenyalensiq_router
 from app.auth import require_active_subscription
+from app.modules.competitive_engine.router import router as competitive_router
+from app.modules.market_engine.router import router as market_router
+from app.modules.location_intel.router import router as location_router
+from app.modules.consumer_voice.router import router as voice_router
+from app.modules.knowledge_base.router import router as kb_router
+from app.modules.report_builder.router import router as reports_router
+from app.modules.ai_insights.router import router as ai_insights_router
+from app.modules.business_os.router import router as business_os_router
+from app.modules.auth.router import router as auth_router
+from app.modules.rag.router import router as rag_router
+from app.modules.payments.router import router as payments_router
+from app.modules.api.routes import router as api_router
+from app.modules.cron.router import router as cron_router
+from app.modules.lens_engine.router import router as lens_router
+from app.modules.core.router import router as core_router
+from app.modules.storage.router import router as storage_router
+from app.modules.chatbot.router import router as chatbot_router
 
 scheduler = AsyncIOScheduler()
 
-app = FastAPI(
-    title="EvidLens API",
-    version="2.5.3"
-)
+app = FastAPI(title="EvidLens API", version="2.5.3")
 
 app.add_middleware(
     CORSMiddleware,
@@ -49,10 +59,7 @@ app.add_middleware(
 )
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
-templates = Jinja2Templates(
-    directory="app/templates",
-    auto_reload=True
-)
+templates = Jinja2Templates(directory="app/templates", auto_reload=True)
 
 AFRICASTALKING_API_KEY = os.getenv("AFRICASTALKING_API_KEY")
 AFRICASTALKING_USERNAME = os.getenv("AFRICASTALKING_USERNAME")
@@ -81,23 +88,24 @@ X_BEARER_TOKEN = os.getenv("X_BEARER_TOKEN")
 
 client = Groq(api_key=GROQ_API_KEY)
 
-from app.modules.competitive_engine.router import router as competitive_router
-from app.modules.market_engine.router import router as market_router
-from app.modules.location_intel.router import router as location_router
-from app.modules.consumer_voice.router import router as voice_router
-from app.modules.knowledge_base.router import router as kb_router
-from app.modules.report_builder.router import router as reports_router
-from app.modules.ai_insights.router import router as ai_insights_router
-from app.modules.business_os.router import router as business_os_router
-from app.modules.auth.router import router as auth_router
-from app.modules.rag.router import router as rag_router
-from app.modules.payments.router import router as payments_router
-from app.modules.api.routes import router as api_router
-from app.modules.cron.router import router as cron_router
-from app.modules.lens_engine.router import router as lens_router
-from app.modules.core.router import router as core_router
-from app.modules.storage.router import router as storage_router
-from app.modules.chatbot.router import router as chatbot_router
+app.include_router(kenyalensiq_router)
+app.include_router(competitive_router)
+app.include_router(market_router)
+app.include_router(location_router)
+app.include_router(voice_router)
+app.include_router(kb_router)
+app.include_router(reports_router)
+app.include_router(ai_insights_router)
+app.include_router(business_os_router)
+app.include_router(auth_router)
+app.include_router(rag_router)
+app.include_router(payments_router)
+app.include_router(api_router)
+app.include_router(cron_router)
+app.include_router(lens_router)
+app.include_router(core_router)
+app.include_router(storage_router)
+app.include_router(chatbot_router)
 
 @app.on_event("startup")
 def on_startup():
