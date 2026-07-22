@@ -1,0 +1,4 @@
+<!DOCTYPE html><html><head><title>Demand Radar</title></head>
+<body><h1>Live Demand</h1>
+<table border="1">{% for d in demand %}<tr><td>{{d.product_name}}</td><td>{{d.county}}</td><td>Score: {{d.demand_score}}</td><td>KES {{d.market_size_kes}}</td></tr>{% endfor %}</table>
+</body></html>
