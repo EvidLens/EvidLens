@@ -1,0 +1,3 @@
+<!DOCTYPE html><html><head><style>body{font-family:sans-serif;margin:0;padding:16px}</style><script src="https://unpkg.com/recharts/umd/Recharts.min.js"></script></head>
+<body>{% if logo %}<img src="{{logo}}" height="24" />{% endif %}<h3>Businesses by Sector</h3><div id="chart"></div>
+<script>const data = {{data | tojson}}; // render chart with Recharts</script></body></html>
