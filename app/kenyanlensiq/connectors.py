@@ -1,10 +1,10 @@
 from sqlmodel import Session
 from datetime import datetime
-from fastapi import Depends
-import httpx, asyncio, os
+import httpx
+import asyncio
+import os
 from App.db import get_session
 from App.kenyalensiq import services
-from App.kenyalensiq.router import router
 
 CONNECTORS = {
     "kra": {"url": "https://api.kra.go.ke/sme-registrations", "key_env": "KRA_KEY", "module": "core"},
@@ -19,6 +19,7 @@ async def map_and_ingest(session: Session, tenant_id: str, source: str, raw: dic
         "business_id": raw.get("pin") or raw.get("till") or raw.get("id") or raw.get("reg_no"),
         "name": raw.get("business_name") or raw.get("name"),
         "region": raw.get("county") or raw.get("region"),
+        "county": raw.get("county"),
         "sector": raw.get("sector") or raw.get("industry"),
         "module": cfg["module"],
         "source": source,
@@ -40,9 +41,9 @@ async def run_connector(session: Session, tenant_id: str, source: str):
             items = data.get("results", data.get("data", []))
             for item in items:
                 await map_and_ingest(session, tenant_id, source, item)
-        services.log_audit(session, tenant_id, "system", "connector_run", source)
+        services.log_audit(session, tenant_id, "system", "connector_run", source, {"source": source})
     except Exception as e:
-        services.log_audit(session, tenant_id, "system", "connector_error", f"{source}:{str(e)}")
+        services.log_audit(session, tenant_id, "system", "connector_error", source, {"error": str(e)})
 
 async def auto_ingest_worker(session: Session, tenant_id: str):
     sub = services.get_subscription(session, tenant_id)
@@ -56,10 +57,5 @@ async def auto_ingest_worker(session: Session, tenant_id: str):
 def run_all_connectors(session: Session):
     tenants = services.get_all_active_tenants(session)
     for t in tenants:
-        asyncio.run(auto_ingest_worker(session, t.id))
+        asyncio.run(auto_ingest_worker(session, t.tenant_id))
     services.check_trial_expiry_alerts(session)
-
-@router.post("/connectors/run")
-def run_connectors(session: Session = Depends(get_session)):
-    run_all_connectors(session)
-    return {"status": "ok", "ran_at": datetime.utcnow()}
