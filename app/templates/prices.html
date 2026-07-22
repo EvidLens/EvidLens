@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Price Oracle - EvidLens</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background: #f5f7fa; }
+       .header { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        h1 { color: #1e3a8a; margin: 0; }
+       .timestamp { color: #64748b; font-size: 14px; margin-top: 8px; }
+       .refresh-btn { background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; margin-top: 10px; }
+       .refresh-btn:hover { background: #1d4ed8; }
+        table { width: 100%; background: white; border-collapse: collapse; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        th { background: #2563eb; color: white; padding: 14px; text-align: left; }
+        td { padding: 12px 14px; border-bottom: 1px solid #e2e8f0; }
+        tr:hover { background: #f8fafc; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📈 Price Oracle - Live Market Prices</h1>
+        <div class="timestamp">
+            Last Updated: {{ prices[0].fetched_at if prices else 'No data yet' }}
+        </div>
+        <button class="refresh-btn" onclick="fetch('/api/run-scraper', {method: 'POST'}).then(()=>location.reload())">
+            🔄 Refresh Prices Now
+        </button>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Product</th>
+                <th>Price</th>
+                <th>County</th>
+                <th>Market</th>
+                <th>Source</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in prices %}
+            <tr>
+                <td><b>{{p.product_name}}</b></td>
+                <td><b>KES {{ "{:,.2f}".format(p.price) }}</b></td>
+                <td>{{p.county}}</td>
+                <td>{{p.market}}</td>
+                <td>{{p.source}}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5">No prices found. Click "Refresh Prices Now" to load data from KPIN.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
