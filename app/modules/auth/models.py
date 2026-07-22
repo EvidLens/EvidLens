@@ -9,7 +9,7 @@ class UserRole(str, enum.Enum):
     ADMIN = "ADMIN"
     STAFF = "STAFF"
 
-class User(SQLModel, table=True):
+class AuthUser(SQLModel, table=True):
     __tablename__ = "auth_users"
 
     id: Optional[int] = Field(default=None, primary_key=True)
