@@ -262,11 +262,20 @@ def scrape_kpin_prices():
 @app.get("/market/risk")
 def risk_sentinel(session: Session = Depends(get_session)):
     news = session.exec(
-        select(NewsArticle)
-      .order_by(NewsArticle.published_at.desc())
-      .limit(10)
+        select(
+            NewsArticle.id,
+            NewsArticle.product_name,
+            NewsArticle.title,
+            NewsArticle.timestamp,
+            NewsArticle.url,
+            NewsArticle.source,
+            NewsArticle.published_at,
+            NewsArticle.summary,
+            NewsArticle.keywords,
+            NewsArticle.fetched_at
+        ).order_by(NewsArticle.published_at.desc()).limit(10)
     ).all()
-    return {"risk_alerts": [n.dict() for n in news]}
+    return {"risk_alerts": [n._mapping for n in news]}
 
 @app.get("/market/export")
 def export_navigator(session: Session = Depends(get_session)):
@@ -843,6 +852,34 @@ async def root(request: Request, session: Session = Depends(get_session)):
         "dashboard.html",
         {"request": request, "data": data}
     )
+
+@app.get("/competitive", response_class=HTMLResponse)
+def competitive_page(request: Request):
+    return templates.TemplateResponse("competitive.html", {"request": request})
+
+@app.get("/market/prices", response_class=HTMLResponse)  
+def prices_page(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request})
+
+@app.get("/market/demand", response_class=HTMLResponse)
+def demand_page(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request})
+
+@app.get("/location/counties", response_class=HTMLResponse)
+def counties_page(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request})
+
+@app.get("/voice", response_class=HTMLResponse)
+def voice_page(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request})
+
+@app.get("/kb/policy", response_class=HTMLResponse)
+def policy_page(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request})
+
+@app.get("/reports/funding", response_class=HTMLResponse)
+def funding_page(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request})
 
 if __name__ == "__main__":
     import uvicorn
