@@ -3,11 +3,11 @@ from datetime import datetime
 from dotenv import load_dotenv
 load_dotenv()
 
-MPESA_CONSUMER_KEY = os.getenv("MPESA_CONSUMER_KEY")
-MPESA_CONSUMER_SECRET = os.getenv("MPESA_CONSUMER_SECRET")
-MPESA_SHORTCODE = os.getenv("MPESA_SHORTCODE")
+MPESA_CONSUMER_KEY = os.getenv("goRHiJtrSKc5RgE2wtBjYdAZwnftgAhRBySgN7ZkfylskGGJ")
+MPESA_CONSUMER_SECRET = os.getenv("snudgiGsOhkBsUcRCK3oX397ToiEGLaStyaGZ5tQ0mRGE3i1fEiO78PmRLc6Jqaq")
+MPESA_SHORTCODE = os.getenv("174379")
 MPESA_PASSKEY = os.getenv("MPESA_PASSKEY")
-MPESA_CALLBACK_URL = os.getenv("MPESA_CALLBACK_URL")
+MPESA_CALLBACK_URL = os.getenv("https://evidlens-s7x6.onrender.com/api/mpesa/callback")
 BASE_URL = "https://api.safaricom.co.ke" if os.getenv("ENV") == "prod" else "https://sandbox.safaricom.co.ke"
 
 def get_mpesa_token():
