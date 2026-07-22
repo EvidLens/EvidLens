@@ -10,7 +10,7 @@ class UserRole(str, enum.Enum):
     STAFF = "STAFF"
 
 class User(SQLModel, table=True):
-    __tablename__ = "users"
+    __tablename__ = "auth_users"
 
     id: Optional[int] = Field(default=None, primary_key=True)
     email: str = Field(unique=True, index=True)
