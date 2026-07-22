@@ -65,3 +65,13 @@ class LensSurvey(SQLModel, table=True):
     module: str = Field(default="core", index=True)
     data: Dict = Field(default={}, sa_column=Column(JSON))
     business: LensBusiness = Relationship(back_populates="surveys")
+    
+class LensMember(SQLModel, table=True):
+    __tablename__ = "lens_members"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    tenant_id: str = Field(index=True)
+    user_id: str = Field(index=True)
+    email: str = Field(index=True)
+    role: str = Field(default="viewer") # viewer, editor, admin
+    invited_by: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
