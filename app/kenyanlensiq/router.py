@@ -102,3 +102,16 @@ def start_trial(sub: LensSubscription = Depends(get_tenant), session: Session = 
         raise HTTPException(400, "You already have a subscription")
     new_sub = services.start_trial(session, sub)
     return {"status": "trial_started", "expires_at": new_sub.expires_at}
+from datetime import datetime
+
+@router.get("/me")
+def me(sub: LensSubscription = Depends(require_active_subscription)):
+    days_left = (sub.expires_at - datetime.utcnow()).days
+    return {
+        "plan": sub.plan, 
+        "modules": sub.modules.split(","), 
+        "regions": sub.regions.split(","),
+        "expires_at": sub.expires_at,
+        "days_left": days_left,
+        "is_trial": sub.plan == "Trial"
+    }
