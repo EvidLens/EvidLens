@@ -123,11 +123,13 @@ PRICING = {
     "BASIC": {"monthly": 500, "yearly": 5000},
     "PROFESSIONAL": {"monthly": 1500, "yearly": 15000},
     "ENTERPRISE": {"monthly": 5000, "yearly": 50000}
+}
 ADDONS = {
     "EXTRA_REPORTS_10": {"name": "10 Extra Reports", "one_time": 1000},
     "API_ACCESS": {"name": "API Access", "monthly": 2000},
     "TEAM_SEAT": {"name": "Extra Team Seat", "monthly": 500},
     "DATA_EXPORT": {"name": "Bulk Data Export", "one_time": 5000}
+}
 ALC = {
     "CUSTOM_REPORT": {"name": "Custom Market Report", "price": 25000},
     "DATA_ONBOARDING": {"name": "Data Onboarding", "price": 50000},
