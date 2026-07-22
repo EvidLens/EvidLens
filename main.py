@@ -25,7 +25,7 @@ from app.models import LensBusiness, LensSurvey, LensResponse, Tenant
 
 from app.modules.db import init_db
 from app.modules.data_layer.seed import seed_data
-from app.modules.cron.price_cron import start_scheduler, scrape_kpin_prices
+from app.modules.cron.price_cron import start_scheduler
 from app.modules.kenyalensiq.router import router as kenyalensiq_router
 from app.auth import require_active_subscription
 from app.modules.competitive_engine.router import router as competitive_router
