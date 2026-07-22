@@ -25,7 +25,7 @@ from app.modules.db import init_db
 from app.modules.data_layer.seed import seed_data
 from app.modules.data_layer.models import *
 from app.modules.cron.price_cron import start_scheduler
-from App.kenyalensiq.router import router as kenyalensiq_router
+from app.kenyalensiq.router import router as kenyalensiq_router
 from App.auth import require_active_subscription
 
 scheduler = AsyncIOScheduler()
