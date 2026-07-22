@@ -2,6 +2,7 @@ import os
 import redis
 from typing import Generator
 from sqlmodel import SQLModel, create_engine, Session
+from app.models import *
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 REDIS_URL = os.getenv("REDIS_URL")
@@ -26,5 +27,4 @@ def get_db():
     return get_session()
 
 def create_db_and_tables():
-    from app.models import *
     SQLModel.metadata.create_all(engine)
