@@ -89,8 +89,16 @@ def require_active_subscription(tenant_id: str = Depends(get_tenant), session: S
     sub = services.get_subscription(session, tenant_id) # already exists in services.py
     return sub
 
-# Then update all routes like this:
 @router.get("/core")
 def core(sub: LensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
     services.log_audit(session, sub.tenant_id, sub.tenant_id, "view", "core")
     return services.query_aggregate(session, sub.tenant_id, "core", "sector")
+from datetime import datetime, timedelta
+
+@router.post("/trial/start")
+def start_trial(sub: LensSubscription = Depends(get_tenant), session: Session = Depends(get_session)):
+    existing = services.get_subscription(session, sub)
+    if existing:
+        raise HTTPException(400, "You already have a subscription")
+    new_sub = services.start_trial(session, sub)
+    return {"status": "trial_started", "expires_at": new_sub.expires_at}
