@@ -1,3 +1,4 @@
-<!DOCTYPE html>
-<html><head><title>Competitive</title></head>
-<body><h1>Competitive Engine</h1><p>Loading 50+ companies...</p></body></html>
+<!DOCTYPE html><html><head><title>Competitive Engine</title></head>
+<body><h1>Companies</h1>
+<table border="1">{% for c in companies %}<tr><td>{{c.name}}</td><td>{{c.sector}}</td><td>{{c.county}}</td><td>Rating: {{c.rating}}</td></tr>{% endfor %}</table>
+</body></html>
