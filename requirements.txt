@@ -34,3 +34,4 @@ email-validator==2.2.0
 supabase==2.3.4
 alembic==1.13.2
 newsapi-python==0.2.7
+slowapi==0.1.9
