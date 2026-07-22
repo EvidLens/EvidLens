@@ -76,3 +76,12 @@ def trade(tenant_id: str = Depends(get_tenant), session: Session = Depends(get_s
 @router.get("/api/{module}")
 def api(module: str, tenant_id: str = Depends(get_tenant_api), session: Session = Depends(get_session)):
     return services.query_aggregate(session, tenant_id, module, "sector")
+
+from fastapi import BackgroundTasks
+from App.kenyalensiq import connectors
+
+@router.post("/connectors/run")
+async def run_connectors(bg: BackgroundTasks, tenant_id: str = Depends(get_tenant), session: Session = Depends(get_session)):
+    """Hit this with cron every 1 hour. Or use Celery Beat"""
+    bg.add_task(connectors.auto_ingest_worker, session, tenant_id)
+    return {"status": "connectors started"}
