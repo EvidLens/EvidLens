@@ -91,3 +91,47 @@ def start_trial(session: Session, tenant_id: str):
     log_audit(session, tenant_id, "system", "trial_start", "kenyalensiq")
     session.commit()
     return sub
+from datetime import datetime, timedelta
+
+def check_trial_expiry_alerts(session: Session):
+    """Run this daily via /kenyalensiq/connectors/run"""
+    tomorrow = datetime.utcnow() + timedelta(days=1)
+    
+    expiring_trials = session.exec(
+        select(LensSubscription)
+        .where(LensSubscription.plan == "Trial")
+        .where(LensSubscription.expires_at <= tomorrow)
+        .where(LensSubscription.expires_at > datetime.utcnow())
+    ).all()
+
+    for sub in expiring_trials:
+        # 1. Check if we already alerted to avoid spam
+        already_alerted = session.exec(
+            select(LensAudit).where(
+                LensAudit.tenant_id == sub.tenant_id,
+                LensAudit.action == "trial_24h_alert_sent"
+            )
+        ).first()
+        
+        if already_alerted: 
+            continue
+
+        # 2. Create in-app alert
+        alert = {
+            "tenant_id": sub.tenant_id,
+            "type": "trial_expiring",
+            "title": "Trial expires tomorrow",
+            "message": f"Your KenyaLensIQ 7-day trial ends in {sub.days_left} day. Upgrade to keep access.",
+            "link": "/billing/checkout?product=kenyalensiq&plan=Pro"
+        }
+        services.create_alert(session, alert) # use your existing alert system
+
+        # 3. Send email
+        user = services.get_tenant_user(session, sub.tenant_id) # get admin email
+        services.send_email(
+            to=user.email,
+            subject="Your KenyaLensIQ Trial Ends in 24 Hours",
+            body=f"""
+            Hi {user.name},
+            
+            Your KenyaLensIQ free trial ends tomorrow
