@@ -8,14 +8,19 @@ import httpx
 class ConnectionManager:
     def __init__(self):
         self.active: Dict[str, List[WebSocket]] = {}
+
     async def connect(self, tenant_id: str, ws: WebSocket):
         await ws.accept()
         self.active.setdefault(tenant_id, []).append(ws)
+
     def disconnect(self, tenant_id: str, ws: WebSocket):
-        self.active[tenant_id].remove(ws)
+        if tenant_id in self.active and ws in self.active[tenant_id]:
+            self.active[tenant_id].remove(ws)
+
     async def broadcast(self, tenant_id: str, msg: dict):
         for ws in self.active.get(tenant_id, []):
             await ws.send_json(msg)
+
 manager = ConnectionManager()
 
 def get_subscription(session: Session, tenant_id: str) -> LensSubscription | None:
@@ -64,7 +69,7 @@ async def fire_alert(session: Session, alert: LensAlert, value: Any):
     alert.last_triggered = datetime.utcnow()
     session.add(alert)
     session.commit()
-    if alert.destination.startswith("http"):
+    if alert.destination and alert.destination.startswith("http"):
         async with httpx.AsyncClient() as client:
             await client.post(alert.destination, json={"alert": alert.name, "value": value})
 
@@ -86,7 +91,7 @@ async def ingest_live(session: Session, payload: dict, tenant_id: str, user_id: 
 
     alerts = session.exec(select(LensAlert).where(LensAlert.tenant_id == tenant_id, LensAlert.is_active == True)).all()
     for alert in alerts:
-        cond = alert.condition
+        cond = alert.condition or {}
         if business.region == cond.get("region") and survey.data.get(cond.get("metric")) == cond.get("value"):
             await fire_alert(session, alert, survey.data.get(cond.get("metric")))
 
@@ -95,13 +100,22 @@ async def ingest_live(session: Session, payload: dict, tenant_id: str, user_id: 
 def query_aggregate(session: Session, tenant_id: str, module: str, json_key: str):
     sub = check_module_access(session, tenant_id, module)
     stmt = select(LensSurvey.data[json_key].astext, func.count()).join(LensBusiness)
+
     if sub.regions:
         stmt = stmt.where(LensBusiness.region.in_(sub.regions))
     if sub.sectors:
         stmt = stmt.where(LensBusiness.sector.in_(sub.sectors))
+
     stmt = stmt.where(LensSurvey.module == module)
     stmt = stmt.where(LensSurvey.collected_at > datetime.utcnow() - timedelta(days=90))
-    return {"count": session.exec(select(func.count()).join(LensBusiness)).first(), "by_sector": [{"name": k, "count": c} for k, c in session.exec(stmt.group_by(LensSurvey.data[json_key].astext)).all() if k]}
+
+    total = session.exec(select(func.count()).select_from(LensSurvey).join(LensBusiness)).first()
+    rows = session.exec(stmt.group_by(LensSurvey.data[json_key].astext)).all()
+
+    return {
+        "count": total,
+        "by_sector": [{"name": k, "count": c} for k, c in rows if k]
+    }
 
 def start_trial(session: Session, tenant_id: str):
     sub = LensSubscription(
@@ -120,9 +134,9 @@ def check_trial_expiry_alerts(session: Session):
     tomorrow = datetime.utcnow() + timedelta(days=1)
     expiring_trials = session.exec(
         select(LensSubscription)
-       .where(LensSubscription.plan == "Trial")
-       .where(LensSubscription.expires_at <= tomorrow)
-       .where(LensSubscription.expires_at > datetime.utcnow())
+      .where(LensSubscription.plan == "Trial")
+      .where(LensSubscription.expires_at <= tomorrow)
+      .where(LensSubscription.expires_at > datetime.utcnow())
     ).all()
 
     for sub in expiring_trials:
@@ -153,6 +167,7 @@ def check_trial_expiry_alerts(session: Session):
                 body=f"Hi {user.name}, Your KenyaLensIQ free trial ends tomorrow. Upgrade now: /billing/checkout?product=kenyalensiq&plan=Pro"
             )
         log_audit(session, sub.tenant_id, "system", "trial_24h_alert_sent", "kenyalensiq")
+
 def start_paid_plan(session: Session, tenant_id: str, plan: str):
     sub = get_subscription(session, tenant_id) or LensSubscription(tenant_id=tenant_id)
     sub.plan = plan
