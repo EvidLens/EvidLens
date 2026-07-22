@@ -170,3 +170,9 @@ def build_report(tenant_id: str, payload: dict, session: Session = Depends(get_s
 @router.get("/report/export/{report_id}")
 def export_report(report_id: str):
     return Response(content="csv_data", media_type="text/csv")
+
+@router.get("/embed/{module}")
+def embed_widget(module: str, api_key: str, session: Session = Depends(get_session)):
+    sub = session.exec(select(LensSubscription).where(LensSubscription.api_key == api_key)).first()
+    data = query_aggregate(session, sub.tenant_id, module, "sector")
+    return {"data": data, "branding": sub.metadata.get("logo")}
