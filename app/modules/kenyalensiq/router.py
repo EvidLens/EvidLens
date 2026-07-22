@@ -9,7 +9,7 @@ from slowapi.util import get_remote_address
 import io
 import csv
 
-from app.mpesa import stk_push
+from app.modules.kenyalensiq.mpesa import stk_push
 from app.models import get_session, LensSubscription, LensAlert, LensMember, LensApiUsage
 from app.modules.kenyalensiq import services
 from app.modules.kenyalensiq import connectors
