@@ -4,7 +4,7 @@ import httpx
 import asyncio
 import os
 from app.modules.database import get_session
-from App.kenyalensiq import services
+from app.modules.kenyalensiq import services
 
 CONNECTORS = {
     "kra": {"url": "https://api.kra.go.ke/sme-registrations", "key_env": "KRA_KEY", "module": "core"},
