@@ -1,0 +1,6 @@
+<!DOCTYPE html><html><head><title>County Mapper</title></head>
+<body><h1>County Data</h1>
+<table border="1">{% for c in counties %}<tr><td>{{c.name}}</td></tr>{% endfor %}</table>
+<h2>Market Size by County</h2>
+<table border="1">{% for s in stats %}<tr><td>{{s.county}}</td><td>KES {{s.market_size}}</td></tr>{% endfor %}</table>
+</body></html>
