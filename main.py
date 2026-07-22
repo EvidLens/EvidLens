@@ -107,6 +107,9 @@ app.include_router(core_router)
 app.include_router(storage_router)
 app.include_router(chatbot_router)
 
+from app.modules.cron.price_cron import start_scheduler
+from app.modules.database import create_db_and_tables
+
 @app.on_event("startup")
 def on_startup():
     init_db()
