@@ -115,3 +115,30 @@ def me(sub: LensSubscription = Depends(require_active_subscription)):
         "days_left": days_left,
         "is_trial": sub.plan == "Trial"
     }
+@router.get("/admin/stats")
+def admin_stats(session: Session = Depends(get_session)):
+    total_subs = session.exec(select(func.count()).select_from(LensSubscription)).first()
+    trial_subs = session.exec(select(func.count()).select_from(LensSubscription).where(LensSubscription.plan == "Trial")).first()
+    paid_subs = session.exec(select(func.count()).select_from(LensSubscription).where(LensSubscription.plan != "Trial")).first()
+    mrr = paid_subs * 5000
+    return {"total_subs": total_subs, "trial_subs": trial_subs, "paid_subs": paid_subs, "mrr": mrr}
+
+@router.post("/admin/grant")
+def grant_access(tenant_id: str, plan: str, session: Session = Depends(get_session)):
+    sub = services.get_subscription(session, tenant_id)
+    if not sub:
+        sub = LensSubscription(tenant_id=tenant_id)
+    
+    if plan == "Pro":
+        sub.plan = "Pro"
+        sub.modules = ["core","health","money","brand","demand","behavior","policy","capital","trade"]
+        sub.expires_at = datetime.utcnow() + timedelta(days=30)
+    elif plan == "Enterprise":
+        sub.plan = "Enterprise"
+        sub.modules = ["core","health","money","brand","demand","behavior","policy","capital","trade"]
+        sub.expires_at = datetime.utcnow() + timedelta(days=365)
+    
+    session.add(sub)
+    services.log_audit(session, tenant_id, "admin", "grant_plan", "kenyalensiq", {"plan": plan})
+    session.commit()
+    return {"status": "granted", "tenant_id": tenant_id, "plan": plan}
