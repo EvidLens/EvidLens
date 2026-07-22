@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head><title>Risk Sentinel</title></head>
+<body>
+    <h1>⚠️ Risk Alerts</h1>
+    <table border="1">
+        {% for n in news %}
+        <tr>
+            <td><b>{{n.title}}</b></td> 
+            <td>{{n.source}}</td>
+            <td>{{n.published_at}}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>
