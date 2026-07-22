@@ -3,7 +3,7 @@ from datetime import datetime
 import httpx
 import asyncio
 import os
-from App.db import get_session
+from app.modules.database import get_session
 from App.kenyalensiq import services
 
 CONNECTORS = {
