@@ -116,3 +116,5 @@ class LensResponse(SQLModel, table=True):
     source: str = Field(default="web")
     data: Dict = Field(default_factory=dict, sa_column=Column(JSONB))
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+Subscription = LensSubscription
