@@ -115,7 +115,7 @@ from app.modules.database import create_db_and_tables
 def on_startup():
     init_db()
     create_db_and_tables()
-    seed_data()
+    # seed_data()
     start_scheduler()
     scheduler.add_job(scrape_kpin_prices, "cron", hour=6)
     scheduler.start()
