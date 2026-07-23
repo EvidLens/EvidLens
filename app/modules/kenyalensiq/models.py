@@ -99,3 +99,22 @@ class KenyaLensAlert(SQLModel, table=True):
     severity: str = Field(default="info")
     is_read: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class KenyaLensMember(SQLModel, table=True):
+    __tablename__ = "kenya_lens_members"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    tenant_id: str = Field(index=True)
+    user_id: str
+    email: str
+    role: str = Field(default="member")
+    invited_by: str
+    status: str = Field(default="pending")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class KenyaLensApiUsage(SQLModel, table=True):
+    __tablename__ = "kenya_lens_api_usage"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    api_key: str = Field(index=True)
+    endpoint: str
+    tenant_id: Optional[str] = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
