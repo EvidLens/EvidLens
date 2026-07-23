@@ -1,18 +1,12 @@
-from app.modules.kenyalensiq.models import User, Notification, MarketMetric, PriceData, NewsArticle, SocialMention
-from app.modules.auth.models import AuthUser
-from app.modules.auth.service import get_current_user
-from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional, List
-from datetime import datetime
-from app.models import LensBusiness
-from app.models import Subscription
 from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, StreamingResponse
 from sqlmodel import Session, select, func, or_, desc, asc
+from pydantic import BaseModel
 from dotenv import load_dotenv
+
 import os
 import csv
 import io
@@ -23,7 +17,19 @@ from requests.auth import HTTPBasicAuth
 import pandas as pd
 from groq import Groq
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from pydantic import BaseModel
+from datetime import datetime
+
+from app.modules.kenyalensiq.models import (
+    User, 
+    Notification, 
+    MarketMetric, 
+    PriceData, 
+    NewsArticle, 
+    SocialMention,
+    KenyaLensBusiness,
+    KenyaSubscription
+)
+from app.modules.auth.service import get_current_user
 
 load_dotenv()
 
