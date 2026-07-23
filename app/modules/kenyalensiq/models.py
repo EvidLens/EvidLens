@@ -79,7 +79,7 @@ class KenyaLensResponse(SQLModel, table=True):
     data: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-class KenyaSubscription(SQLModel, table=True):
+class LensSubscription(SQLModel, table=True):
     __tablename__ = "kenya_subscriptions"
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="auth_users.id")
