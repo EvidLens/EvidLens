@@ -87,3 +87,15 @@ class KenyaLensSubscription(SQLModel, table=True):
     status: str = "active"
     created_at: datetime = Field(default_factory=datetime.utcnow)
     expires_at: Optional[datetime] = None
+
+class KenyaLensAlert(SQLModel, table=True):
+    __tablename__ = "kenya_lens_alerts"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    tenant_id: str = Field(index=True)
+    title: str
+    description: str
+    module: str
+    severity: str = Field(default="info")
+    is_read: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
