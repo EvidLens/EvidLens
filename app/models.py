@@ -60,7 +60,6 @@ class LensBusiness(SQLModel, table=True):
     sector: str
     county: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    
     surveys: List["app.models.LensSurvey"] = Relationship(back_populates="business")
 
 class LensSurvey(SQLModel, table=True):
@@ -70,7 +69,6 @@ class LensSurvey(SQLModel, table=True):
     title: str
     status: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    
     business: "app.models.LensBusiness" = Relationship(back_populates="surveys")
     
 class LensResponse(SQLModel, table=True):
