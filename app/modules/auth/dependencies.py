@@ -1,7 +1,6 @@
 from fastapi import Depends, HTTPException, Request
 from sqlmodel import Session, select
 from datetime import datetime
-
 from app.modules.auth.models import AuthUser, UserRole
 from app.modules.kenyalensiq.models import KenyaSubscription
 from app.modules.database import get_session as get_db
@@ -21,13 +20,13 @@ def require_active_subscription(current_user: AuthUser = Depends(get_current_use
     sub = db.exec(select(KenyaSubscription).where(KenyaSubscription.user_id == current_user.id)).first()
     if not sub:
         raise HTTPException(status_code=402, detail="Subscription required")
-    if sub.status != "active":
+    if sub.status!= "active":
         raise HTTPException(status_code=402, detail="Subscription not active")
     if sub.expires_at and sub.expires_at < datetime.utcnow():
         raise HTTPException(status_code=402, detail="Subscription expired")
     return current_user
 
 def require_admin(current_user: AuthUser = Depends(get_current_user)):
-    if current_user.role != UserRole.ADMIN:
+    if current_user.role!= UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
