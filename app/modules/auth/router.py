@@ -4,6 +4,7 @@ from sqlmodel import Session
 from pydantic import BaseModel, EmailStr
 from.service import *
 from.models import AuthUser
+from.dependencies import get_current_user, require_active_subscription, require_admin
 from app.modules.database import get_session as get_db
 import secrets
 
@@ -81,6 +82,14 @@ def update_profile_route(req: ProfileUpdateRequest, user: AuthUser = Depends(get
 @router.get("/me")
 def me(user: AuthUser = Depends(get_current_user)):
     return user
+
+@router.get("/dashboard")
+def dashboard(user: AuthUser = Depends(require_active_subscription)):
+    return {"data": "paid content"}
+
+@router.get("/admin")
+def admin_panel(user: AuthUser = Depends(require_admin)):
+    return {"data": "admin only"}
 
 @router.post("/logout")
 def logout():
