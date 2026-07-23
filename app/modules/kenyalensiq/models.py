@@ -4,17 +4,10 @@ from datetime import datetime
 from sqlalchemy import Column
 from sqlalchemy.dialects.postgresql import JSONB
 
-class User(SQLModel, table=True):
-    __tablename__ = "users"
-    id: Optional[int] = Field(default=None, primary_key=True)
-    email: Optional[str] = Field(default=None, index=True, unique=True)
-    phone: Optional[str] = Field(default=None)
-    name: Optional[str] = Field(default=None)
-
 class Notification(SQLModel, table=True):
     __tablename__ = "notifications"
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(index=True, foreign_key="users.id")
+    user_id: int = Field(index=True, foreign_key="auth_users.id")
     message: str
     type: str
     channel: str
@@ -89,7 +82,7 @@ class KenyaLensResponse(SQLModel, table=True):
 class KenyaSubscription(SQLModel, table=True):
     __tablename__ = "kenya_subscriptions"
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id")
+    user_id: int = Field(foreign_key="auth_users.id")
     plan: str
     status: str = "active"
     created_at: datetime = Field(default_factory=datetime.utcnow)
