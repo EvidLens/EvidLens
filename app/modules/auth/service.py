@@ -15,10 +15,7 @@ APP_URL = os.getenv("APP_URL", "http://localhost:8000")
 def send_email(to: str, subject: str, html: str):
     if not RESEND_API_KEY:
         return
-    requests.post("https://api.resend.com/emails",
-        headers={"Authorization": f"Bearer {RESEND_API_KEY}"},
-        json={"from": f"{FROM_NAME} <{FROM_EMAIL}>", "to": [to], "subject": subject, "html": html}
-    )
+    requests.post("https://api.resend.com/emails", headers={"Authorization": f"Bearer {RESEND_API_KEY}"}, json={"from": f"{FROM_NAME} <{FROM_EMAIL}>", "to": [to], "subject": subject, "html": html})
 
 def hash_password(password: str):
     if len(password.encode('utf-8')) > 72:
@@ -98,12 +95,3 @@ def update_profile(db: Session, user: AuthUser, full_name: str, phone: str, them
     user.language = language
     db.commit()
     return {"message": "Profile updated"}
-
-def get_current_user(request: Request, db: Session = Depends(get_db)):
-    user_id = request.cookies.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    user = db.exec(select(AuthUser).where(AuthUser.id == int(user_id))).first()
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
-    return user
