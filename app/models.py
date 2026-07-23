@@ -58,7 +58,7 @@ class LensBusiness(SQLModel, table=True):
     county: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-class LensSurvey(SQLModel, table=True):
+class LensSurveyMain(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     business_id: int = Field(index=True)
     title: str
