@@ -32,6 +32,7 @@ from app.modules.kenyalensiq.models import (
     KenyaLensResponse,
     KenyaTenant
 )
+from app.modules.auth.models import User as AuthUser
 from app.modules.auth.service import get_current_user
 
 load_dotenv()
