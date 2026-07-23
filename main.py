@@ -981,7 +981,35 @@ def kenyalsiq_dashboard(session: Session = Depends(get_session)):
             {"id": 5, "name": "Users", "icon": "👥", "count": user_count, "route": "/users"},
         ]
     }
-    
+
+@app.get("/dashboard")
+def dashboard(request: Request, sub: Subscription = Depends(require_active_subscription), user: AuthUser = Depends(get_current_user)):
+    data = dashboard_api(Session(engine))
+    return templates.TemplateResponse("dashboard.html", {"request": request, "data": data, "current_user": user})
+
+@app.get("/settings", response_class=HTMLResponse)
+def settings(request: Request, user: AuthUser = Depends(get_current_user)): return templates.TemplateResponse("settings.html", {"request": request, "current_user": user})
+@app.get("/billing", response_class=HTMLResponse)
+def billing(request: Request, user: AuthUser = Depends(get_current_user)): return templates.TemplateResponse("billing.html", {"request": request, "current_user": user, "plans": PRICING})
+@app.get("/security", response_class=HTMLResponse)
+def security(request: Request, user: AuthUser = Depends(get_current_user)): return templates.TemplateResponse("security.html", {"request": request, "current_user": user})
+@app.get("/history", response_class=HTMLResponse)
+def history(request: Request, user: AuthUser = Depends(get_current_user)): return templates.TemplateResponse("history.html", {"request": request, "current_user": user})
+@app.get("/stats", response_class=HTMLResponse)
+def stats(request: Request, user: AuthUser = Depends(get_current_user)): return templates.TemplateResponse("stats.html", {"request": request, "current_user": user})
+@app.get("/wallet", response_class=HTMLResponse)
+def wallet(request: Request, user: AuthUser = Depends(get_current_user)): return templates.TemplateResponse("wallet.html", {"request": request, "current_user": user})
+@app.get("/workspaces", response_class=HTMLResponse)
+def workspaces(request: Request, user: AuthUser = Depends(get_current_user)): return templates.TemplateResponse("workspaces.html", {"request": request, "current_user": user})
+@app.get("/help", response_class=HTMLResponse)
+def help(request: Request): return templates.TemplateResponse("help.html", {"request": request})
+@app.get("/changelog", response_class=HTMLResponse)
+def changelog(request: Request): return templates.TemplateResponse("changelog.html", {"request": request})
+@app.get("/forgot-password", response_class=HTMLResponse)
+def forgot_page(request: Request): return templates.TemplateResponse("forgot.html", {"request": request})
+@app.get("/reset-password", response_class=HTMLResponse)
+def reset_page(request: Request, token: str): return templates.TemplateResponse("reset.html", {"request": request, "token": token})
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
