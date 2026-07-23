@@ -1,4 +1,4 @@
-from app.modules.kenyalensiq.models import LensAlert, LensSubscription, LensMember, LensApiUsage
+from app.modules.kenyalensiq.models import KenyaLensAlert, KenyaLensSubscription, KenyaLensMember, KenyaLensApiUsage
 from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect, Header, BackgroundTasks, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from fastapi.templating import Jinja2Templates
@@ -28,7 +28,7 @@ def get_tenant(authorization: str = Header(...)) -> str:
     return authorization.split(" ")[1]
 
 def get_tenant_api(x_api_key: str = Header(...), session: Session = Depends(get_session)) -> str:
-    sub = session.exec(select(LensSubscription).where(LensSubscription.api_key == x_api_key)).first()
+    sub = session.exec(select(KenyaLensSubscription).where(KenyaLensSubscription.api_key == x_api_key)).first()
     if not sub:
         raise HTTPException(401, "Invalid API Key")
     return sub.tenant_id
@@ -54,13 +54,13 @@ async def mpesa_callback(req: Request, session: Session = Depends(get_session)):
     tenant_id = str(items["AccountReference"])
     receipt = items["MpesaReceiptNumber"]
     exists = session.exec(
-        select(LensSubscription).where(LensSubscription.metadata.contains({"last_payment": receipt}))
+        select(KenyaLensSubscription).where(KenyaLensSubscription.metadata.contains({"last_payment": receipt}))
     ).first()
     if exists:
         return {"ResultCode": 0, "ResultDesc": "Already processed"}
-    sub = session.exec(select(LensSubscription).where(LensSubscription.tenant_id == tenant_id)).first()
+    sub = session.exec(select(KenyaLensSubscription).where(KenyaLensSubscription.tenant_id == tenant_id)).first()
     if not sub:
-        sub = LensSubscription(tenant_id=tenant_id)
+        sub = KenyaLensSubscription(tenant_id=tenant_id)
     amount = items["Amount"]
     sub.plan = "Pro" if amount == 5000 else "Enterprise"
     sub.modules = ["core", "health", "money", "brand", "demand", "behavior", "policy", "capital", "trade"]
@@ -76,7 +76,7 @@ async def payment_webhook(req: Request, session: Session = Depends(get_session))
     payload = await req.json()
     if payload.get("payment_status") == "Completed":
         tenant_id = payload.get("merchant_reference")
-        sub = services.get_subscription(session, tenant_id) or LensSubscription(tenant_id=tenant_id)
+        sub = services.get_subscription(session, tenant_id) or KenyaLensSubscription(tenant_id=tenant_id)
         sub.plan = "Pro"
         sub.modules = ["core", "health", "money", "brand", "demand", "behavior", "policy", "capital", "trade"]
         sub.expires_at = datetime.utcnow() + timedelta(days=30)
@@ -105,7 +105,7 @@ async def ingest(
     return {"status": "accepted"}
 
 @router.post("/alerts")
-def create_alert(alert: LensAlert, tenant_id: str = Depends(get_tenant), session: Session = Depends(get_session)):
+def create_alert(alert: KenyaLensAlert, tenant_id: str = Depends(get_tenant), session: Session = Depends(get_session)):
     services.check_module_access(session, tenant_id, "policy")
     alert.tenant_id = tenant_id
     session.add(alert)
@@ -121,40 +121,40 @@ def export(module: str, tenant_id: str = Depends(get_tenant), session: Session =
     return StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
 
 @router.get("/core")
-def core(sub: LensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
+def core(sub: KenyaLensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
     services.log_audit(session, sub.tenant_id, sub.tenant_id, "view", "core")
     return services.query_aggregate(session, sub.tenant_id, "core", "sector")
 
 @router.get("/health")
-def health(sub: LensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
+def health(sub: KenyaLensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
     return services.query_aggregate(session, sub.tenant_id, "health", "performance_last_year")
 
 @router.get("/money")
-def money(sub: LensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
+def money(sub: KenyaLensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
     return services.query_aggregate(session, sub.tenant_id, "money", "payment_methods_used")
 
 @router.get("/brand")
-def brand(sub: LensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
+def brand(sub: KenyaLensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
     return services.query_aggregate(session, sub.tenant_id, "brand", "brand_awareness")
 
 @router.get("/demand")
-def demand(sub: LensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
+def demand(sub: KenyaLensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
     return services.query_aggregate(session, sub.tenant_id, "demand", "has_health_cover")
 
 @router.get("/behavior")
-def behavior(sub: LensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
+def behavior(sub: KenyaLensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
     return services.query_aggregate(session, sub.tenant_id, "behavior", "channel_usage")
 
 @router.get("/policy")
-def policy(sub: LensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
+def policy(sub: KenyaLensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
     return services.query_aggregate(session, sub.tenant_id, "policy", "top_challenges")
 
 @router.get("/capital")
-def capital(sub: LensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
+def capital(sub: KenyaLensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
     return services.query_aggregate(session, sub.tenant_id, "capital", "funding_need")
 
 @router.get("/trade")
-def trade(sub: LensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
+def trade(sub: KenyaLensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
     return services.query_aggregate(session, sub.tenant_id, "trade", "geographic_scope")
 
 @router.get("/api/{module}")
@@ -175,7 +175,7 @@ def start_trial(tenant_id: str = Depends(get_tenant), session: Session = Depends
     return {"status": "trial_started", "expires_at": new_sub.expires_at}
 
 @router.get("/me")
-def me(sub: LensSubscription = Depends(require_active_subscription)):
+def me(sub: KenyaLensSubscription = Depends(require_active_subscription)):
     days_left = (sub.expires_at - datetime.utcnow()).days
     return {
         "plan": sub.plan,
@@ -188,9 +188,9 @@ def me(sub: LensSubscription = Depends(require_active_subscription)):
 
 @router.get("/admin/stats")
 def admin_stats(session: Session = Depends(get_session)):
-    total_subs = session.exec(select(func.count()).select_from(LensSubscription)).first()
-    trial_subs = session.exec(select(func.count()).select_from(LensSubscription).where(LensSubscription.plan == "Trial")).first()
-    paid_subs = session.exec(select(func.count()).select_from(LensSubscription).where(LensSubscription.plan!= "Trial")).first()
+    total_subs = session.exec(select(func.count()).select_from(KenyaLensSubscription)).first()
+    trial_subs = session.exec(select(func.count()).select_from(KenyaLensSubscription).where(KenyaLensSubscription.plan == "Trial")).first()
+    paid_subs = session.exec(select(func.count()).select_from(KenyaLensSubscription).where(KenyaLensSubscription.plan!= "Trial")).first()
     mrr = paid_subs * 5000
     return {"total_subs": total_subs, "trial_subs": trial_subs, "paid_subs": paid_subs, "mrr": mrr}
 
@@ -198,7 +198,7 @@ def admin_stats(session: Session = Depends(get_session)):
 def grant_access(tenant_id: str, plan: str, session: Session = Depends(get_session)):
     sub = services.get_subscription(session, tenant_id)
     if not sub:
-        sub = LensSubscription(tenant_id=tenant_id)
+        sub = KenyaLensSubscription(tenant_id=tenant_id)
     if plan == "Pro":
         sub.plan = "Pro"
         sub.modules = ["core", "health", "money", "brand", "demand", "behavior", "policy", "capital", "trade"]
@@ -214,18 +214,18 @@ def grant_access(tenant_id: str, plan: str, session: Session = Depends(get_sessi
 
 @router.get("/team")
 def get_team(tenant_id: str, session: Session = Depends(get_session)):
-    return session.exec(select(LensMember).where(LensMember.tenant_id == tenant_id)).all()
+    return session.exec(select(KenyaLensMember).where(KenyaLensMember.tenant_id == tenant_id)).all()
 
 @router.post("/team/invite")
 def invite_member(tenant_id: str, email: str, role: str, user_id: str, session: Session = Depends(get_session)):
-    member = LensMember(tenant_id=tenant_id, email=email, role=role, invited_by=user_id, user_id="pending")
+    member = KenyaLensMember(tenant_id=tenant_id, email=email, role=role, invited_by=user_id, user_id="pending")
     session.add(member)
     session.commit()
     return {"status": "invited"}
 
 @router.delete("/team/{member_id}")
 def remove_member(member_id: int, session: Session = Depends(get_session)):
-    member = session.get(LensMember, member_id)
+    member = session.get(KenyaLensMember, member_id)
     session.delete(member)
     session.commit()
     return {"status": "removed"}
@@ -243,14 +243,14 @@ def export_report(report_id: str):
 @router.get("/embed/{module}")
 @limiter.limit("100/hour")
 def embed_widget(module: str, request: Request, api_key: str, session: Session = Depends(get_session)):
-    sub = session.exec(select(LensSubscription).where(LensSubscription.api_key == api_key)).first()
+    sub = session.exec(select(KenyaLensSubscription).where(KenyaLensSubscription.api_key == api_key)).first()
     if not sub:
         return templates.TemplateResponse("embed_locked.html", {"request": request, "reason": "Invalid API Key"})
     if datetime.utcnow() > sub.expires_at or sub.plan == "Trial":
         return templates.TemplateResponse("embed_locked.html", {"request": request, "reason": "Upgrade Required"})
     if module not in sub.modules:
         return templates.TemplateResponse("embed_locked.html", {"request": request, "reason": f"Upgrade to unlock {module}"})
-    session.add(LensApiUsage(api_key=api_key, endpoint=module))
+    session.add(KenyaLensApiUsage(api_key=api_key, endpoint=module))
     session.commit()
     data = services.query_aggregate(session, sub.tenant_id, module, "sector")
     branding = sub.metadata or {}
