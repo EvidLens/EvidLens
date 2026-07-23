@@ -60,13 +60,12 @@ class LensBusiness(SQLModel, table=True):
 
 class LensSurvey(SQLModel, table=True):
     __tablename__ = "lens_survey"
-    __module__ = "app.models"
     id: int | None = Field(default=None, primary_key=True)
-    business_id: int = Field(index=True)
+    business_id: int = Field(index=True, foreign_key="lensbusiness.id")
     title: str
     status: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
-
+    
 class LensResponse(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     survey_id: int = Field(index=True)
