@@ -4,6 +4,10 @@ from sqlalchemy.dialects.postgresql import JSONB
 from typing import Optional, Dict, List
 from datetime import datetime
 import uuid
+from sqlalchemy.orm import declarative_base, relationship, Session
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text
+
+Base = declarative_base()
 
 class LensSubscription(SQLModel, table=True):
     __tablename__ = "lens_subscriptions"
