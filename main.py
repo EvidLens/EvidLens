@@ -27,7 +27,7 @@ from pydantic import BaseModel
 load_dotenv()
 
 from app.modules.database import engine, create_db_and_tables
-from app.models import User, MarketMetric, PriceData, NewsArticle, SocialMention
+from app.kenyalensiq.models import User, MarketMetric, PriceData, NewsArticle, SocialMention
 from app.models import LensBusiness, LensSurvey, LensResponse, Tenant
 
 from app.modules.db import init_db
