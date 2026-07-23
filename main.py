@@ -967,7 +967,7 @@ def funding_page(request: Request, session: Session = Depends(get_session)):
 def kenyalsiq_dashboard(session: Session = Depends(get_session)):
     business_count = session.exec(select(func.count()).select_from(LensBusiness)).one()
     survey_count = session.exec(select(func.count()).select_from(LensSurvey)).one()
-    response_count = session.exec(select(func.count()).select_from(LensResponse)).one() # <-- 5th count
+    response_count = session.exec(select(func.count()).select_from(LensResponse)).one()
     tenant_count = session.exec(select(func.count()).select_from(Tenant)).one()
     user_count = session.exec(select(func.count()).select_from(User)).one()
 
@@ -983,10 +983,34 @@ def kenyalsiq_dashboard(session: Session = Depends(get_session)):
     }
 
 @app.get("/dashboard")
-def dashboard(request: Request, sub: Subscription = Depends(require_active_subscription), user: AuthUser = Depends(get_current_user)):
-    data = dashboard_api(Session(engine))
-    return templates.TemplateResponse("dashboard.html", {"request": request, "data": data, "current_user": user})
-
+async def dashboard(request: Request, current_user: User = Depends(get_current_user)):
+    data = get_dashboard_data(current_user.tenant_id)
+    
+    API = {
+        "logout": "/auth/logout",
+        "login": "/login",
+        "prices": "/api/prices",
+        "demand": "/api/demand",
+        "companies": "/api/companies",
+        "county_stats": "/api/county-stats",
+        "sectors": "/api/top-sectors",
+        "opportunities": "/api/opportunities",
+        "get_sectors": "/api/sectors",
+        "get_counties": "/api/counties",
+        "get_subcounties": "/api/subcounties",
+        "analyze": "/api/analyze-detailed",
+        "chat": "/lens/chat",
+        "download": "/download-report",
+        "export": "/api/export"
+    }
+    
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request,
+        "current_user": current_user,
+        "data": data,
+        "API": API
+    })
+    
 @app.get("/settings", response_class=HTMLResponse)
 def settings(request: Request, user: AuthUser = Depends(get_current_user)): return templates.TemplateResponse("settings.html", {"request": request, "current_user": user})
 @app.get("/billing", response_class=HTMLResponse)
