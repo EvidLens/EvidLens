@@ -1,3 +1,4 @@
+from app.modules.lens.models import LensSurvey
 from datetime import datetime
 from typing import Optional, List, Dict
 from sqlmodel import SQLModel, Field, Column, JSON, Relationship
