@@ -27,21 +27,21 @@ from app.modules.kenyalensiq.models import (
     NewsArticle, 
     SocialMention,
     KenyaLensBusiness,
-    KenyaSubscription
+    KenyaSubscription,
+    KenyaLensSurvey,
+    KenyaLensResponse,
+    KenyaTenant
 )
 from app.modules.auth.service import get_current_user
 
 load_dotenv()
 
 from app.modules.database import engine, create_db_and_tables
-from app.kenyalensiq.models import User, MarketMetric, PriceData, NewsArticle, SocialMention
-from app.models import LensBusiness, LensSurvey, LensResponse, Tenant
-
 from app.modules.db import init_db
 from app.modules.data_layer.seed import seed_data
 from app.modules.cron.price_cron import start_scheduler
 from app.modules.kenyalensiq.router import router as kenyalensiq_router
-from app.auth import require_active_subscription
+from app.modules.auth.dependencies import require_active_subscription
 from app.modules.competitive_engine.router import router as competitive_router
 from app.modules.market_engine.router import router as market_router
 from app.modules.location_intel.router import router as location_router
