@@ -1,119 +1,89 @@
-from sqlmodel import SQLModel, Field, Relationship, Column
-from sqlalchemy import Index
-from sqlalchemy.dialects.postgresql import JSONB
-from typing import Optional, Dict, List
+from sqlmodel import SQLModel, Field, Relationship
+from typing import Optional, List
 from datetime import datetime
-import uuid
-
-class LensSubscription(SQLModel, table=True):
-    __tablename__ = "lens_subscriptions"
-    id: Optional[int] = Field(default=None, primary_key=True)
-    tenant_id: str = Field(index=True, unique=True)
-    plan: str = Field(default="Starter")
-    modules: List[str] = Field(default_factory=lambda: ["core", "health"], sa_column=Column(JSONB))
-    regions: List[str] = Field(default_factory=list, sa_column=Column(JSONB))
-    sectors: List[str] = Field(default_factory=list, sa_column=Column(JSONB))
-    role: str = Field(default="viewer")
-    expires_at: datetime
-    api_key: str = Field(default_factory=lambda: str(uuid.uuid4()), index=True, unique=True)
-    extra_data: Dict = Field(default_factory=dict, sa_column=Column(JSONB))
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-
-class LensAlert(SQLModel, table=True):
-    __tablename__ = "lens_alerts"
-    id: Optional[int] = Field(default=None, primary_key=True)
-    tenant_id: str = Field(index=True)
-    name: str
-    type: str = Field(default="custom")
-    title: str = Field(default="")
-    message: str = Field(default="")
-    link: str = Field(default="")
-    condition: Dict = Field(default_factory=dict, sa_column=Column(JSONB))
-    destination: str = Field(default="email")
-    is_active: bool = True
-    last_triggered: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-
-class LensAudit(SQLModel, table=True):
-    __tablename__ = "lens_audit"
-    id: Optional[int] = Field(default=None, primary_key=True)
-    tenant_id: str = Field(index=True)
-    user_id: str
-    action: str
-    module: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-    payload: Dict = Field(default_factory=dict, sa_column=Column(JSONB))
-
-class LensBusiness(SQLModel, table=True):
-    __tablename__ = "lens_businesses"
-    id: Optional[int] = Field(default=None, primary_key=True)
-    external_id: str = Field(index=True, unique=True)
-    name: Optional[str] = Field(default=None, index=True)
-    region: Optional[str] = Field(default=None, index=True)
-    county: Optional[str] = Field(default=None, index=True)
-    sector: Optional[str] = Field(default=None, index=True)
-    size_category: Optional[str] = Field(default=None, index=True)
-    employees_total: Optional[int] = None
-    extra_data: Dict = Field(default_factory=dict, sa_column=Column(JSONB))
-    updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-    surveys: List["LensSurvey"] = Relationship(back_populates="business")
-
-class LensSurvey(SQLModel, table=True):
-    __tablename__ = "lens_surveys"
-    __table_args__ = (Index('ix_lens_data_gin', 'data', postgresql_using='gin'),)
-    id: Optional[int] = Field(default=None, primary_key=True)
-    business_id: int = Field(foreign_key="lens_businesses.id", index=True)
-    collected_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-    source: str = Field(default="api")
-    module: str = Field(default="core", index=True)
-    data: Dict = Field(default_factory=dict, sa_column=Column(JSONB))
-    business: LensBusiness = Relationship(back_populates="surveys")
-
-class LensMember(SQLModel, table=True):
-    __tablename__ = "lens_members"
-    id: Optional[int] = Field(default=None, primary_key=True)
-    tenant_id: str = Field(index=True)
-    user_id: str = Field(index=True)
-    email: str = Field(index=True)
-    role: str = Field(default="viewer")
-    invited_by: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-
-class LensApiUsage(SQLModel, table=True):
-    __tablename__ = "lens_api_usage"
-    id: Optional[int] = Field(default=None, primary_key=True)
-    api_key: str = Field(index=True)
-    endpoint: str
-    ts: datetime = Field(default_factory=datetime.utcnow)
-
-class Tenant(SQLModel, table=True):
-    __tablename__ = "tenants"
-    id: Optional[int] = Field(default=None, primary_key=True)
-    tenant_id: str = Field(index=True, unique=True)
-    name: str
-    is_active: bool = True
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+from sqlalchemy import Column
+from sqlalchemy.dialects.postgresql import JSONB
 
 class User(SQLModel, table=True):
-    __tablename__ = "users"
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: str = Field(index=True, unique=True)
-    tenant_id: str = Field(index=True)
-    name: str
-    email: str = Field(index=True, unique=True)
-    is_admin: bool = False
+    email: Optional[str] = Field(default=None, index=True, unique=True)
+    phone: Optional[str] = Field(default=None)
+    name: Optional[str] = Field(default=None)
+
+class Notification(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(index=True)
+    message: str
+    type: str
+    channel: str
+    status: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-class LensResponse(SQLModel, table=True):
-    __tablename__ = "lens_responses"
-    __table_args__ = (Index('ix_lens_response_data_gin', 'data', postgresql_using='gin'),)
-    
+class MarketMetric(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    survey_id: int = Field(foreign_key="lens_surveys.id", index=True)
-    business_id: int = Field(foreign_key="lens_businesses.id", index=True)
-    tenant_id: str = Field(index=True)
-    respondent_id: Optional[str] = Field(default=None, index=True)
-    collected_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-    source: str = Field(default="web")
-    data: Dict = Field(default_factory=dict, sa_column=Column(JSONB))
+    product: str
+    county: str
+    sector: str
+    demand_score: float = 0.0
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+class PriceData(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    product_name: str
+    county: str
+    sector: str
+    price: float
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+class NewsArticle(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    product: str
+    title: str
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+class SocialMention(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    product: str
+    platform: str
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+class KenyaTenant(SQLModel, table=True):
+    __tablename__ = "kenya_tenants"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class KenyaLensBusiness(SQLModel, table=True):
+    __tablename__ = "kenya_lens_business"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    tenant_id: int = Field(index=True)
+    name: str
+    sector: str
+    county: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    surveys: List["app.modules.kenyalensiq.models.KenyaLensSurvey"] = Relationship(back_populates="business")
+
+class KenyaLensSurvey(SQLModel, table=True):
+    __tablename__ = "kenya_lens_survey"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(index=True, foreign_key="kenya_lens_business.id")
+    title: str
+    status: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    business: "app.modules.kenyalensiq.models.KenyaLensBusiness" = Relationship(back_populates="surveys")
+
+class KenyaLensResponse(SQLModel, table=True):
+    __tablename__ = "kenya_lens_response"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    survey_id: int = Field(index=True)
+    respondent_phone: Optional[str] = None
+    data: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class KenyaSubscription(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id")
+    plan: str
+    status: str = "active"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    expires_at: Optional[datetime] = None
