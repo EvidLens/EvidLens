@@ -35,13 +35,53 @@ tbody tr:hover{background:#F5F7FA}
 </style>
 </head>
 <body>
-<header class="text-white px-6 py-4 sticky top-0 shadow-md" style="background:#0A1F44">
+<script>
+const API = {{ API | tojson }};
+const tableConfig = {
+  'prices': {name: 'Live KES Prices', endpoint: API.prices, headers: {product:"Product", price:"Price", county:"County", market:"Market", fetched_at:"Updated"}},
+  'demand': {name: 'Top Demand Scores', endpoint: API.demand, headers: {product_name:"Product", sector:"Sector", county:"County", demand_score:"Demand", volume:"Volume"}},
+  'companies': {name: '50+ Real Businesses', endpoint: API.companies, headers: {name:"Name", sector:"Sector", county:"County", rating:"Rating", reviews:"Reviews", address:"Address"}},
+  'county-stats': {name: 'County Market Size', endpoint: API.county_stats, headers: {county:"County", market_size:"Market Size KES", growth:"Growth %", volume:"Volume"}},
+  'sectors': {name: 'Top Sectors', endpoint: API.sectors, headers: {sector:"Sector", count:"Search Count"}},
+  'opportunities': {name: 'High Opportunity Zones', endpoint: API.opportunities, headers: {county:"County", product_name:"Product", destination_country:"Export To", market_size_kes:"Market Size", demand_score:"Opportunity Score"}}
+}
+</script>
+
+<header class="text-white px-6 py-4 sticky top-0 shadow-md z-40" style="background:#0A1F44">
   <div class="flex items-center justify-between max-w-[1400px] mx-auto">
     <div class="flex items-center gap-3">
       <img src="/static/logo.png?v=5" alt="EvidLens Logo" class="w-10 h-10 rounded-xl object-contain bg-white p-1">
       <div><h1 class="font-bold text-2xl"><span style="color:#FFFFFF">Evid</span><span style="color:#14B8A6">Lens</span></h1><p class="text-xs" style="color:#CBD5E1">Decision Intelligence</p></div>
     </div>
-    <p class="text-xs" id="lastUpdated">Last updated: {{ data.last_updated }}</p>
+    <div class="flex items-center gap-4">
+      <p class="text-xs" id="lastUpdated">Last updated: {{ data.last_updated }}</p>
+      <div class="relative" id="profileMenu">
+        <button id="profileBtn" class="flex items-center gap-2">
+          {% if current_user.avatar_url %}<img src="{{ current_user.avatar_url }}" class="w-9 h-9 rounded-full object-cover">{% else %}<div class="w-9 h-9 rounded-full bg-gradient-to-r from-[#14B8A6] to-[#0A1F44] flex items-center justify-center text-white font-bold">{{ current_user.full_name[:1] if current_user else 'U' }}</div>{% endif %}
+        </button>
+        <div id="profileDropdown" class="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl hidden text-[#0A1F44] z-50">
+          <div class="p-4 border-b border-gray-100">
+            <p class="font-bold">{{ current_user.full_name if current_user else 'User' }}</p>
+            <p class="text-xs text-gray-500">{{ current_user.email if current_user else '' }}</p>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 mt-1 inline-block">{{ current_user.plan if current_user else 'BASIC' }}</span>
+          </div>
+          <div class="p-2 max-h-96 overflow-y-auto">
+            <a href="/settings" class="block px-3 py-2 hover:bg-gray-50 rounded-lg text-sm">Profile & Preferences</a>
+            <a href="/billing" class="block px-3 py-2 hover:bg-gray-50 rounded-lg text-sm">Billing & Subscriptions</a>
+            <a href="/history" class="block px-3 py-2 hover:bg-gray-50 rounded-lg text-sm">Activity & History</a>
+            <a href="/stats" class="block px-3 py-2 hover:bg-gray-50 rounded-lg text-sm">Usage & Stats</a>
+            <a href="/wallet" class="block px-3 py-2 hover:bg-gray-50 rounded-lg text-sm">Wallet / Credits: {{ current_user.credits if current_user else 0 }}</a>
+            <a href="/security" class="block px-3 py-2 hover:bg-gray-50 rounded-lg text-sm">Security & 2FA</a>
+            <a href="/workspaces" class="block px-3 py-2 hover:bg-gray-50 rounded-lg text-sm">Workspaces</a>
+            <a href="/help" class="block px-3 py-2 hover:bg-gray-50 rounded-lg text-sm">Help & Support</a>
+            <a href="/changelog" class="block px-3 py-2 hover:bg-gray-50 rounded-lg text-sm">Changelog</a>
+          </div>
+          <div class="p-2 border-t border-gray-100">
+            <button onclick="logout()" class="w-full text-left px-3 py-2 hover:bg-red-50 text-red-600 rounded-lg text-sm">Sign Out</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </header>
 
@@ -129,24 +169,20 @@ tbody tr:hover{background:#F5F7FA}
   </div>
 </main>
 
-<form id="pdfForm" method="POST" action="/download-report" style="display:none"><input type="hidden" name="q" id="pdf_q"><input type="hidden" name="sector" id="pdf_sector"><input type="hidden" name="county" id="pdf_county"></form>
+<form id="pdfForm" method="POST" action="{{ API.download }}" style="display:none"><input type="hidden" name="q" id="pdf_q"><input type="hidden" name="sector" id="pdf_sector"><input type="hidden" name="county" id="pdf_county"></form>
 
 <footer class="footer text-white pt-12 pb-8 mt-12"><div class="max-w-[1400px] mx-auto px-6"><div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8"><div><h3 class="font-bold mb-3" style="color:#14B8A6">Legal</h3><ul class="space-y-2 text-sm"><li><a href="/privacy" class="footer-link">Privacy Policy</a></li><li><a href="/terms" class="footer-link">Terms</a></li></ul></div><div><h3 class="font-bold mb-3" style="color:#14B8A6">Support</h3><ul class="space-y-2 text-sm"><li><a href="/contact" class="footer-link">Contact Us</a></li></ul></div><div><h3 class="font-bold mb-3" style="color:#14B8A6">Product</h3><ul class="space-y-2 text-sm"><li><a href="/pricing" class="footer-link">Pricing</a></li></ul></div><div><h3 class="font-bold mb-3" style="color:#14B8A6">Company</h3><ul class="space-y-2 text-sm"><li><a href="/about" class="footer-link">About</a></li></ul></div></div><div class="border-t border-gray-700 pt-6 text-center text-sm" style="color:#CBD5E1">© 2026 EvidLens. Decision Intelligence for Kenya.</div></div></footer>
 
 <div id="chatWidget"><div id="chatBox"><div id="chatHeader">🤖 Lens AI Assistant</div><div id="chatMessages"><div class="msg bot">Hi! I'm Lens. Ask me anything about Kenya markets.</div></div><div id="chatInputBox"><input id="chatInput" placeholder="Ask Lens anything..."><button id="chatSend">Send</button></div></div><button id="chatBtn">💬</button></div>
 
 <script>
+document.getElementById('profileBtn').onclick = (e) => {e.stopPropagation(); document.getElementById('profileDropdown').classList.toggle('hidden');}
+document.addEventListener('click', (e) => {if(!document.getElementById('profileMenu').contains(e.target)){document.getElementById('profileDropdown').classList.add('hidden');}})
+async function logout(){await fetch(API.logout, {method:'POST'}); window.location = API.login;}
+
 let lastAnalysis = null;
 let chatHistory = [];
 let activeTable = 'prices';
-let tableConfig = {
-  'prices': {name: 'Live KES Prices', endpoint: '/api/prices', headers: {product:"Product", price:"Price", county:"County", market:"Market", fetched_at:"Updated"}},
-  'demand': {name: 'Top Demand Scores', endpoint: '/api/demand', headers: {product_name:"Product", sector:"Sector", county:"County", demand_score:"Demand", volume:"Volume"}},
-  'companies': {name: '50+ Real Businesses', endpoint: '/api/companies', headers: {name:"Name", sector:"Sector", county:"County", rating:"Rating", reviews:"Reviews", address:"Address"}},
-  'county-stats': {name: 'County Market Size', endpoint: '/api/county-stats', headers: {county:"County", market_size:"Market Size KES", growth:"Growth %", volume:"Volume"}},
-  'sectors': {name: 'Top Sectors', endpoint: '/api/top-sectors', headers: {sector:"Sector", count:"Search Count"}},
-  'opportunities': {name: 'High Opportunity Zones', endpoint: '/api/opportunities', headers: {county:"County", product_name:"Product", destination_country:"Export To", market_size_kes:"Market Size", demand_score:"Opportunity Score"}}
-}
 let state = {page:1, sort_by: 'id', order:'desc', search:''}
 
 document.getElementById('tableSelector').onchange = (e) => { activeTable = e.target.value; state.page = 1; loadActiveTable(); }
@@ -183,7 +219,7 @@ function sortActive(key){
   else {state.sort_by = key; state.order='desc'}
   loadActiveTable();
 }
-function exportCurrentTable(){ window.location = `/api/export/${activeTable}?search=${state.search}` }
+function exportCurrentTable(){ window.location = `${API.export}/${activeTable}?search=${state.search}` }
 
 async function loadActiveTable(){
   const t = tableConfig[activeTable];
@@ -203,12 +239,12 @@ async function loadActiveTable(){
 }
 
 async function loadDropdowns(){
-  const [s, c] = await Promise.all([fetch('/api/sectors'), fetch('/api/counties')]);
+  const [s, c] = await Promise.all([fetch(API.get_sectors), fetch(API.get_counties)]);
   const sectors = await s.json(); const counties = await c.json();
   document.getElementById('sectorSelect').innerHTML += sectors.sectors.map(x=>`<option>${x}</option>`).join('');
   document.getElementById('countySelect').innerHTML += counties.counties.map(x=>`<option>${x}</option>`).join('');
   document.getElementById('countySelect').onchange = async (e) => {
-    const res = await fetch(`/api/subcounties?county=${e.target.value}`);
+    const res = await fetch(`${API.get_subcounties}?county=${e.target.value}`);
     const subs = await res.json();
     document.getElementById('subcountySelect').innerHTML = '<option value="">All Subcounties</option>' + subs.subcounties.map(x=>`<option>${x}</option>`).join('');
   }
@@ -222,7 +258,7 @@ document.getElementById('searchForm').onsubmit = async (e) => {
   const form = new FormData(e.target);
   lastAnalysis = Object.fromEntries(form);
   document.getElementById('result').innerHTML = '<p class="text-gray-500">Analyzing...</p>';
-  const res = await fetch('/api/analyze-detailed', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(lastAnalysis)});
+  const res = await fetch(API.analyze, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(lastAnalysis)});
   const data = await res.json();
   document.getElementById('result').innerHTML = `<pre class="whitespace-pre-wrap bg-gray-50 p-3 rounded">${data.summary}</pre>`;
 }
@@ -230,7 +266,7 @@ document.getElementById('searchForm').onsubmit = async (e) => {
 function downloadPDF(){ if(!lastAnalysis){ alert('Please run an analysis first'); return; } document.getElementById('pdf_q').value = lastAnalysis.product; document.getElementById('pdf_sector').value = lastAnalysis.sector; document.getElementById('pdf_county').value = lastAnalysis.county; document.getElementById('pdfForm').submit(); }
 const chatBtn = document.getElementById('chatBtn'); const chatBox = document.getElementById('chatBox'); const chatInput = document.getElementById('chatInput'); const chatSend = document.getElementById('chatSend'); const chatMessages = document.getElementById('chatMessages');
 chatBtn.onclick = () => { chatBox.style.display = chatBox.style.display === 'flex'? 'none' : 'flex'; };
-async function sendChat(){ const msg = chatInput.value.trim(); if(!msg) return; chatMessages.innerHTML += '<div class="msg user">' + msg + '</div>'; chatHistory.push({role: "user", content: msg}); chatInput.value = ''; chatMessages.innerHTML += '<div class="msg bot" id="typing">Lens is thinking...</div>'; chatMessages.scrollTop = chatMessages.scrollHeight; try{ const res = await fetch('/lens/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message: msg, history: chatHistory, context: lastAnalysis})}); const data = await res.json(); document.getElementById('typing').remove(); chatHistory.push({role: "assistant", content: data.reply}); chatMessages.innerHTML += '<div class="msg bot">' + data.reply + '</div>'; }catch(e){ document.getElementById('typing').innerText = 'Error: Could not reach AI'; } chatMessages.scrollTop = chatMessages.scrollHeight; }
+async function sendChat(){ const msg = chatInput.value.trim(); if(!msg) return; chatMessages.innerHTML += '<div class="msg user">' + msg + '</div>'; chatHistory.push({role: "user", content: msg}); chatInput.value = ''; chatMessages.innerHTML += '<div class="msg bot" id="typing">Lens is thinking...</div>'; chatMessages.scrollTop = chatMessages.scrollHeight; try{ const res = await fetch(API.chat, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message: msg, history: chatHistory, context: lastAnalysis})}); const data = await res.json(); document.getElementById('typing').remove(); chatHistory.push({role: "assistant", content: data.reply}); chatMessages.innerHTML += '<div class="msg bot">' + data.reply + '</div>'; }catch(e){ document.getElementById('typing').innerText = 'Error: Could not reach AI'; } chatMessages.scrollTop = chatMessages.scrollHeight; }
 chatSend.onclick = sendChat; chatInput.onkeypress = (e) => { if(e.key === 'Enter') sendChat(); }
 </script>
 </body>
