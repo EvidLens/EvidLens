@@ -51,12 +51,14 @@ class Tenant(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class LensBusiness(SQLModel, table=True):
+    __tablename__ = "lensbusiness"
     id: int | None = Field(default=None, primary_key=True)
     tenant_id: int = Field(index=True)
     name: str
     sector: str
     county: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    surveys: List["app.models.LensSurvey"] = Relationship(back_populates="business")
 
 class LensSurvey(SQLModel, table=True):
     __tablename__ = "lens_survey"
@@ -65,6 +67,7 @@ class LensSurvey(SQLModel, table=True):
     title: str
     status: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    business: "app.models.LensBusiness" = Relationship(back_populates="surveys")
     
 class LensResponse(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
