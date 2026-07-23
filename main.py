@@ -1,3 +1,4 @@
+from app.models import LensBusiness
 from app.models import Subscription
 from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -680,7 +681,7 @@ def get_news_feed(session: Session = Depends(get_session)):
     }
 
 def dashboard_api(session: Session):
-    company_count = session.exec(select(func.count(Company.id))).one()
+    company_count = session.exec(select(func.count(LensBusiness.id))).one()
     metric_count = session.exec(select(func.count(MarketMetric.id))).one()
     search_count = session.exec(select(func.count(MarketSearch.id))).one()
     county_count = session.exec(select(func.count(County.id))).one()
