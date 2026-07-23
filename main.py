@@ -1,3 +1,4 @@
+from app.modules.kenyalensiq.models import User, Notification, MarketMetric, PriceData, NewsArticle, SocialMention
 from app.modules.auth.models import AuthUser
 from app.modules.auth.service import get_current_user
 from sqlmodel import SQLModel, Field, Relationship
