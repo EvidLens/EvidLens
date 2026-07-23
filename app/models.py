@@ -1,6 +1,8 @@
-from sqlmodel import SQLModel, Field
+from sqlmodel import SQLModel, Field, Relationship
+from typing import Optional, List
 from datetime import datetime
-from typing import Optional
+from sqlalchemy import Column, JSON
+from sqlalchemy.sql import func
 
 class User(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
