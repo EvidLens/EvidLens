@@ -2,7 +2,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.modules.database import SessionLocal
 from app.modules.data_layer.service import fetch_price_trends
 from sqlmodel import Session, select
-from app.modules.data_layer.models import NewsArticle, SocialPost # FIXED: was from app.main
+from app.modules.data_layer.models import NewsArticle, SocialPost
 from datetime import datetime
 import os
 import requests
