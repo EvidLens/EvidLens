@@ -1,7 +1,7 @@
 import os
 import redis
 from typing import Generator
-from app.modules.kenyalensiq.models import
+from app.modules.kenyalensiq.models import *
 from app.kenyalensiq.models import *
 
 DATABASE_URL = os.getenv("DATABASE_URL")
