@@ -152,7 +152,10 @@ def get_dashboard_data(session: Session):
 @app.on_event("startup")
 def on_startup():
     init_db()
-    create_db_and_tables()
+    from sqlmodel import SQLModel
+    SQLModel.metadata.drop_all(engine)
+    SQLModel.metadata.create_all(engine)
+    print("Tables recreated")
     start_scheduler()
 
 @app.get("/")
