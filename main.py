@@ -917,9 +917,13 @@ async def root(request: Request, session: Session = Depends(get_session)):
     data = dashboard_api(session)
     return templates.TemplateResponse(
         "dashboard.html",
-        {"request": request, "data": data}
+        {
+            "request": request, 
+            "data": data,
+            "API": "https://evidlens-s7x6.onrender.com"
+        }
     )
-
+    
 @app.get("/competitive", response_class=HTMLResponse)
 def competitive_page(request: Request, session: Session = Depends(get_session)):
     companies = session.exec(select(Company).limit(50)).all()
