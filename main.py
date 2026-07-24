@@ -915,6 +915,13 @@ def catch_undefined():
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request, session: Session = Depends(get_session)):
     data = dashboard_api(session)
+    if not data or "stats" not in data:
+        data = {
+            "stats": {"insights_generated": 0, "active_clients": 0, "reports_exported": 0},
+            "heatmap": [],
+            "trends": []
+        }
+
     return templates.TemplateResponse(
         "dashboard.html",
         {
