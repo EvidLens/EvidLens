@@ -113,3 +113,48 @@ class MarketEngineService:
         url = f"https://us1.locationiq.com/v1/search.php?key={LOCATIONIQ_KEY}&q={county},Kenya&format=json"
         data = await self._call_api(url)
         return {"county": county, "geo_data": data}
+
+from app.core.db import SessionLocal
+
+def _get_service():
+    db = SessionLocal()
+    service = MarketEngineService(db)
+    return service
+
+async def search_market(q, sector, county):
+    s = _get_service()
+    try:
+        return await s.search_market(q, sector, county)
+    finally:
+        s.db.close()
+
+async def get_dashboard_stats():
+    s = _get_service()
+    try:
+        return await s.get_dashboard_stats()
+    finally:
+        s.db.close()
+
+async def get_real_time_terminal(sector, county):
+    s = _get_service()
+    try:
+        return await s.get_real_time_terminal(sector, county)
+    finally:
+        s.db.close()
+
+async def get_competitor_overview(sector, county):
+    s = _get_service()
+    try:
+        return await s.get_competitor_overview(sector, county)
+    finally:
+        s.db.close()
+
+async def get_location_data(county):
+    s = _get_service()
+    try:
+        return await s.get_location_data(county)
+    finally:
+        s.db.close()
+
+async def call_groq(prompt):
+    return {"status": "removed_per_request"}
