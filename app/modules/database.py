@@ -1,8 +1,8 @@
 import os
 import redis
 from typing import Generator
+from sqlmodel import SQLModel, create_engine, Session
 from app.modules.kenyalensiq.models import *
-from app.kenyalensiq.models import *
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 REDIS_URL = os.getenv("REDIS_URL")
