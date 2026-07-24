@@ -30,7 +30,7 @@ from app.modules.kenyalensiq.models import (
     KenyaLensApiUsage
 )
 from app.modules.auth.models import AuthUser
-from app.modules.auth.service import get_current_user
+from app.modules.auth.dependencies import get_current_user
 
 load_dotenv()
 
