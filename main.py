@@ -988,7 +988,7 @@ def kenyalsiq_dashboard(session: Session = Depends(get_session)):
     }
 
 @app.get("/dashboard")
-async def dashboard(request: Request, current_user: User = Depends(get_current_user)):
+async def dashboard(request: Request, current_user: AuthUser = Depends(get_current_user)):
     data = get_dashboard_data(current_user.tenant_id)
     
     API = {
