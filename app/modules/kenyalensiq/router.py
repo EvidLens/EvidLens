@@ -65,8 +65,8 @@ async def mpesa_callback(req: Request, session: Session = Depends(get_session)):
     sub.plan = "Pro" if amount == 5000 else "Enterprise"
     sub.modules = ["core", "health", "money", "brand", "demand", "behavior", "policy", "capital", "trade"]
     sub.expires_at = datetime.utcnow() + timedelta(days=30)
-    sub.metadata["last_payment"] = receipt
-    sub.metadata["last_phone"] = items["PhoneNumber"]
+    sub.extra_data["last_payment"] = receipt
+    sub.extra_data["last_phone"] = items["PhoneNumber"]
     session.add(sub)
     session.commit()
     return {"ResultCode": 0, "ResultDesc": "Success"}
