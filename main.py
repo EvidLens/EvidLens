@@ -1,3 +1,4 @@
+from sqlalchemy import text
 from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -153,7 +154,9 @@ def get_dashboard_data(session: Session):
 def on_startup():
     init_db()
     from sqlmodel import SQLModel
-    SQLModel.metadata.drop_all(engine)
+    with engine.connect() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS marketmetric CASCADE"))
+        conn.commit()
     SQLModel.metadata.create_all(engine)
     start_scheduler()
 
