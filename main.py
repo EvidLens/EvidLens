@@ -27,7 +27,16 @@ from app.modules.kenyalensiq.models import (
     KenyaLensSubscription,
     KenyaLensAlert,
     KenyaLensMember,
-    KenyaLensApiUsage
+    KenyaLensApiUsage,
+    KenyaLensMarketMetric,
+    KenyaLensMarketSearch,
+    KenyaLensCounty,
+    KenyaLensSocialPost,
+    KenyaLensNewsArticle,
+    KenyaLensSector,
+    KenyaLensFMCGProduct,
+    KenyaLensPolicyWatch,
+    KenyaLensExportOpportunity
 )
 from app.modules.auth.models import AuthUser
 from app.modules.auth.dependencies import get_current_user
