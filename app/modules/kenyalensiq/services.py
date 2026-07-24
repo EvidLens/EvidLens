@@ -23,10 +23,10 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-def get_subscription(session: Session, tenant_id: str) -> LensSubscription | None:
-    sub = session.exec(select(LensSubscription).where(LensSubscription.tenant_id == tenant_id)).first()
+def get_subscription(session: Session, tenant_id: str) -> KenyaLensSubscription | None:
+    sub = session.exec(select(KenyaLensSubscription).where(KenyaLensSubscription.tenant_id == tenant_id)).first()
     if not sub:
-        used_trial = session.exec(select(LensAudit).where(LensAudit.tenant_id == tenant_id, LensAudit.action == "trial_start")).first()
+        used_trial = session.exec(select(KenyaLensAudit).where(KenyaLensAudit.tenant_id == tenant_id, KenyaLensAudit.action == "trial_start")).first()
         if used_trial:
             return None
     if sub and sub.expires_at < datetime.utcnow():
@@ -34,7 +34,7 @@ def get_subscription(session: Session, tenant_id: str) -> LensSubscription | Non
             return None
     return sub
 
-def require_active_subscription(session: Session, tenant_id: str) -> LensSubscription:
+def require_active_subscription(session: Session, tenant_id: str) -> KenyaLensSubscription:
     sub = get_subscription(session, tenant_id)
     if not sub:
         raise HTTPException(403, "Subscription required")
@@ -42,30 +42,27 @@ def require_active_subscription(session: Session, tenant_id: str) -> LensSubscri
         raise HTTPException(403, "Subscription expired")
     return sub
 
-def check_module_access(session: Session, tenant_id: str, module: str) -> LensSubscription:
+def check_module_access(session: Session, tenant_id: str, module: str) -> KenyaLensSubscription:
     sub = require_active_subscription(session, tenant_id)
     if module not in sub.modules:
         raise HTTPException(403, f"Upgrade to access {module}")
     return sub
 
 def log_audit(session: Session, tenant_id: str, user_id: str, action: str, module: str, payload: dict = {}):
-    session.add(LensAudit(tenant_id=tenant_id, user_id=user_id, action=action, module=module, payload=payload))
+    session.add(KenyaLensAudit(tenant_id=tenant_id, user_id=user_id, action=action, module=module, payload=payload))
     session.commit()
 
 def get_all_active_tenants(session: Session):
-    return session.exec(select(Tenant).where(Tenant.is_active == True)).all()
+    return session.exec(select(KenyaLensTenant).where(KenyaLensTenant.is_active == True)).all()
 
 def get_tenant_user(session: Session, tenant_id: str):
-    return session.exec(select(User).where(User.tenant_id == tenant_id, User.is_admin == True)).first()
+    return session.exec(select(KenyaLensUser).where(KenyaLensUser.tenant_id == tenant_id, KenyaLensUser.is_admin == True)).first()
 
 def create_alert(session: Session, data: dict):
-    session.add(LensAlert(**data))
+    session.add(KenyaLensAlert(**data))
     session.commit()
 
-def send_email(to: str, subject: str, body: str):
-    pass
-
-async def fire_alert(session: Session, alert: LensAlert, value: Any):
+async def fire_alert(session: Session, alert: KenyaLensAlert, value: Any):
     alert.last_triggered = datetime.utcnow()
     session.add(alert)
     session.commit()
@@ -74,9 +71,9 @@ async def fire_alert(session: Session, alert: LensAlert, value: Any):
             await client.post(alert.destination, json={"alert": alert.name, "value": value})
 
 async def ingest_live(session: Session, payload: dict, tenant_id: str, user_id: str, source: str = "api"):
-    business = session.exec(select(LensBusiness).where(LensBusiness.external_id == payload['business_id'])).first()
+    business = session.exec(select(KenyaLensBusiness).where(KenyaLensBusiness.external_id == payload['business_id'])).first()
     if not business:
-        business = LensBusiness(**{k: payload.get(k) for k in ["external_id","name","region","county","sector","size_category","employees_total"]})
+        business = KenyaLensBusiness(**{k: payload.get(k) for k in ["external_id","name","region","county","sector","size_category","employees_total"]})
         session.add(business)
         session.commit()
         session.refresh(business)
@@ -84,12 +81,12 @@ async def ingest_live(session: Session, payload: dict, tenant_id: str, user_id: 
         business.updated_at = datetime.utcnow()
         session.add(business)
 
-    survey = LensSurvey(business_id=business.id, source=source, module=payload.get("module", "core"), data=payload.get('all_answers', {}))
+    survey = KenyaLensSurvey(business_id=business.id, source=source, module=payload.get("module", "core"), data=payload.get('all_answers', {}))
     session.add(survey)
     session.commit()
     log_audit(session, tenant_id, user_id, "ingest_data", "core", {"business_id": business.id})
 
-    alerts = session.exec(select(LensAlert).where(LensAlert.tenant_id == tenant_id, LensAlert.is_active == True)).all()
+    alerts = session.exec(select(KenyaLensAlert).where(KenyaLensAlert.tenant_id == tenant_id, KenyaLensAlert.is_active == True)).all()
     for alert in alerts:
         cond = alert.condition or {}
         if business.region == cond.get("region") and survey.data.get(cond.get("metric")) == cond.get("value"):
@@ -99,18 +96,18 @@ async def ingest_live(session: Session, payload: dict, tenant_id: str, user_id: 
 
 def query_aggregate(session: Session, tenant_id: str, module: str, json_key: str):
     sub = check_module_access(session, tenant_id, module)
-    stmt = select(LensSurvey.data[json_key].astext, func.count()).join(LensBusiness)
+    stmt = select(KenyaLensSurvey.data[json_key].astext, func.count()).join(KenyaLensBusiness)
 
     if sub.regions:
-        stmt = stmt.where(LensBusiness.region.in_(sub.regions))
+        stmt = stmt.where(KenyaLensBusiness.region.in_(sub.regions))
     if sub.sectors:
-        stmt = stmt.where(LensBusiness.sector.in_(sub.sectors))
+        stmt = stmt.where(KenyaLensBusiness.sector.in_(sub.sectors))
 
-    stmt = stmt.where(LensSurvey.module == module)
-    stmt = stmt.where(LensSurvey.collected_at > datetime.utcnow() - timedelta(days=90))
+    stmt = stmt.where(KenyaLensSurvey.module == module)
+    stmt = stmt.where(KenyaLensSurvey.collected_at > datetime.utcnow() - timedelta(days=90))
 
-    total = session.exec(select(func.count()).select_from(LensSurvey).join(LensBusiness)).first()
-    rows = session.exec(stmt.group_by(LensSurvey.data[json_key].astext)).all()
+    total = session.exec(select(func.count()).select_from(KenyaLensSurvey).join(KenyaLensBusiness)).first()
+    rows = session.exec(stmt.group_by(KenyaLensSurvey.data[json_key].astext)).all()
 
     return {
         "count": total,
@@ -118,7 +115,7 @@ def query_aggregate(session: Session, tenant_id: str, module: str, json_key: str
     }
 
 def start_trial(session: Session, tenant_id: str):
-    sub = LensSubscription(
+    sub = KenyaLensSubscription(
         tenant_id=tenant_id,
         plan="Trial",
         modules=["core","health"],
@@ -133,17 +130,17 @@ def start_trial(session: Session, tenant_id: str):
 def check_trial_expiry_alerts(session: Session):
     tomorrow = datetime.utcnow() + timedelta(days=1)
     expiring_trials = session.exec(
-        select(LensSubscription)
-     .where(LensSubscription.plan == "Trial")
-     .where(LensSubscription.expires_at <= tomorrow)
-     .where(LensSubscription.expires_at > datetime.utcnow())
+        select(KenyaLensSubscription)
+    .where(KenyaLensSubscription.plan == "Trial")
+    .where(KenyaLensSubscription.expires_at <= tomorrow)
+    .where(KenyaLensSubscription.expires_at > datetime.utcnow())
     ).all()
 
     for sub in expiring_trials:
         already_alerted = session.exec(
-            select(LensAudit).where(
-                LensAudit.tenant_id == sub.tenant_id,
-                LensAudit.action == "trial_24h_alert_sent"
+            select(KenyaLensAudit).where(
+                KenyaLensAudit.tenant_id == sub.tenant_id,
+                KenyaLensAudit.action == "trial_24h_alert_sent"
             )
         ).first()
         if already_alerted:
@@ -169,7 +166,7 @@ def check_trial_expiry_alerts(session: Session):
         log_audit(session, sub.tenant_id, "system", "trial_24h_alert_sent", "kenyalensiq")
 
 def start_paid_plan(session: Session, tenant_id: str, plan: str):
-    sub = get_subscription(session, tenant_id) or LensSubscription(tenant_id=tenant_id)
+    sub = get_subscription(session, tenant_id) or KenyaLensSubscription(tenant_id=tenant_id)
     sub.plan = plan
     sub.modules = ["core","health","money","brand","demand","behavior","policy","capital","trade"]
     sub.expires_at = datetime.utcnow() + timedelta(days=30 if plan == "Pro" else 365)
