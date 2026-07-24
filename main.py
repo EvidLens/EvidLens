@@ -155,7 +155,6 @@ def on_startup():
     from sqlmodel import SQLModel
     SQLModel.metadata.drop_all(engine)
     SQLModel.metadata.create_all(engine)
-    print("Tables recreated")
     start_scheduler()
 
 @app.get("/")
