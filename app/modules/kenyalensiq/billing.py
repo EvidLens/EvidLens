@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, HTTPException, Depends
 from sqlmodel import Session
 from App.kenyalensiq import services
-from App.kenyalensiq.models import Subscription
+from app.modules.kenyalensiq.models import KenyaLensSubscription
 from App.db import get_session
 from datetime import datetime, timedelta
 
