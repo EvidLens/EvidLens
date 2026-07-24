@@ -6,6 +6,13 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from sqlmodel import Session, select, func, or_, desc, asc
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from sqlmodel import select, func
+from sqlmodel import select, func, or_
+from app.modules.kenyalensiq.models import (
+    MarketMetric, PriceData, NewsArticle, SocialMention,
+    KenyaTenant, KenyaLensBusiness, KenyaLensSurvey,
+    KenyaLensSubscription, KenyaLensAlert, KenyaLensMember
+)
 
 import os
 import csv
@@ -691,39 +698,44 @@ def get_news_feed(session: Session = Depends(get_session)):
     }
 
 def dashboard_api(session: Session):
-    company_count = session.exec(select(func.count(KenyaLensBusiness.id))).one()
-    metric_count = session.exec(select(func.count(MarketMetric.id))).one()
-    search_count = session.exec(select(func.count(MarketSearch.id))).one()
-    county_count = session.exec(select(func.count(County.id))).one()
-    social_count = session.exec(select(func.count(SocialPost.id))).one()
-    news_count = session.exec(select(func.count(NewsArticle.id))).one()
-    sector_count = session.exec(select(func.count(Sector.id))).one()
-    product_count = session.exec(select(func.count(FMCGProduct.id))).one()
-    subscription_count = session.exec(select(func.count(Subscription.id))).one()
-    policy_count = session.exec(select(func.count(PolicyWatch.id))).one()
-    export_count = session.exec(select(func.count(ExportOpportunity.id))).one()
+    return {
+        "businesses": session.exec(select(func.count(KenyaLensBusiness.id))).one(),
+        "funding_businesses": session.exec(select(func.count(KenyaLensBusiness.id)).where(or_(KenyaLensBusiness.sector.contains("Financial"), KenyaLensBusiness.sector.contains("Banking"), KenyaLensBusiness.sector.contains("Insurance"), KenyaLensBusiness.sector.contains("SACCO"), KenyaLensBusiness.sector.contains("Microfinance"), KenyaLensBusiness.sector.contains("FinTech")))).one(),
+        "metrics": session.exec(select(func.count(MarketMetric.id))).one(),
+        "price_data": session.exec(select(func.count(PriceData.id))).one(),
+        "news_articles": session.exec(select(func.count(NewsArticle.id))).one(),
+        "social_mentions": session.exec(select(func.count(SocialMention.id))).one(),
+        "tenants": session.exec(select(func.count(KenyaTenant.id))).one(),
+        "surveys": session.exec(select(func.count(KenyaLensSurvey.id))).one(),
+        "subscriptions": session.exec(select(func.count(KenyaLensSubscription.id))).one(),
+        "alerts": session.exec(select(func.count(KenyaLensAlert.id))).one(),
+        "members": session.exec(select(func.count(KenyaLensMember.id))).one()
+    }
     funding_count = session.exec(
-        select(func.count(Company.id)).where(
+        select(func.count(KenyaLensBusiness.id)).where(
             or_(
-                Company.sector.contains("Financial"),
-                Company.sector.contains("Banking"),
-                Company.sector.contains("Insurance"),
-                Company.sector.contains("SACCO"),
-                Company.sector.contains("Microfinance"),
-                Company.sector.contains("FinTech")
+                KenyaLensBusiness.sector.contains("Financial"),
+                KenyaLensBusiness.sector.contains("Banking"),
+                KenyaLensBusiness.sector.contains("Insurance"),
+                KenyaLensBusiness.sector.contains("SACCO"),
+                KenyaLensBusiness.sector.contains("Microfinance"),
+                KenyaLensBusiness.sector.contains("FinTech")
             )
         )
     ).one()
     
     return {
-        "companies": company_count,
+        "businesses": business_count,
+        "funding_businesses": funding_count,
         "metrics": metric_count,
-        "searches": search_count,
-        "counties": county_count,
-        "social_posts": social_count,
-        "news": news_count,
-        "sectors": sector_count,
-        "products": product_count,
+        "price_data": price_count,
+        "news_articles": news_count,
+        "social_mentions": social_count,
+        "tenants": tenant_count,
+        "surveys": survey_count,
+        "subscriptions": subscription_count,
+        "alerts": alert_count,
+        "members": member_count
     }
     lens_count = session.exec(select(func.count()).select_from(LensSurvey)).one()
     modules = [
