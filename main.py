@@ -724,10 +724,6 @@ def dashboard_api(session: Session):
         "news": news_count,
         "sectors": sector_count,
         "products": product_count,
-        "subscriptions": subscription_count,
-        "policies": policy_count,
-        "exports": export_count,
-        "funding_companies": funding_count
     }
     lens_count = session.exec(select(func.count()).select_from(LensSurvey)).one()
     modules = [
