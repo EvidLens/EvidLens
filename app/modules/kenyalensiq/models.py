@@ -1,7 +1,6 @@
-from sqlmodel import SQLModel, Field, Relationship
+from sqlmodel import SQLModel, Field, Relationship, Column
 from typing import Optional, List
 from datetime import datetime
-from sqlalchemy import Column
 from sqlalchemy.dialects.postgresql import JSONB
 
 class Notification(SQLModel, table=True):
@@ -17,6 +16,7 @@ class Notification(SQLModel, table=True):
 class MarketMetric(SQLModel, table=True):
     __tablename__ = "market_metrics"
     id: Optional[int] = Field(default=None, primary_key=True)
+    tenant_id: str = Field(index=True)
     product: str
     county: str
     sector: str
@@ -26,6 +26,7 @@ class MarketMetric(SQLModel, table=True):
 class PriceData(SQLModel, table=True):
     __tablename__ = "price_data"
     id: Optional[int] = Field(default=None, primary_key=True)
+    tenant_id: str = Field(index=True)
     product_name: str
     county: str
     sector: str
@@ -35,6 +36,7 @@ class PriceData(SQLModel, table=True):
 class NewsArticle(SQLModel, table=True):
     __tablename__ = "news_articles"
     id: Optional[int] = Field(default=None, primary_key=True)
+    tenant_id: str = Field(index=True)
     product: str
     title: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
@@ -42,6 +44,7 @@ class NewsArticle(SQLModel, table=True):
 class SocialMention(SQLModel, table=True):
     __tablename__ = "social_mentions"
     id: Optional[int] = Field(default=None, primary_key=True)
+    tenant_id: str = Field(index=True)
     product: str
     platform: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
@@ -55,7 +58,7 @@ class KenyaTenant(SQLModel, table=True):
 class KenyaLensBusiness(SQLModel, table=True):
     __tablename__ = "kenya_lens_business"
     id: Optional[int] = Field(default=None, primary_key=True)
-    tenant_id: int = Field(index=True)
+    tenant_id: str = Field(index=True)
     name: str
     sector: str
     county: str
@@ -65,6 +68,7 @@ class KenyaLensBusiness(SQLModel, table=True):
 class KenyaLensSurvey(SQLModel, table=True):
     __tablename__ = "kenya_lens_survey"
     id: Optional[int] = Field(default=None, primary_key=True)
+    tenant_id: str = Field(index=True)
     business_id: int = Field(index=True, foreign_key="kenya_lens_business.id")
     title: str
     status: str
@@ -74,6 +78,7 @@ class KenyaLensSurvey(SQLModel, table=True):
 class KenyaLensResponse(SQLModel, table=True):
     __tablename__ = "kenya_lens_response"
     id: Optional[int] = Field(default=None, primary_key=True)
+    tenant_id: str = Field(index=True)
     survey_id: int = Field(index=True)
     respondent_phone: Optional[str] = None
     data: str
@@ -82,15 +87,18 @@ class KenyaLensResponse(SQLModel, table=True):
 class KenyaLensSubscription(SQLModel, table=True):
     __tablename__ = "kenya_lens_subscriptions"
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="auth_users.id")
+    user_id: Optional[int] = Field(foreign_key="auth_users.id")
+    tenant_id: str = Field(index=True)
     plan: str
     status: str = "active"
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    modules: List[str] = Field(default_factory=list, sa_column=Column(JSONB))
     expires_at: Optional[datetime] = None
+    metadata: dict = Field(default_factory=dict, sa_column=Column(JSONB))
+    api_key: Optional[str] = Field(default=None, index=True, unique=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class KenyaLensAlert(SQLModel, table=True):
     __tablename__ = "kenya_lens_alerts"
-
     id: Optional[int] = Field(default=None, primary_key=True)
     tenant_id: str = Field(index=True)
     title: str
