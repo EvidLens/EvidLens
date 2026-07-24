@@ -4,7 +4,7 @@ from sqlmodel import Session
 from pydantic import BaseModel, EmailStr
 from.service import *
 from.models import AuthUser
-from.dependencies import get_current_user, require_active_subscription, require_admin
+from .dependencies import get_current_user, require_active_subscription, require_admin
 from app.modules.database import get_session as get_db
 import secrets
 
