@@ -691,30 +691,44 @@ def get_news_feed(session: Session = Depends(get_session)):
     }
 
 def dashboard_api(session: Session):
-    company_count = session.exec(select(func.count(LensBusiness.id))).one()
-    metric_count = session.exec(select(func.count(MarketMetric.id))).one()
-    search_count = session.exec(select(func.count(MarketSearch.id))).one()
-    county_count = session.exec(select(func.count(County.id))).one()
-    social_count = session.exec(select(func.count(SocialPost.id))).one()
-    news_count = session.exec(select(func.count(NewsArticle.id))).one()
-    sector_count = session.exec(select(func.count(Sector.id))).one()
-    product_count = session.exec(select(func.count(FMCGProduct.id))).one()
-    subscription_count = session.exec(select(func.count(Subscription.id))).one()
-    policy_count = session.exec(select(func.count(PolicyWatch.id))).one()
-    export_count = session.exec(select(func.count(ExportOpportunity.id))).one()
+    company_count = session.exec(select(func.count(KenyaLensBusiness.id))).one()
+    metric_count = session.exec(select(func.count(KenyaLensMarketMetric.id))).one()
+    search_count = session.exec(select(func.count(KenyaLensMarketSearch.id))).one()
+    county_count = session.exec(select(func.count(KenyaLensCounty.id))).one()
+    social_count = session.exec(select(func.count(KenyaLensSocialPost.id))).one()
+    news_count = session.exec(select(func.count(KenyaLensNewsArticle.id))).one()
+    sector_count = session.exec(select(func.count(KenyaLensSector.id))).one()
+    product_count = session.exec(select(func.count(KenyaLensFMCGProduct.id))).one()
+    subscription_count = session.exec(select(func.count(KenyaLensSubscription.id))).one()
+    policy_count = session.exec(select(func.count(KenyaLensPolicyWatch.id))).one()
+    export_count = session.exec(select(func.count(KenyaLensExportOpportunity.id))).one()
     funding_count = session.exec(
-        select(func.count(Company.id)).where(
+        select(func.count(KenyaLensBusiness.id)).where(
             or_(
-                Company.sector.contains("Financial"),
-                Company.sector.contains("Banking"),
-                Company.sector.contains("Insurance"),
-                Company.sector.contains("SACCO"),
-                Company.sector.contains("Microfinance"),
-                Company.sector.contains("FinTech")
+                KenyaLensBusiness.sector.contains("Financial"),
+                KenyaLensBusiness.sector.contains("Banking"),
+                KenyaLensBusiness.sector.contains("Insurance"),
+                KenyaLensBusiness.sector.contains("SACCO"),
+                KenyaLensBusiness.sector.contains("Microfinance"),
+                KenyaLensBusiness.sector.contains("FinTech")
             )
         )
     ).one()
-
+    
+    return {
+        "companies": company_count,
+        "metrics": metric_count,
+        "searches": search_count,
+        "counties": county_count,
+        "social_posts": social_count,
+        "news": news_count,
+        "sectors": sector_count,
+        "products": product_count,
+        "subscriptions": subscription_count,
+        "policies": policy_count,
+        "exports": export_count,
+        "funding_companies": funding_count
+    }
     lens_count = session.exec(select(func.count()).select_from(LensSurvey)).one()
     modules = [
     {"id": 1, "name": "Competitive Engine", "icon": "🎯", "count": company_count, "route": "/competitive"},
