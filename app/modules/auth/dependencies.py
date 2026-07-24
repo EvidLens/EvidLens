@@ -2,7 +2,7 @@ from fastapi import Depends, HTTPException, Request
 from sqlmodel import Session, select
 from datetime import datetime
 from app.modules.auth.models import AuthUser, UserRole
-from app.modules.kenyalensiq.models import KenyaSubscription
+from app.modules.kenyalensiq.models import KenyaLensSubscription
 from app.modules.database import get_session as get_db
 
 def get_current_user(request: Request, db: Session = Depends(get_db)):
