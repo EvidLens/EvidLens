@@ -919,8 +919,18 @@ async def root(request: Request, session: Session = Depends(get_session)):
         data = {
             "stats": {"insights_generated": 0, "active_clients": 0, "reports_exported": 0},
             "heatmap": [],
-            "trends": []
+            "trends": [],
+            "trending": {"category": "WELCOME", "headline": "Sign in to see trending insights"}
         }
+    return templates.TemplateResponse(
+        "dashboard.html",
+        {
+            "request": request, 
+            "data": data,
+            "API": "https://evidlens-s7x6.onrender.com",
+            "current_user": None
+        }
+    )
 
     return templates.TemplateResponse(
         "dashboard.html",
