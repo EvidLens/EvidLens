@@ -153,7 +153,7 @@ app.include_router(kenyalensiq_router, prefix="/kenyalensiq", tags=["kenyalensiq
 @app.get("/dashboard")
 def dashboard(
     request: Request,
-    sub: Subscription = Depends(require_active_subscription)
+    sub: KenyaLensSubscription = Depends(require_active_subscription)
 ):
     data = get_dashboard_data()
     return templates.TemplateResponse("dashboard.html", {
