@@ -93,7 +93,7 @@ class KenyaLensSubscription(SQLModel, table=True):
     status: str = "active"
     modules: List[str] = Field(default_factory=list, sa_column=Column(JSONB))
     expires_at: Optional[datetime] = None
-    metadata: dict = Field(default_factory=dict, sa_column=Column(JSONB))
+    extra_data: dict = Field(default_factory=dict, sa_column=Column(JSONB))
     api_key: Optional[str] = Field(default=None, index=True, unique=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
