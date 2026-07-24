@@ -166,7 +166,8 @@ def dashboard(
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "data": data,
-        "current_user": {"api_key": sub.api_key}
+        "current_user": {"api_key": sub.api_key},
+        "API": "https://evidlens-s7x6.onrender.com"
     })
 
 PRICING = {
