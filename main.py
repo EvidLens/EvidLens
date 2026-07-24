@@ -134,8 +134,19 @@ def get_dashboard_data(session: Session):
         {"id": 10, "name": "KenyaLensIQ", "icon": "📊", "count": survey_count, "route": "/kenyalensiq"}
     ]
     stats = {"insights_generated": metric_count, "sectors_covered": 12, "reports_exported": subscription_count, "active_products": price_count}
-    top_demands = session.exec(select(MarketMetric.product_name, MarketMetric.county, MarketMetric.sector, MarketMetric.demand_score).order_by(desc(MarketMetric.demand_score)).limit(1)).all()
-    trending = {"category": top_demands[0].sector if top_demands else "Agriculture", "headline": f"{top_demands[0].product_name} demand up in {top_demands[0].county}" if top_demands else "No data yet"}
+
+    trending = {"category": "Agriculture", "headline": "No data yet"}
+    try:
+        top_demands = session.exec(select(MarketMetric).order_by(desc(MarketMetric.demand_score)).limit(1)).all()
+        if top_demands:
+            d = top_demands[0]
+            product = getattr(d, 'product_name', getattr(d, 'product', 'Product'))
+            county = getattr(d, 'county', 'Kenya')
+            sector = getattr(d, 'sector', 'Agriculture')
+            trending = {"category": sector, "headline": f"{product} demand up in {county}"}
+    except:
+        pass
+
     return {"stats": stats, "trending": trending, "modules": modules, "last_updated": datetime.utcnow().isoformat()}
 
 @app.on_event("startup")
