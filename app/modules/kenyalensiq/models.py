@@ -16,7 +16,7 @@ class Notification(SQLModel, table=True):
 class MarketMetric(SQLModel, table=True):
     __tablename__ = "market_metrics"
     id: Optional[int] = Field(default=None, primary_key=True)
-    tenant_id: str = Field(index=True)
+    # tenant_id: str = Field(index=True)
     product: str
     county: str
     sector: str
