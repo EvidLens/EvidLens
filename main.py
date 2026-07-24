@@ -920,7 +920,8 @@ async def root(request: Request, session: Session = Depends(get_session)):
         {
             "request": request, 
             "data": data,
-            "API": "https://evidlens-s7x6.onrender.com"
+            "API": "https://evidlens-s7x6.onrender.com",
+            "current_user": None
         }
     )
     
