@@ -20,17 +20,13 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from datetime import datetime
 
 from app.modules.kenyalensiq.models import (
-    User, 
-    Notification, 
-    MarketMetric, 
-    PriceData, 
-    NewsArticle, 
-    SocialMention,
+    KenyaLensUser,
+    KenyaLensTenant,
+    KenyaLensSubscription,
+    KenyaLensAlert,
     KenyaLensBusiness,
-    KenyaSubscription,
     KenyaLensSurvey,
-    KenyaLensResponse,
-    KenyaTenant
+    KenyaLensAudit
 )
 from app.modules.auth.models import User as AuthUser
 from app.modules.auth.service import get_current_user
