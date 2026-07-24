@@ -48,13 +48,12 @@ def check_module_access(session: Session, tenant_id: str, module: str) -> KenyaL
         raise HTTPException(403, f"Upgrade to access {module}")
     return sub
 
-def log_audit(session: Session, tenant_id: str, user_id: str, action: str, module: str, payload: dict = {}):
-    session.add(KenyaLensAudit(tenant_id=tenant_id, user_id=user_id, action=action, module=module, payload=payload))
-    session.commit()
-
 def get_all_active_tenants(session: Session):
     return session.exec(select(KenyaLensTenant).where(KenyaLensTenant.is_active == True)).all()
 
+def get_tenant_user(session: Session, tenant_id: str):
+    return session.exec(select(KenyaLensUser).where(KenyaLensUser.tenant_id == tenant_id, KenyaLensUser.is_admin == True)).first()
+    
 def get_tenant_user(session: Session, tenant_id: str):
     return session.exec(select(KenyaLensUser).where(KenyaLensUser.tenant_id == tenant_id, KenyaLensUser.is_admin == True)).first()
 
