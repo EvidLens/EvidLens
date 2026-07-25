@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from sqlmodel import select, func
 from sqlmodel import select, func, or_
 from bs4 import BeautifulSoup
-import tweepy
+# import tweepy
 from supabase import create_client, Client
 
 from app.modules.kenyalensiq.models import (
