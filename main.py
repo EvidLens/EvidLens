@@ -117,8 +117,20 @@ WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
 X_BEARER_TOKEN = os.getenv("X_BEARER_TOKEN")
 
 client = Groq(api_key=GROQ_API_KEY)
-supabase: Client = create_client(SUPABASE_URL, APP_SUPABASE_KEY) if SUPABASE_URL and APP_SUPABASE_KEY else None
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+APP_SUPABASE_KEY = os.getenv("APP_SUPABASE_KEY")
 
+supabase: Client = None
+if SUPABASE_URL and APP_SUPABASE_KEY:
+    try:
+        supabase = create_client(SUPABASE_URL, APP_SUPABASE_KEY)
+        print("Supabase connected")
+    except Exception as e:
+        print(f"Supabase connection failed: {e}")
+        supabase = None
+else:
+    print("Warning: SUPABASE_URL or APP_SUPABASE_KEY not set")
+    
 app.include_router(kenyalensiq_router)
 app.include_router(competitive_router)
 app.include_router(market_router)
