@@ -1,5 +1,5 @@
 
-from app.modules.database import get_db
+from app.modules.database import get_session
 from app.modules.kenyalensiq.models import KenyaLensBusiness, MarketMetric
 from groq import Groq
 import smtplib, json
