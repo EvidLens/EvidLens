@@ -13,14 +13,15 @@ if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=10, max_overflow=20)
-redis_client = redis.from_url(REDIS_URL, decode_responses=True) if REDIS_URL else None
+SessionLocal = Session # ADD THIS BACK
 
+redis_client = redis.from_url(REDIS_URL, decode_responses=True) if REDIS_URL else None
 Base = SQLModel.metadata
 
 def get_session() -> Generator[Session, None, None]:
     with Session(engine) as session:
         yield session
-        
+
 get_db = get_session 
 
 def create_db_and_tables():
