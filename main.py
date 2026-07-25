@@ -67,6 +67,11 @@ from app.modules.chatbot.router import router as chatbot_router
 
 scheduler = AsyncIOScheduler()
 
+scheduler = AsyncIOScheduler()
+scheduler.add_job(scrape_kpin_prices, "cron", hour="0,6,12,18")
+scheduler.add_job(fetch_real_news, "interval", hours=6)
+scheduler.add_job(fetch_real_tweets, "interval", hours=3)
+
 app = FastAPI(title="EvidLens API", version="2.5.3")
 
 app.add_middleware(
@@ -699,88 +704,98 @@ def get_news_feed(session: Session = Depends(get_session)):
     }
 
 def dashboard_api(session: Session):
-    return {
-        "businesses": session.exec(select(func.count(KenyaLensBusiness.id))).one(),
-        "funding_businesses": session.exec(select(func.count(KenyaLensBusiness.id)).where(or_(KenyaLensBusiness.sector.contains("Financial"), KenyaLensBusiness.sector.contains("Banking"), KenyaLensBusiness.sector.contains("Insurance"), KenyaLensBusiness.sector.contains("SACCO"), KenyaLensBusiness.sector.contains("Microfinance"), KenyaLensBusiness.sector.contains("FinTech")))).one(),
-        "metrics": session.exec(select(func.count(MarketMetric.id))).one(),
-        "price_data": session.exec(select(func.count(PriceData.id))).one(),
-        "news_articles": session.exec(select(func.count(NewsArticle.id))).one(),
-        "social_mentions": session.exec(select(func.count(SocialMention.id))).one(),
-        "tenants": session.exec(select(func.count(KenyaTenant.id))).one(),
-        "surveys": session.exec(select(func.count(KenyaLensSurvey.id))).one(),
-        "subscriptions": session.exec(select(func.count(KenyaLensSubscription.id))).one(),
-        "alerts": session.exec(select(func.count(KenyaLensAlert.id))).one(),
-        "members": session.exec(select(func.count(KenyaLensMember.id))).one()
-    }
-    funding_count = session.exec(
-        select(func.count(KenyaLensBusiness.id)).where(
-            or_(
-                KenyaLensBusiness.sector.contains("Financial"),
-                KenyaLensBusiness.sector.contains("Banking"),
-                KenyaLensBusiness.sector.contains("Insurance"),
-                KenyaLensBusiness.sector.contains("SACCO"),
-                KenyaLensBusiness.sector.contains("Microfinance"),
-                KenyaLensBusiness.sector.contains("FinTech")
-            )
-        )
-    ).one()
+    # Live counts from DB - no hardcodes
+    business_count = session.exec(select(func.count(KenyaLensBusiness.id))).one()
+    metric_count = session.exec(select(func.count(MarketMetric.id))).one()
+    news_count = session.exec(select(func.count(NewsArticle.id))).one()
+    social_count = session.exec(select(func.count(SocialMention.id))).one()
+    tenant_count = session.exec(select(func.count(KenyaTenant.id))).one()
+    survey_count = session.exec(select(func.count(KenyaLensSurvey.id))).one()
+    subscription_count = session.exec(select(func.count(KenyaLensSubscription.id))).one()
+    alert_count = session.exec(select(func.count(KenyaLensAlert.id))).one()
+    member_count = session.exec(select(func.count(KenyaLensMember.id))).one()
+    lens_count = session.exec(select(func.count(KenyaLensSurvey.id))).one()
     
-    return {
-        "businesses": business_count,
-        "funding_businesses": funding_count,
-        "metrics": metric_count,
-        "price_data": price_count,
-        "news_articles": news_count,
-        "social_mentions": social_count,
-        "tenants": tenant_count,
-        "surveys": survey_count,
-        "subscriptions": subscription_count,
-        "alerts": alert_count,
-        "members": member_count
-    }
-    lens_count = session.exec(select(func.count()).select_from(LensSurvey)).one()
+    # Dynamic counts
+    company_count = business_count
+    search_count = session.exec(select(func.count(MarketMetric.id))).one()
+    county_count = session.exec(select(func.count(func.distinct(MarketMetric.county)))).one() if metric_count > 0 else 0
+    sector_count = session.exec(select(func.count(func.distinct(MarketMetric.sector)))).one() if metric_count > 0 else 0
+    
+    # Policy count - only if category column exists
+    try:
+        policy_count = session.exec(select(func.count(NewsArticle.id)).where(NewsArticle.category == "Policy")).one()
+    except:
+        policy_count = 0
+    
+    # Funding businesses - live filter
+    funding_count = session.exec(select(func.count(KenyaLensBusiness.id)).where(
+        or_(
+            KenyaLensBusiness.sector.ilike("%Financial%"),
+            KenyaLensBusiness.sector.ilike("%Banking%"),
+            KenyaLensBusiness.sector.ilike("%Insurance%"),
+            KenyaLensBusiness.sector.ilike("%SACCO%"),
+            KenyaLensBusiness.sector.ilike("%Microfinance%"),
+            KenyaLensBusiness.sector.ilike("%FinTech%")
+        )
+    )).one() if business_count > 0 else 0
+    
+    # Export count - try model, fallback to 0 if table missing
+    try:
+        from app.modules.kenyalensiq.models import ExportOpportunity
+        export_count = session.exec(select(func.count(ExportOpportunity.id))).one()
+    except:
+        export_count = 0
+
+    # ALL 10 MODULES - all counts live
     modules = [
-    {"id": 1, "name": "Competitive Engine", "icon": "🎯", "count": company_count, "route": "/competitive"},
-    {"id": 2, "name": "Price Oracle", "icon": "💰", "count": metric_count, "route": "/market/prices"},
-    {"id": 3, "name": "Demand Radar", "icon": "📈", "count": search_count, "route": "/market/demand"},
-    {"id": 4, "name": "County Mapper", "icon": "🗺️", "count": county_count, "route": "/location/counties"},
-    {"id": 5, "name": "Consumer Pulse", "icon": "👥", "count": social_count, "route": "/voice"},
-    {"id": 6, "name": "Risk Sentinel", "icon": "⚠️", "count": news_count, "route": "/market/risk"},
-    {"id": 7, "name": "Policy Watch", "icon": "📜", "count": policy_count, "route": "/kb/policy"},
-    {"id": 8, "name": "Funding Radar", "icon": "🏦", "count": funding_count, "route": "/reports/funding"},
-    {"id": 9, "name": "Export Navigator", "icon": "🚢", "count": export_count, "route": "/market/export"},
-    {"id": 10, "name": "KenyaLensIQ", "icon": "📊", "count": lens_count, "route": "/kenyalensiq"}
-]
+        {"id": 1, "name": "Competitive Engine", "icon": "🎯", "count": company_count, "route": "/competitive"},
+        {"id": 2, "name": "Price Oracle", "icon": "💰", "count": metric_count, "route": "/market/prices"},
+        {"id": 3, "name": "Demand Radar", "icon": "📈", "count": search_count, "route": "/market/demand"},
+        {"id": 4, "name": "County Mapper", "icon": "🗺️", "count": county_count, "route": "/location/counties"},
+        {"id": 5, "name": "Consumer Pulse", "icon": "👥", "count": social_count, "route": "/voice"},
+        {"id": 6, "name": "Risk Sentinel", "icon": "⚠️", "count": news_count, "route": "/market/risk"},
+        {"id": 7, "name": "Policy Watch", "icon": "📜", "count": policy_count, "route": "/kb/policy"},
+        {"id": 8, "name": "Funding Radar", "icon": "🏦", "count": funding_count, "route": "/reports/funding"},
+        {"id": 9, "name": "Export Navigator", "icon": "🚢", "count": export_count, "route": "/market/export"},
+        {"id": 10, "name": "KenyaLensIQ", "icon": "📊", "count": lens_count, "route": "/kenyalensiq"}
+    ]
+
+    # STATS - all live
     stats = {
         "insights_generated": search_count,
         "sectors_covered": sector_count,
         "reports_exported": subscription_count,
-        "active_products": product_count
+        "active_products": metric_count,
+        "businesses": business_count,
+        "surveys": survey_count,
+        "alerts": alert_count,
+        "members": member_count
     }
 
-    top_demands = session.exec(
-        select(
-            MarketMetric.product_name,
-            MarketMetric.county,
-            MarketMetric.sector,
-            MarketMetric.demand_score
-        ).order_by(desc(MarketMetric.demand_score)).limit(3)
-    ).all()
-
+    # TRENDING - only if data exists
     trending = []
-    for d in top_demands:
-        trending.append(
-            {
-                "category": d.sector or 'Agriculture',
-                "headline": f"{d.product_name} demand up in {d.county}",
-                "score": d.demand_score,
-                "product": d.product_name,
-                "county": d.county,
-                "updated": ""
-            }
-        )
-    if not trending:
-        trending = [{"category": "Agriculture", "headline": "No data yet", "score": 0}]
+    if metric_count > 0:
+        top_demands = session.exec(
+            select(
+                MarketMetric.product,
+                MarketMetric.county,
+                MarketMetric.sector,
+                MarketMetric.demand_score
+            ).where(MarketMetric.demand_score.isnot(None)).order_by(desc(MarketMetric.demand_score)).limit(3)
+        ).all()
+        for d in top_demands:
+            trending.append(
+                {
+                    "category": d.sector,
+                    "headline": f"{d.product} demand up in {d.county}",
+                    "score": d.demand_score,
+                    "product": d.product,
+                    "county": d.county,
+                    "updated": ""
+                }
+            )
+        
     return {
         "stats": stats,
         "trending": trending,
