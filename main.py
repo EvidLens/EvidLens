@@ -1,3 +1,10 @@
+
+from app.modules.database import get_db
+from app.modules.kenyalensiq.models import KenyaLensBusiness, MarketMetric
+from groq import Groq
+import smtplib, json
+from email.mime.text import MIMEText
+from fastapi import Depends
 from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -209,18 +216,102 @@ def check_subscription(user_id: int, db: Session):
             raise HTTPException(status_code=402, detail="Subscribe to continue. 3 free queries used.")
     return True
 
-def generate_insights(user_message: str):
+def send_support_ticket(subject: str, body: str, user_email: str = "user@evidlens.co.ke"):
+    """Raises a ticket to support@evidlens.co.ke"""
     try:
+        msg = MIMEText(f"From: {user_email}\n\n{body}")
+        msg['Subject'] = f"[EvidLens Ticket] {subject}"
+        msg['From'] = user_email
+        msg['To'] = SUPPORT_EMAIL
+
+        with smtplib.SMTP("smtp.gmail.com", 587) as server: # use env vars on Render
+            server.starttls()
+            server.login("support@evidlens.co.ke", "your_app_password") # SMTP_USER, SMTP_PASS
+            server.send_message(msg)
+        return True
+    except Exception as e:
+        print(f"Ticket Error: {e}")
+        return False
+
+def generate_insights(user_message: str, user_email: str = "user@evidlens.co.ke", db: Session = Depends(get_db)):
+    try:
+        # 1. PULL REAL DATA
+        top_counties = db.exec(
+            select(KenyaLensBusiness.county, func.count(KenyaLensBusiness.id))
+          .group_by(KenyaLensBusiness.county)
+          .order_by(func.count(KenyaLensBusiness.id).desc())
+          .limit(5)
+        ).all()
+
+        avg_prices = db.exec(
+            select(MarketMetric.sector, func.avg(MarketMetric.metric_value))
+          .filter(MarketMetric.metric_type == "price_avg")
+          .group_by(MarketMetric.sector)
+          .limit(10)
+        ).all()
+
+        context = f"""
+        REAL DATA CONTEXT:
+        Top Counties by Business: {top_counties}
+        Avg Prices KES: {avg_prices}
+        APP FEATURES: /api/competitive, /api/price-oracle, /api/demand, /api/county, /api/consumer, /report-builder, /ai-insights
+        SUPPORT: support@evidlens.co.ke
+        Currency: KES. Location: Kenya Counties only.
+        """
+
+        system_prompt = """You are EvidLens AI. You give market insights for Kenyan farmers and SMEs.
+        Rules:
+        1. Be concise. Max 4 sentences. Data-driven. Use KES and Counties.
+        2. If user asks "how do I...", guide them step by step through the app features.
+        3. If user says "problem", "bug", "not working", "help", "support" -> You MUST offer to raise a ticket to support@evidlens.co.ke. End with: "Should I raise a ticket for you?"
+        4. If no data, say "No data yet for X county".
+        5. Always give 1 actionable next step.
+        """
+
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
-                {"role": "system", "content": "You are EvidLens AI. You give market insights for Kenyan farmers and SMEs. Be concise and data-driven. Use KES and Counties."},
+                {"role": "system", "content": system_prompt + context},
                 {"role": "user", "content": user_message}
             ],
+            temperature=0.2,
+            max_tokens=350,
+            tools=[
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "raise_ticket",
+                        "description": "Raise a support ticket to EvidLens team at support@evidlens.co.ke",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "subject": {"type": "string", "description": "Short issue title"},
+                                "description": {"type": "string", "description": "Full problem description"}
+                            },
+                            "required": ["subject", "description"]
+                        }
+                    }
+                }
+            ]
         )
-        return completion.choices[0].message.content
+
+        response = completion.choices[0].message
+
+        # 2. HANDLE FUNCTION CALL
+        if response.tool_calls:
+            for tool_call in response.tool_calls:
+                if tool_call.function.name == "raise_ticket":
+                    args = json.loads(tool_call.function.arguments)
+                    sent = send_support_ticket(args['subject'], args['description'], user_email)
+                    if sent:
+                        return "Ticket raised successfully. Our team at support@evidlens.co.ke will reply within 24hrs."
+                    else:
+                        return "Could not send ticket. Please email us directly at support@evidlens.co.ke"
+
+        return response.content
+
     except Exception as e:
-        return f"AI Error: {str(e)}. Please try again."
+        return f"EvidLens AI Error: {str(e)}. Email support@evidlens.co.ke for support."
 
 def apply_sort(q, model, sort_by: str, order: str):
     if not sort_by or not hasattr(model, sort_by):
