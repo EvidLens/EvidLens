@@ -1,3 +1,5 @@
+from app.modules.kenyalensiq.models import KenyaLensBusiness
+from sqlalchemy import distinct
 from fastapi import APIRouter, Request, Form, Depends, Response
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -162,4 +164,38 @@ def get_county(db: Session = Depends(get_db)):
         "status": "LIVE",
         "counties": len(data),
         "data": data
+    }
+
+@router.get("/api/counties")
+def get_counties(db: Session = Depends(get_db)):
+    """Get all unique counties from KenyaLensBusiness table"""
+    counties = db.query(distinct(KenyaLensBusiness.county)).filter(KenyaLensBusiness.county.isnot(None)).order_by(KenyaLensBusiness.county).all()
+    county_list = [c[0] for c in counties if c[0]]
+    return {
+        "service": "Counties",
+        "status": "LIVE",
+        "count": len(county_list),
+        "data": county_list
+    }
+
+@router.get("/api/sectors")
+def get_sectors(db: Session = Depends(get_db)):
+    """Get all unique sectors from KenyaLensBusiness table"""
+    sectors = db.query(distinct(KenyaLensBusiness.sector)).filter(KenyaLensBusiness.sector.isnot(None)).order_by(KenyaLensBusiness.sector).all()
+    sector_list = [s[0] for s in sectors if s[0]]
+    return {
+        "service": "Sectors",
+        "status": "LIVE",
+        "count": len(sector_list),
+        "data": sector_list
+    }
+
+@router.get("/api/filters")
+def get_filters(db: Session = Depends(get_db)):
+    """Combined endpoint for dropdowns"""
+    counties = db.query(distinct(KenyaLensBusiness.county)).filter(KenyaLensBusiness.county.isnot(None)).all()
+    sectors = db.query(distinct(KenyaLensBusiness.sector)).filter(KenyaLensBusiness.sector.isnot(None)).all()
+    return {
+        "counties": sorted([c[0] for c in counties if c[0]]),
+        "sectors": sorted([s[0] for s in sectors if s[0]])
     }
