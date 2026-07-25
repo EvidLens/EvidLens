@@ -738,6 +738,38 @@ def test_notifications(payload: dict):
     send_whatsapp(to, msg)
     return {"status": "sent", "channels": ["sms", "email", "whatsapp"]}
 
+@app.get("/api/counties")
+def get_counties(search: str = "", session: Session = Depends(get_session)):
+    """Get ALL counties in DB. No hardcoding"""
+    q = select(func.distinct(KenyaLensBusiness.county)).where(KenyaLensBusiness.county.isnot(None))
+    if search:
+        q = q.where(KenyaLensBusiness.county.ilike(f"%{search}%"))
+    counties = [c[0] for c in session.exec(q.order_by(KenyaLensBusiness.county)).all() if c[0]]
+    return {"counties": counties, "total": len(counties)}
+
+
+@app.get("/api/sectors")
+def get_sectors(search: str = "", session: Session = Depends(get_session)):
+    """Get ALL sectors in DB. No hardcoding"""
+    q = select(func.distinct(KenyaLensBusiness.sector)).where(KenyaLensBusiness.sector.isnot(None))
+    if search:
+        q = q.where(KenyaLensBusiness.sector.ilike(f"%{search}%"))
+    sectors = [s[0] for s in session.exec(q.order_by(KenyaLensBusiness.sector)).all() if s[0]]
+    return {"sectors": sectors, "total": len(sectors)}
+
+
+@app.get("/api/filters")
+def get_filters(session: Session = Depends(get_session)):
+    """One call to get all filter options for frontend"""
+    counties = session.exec(select(func.distinct(KenyaLensBusiness.county)).where(KenyaLensBusiness.county.isnot(None)).order_by(KenyaLensBusiness.county)).all()
+    sectors = session.exec(select(func.distinct(KenyaLensBusiness.sector)).where(KenyaLensBusiness.sector.isnot(None)).order_by(KenyaLensBusiness.sector)).all()
+    return {
+        "counties": [c[0] for c in counties if c[0]],
+        "sectors": [s[0] for s in sectors if s[0]],
+        "total_counties": len([c for c in counties if c[0]]),
+        "total_sectors": len([s for s in sectors if s[0]])
+    }
+
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
 def catch_all(path: str):
     return {"status": "ok"}
