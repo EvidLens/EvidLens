@@ -13,7 +13,7 @@ if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=10, max_overflow=20)
-SessionLocal = Session # ADD THIS BACK
+SessionLocal = Session
 
 redis_client = redis.from_url(REDIS_URL, decode_responses=True) if REDIS_URL else None
 Base = SQLModel.metadata
@@ -25,5 +25,5 @@ def get_session() -> Generator[Session, None, None]:
 get_db = get_session 
 
 def create_db_and_tables():
-    from app.modules.kenyalensiq import models # lazy import
+    from app.modules.kenyalensiq import models
     SQLModel.metadata.create_all(engine)
