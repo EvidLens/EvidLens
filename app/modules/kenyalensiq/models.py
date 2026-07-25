@@ -126,3 +126,12 @@ class KenyaLensApiUsage(SQLModel, table=True):
     endpoint: str
     tenant_id: Optional[str] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class ExportOpportunity(SQLModel, table=True):
+    __tablename__ = "export_opportunities"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    tenant_id: str = Field(index=True)
+    country: str
+    product: str
+    opportunity_score: float
+    created_at: datetime = Field(default_factory=datetime.utcnow)
