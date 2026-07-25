@@ -11,6 +11,7 @@ from sqlmodel import select, func, or_
 from bs4 import BeautifulSoup
 import tweepy
 from supabase import create_client, Client
+
 from app.modules.kenyalensiq.models import (
     MarketMetric, PriceData, NewsArticle, SocialMention,
     KenyaTenant, KenyaLensBusiness, KenyaLensSurvey,
@@ -71,7 +72,7 @@ from app.modules.chatbot.router import router as chatbot_router
 
 scheduler = AsyncIOScheduler()
 
-app = FastAPI(title="EvidLens API", version="2.5.8")
+app = FastAPI(title="EvidLens API", version="2.5.12")
 
 app.add_middleware(
     CORSMiddleware,
@@ -130,6 +131,25 @@ app.include_router(lens_router)
 app.include_router(core_router)
 app.include_router(storage_router)
 app.include_router(chatbot_router)
+
+app.include_router(competitive_router, tags=["Competitive"])
+app.include_router(market_router, prefix="/market", tags=["Market"])
+app.include_router(location_router, prefix="/location", tags=["Location"])
+app.include_router(voice_router, prefix="/voice", tags=["Voice"])
+app.include_router(kb_router, prefix="/kb", tags=["KB"])
+app.include_router(reports_router, prefix="/reports", tags=["Reports"])
+app.include_router(ai_insights_router, prefix="/ai", tags=["AI Insights"])
+app.include_router(business_os_router, prefix="/business", tags=["Business OS"])
+app.include_router(auth_router, prefix="/auth", tags=["Auth"])
+app.include_router(rag_router, prefix="/rag", tags=["RAG"])
+app.include_router(payments_router, prefix="/payments", tags=["Payments"])
+app.include_router(api_router, prefix="/api", tags=["API"])
+app.include_router(cron_router, tags=["Cron"])
+app.include_router(lens_router, tags=["Lens"])
+app.include_router(core_router, tags=["Core"])
+app.include_router(storage_router, tags=["Storage"])
+app.include_router(chatbot_router)
+app.include_router(kenyalensiq_router, prefix="/kenyalensiq", tags=["kenyalensiq"])
 
 def get_session():
     db = Session(engine)
@@ -557,7 +577,7 @@ def run_scraper():
 
 @app.get("/health")
 def health():
-    return {"status": "healthy", "version": "2.5.8"}
+    return {"status": "healthy", "version": "2.5.12"}
 
 @app.get("/pricing", response_class=HTMLResponse)
 def pricing_page(request: Request):
@@ -589,7 +609,7 @@ def competitive_page(request: Request, session: Session = Depends(get_session)):
     companies = session.exec(select(KenyaLensBusiness).limit(50)).all()
     return templates.TemplateResponse("competitive.html", {"request": request, "companies": companies})
 
-@app.get("/market/prices", response_class=HTMLResponse) 
+@app.get("/market/prices", response_class=HTMLResponse)
 def prices_page(request: Request, session: Session = Depends(get_session)):
     prices = session.exec(select(MarketMetric).order_by(MarketMetric.created_at.desc()).limit(100)).all()
     return templates.TemplateResponse("prices.html", {"request": request, "prices": prices})
@@ -612,7 +632,7 @@ def voice_page(request: Request, session: Session = Depends(get_session)):
 
 @app.get("/kb/policy", response_class=HTMLResponse)
 def policy_page(request: Request, session: Session = Depends(get_session)):
-        policies = session.exec(select(NewsArticle).where(NewsArticle.category == "Policy").order_by(NewsArticle.published_at.desc()).limit(20)).all()
+    policies = session.exec(select(NewsArticle).where(NewsArticle.category == "Policy").order_by(NewsArticle.published_at.desc()).limit(20)).all()
     return templates.TemplateResponse("policy.html", {"request": request, "policies": policies})
 
 @app.get("/reports/funding", response_class=HTMLResponse)
@@ -627,6 +647,7 @@ def kenyalsiq_dashboard(session: Session = Depends(get_session)):
     response_count = session.exec(select(func.count(KenyaLensResponse.id))).one()
     tenant_count = session.exec(select(func.count(KenyaTenant.id))).one()
     user_count = session.exec(select(func.count(KenyaLensMember.id))).one()
+
     return {"title": "KenyaLensIQ", "modules": [{"id": 1, "name": "Businesses", "icon": "🏢", "count": business_count, "route": "/businesses"}, {"id": 2, "name": "Surveys", "icon": "📋", "count": survey_count, "route": "/surveys"}, {"id": 3, "name": "Responses", "icon": "📝", "count": response_count, "route": "/responses"}, {"id": 4, "name": "Tenants", "icon": "🏛️", "count": tenant_count, "route": "/tenants"}, {"id": 5, "name": "Users", "icon": "👥", "count": user_count, "route": "/users"}]}
 
 @app.get("/dashboard")
@@ -634,41 +655,71 @@ async def dashboard(request: Request, current_user: AuthUser = Depends(get_curre
     session = Session(engine)
     data = dashboard_api(session)
     session.close()
-    API = {"logout": "/auth/logout", "login": "/login", "prices": "/api/prices", "demand": "/api/demand", "companies": "/api/companies", "county_stats": "/api/county-stats", "sectors": "/api/top-sectors", "opportunities": "/api/opportunities", "get_sectors": "/api/sectors", "get_counties": "/api/counties", "get_subcounties": "/api/subcounties", "analyze": "/api/analyze-detailed", "chat": "/lens/chat", "download": "/download-report", "export": "/api/export", "money_embed": "/kenyalensiq/embed/money"}
+    
+    API = {
+        "logout": "/auth/logout",
+        "login": "/login",
+        "prices": "/api/prices",
+        "demand": "/api/demand",
+        "companies": "/api/companies",
+        "county_stats": "/api/county-stats",
+        "sectors": "/api/top-sectors",
+        "opportunities": "/api/opportunities",
+        "get_sectors": "/api/sectors",
+        "get_counties": "/api/counties",
+        "get_subcounties": "/api/subcounties",
+        "analyze": "/api/analyze-detailed",
+        "chat": "/lens/chat",
+        "download": "/download-report",
+        "export": "/api/export",
+        "money_embed": "/kenyalensiq/embed/money"
+    }
+    
     return templates.TemplateResponse("dashboard.html", {"request": request, "current_user": current_user, "data": data, "API": API})
 
 @app.get("/settings", response_class=HTMLResponse)
-def settings(request: Request, user: AuthUser = Depends(get_current_user)): return templates.TemplateResponse("settings.html", {"request": request, "current_user": user})
+def settings(request: Request, user: AuthUser = Depends(get_current_user)): 
+    return templates.TemplateResponse("settings.html", {"request": request, "current_user": user})
 
 @app.get("/billing", response_class=HTMLResponse)
-def billing(request: Request, user: AuthUser = Depends(get_current_user)): return templates.TemplateResponse("billing.html", {"request": request, "current_user": user, "plans": PRICING})
+def billing(request: Request, user: AuthUser = Depends(get_current_user)): 
+    return templates.TemplateResponse("billing.html", {"request": request, "current_user": user, "plans": PRICING})
 
 @app.get("/security", response_class=HTMLResponse)
-def security(request: Request, user: AuthUser = Depends(get_current_user)): return templates.TemplateResponse("security.html", {"request": request, "current_user": user})
+def security(request: Request, user: AuthUser = Depends(get_current_user)): 
+    return templates.TemplateResponse("security.html", {"request": request, "current_user": user})
 
 @app.get("/history", response_class=HTMLResponse)
-def history(request: Request, user: AuthUser = Depends(get_current_user)): return templates.TemplateResponse("history.html", {"request": request, "current_user": user})
+def history(request: Request, user: AuthUser = Depends(get_current_user)): 
+    return templates.TemplateResponse("history.html", {"request": request, "current_user": user})
 
 @app.get("/stats", response_class=HTMLResponse)
-def stats(request: Request, user: AuthUser = Depends(get_current_user)): return templates.TemplateResponse("stats.html", {"request": request, "current_user": user})
+def stats(request: Request, user: AuthUser = Depends(get_current_user)): 
+    return templates.TemplateResponse("stats.html", {"request": request, "current_user": user})
 
 @app.get("/wallet", response_class=HTMLResponse)
-def wallet(request: Request, user: AuthUser = Depends(get_current_user)): return templates.TemplateResponse("wallet.html", {"request": request, "current_user": user})
+def wallet(request: Request, user: AuthUser = Depends(get_current_user)): 
+    return templates.TemplateResponse("wallet.html", {"request": request, "current_user": user})
 
 @app.get("/workspaces", response_class=HTMLResponse)
-def workspaces(request: Request, user: AuthUser = Depends(get_current_user)): return templates.TemplateResponse("workspaces.html", {"request": request, "current_user": user})
+def workspaces(request: Request, user: AuthUser = Depends(get_current_user)): 
+    return templates.TemplateResponse("workspaces.html", {"request": request, "current_user": user})
 
 @app.get("/help", response_class=HTMLResponse)
-def help(request: Request): return templates.TemplateResponse("help.html", {"request": request})
+def help(request: Request): 
+    return templates.TemplateResponse("help.html", {"request": request})
 
 @app.get("/changelog", response_class=HTMLResponse)
-def changelog(request: Request): return templates.TemplateResponse("changelog.html", {"request": request})
+def changelog(request: Request): 
+    return templates.TemplateResponse("changelog.html", {"request": request})
 
 @app.get("/forgot-password", response_class=HTMLResponse)
-def forgot_page(request: Request): return templates.TemplateResponse("forgot.html", {"request": request})
+def forgot_page(request: Request): 
+    return templates.TemplateResponse("forgot.html", {"request": request})
 
 @app.get("/reset-password", response_class=HTMLResponse)
-def reset_page(request: Request, token: str): return templates.TemplateResponse("reset.html", {"request": request, "token": token})
+def reset_page(request: Request, token: str): 
+    return templates.TemplateResponse("reset.html", {"request": request, "token": token})
 
 @app.get("/kenyalensiq/embed/money")
 def money_module_embed(query: str = "", session: Session = Depends(get_session)):
