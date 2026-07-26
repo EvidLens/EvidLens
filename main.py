@@ -1711,6 +1711,74 @@ def get_trending(session: Session = Depends(get_session)):
     
     return {"trending": trending_list} # <-- NO FALLBACK
 
+from sqlalchemy import text
+
+@app.get("/analysis/search")
+def search_insights(
+    q: str = "", 
+    county: str = None,
+    sector: str = None, 
+    min_demand: float = 0,
+    session: Session = Depends(get_session)
+):
+    if not q and not county and not sector:
+        return {"results": [], "total": 0}
+
+    # Base query
+    stmt = select(MarketMetric)
+    
+    filters = []
+    
+    # 1. Full-text search across multiple fields
+    if q:
+        search_term = f"%{q}%"
+        filters.append(
+            or_(
+                MarketMetric.product.ilike(search_term),
+                MarketMetric.county.ilike(search_term),
+                MarketMetric.sector.ilike(search_term),
+                MarketMetric.notes.ilike(search_term) # if you have notes/insights field
+            )
+        )
+    
+    # 2. Filters
+    if county:
+        filters.append(MarketMetric.county == county)
+    if sector:
+        filters.append(MarketMetric.sector == sector)
+    if min_demand > 0:
+        filters.append(MarketMetric.demand_score >= min_demand)
+    
+    if filters:
+        stmt = stmt.where(*filters)
+    
+    # 3. Smart ranking: demand_score * 0.5 + recency * 0.3 + activity * 0.2
+    days_old = func.julianday('now') - func.julianday(MarketMetric.timestamp)
+    recency_score = func.max(0, 30 - days_old) # newer = higher
+    relevance = (MarketMetric.demand_score * 0.5) + (recency_score * 0.3) + (MarketMetric.activity_count * 0.2)
+    
+    stmt = stmt.order_by(desc(relevance)).limit(50)
+    
+    results = session.exec(stmt).all()
+    
+    # 4. Return rich data for frontend cards
+    formatted = []
+    for r in results:
+        formatted.append({
+            "id": r.id,
+            "product": r.product,
+            "county": r.county,
+            "sector": r.sector,
+            "current_price_kes": r.current_price_kes,
+            "demand_score": r.demand_score,
+            "risk_level": r.risk_level,
+            "recommendation": r.recommendation,
+            "timestamp": r.timestamp,
+            "snippet": f"{r.product} in {r.county} - Demand {r.demand_score}/10. {r.recommendation}"
+        })
+    
+    return {"results": formatted, "total": len(formatted)}
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
