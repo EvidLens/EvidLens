@@ -957,9 +957,29 @@ async def root(request: Request, session: Session = Depends(get_session)):
     return templates.TemplateResponse("dashboard.html", {"request": request, "data": data, "API": os.getenv("API_BASE_URL"), "current_user": None})
 
 @app.get("/competitive", response_class=HTMLResponse)
-def competitive_page(request: Request, session: Session = Depends(get_session)):
-    companies = session.exec(select(KenyaLensBusiness).limit(50)).all()
-    return templates.TemplateResponse("competitive.html", {"request": request, "companies": companies})
+def competitive(request: Request, user: AuthUser = Depends(get_current_user), session: Session = Depends(get_session)):
+
+    # Get user's last analysis to filter competitors
+    last = session.exec(select(MarketMetric).where(MarketMetric.user_id == user.id).order_by(desc(MarketMetric.timestamp)).limit(1)).first()
+
+    if last:
+        stmt = select(Company).where(
+            Company.sector == last.sector,
+            Company.county == last.county
+        ).limit(20)
+        companies = session.exec(stmt).all()
+        sector, county = last.sector, last.county
+    else:
+        companies = []
+        sector, county = None, None
+
+    return templates.TemplateResponse("competitive.html", {
+        "request": request,
+        "current_user": user,
+        "companies": companies,
+        "sector": sector,
+        "county": county
+    })
 
 @app.get("/market/prices", response_class=HTMLResponse)
 def prices_page(request: Request, session: Session = Depends(get_session)):
