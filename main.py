@@ -1,3 +1,11 @@
+import io, csv, secrets, os, base64, requests
+from typing import Optional
+from datetime import datetime, timedelta
+from fastapi import FastAPI, Request, Depends, Form, HTTPException
+from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
+from sqlmodel import SQLModel, Field, Column, JSON, Session, create_engine, select, func, desc, or_
+
 # Standard lib
 from io import BytesIO
 import os
@@ -816,6 +824,252 @@ def detailed_analysis(req: DetailedAnalysisRequest, session: Session = Depends(g
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
+# ====== 1. CONFIG + CONSTANTS ======
+PRICING = {"BASIC": {"monthly": 500, "yearly": 5000}, "PROFESSIONAL": {"monthly": 1500, "yearly": 15000}, "ENTERPRISE": {"monthly": 5000, "yearly": 50000}}
+ADDONS = {"EXTRA_REPORTS_10": {"name": "10 Extra Reports", "one_time": 1000}, "API_ACCESS": {"name": "API Access", "monthly": 2000}, "TEAM_SEAT": {"name": "Extra Team Seat", "monthly": 500}, "DATA_EXPORT": {"name": "Bulk Data Export", "one_time": 5000}}
+ALC = {"CUSTOM_REPORT": {"name": "Custom Market Report", "price": 25000}, "DATA_ONBOARDING": {"name": "Data Onboarding", "price": 50000}, "TRAINING": {"name": "Team Training", "price": 15000}}
+
+def get_daraja_token():
+    api_url = ("https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials" if MPESA_ENV == "sandbox" else "https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials")
+    r = requests.get(api_url, auth=(DARAJA_CONSUMER_KEY, DARAJA_CONSUMER_SECRET))
+    return r.json()["access_token"]
+
+def get_timestamp(): return datetime.now().strftime('%Y%m%d%H%M%S')
+def get_password(shortcode, passkey, timestamp): return base64.b64encode((shortcode + passkey + timestamp).encode()).decode('utf-8')
+
+# ====== 2. DB MODELS ======
+class User(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    email: str = Field(index=True, unique=True)
+    hashed_password: str
+    name: str
+    phone: Optional[str] = None
+    county: Optional[str] = None
+    sector: Optional[str] = None
+    current_workspace_id: Optional[int] = Field(default=None, foreign_key="workspace.id")
+    reset_token: Optional[str] = None
+    reset_token_expires: Optional[datetime] = None
+    consent_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class Workspace(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    owner_id: int = Field(foreign_key="user.id")
+    credits: int = Field(default=0)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class Subscription(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id")
+    plan: str
+    billing: str
+    status: str = Field(default="Pending")
+    credits: int
+    expires_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class MarketMetric(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[int] = Field(default=None, foreign_key="user.id")
+    product: str
+    sector: str
+    county: str
+    company_name: Optional[str] = None
+    avg_price_kes: float = 0
+    demand_score: int = 0
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class KenyaLensBusiness(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    sector: str
+    county: str
+    address: Optional[str] = None
+    lat: float = 0
+    lng: float = 0
+
+class Funder(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    type: str
+    sector: str
+    county: str
+    rating: int
+    min_amount: int
+    max_amount: int
+    interest_rate: float
+    requirements: str
+    apply_link: str
+
+class Policy(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    title: str
+    summary: str
+    impact_statement: str
+    category: str
+    sector: str
+    county: str
+    impact: str
+    url: str
+    published_at: datetime = Field(default_factory=datetime.utcnow)
+
+class SocialMention(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    platform: str
+    author: str
+    content: str
+    sentiment: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class NewsArticle(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    title: str
+    summary: str
+    category: str
+    url: str
+    published_at: datetime = Field(default_factory=datetime.utcnow)
+
+class Company(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    sector: str
+    county: str
+
+class Report(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id")
+    title: str
+    data: dict = Field(sa_column=Column(JSON))
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class KenyaLensSurvey(SQLModel, table=True): id: Optional[int] = Field(default=None, primary_key=True)
+class KenyaLensResponse(SQLModel, table=True): id: Optional[int] = Field(default=None, primary_key=True)
+class KenyaTenant(SQLModel, table=True): id: Optional[int] = Field(default=None, primary_key=True)
+class KenyaLensMember(SQLModel, table=True): id: Optional[int] = Field(default=None, primary_key=True)
+
+# ====== 3. DB SETUP + PLACEHOLDERS ======
+engine = create_engine("sqlite:///./evidlens.db", echo=True)
+SQLModel.metadata.create_all(engine)
+
+def get_session():
+    with Session(engine) as session:
+        yield session
+
+def get_current_user(): return User(id=1, email="test@evidlens.co.ke", hashed_password="x", name="Test User")
+def get_db(): return next(get_session())
+def dashboard_api(session): return {"total_users": 0}
+def send_email(to, subject, body): print(f"Email to {to}: {subject}")
+def send_sms(to, msg): print(f"SMS to {to}: {msg}")
+def send_whatsapp(to, msg): print(f"WA to {to}: {msg}")
+def get_password_hash(pw): return "hashed_" + pw
+def get_subscription(db, user_id): return db.exec(select(Subscription).where(Subscription.user_id == user_id)).first()
+def scrape_kpin_prices(): print("Scraping prices...")
+def fetch_real_news(): print("Fetching news...")
+def fetch_real_tweets(): print("Fetching tweets...")
+
+# ====== 4. APP + ROUTES ======
+app = FastAPI()
+templates = Jinja2Templates(directory="templates")
+
+# ====== PAGES ======
+@app.get("/", response_class=HTMLResponse)
+async def root(request: Request, session: Session = Depends(get_session)):
+    data = dashboard_api(session)
+    return templates.TemplateResponse("dashboard.html", {"request": request, "data": data, "API": os.getenv("API_BASE_URL"), "current_user": None})
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    data = dashboard_api(session)
+    API = {"logout": "/auth/logout","login": "/login","prices": "/api/prices","demand": "/api/demand","companies": "/api/companies","county_stats": "/api/county-stats","sectors": "/api/top-sectors","opportunities": "/api/opportunities","get_sectors": "/api/sectors","get_counties": "/api/counties","get_subcounties": "/api/subcounties","analyze": "/api/analyze-detailed","chat": "/lens/chat","download": "/download-report","export": "/api/export","money_embed": "/kenyalensiq/embed/money"}
+    return templates.TemplateResponse("dashboard.html", {"request": request, "current_user": current_user, "data": data, "API": API})
+
+@app.get("/about", response_class=HTMLResponse)
+def about(request: Request): return templates.TemplateResponse("about.html", {"request": request})
+@app.get("/billing", response_class=HTMLResponse)
+def billing(request: Request, user: User = Depends(get_current_user)): return templates.TemplateResponse("billing.html", {"request": request, "current_user": user, "plans": PRICING})
+@app.get("/changelog", response_class=HTMLResponse)
+def changelog(request: Request): return templates.TemplateResponse("changelog.html", {"request": request})
+@app.get("/competitive", response_class=HTMLResponse)
+def competitive(request: Request, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    last = session.exec(select(MarketMetric).where(MarketMetric.user_id == user.id).order_by(desc(MarketMetric.timestamp)).limit(1)).first()
+    if last:
+        stmt = select(Company).where(Company.sector == last.sector, Company.county == last.county).limit(20)
+        companies = session.exec(stmt).all()
+        sector, county = last.sector, last.county
+    else: companies, sector, county = [], None, None
+    return templates.TemplateResponse("competitive.html", {"request": request,"current_user": user,"companies": companies,"sector": sector,"county": county})
+@app.get("/contact", response_class=HTMLResponse)
+def contact(request: Request): return templates.TemplateResponse("contact.html", {"request": request})
+@app.get("/location/counties", response_class=HTMLResponse)
+def counties_page(request: Request, session: Session = Depends(get_session)):
+    counties = session.exec(select(func.distinct(MarketMetric.county))).all()
+    stats = session.exec(select(MarketMetric.county, func.sum(MarketMetric.avg_price_kes).label("market_size")).group_by(MarketMetric.county)).all()
+    return templates.TemplateResponse("counties.html", {"request": request, "counties": [c[0] for c in counties], "stats": [dict(s._mapping) for s in stats]})
+@app.get("/market/prices", response_class=HTMLResponse)
+def prices_page(request: Request, session: Session = Depends(get_session)):
+    prices = session.exec(select(MarketMetric).order_by(MarketMetric.created_at.desc()).limit(100)).all()
+    return templates.TemplateResponse("prices.html", {"request": request, "prices": prices})
+@app.get("/market/demand", response_class=HTMLResponse)
+def demand_page(request: Request, session: Session = Depends(get_session)):
+    demand = session.exec(select(MarketMetric).order_by(desc(MarketMetric.demand_score)).limit(100)).all()
+    return templates.TemplateResponse("demand.html", {"request": request, "demand": demand})
+@app.get("/reports/funding", response_class=HTMLResponse)
+def funding_page(request: Request, session: Session = Depends(get_session)):
+    funders = session.exec(select(KenyaLensBusiness).where(or_(KenyaLensBusiness.sector.ilike("%Financial%"),KenyaLensBusiness.sector.ilike("%Banking%"),KenyaLensBusiness.sector.ilike("%Insurance%"),KenyaLensBusiness.sector.ilike("%SACCO%"))).limit(50)).all()
+    return templates.TemplateResponse("funding.html", {"request": request, "funders": funders})
+@app.get("/help", response_class=HTMLResponse)
+def help(request: Request): return templates.TemplateResponse("help.html", {"request": request})
+@app.get("/history", response_class=HTMLResponse)
+def history(request: Request, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
+    stmt = select(MarketMetric).where(MarketMetric.user_id == user.id).order_by(desc(MarketMetric.timestamp)).limit(50)
+    analyses = session.exec(stmt).all()
+    return templates.TemplateResponse("history.html", {"request": request, "current_user": user, "analyses": analyses})
+@app.get("/login", response_class=HTMLResponse)
+def login(request: Request): return templates.TemplateResponse("login.html", {"request": request})
+@app.get("/signup", response_class=HTMLResponse)
+def signup(request: Request): return templates.TemplateResponse("signup.html", {"request": request})
+@app.get("/module_detail", response_class=HTMLResponse)
+def module_detail(request: Request): return templates.TemplateResponse("module_detail.html", {"request": request})
+@app.get("/kb/policy", response_class=HTMLResponse)
+def policy_page(request: Request, session: Session = Depends(get_session)):
+    policies = session.exec(select(NewsArticle).where(NewsArticle.category == "Policy").order_by(NewsArticle.published_at.desc()).limit(20)).all()
+    return templates.TemplateResponse("policy.html", {"request": request, "policies": policies})
+@app.get("/pricing", response_class=HTMLResponse)
+def pricing_page(request: Request): return templates.TemplateResponse("pricing.html", {"request": request, "plans": PRICING, "addons": ADDONS, "alc": ALC})
+@app.get("/privacy", response_class=HTMLResponse)
+def privacy(request: Request): return templates.TemplateResponse("privacy.html", {"request": request})
+@app.get("/risk", response_class=HTMLResponse)
+def risk(request: Request): return templates.TemplateResponse("risk.html", {"request": request})
+@app.get("/security", response_class=HTMLResponse)
+def security(request: Request, user: User = Depends(get_current_user)): return templates.TemplateResponse("security.html", {"request": request, "current_user": user})
+@app.get("/settings", response_class=HTMLResponse)
+def settings(request: Request, user: User = Depends(get_current_user)): return templates.TemplateResponse("settings.html", {"request": request, "current_user": user})
+@app.get("/static_page", response_class=HTMLResponse)
+def static_page(request: Request): return templates.TemplateResponse("static_page.html", {"request": request})
+@app.get("/stats", response_class=HTMLResponse)
+def stats(request: Request, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
+    total = session.exec(select(func.count()).where(MarketMetric.user_id == user.id)).first()
+    county_stmt = select(MarketMetric.county, func.count().label("c")).where(MarketMetric.user_id == user.id).group_by(MarketMetric.county).order_by(desc("c")).limit(5)
+    top_counties = session.exec(county_stmt).all()
+    return templates.TemplateResponse("stats.html", {"request": request,"current_user": user,"total_analyses": total,"credits_spent": total,"top_counties": top_counties})
+@app.get("/terms", response_class=HTMLResponse)
+def terms(request: Request): return templates.TemplateResponse("terms.html", {"request": request})
+@app.get("/voice", response_class=HTMLResponse)
+def voice_page(request: Request, session: Session = Depends(get_session)):
+    posts = session.exec(select(SocialMention).order_by(SocialMention.created_at.desc()).limit(50)).all()
+    return templates.TemplateResponse("voice.html", {"request": request, "posts": posts})
+@app.get("/wallet", response_class=HTMLResponse)
+def wallet(request: Request, user: User = Depends(get_current_user)): return templates.TemplateResponse("wallet.html", {"request": request, "current_user": user})
+@app.get("/workspaces", response_class=HTMLResponse)
+def workspaces(request: Request, user: User = Depends(get_current_user)): return templates.TemplateResponse("workspaces.html", {"request": request, "current_user": user})
+@app.get("/forgot-password", response_class=HTMLResponse)
+def forgot_page(request: Request): return templates.TemplateResponse("forgot.html", {"request": request})
+@app.get("/reset-password", response_class=HTMLResponse)
+def reset_page(request: Request, token: str): return templates.TemplateResponse("reset.html", {"request": request, "token": token})
+
+# ====== APIs ======
 @app.get("/api/export/{table}")
 def export_csv(table: str, search: str = "", session: Session = Depends(get_session)):
     output = io.StringIO()
@@ -824,12 +1078,12 @@ def export_csv(table: str, search: str = "", session: Session = Depends(get_sess
         q = select(KenyaLensBusiness)
         data = session.exec(q).all()
         writer.writerow(["Name","Sector","County","Rating","Reviews","Address","Lat","Lng"])
-        [writer.writerow([r.name,r.sector,r.county,0,0,r.county,0,0]) for r in data]
+        [writer.writerow([r.name,r.sector,r.county,0,0,r.address or r.county,r.lat,r.lng]) for r in data]
     elif table == "prices":
         q = select(MarketMetric)
         data = session.exec(q).all()
         writer.writerow(["Product","Price","County","Market","Source","FetchedAt"])
-        [writer.writerow([r.product,r.avg_price_kes,r.county,r.company_name,"KPIN",r.created_at]) for r in data]
+        [writer.writerow([r.product,r.avg_price_kes,r.county,r.company_name or "","KPIN",r.created_at]) for r in data]
     elif table == "demand":
         q = select(MarketMetric)
         data = session.exec(q).all()
@@ -841,103 +1095,32 @@ def export_csv(table: str, search: str = "", session: Session = Depends(get_sess
 @app.get("/api/social-feed")
 def get_social_feed(platform: str = "all", session: Session = Depends(get_session)):
     q = select(SocialMention).order_by(SocialMention.created_at.desc()).limit(20)
-    if platform!= "all":
-        q = q.where(SocialMention.platform == platform)
+    if platform!= "all": q = q.where(SocialMention.platform == platform)
     return {"posts": [p.dict() for p in session.exec(q).all()]}
 
 @app.get("/api/news-feed")
 def get_news_feed(session: Session = Depends(get_session)):
     return {"articles": [n.dict() for n in session.exec(select(NewsArticle).order_by(NewsArticle.published_at.desc()).limit(20)).all()]}
 
-PRICING = {"BASIC": {"monthly": 500, "yearly": 5000}, "PROFESSIONAL": {"monthly": 1500, "yearly": 15000}, "ENTERPRISE": {"monthly": 5000, "yearly": 50000}}
-ADDONS = {"EXTRA_REPORTS_10": {"name": "10 Extra Reports", "one_time": 1000}, "API_ACCESS": {"name": "API Access", "monthly": 2000}, "TEAM_SEAT": {"name": "Extra Team Seat", "monthly": 500}, "DATA_EXPORT": {"name": "Bulk Data Export", "one_time": 5000}}
-ALC = {"CUSTOM_REPORT": {"name": "Custom Market Report", "price": 25000}, "DATA_ONBOARDING": {"name": "Data Onboarding", "price": 50000}, "TRAINING": {"name": "Team Training", "price": 15000}}
-
-ALC = {...}
-
-def get_daraja_token():
-    res = requests.get("https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials",
-      auth=(DARAJA_CONSUMER_KEY, DARAJA_CONSUMER_SECRET))
-    return res.json()["access_token"]
-
-@app.post("/api/checkout")
-def checkout(req: dict, user: AuthUser = Depends(get_current_user), session: Session = Depends(get_session)):
-    plan = req["plan"]
-    billing = req["billing"]
-    phone = req["phone"] # 2547XXXXXXXX
-
-    price = PRICING[plan][billing] # 1500, 15000 etc
-
-    # Map plan to credits
-    credits_map = {"BASIC": 10, "PROFESSIONAL": 100, "ENTERPRISE": 99999}
-
-    token = get_daraja_token()
-    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-    password = base64.b64encode(f"{DARAJA_SHORTCODE}{DARAJA_PASSKEY}{timestamp}".encode()).decode()
-
-    payload = {
-        "BusinessShortCode": DARAJA_SHORTCODE,
-        "Password": password,
-        "Timestamp": timestamp,
-        "TransactionType": "CustomerPayBillOnline",
-        "Amount": price,
-        "PartyA": phone,
-        "PartyB": DARAJA_SHORTCODE,
-        "PhoneNumber": phone,
-        "CallBackURL": "https://evidlens.co.ke/api/mpesa/callback",
-        "AccountReference": f"EvidLens-{plan}",
-        "TransactionDesc": f"{plan} {billing} subscription"
-    }
-
-    headers = {"Authorization": f"Bearer {token}"}
-    res = requests.post("https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest", json=payload, headers=headers)
-
-    # Save pending subscription
-    session.add(Subscription(user_id=user.id, plan=plan, billing=billing, status="Pending", credits=credits_map[plan]))
-    session.commit()
-
-    return res.json()
-
-@app.get("/billing", response_class=HTMLResponse)
-def billing(request: Request, user: AuthUser = Depends(get_current_user)): 
-    return templates.TemplateResponse("billing.html", {"request": request, "current_user": user, "plans": PRICING})
-
-@app.get("/", response_class=HTMLResponse)
-def home(request: Request, user: AuthUser = Depends(get_current_user)):
-    return templates.TemplateResponse("index.html", {
-        "request": request, 
-        "current_user": user,  # <-- THIS MAKES THE DROPDOWN WORK
-        "data": data
-    })
-
-def get_mpesa_token():
-    api_url = ("https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials" if MPESA_ENV == "sandbox" else "https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials")
-    r = requests.get(api_url, auth=HTTPBasicAuth(MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET))
-    return r.json()["access_token"]
-
-def get_timestamp():
-    return datetime.now().strftime('%Y%m%d%H%M%S')
-
-def get_password(shortcode, passkey, timestamp):
-    return base64.b64encode((shortcode + passkey + timestamp).encode()).decode('utf-8')
-
 @app.get("/api/pricing")
-def api_pricing():
-    return {"plans": PRICING, "addons": ADDONS, "alc": ALC}
+def api_pricing(): return {"plans": PRICING, "addons": ADDONS, "alc": ALC}
 
 @app.post("/api/checkout")
-def mpesa_stk_push(payload: dict, user_id: int = Depends(get_current_user)):
+def mpesa_stk_push(payload: dict, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     plan = payload.get("plan")
     billing = payload.get("billing")
     phone = payload.get("phone")
-    amount = PRICING[billing]["monthly"]
-    token = get_mpesa_token()
+    price = PRICING[plan][billing]
+    credits_map = {"BASIC": 10, "PROFESSIONAL": 100, "ENTERPRISE": 99999}
+    token = get_daraja_token()
     timestamp = get_timestamp()
-    password = get_password(MPESA_SHORTCODE, MPESA_PASSKEY, timestamp)
+    password = get_password(DARAJA_SHORTCODE, DARAJA_PASSKEY, timestamp)
     api_url = ("https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest" if MPESA_ENV == "sandbox" else "https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest")
     headers = {"Authorization": "Bearer " + token}
-    payload_mpesa = {"BusinessShortCode": MPESA_SHORTCODE, "Password": password, "Timestamp": timestamp, "TransactionType": "CustomerPayBillOnline", "Amount": amount, "PartyA": phone, "PartyB": MPESA_SHORTCODE, "PhoneNumber": phone, "CallBackURL": MPESA_CALLBACK_URL, "AccountReference": f"EvidLens-{plan}-{user_id}", "TransactionDesc": f"{plan} {billing} Subscription"}
+    payload_mpesa = {"BusinessShortCode": DARAJA_SHORTCODE,"Password": password,"Timestamp": timestamp,"TransactionType": "CustomerPayBillOnline","Amount": price,"PartyA": phone,"PartyB": DARAJA_SHORTCODE,"PhoneNumber": phone,"CallBackURL": MPESA_CALLBACK_URL,"AccountReference": f"EvidLens-{plan}-{user.id}","TransactionDesc": f"{plan} {billing} Subscription"}
     r = requests.post(api_url, json=payload_mpesa, headers=headers)
+    session.add(Subscription(user_id=user.id, plan=plan, billing=billing, status="Pending", credits=credits_map[plan]))
+    session.commit()
     return r.json()
 
 @app.post("/api/mpesa-callback")
@@ -957,10 +1140,9 @@ async def mpesa_callback(request: Request, db: Session = Depends(get_db)):
                 sub.status = "active"
                 sub.expires_at = expires
             else:
-                db.add(KenyaLensSubscription(user_id=user_id, plan=plan, status="active", expires_at=expires))
+                db.add(Subscription(user_id=user_id, plan=plan, billing="monthly", status="active", expires_at=expires, credits=PRICING[plan]["monthly"]))
             db.commit()
-    except Exception:
-        pass
+    except Exception: pass
     return {"ResultCode": 0, "ResultDesc": "Accepted"}
 
 @app.post("/api/run-scraper")
@@ -971,137 +1153,32 @@ def run_scraper():
     return {"status": "scraper ran. DB updated with real prices"}
 
 @app.get("/health")
-def health():
-    return {"status": "healthy", "version": "2.5.12"}
-
-@app.get("/pricing", response_class=HTMLResponse)
-def pricing_page(request: Request):
-    return templates.TemplateResponse("pricing.html", {"request": request, "plans": PRICING, "addons": ADDONS, "alc": ALC})
-
-@app.get("/privacy", response_class=HTMLResponse)
-def privacy(request: Request):
-    return templates.TemplateResponse("privacy.html", {"request": request})
-
-@app.get("/terms", response_class=HTMLResponse)
-def terms(request: Request):
-    return templates.TemplateResponse("terms.html", {"request": request})
-
-import secrets
-from datetime import timedelta
+def health(): return {"status": "healthy", "version": "2.5.12"}
 
 @app.post("/auth/forgot-password")
 def forgot_password(req: dict, session: Session = Depends(get_session)):
     email = req["email"]
     user = session.exec(select(User).where(User.email == email)).first()
-
-    if not user:
-        return {"message": "If an account exists, a reset link has been sent"} # don't reveal if email exists
-
-    # 1. Generate token
+    if not user: return {"message": "If an account exists, a reset link has been sent"}
     token = secrets.token_urlsafe(32)
     user.reset_token = token
     user.reset_token_expires = datetime.utcnow() + timedelta(hours=1)
     session.add(user)
     session.commit()
-
-    # 2. Send email - use Resend, Sendgrid, or Gmail SMTP
     reset_link = f"https://evidlens.co.ke/auth/reset-password?token={token}"
-    send_email(
-        to=email,
-        subject="Reset your EvidLens password",
-        body=f"Click here to reset: {reset_link}. Link expires in 1 hour."
-    )
-
+    send_email(to=email, subject="Reset your EvidLens password", body=f"Click here to reset: {reset_link}. Link expires in 1 hour.")
     return {"message": "Password reset link sent to your email"}
-
-@app.get("/auth/reset-password")
-def reset_page(request: Request, token: str, session: Session = Depends(get_session)):
-    user = session.exec(select(User).where(User.reset_token == token, User.reset_token_expires > datetime.utcnow())).first()
-    if not user:
-        return HTMLResponse("Link expired or invalid")
-    return templates.TemplateResponse("reset_password.html", {"request": request, "token": token})
 
 @app.post("/auth/reset-password")
 def reset_password(token: str = Form(...), password: str = Form(...), session: Session = Depends(get_session)):
     user = session.exec(select(User).where(User.reset_token == token, User.reset_token_expires > datetime.utcnow())).first()
-    if not user:
-        return {"error": "Invalid token"}
-
+    if not user: return {"error": "Invalid token"}
     user.hashed_password = get_password_hash(password)
     user.reset_token = None
     user.reset_token_expires = None
     session.add(user)
     session.commit()
     return RedirectResponse("/login?success=Password reset", status_code=303)
-
-@app.get("/contact", response_class=HTMLResponse)
-def contact(request: Request):
-    return templates.TemplateResponse("contact.html", {"request": request})
-
-@app.get("/about", response_class=HTMLResponse)
-def about(request: Request):
-    return templates.TemplateResponse("about.html", {"request": request})
-
-@app.get("/", response_class=HTMLResponse)
-async def root(request: Request, session: Session = Depends(get_session)):
-    data = dashboard_api(session)
-    return templates.TemplateResponse("dashboard.html", {"request": request, "data": data, "API": os.getenv("API_BASE_URL"), "current_user": None})
-
-@app.get("/competitive", response_class=HTMLResponse)
-def competitive(request: Request, user: AuthUser = Depends(get_current_user), session: Session = Depends(get_session)):
-
-    # Get user's last analysis to filter competitors
-    last = session.exec(select(MarketMetric).where(MarketMetric.user_id == user.id).order_by(desc(MarketMetric.timestamp)).limit(1)).first()
-
-    if last:
-        stmt = select(Company).where(
-            Company.sector == last.sector,
-            Company.county == last.county
-        ).limit(20)
-        companies = session.exec(stmt).all()
-        sector, county = last.sector, last.county
-    else:
-        companies = []
-        sector, county = None, None
-
-    return templates.TemplateResponse("competitive.html", {
-        "request": request,
-        "current_user": user,
-        "companies": companies,
-        "sector": sector,
-        "county": county
-    })
-
-@app.get("/market/prices", response_class=HTMLResponse)
-def prices_page(request: Request, session: Session = Depends(get_session)):
-    prices = session.exec(select(MarketMetric).order_by(MarketMetric.created_at.desc()).limit(100)).all()
-    return templates.TemplateResponse("prices.html", {"request": request, "prices": prices})
-
-@app.get("/market/demand", response_class=HTMLResponse)
-def demand_page(request: Request, session: Session = Depends(get_session)):
-    demand = session.exec(select(MarketMetric).order_by(desc(MarketMetric.demand_score)).limit(100)).all()
-    return templates.TemplateResponse("demand.html", {"request": request, "demand": demand})
-
-@app.get("/location/counties", response_class=HTMLResponse)
-def counties_page(request: Request, session: Session = Depends(get_session)):
-    counties = session.exec(select(func.distinct(MarketMetric.county))).all()
-    stats = session.exec(select(MarketMetric.county, func.sum(MarketMetric.avg_price_kes).label("market_size")).group_by(MarketMetric.county)).all()
-    return templates.TemplateResponse("counties.html", {"request": request, "counties": [c[0] for c in counties], "stats": [dict(s._mapping) for s in stats]})
-
-@app.get("/voice", response_class=HTMLResponse)
-def voice_page(request: Request, session: Session = Depends(get_session)):
-    posts = session.exec(select(SocialMention).order_by(SocialMention.created_at.desc()).limit(50)).all()
-    return templates.TemplateResponse("voice.html", {"request": request, "posts": posts})
-
-@app.get("/kb/policy", response_class=HTMLResponse)
-def policy_page(request: Request, session: Session = Depends(get_session)):
-    policies = session.exec(select(NewsArticle).where(NewsArticle.category == "Policy").order_by(NewsArticle.published_at.desc()).limit(20)).all()
-    return templates.TemplateResponse("policy.html", {"request": request, "policies": policies})
-
-@app.get("/reports/funding", response_class=HTMLResponse)
-def funding_page(request: Request, session: Session = Depends(get_session)):
-    funders = session.exec(select(KenyaLensBusiness).where(or_(KenyaLensBusiness.sector.ilike("%Financial%"),KenyaLensBusiness.sector.ilike("%Banking%"),KenyaLensBusiness.sector.ilike("%Insurance%"),KenyaLensBusiness.sector.ilike("%SACCO%"))).limit(50)).all()
-    return templates.TemplateResponse("funding.html", {"request": request, "funders": funders})
 
 @app.get("/kenyalensiq")
 def kenyalsiq_dashboard(session: Session = Depends(get_session)):
@@ -1110,109 +1187,23 @@ def kenyalsiq_dashboard(session: Session = Depends(get_session)):
     response_count = session.exec(select(func.count(KenyaLensResponse.id))).one()
     tenant_count = session.exec(select(func.count(KenyaTenant.id))).one()
     user_count = session.exec(select(func.count(KenyaLensMember.id))).one()
-
     return {"title": "KenyaLensIQ", "modules": [{"id": 1, "name": "Businesses", "icon": "🏢", "count": business_count, "route": "/businesses"}, {"id": 2, "name": "Surveys", "icon": "📋", "count": survey_count, "route": "/surveys"}, {"id": 3, "name": "Responses", "icon": "📝", "count": response_count, "route": "/responses"}, {"id": 4, "name": "Tenants", "icon": "🏛️", "count": tenant_count, "route": "/tenants"}, {"id": 5, "name": "Users", "icon": "👥", "count": user_count, "route": "/users"}]}
-
-@app.get("/dashboard")
-async def dashboard(request: Request, current_user: AuthUser = Depends(get_current_user)):
-    session = Session(engine)
-    data = dashboard_api(session)
-    session.close()
-    
-    API = {
-        "logout": "/auth/logout",
-        "login": "/login",
-        "prices": "/api/prices",
-        "demand": "/api/demand",
-        "companies": "/api/companies",
-        "county_stats": "/api/county-stats",
-        "sectors": "/api/top-sectors",
-        "opportunities": "/api/opportunities",
-        "get_sectors": "/api/sectors",
-        "get_counties": "/api/counties",
-        "get_subcounties": "/api/subcounties",
-        "analyze": "/api/analyze-detailed",
-        "chat": "/lens/chat",
-        "download": "/download-report",
-        "export": "/api/export",
-        "money_embed": "/kenyalensiq/embed/money"
-    }
-    
-    return templates.TemplateResponse("dashboard.html", {"request": request, "current_user": current_user, "data": data, "API": API})
-
-@app.get("/settings", response_class=HTMLResponse)
-def settings(request: Request, user: AuthUser = Depends(get_current_user)): 
-    return templates.TemplateResponse("settings.html", {"request": request, "current_user": user})
-
-@app.get("/billing", response_class=HTMLResponse)
-def billing(request: Request, user: AuthUser = Depends(get_current_user)): 
-    return templates.TemplateResponse("billing.html", {"request": request, "current_user": user, "plans": PRICING})
-
-@app.get("/security", response_class=HTMLResponse)
-def security(request: Request, user: AuthUser = Depends(get_current_user)): 
-    return templates.TemplateResponse("security.html", {"request": request, "current_user": user})
-
-@app.get("/history", response_class=HTMLResponse)
-def history(request: Request, user: AuthUser = Depends(get_current_user)): 
-    return templates.TemplateResponse("history.html", {"request": request, "current_user": user})
-
-@app.get("/stats", response_class=HTMLResponse)
-def stats(request: Request, user: AuthUser = Depends(get_current_user)): 
-    return templates.TemplateResponse("stats.html", {"request": request, "current_user": user})
-
-@app.get("/wallet", response_class=HTMLResponse)
-def wallet(request: Request, user: AuthUser = Depends(get_current_user)): 
-    return templates.TemplateResponse("wallet.html", {"request": request, "current_user": user})
-
-@app.get("/workspaces", response_class=HTMLResponse)
-def workspaces(request: Request, user: AuthUser = Depends(get_current_user)): 
-    return templates.TemplateResponse("workspaces.html", {"request": request, "current_user": user})
-
-@app.get("/help", response_class=HTMLResponse)
-def help(request: Request): 
-    return templates.TemplateResponse("help.html", {"request": request})
-
-@app.get("/changelog", response_class=HTMLResponse)
-def changelog(request: Request): 
-    return templates.TemplateResponse("changelog.html", {"request": request})
-
-@app.get("/forgot-password", response_class=HTMLResponse)
-def forgot_page(request: Request): 
-    return templates.TemplateResponse("forgot.html", {"request": request})
-
-@app.get("/reset-password", response_class=HTMLResponse)
-def reset_page(request: Request, token: str): 
-    return templates.TemplateResponse("reset.html", {"request": request, "token": token})
-
-    @app.get("/history", response_class=HTMLResponse)
-def history(request: Request, session: Session = Depends(get_session), user: AuthUser = Depends(get_current_user)):
-    stmt = select(MarketMetric).where(MarketMetric.user_id == user.id).order_by(desc(MarketMetric.timestamp)).limit(50)
-    analyses = session.exec(stmt).all()
-    return templates.TemplateResponse("history.html", {"request": request, "current_user": user, "analyses": analyses})
-
-@app.get("/stats", response_class=HTMLResponse)
-def stats(request: Request, session: Session = Depends(get_session), user: AuthUser = Depends(get_current_user)):
-    total = session.exec(select(func.count()).where(MarketMetric.user_id == user.id)).first()
-
-    # Top counties
-    county_stmt = select(MarketMetric.county, func.count().label("c")).where(MarketMetric.user_id == user.id).group_by(MarketMetric.county).order_by(desc("c")).limit(5)
-    top_counties = session.exec(county_stmt).all()
-
-    return templates.TemplateResponse("stats.html", {
-        "request": request,
-        "current_user": user,
-        "total_analyses": total,
-        "credits_spent": total, # 1 credit per analysis
-        "top_counties": top_counties
-    })
 
 @app.get("/kenyalensiq/embed/money")
 def money_module_embed(query: str = "", session: Session = Depends(get_session)):
     funding_count = session.exec(select(func.count(KenyaLensBusiness.id)).where(or_(KenyaLensBusiness.sector.ilike("%Financial%"),KenyaLensBusiness.sector.ilike("%Banking%"),KenyaLensBusiness.sector.ilike("%Insurance%"),KenyaLensBusiness.sector.ilike("%SACCO%"),KenyaLensBusiness.sector.ilike("%Microfinance%"),KenyaLensBusiness.sector.ilike("%FinTech%")))).one()
     sector_breakdown = session.exec(select(KenyaLensBusiness.sector, func.count(KenyaLensBusiness.id).label("count")).where(or_(KenyaLensBusiness.sector.ilike("%Financial%"),KenyaLensBusiness.sector.ilike("%Banking%"),KenyaLensBusiness.sector.ilike("%Insurance%"),KenyaLensBusiness.sector.ilike("%SACCO%"),KenyaLensBusiness.sector.ilike("%Microfinance%"),KenyaLensBusiness.sector.ilike("%FinTech%"))).group_by(KenyaLensBusiness.sector)).all()
-    if query:
-        sector_breakdown = [r for r in sector_breakdown if query.lower() in r.sector.lower()]
+    if query: sector_breakdown = [r for r in sector_breakdown if query.lower() in r.sector.lower()]
     return {"module": "Money Module - Sector Breakdown", "total_funding_businesses": funding_count, "query": query, "data": [dict(r._mapping) for r in sector_breakdown]}
+
+@app.post("/api/test-notifications")
+def test_notifications(payload: dict):
+    to = payload.get("to")
+    msg = payload.get("message", "Test from EvidLens")
+    send_sms(to, msg)
+    send_email(to, "EvidLens Test", f"<p>{msg}</p>")
+    send_whatsapp(to, msg)
+    return {"status": "sent", "channels": ["sms", "email", "whatsapp"]}
 
 @app.post("/api/test-notifications")
 def test_notifications(payload: dict):
