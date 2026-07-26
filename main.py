@@ -1,3 +1,6 @@
+from app.modules.core.models import UserSubscription
+from datetime import datetime, timedelta
+
 # Standard lib
 import os
 import io
@@ -792,6 +795,28 @@ def get_daraja_token():
     r = requests.get(api_url, auth=(DARAJA_CONSUMER_KEY, DARAJA_CONSUMER_SECRET))
     r.raise_for_status()
     return r.json()["access_token"]
+
+
+def stk_push(user_id: int, plan_name: str, phone: str):
+    plan_data = _core.PRICING.get(plan_name)
+    amount = plan_data["monthly"]
+    
+    account_ref = f"{user_id}_{plan_name}" # THIS CONNECTS PAYMENT TO USER + PLAN
+    
+    payload = {
+        "BusinessShortCode": MPESA_SHORTCODE,
+        "Password": get_password(...),
+        "Timestamp": get_timestamp(),
+        "TransactionType": "CustomerPayBillOnline",
+        "Amount": amount,
+        "PartyA": phone,
+        "PartyB": MPESA_SHORTCODE,
+        "PhoneNumber": phone,
+        "CallBackURL": "https://your-domain.com/api/mpesa/callback",
+        "AccountReference": account_ref, # CRITICAL
+        "TransactionDesc": f"Upgrade to {plan_name}"
+    }
+    # send to daraja...
 
 def get_timestamp(): 
     return datetime.now().strftime('%Y%m%d%H%M%S')
@@ -1888,6 +1913,58 @@ def search_insights(
         })
     
     return {"results": formatted, "total": len(formatted)}
+
+@app.post("/api/mpesa/callback")
+async def mpesa_callback(payload: dict, db: Session = Depends(get_db)):
+    """Daraja will POST here after payment"""
+    body = payload.get("Body", {}).get("stkCallback", {})
+    result_code = body.get("ResultCode")
+    
+    if result_code != 0:
+        return {"ResultCode": 0, "ResultDesc": "Failed"} # ignore failed payments
+    
+    items = {item["Name"]: item["Value"] for item in body.get("CallbackMetadata", {}).get("Item", [])}
+    mpesa_receipt = items.get("MpesaReceiptNumber")
+    phone = items.get("PhoneNumber")
+    amount = items.get("Amount")
+    account_ref = items.get("AccountReference") # we will put user_id + plan here
+    
+    # AccountReference format: "123_EV-GROWTH" -> user_id 123, plan EV-GROWTH
+    try:
+        user_id_str, plan_name = account_ref.split("_")
+        user_id = int(user_id_str)
+    except:
+        return {"ResultCode": 0, "ResultDesc": "Bad AccountReference"}
+    
+    # Get price to calculate expiry. Annual = 12 months
+    plan_data = _core.PRICING.get(plan_name)
+    if not plan_data:
+        return {"ResultCode": 0, "ResultDesc": "Plan not found"}
+    
+    # Give 30 days for monthly, 365 for annual
+    is_annual = amount == plan_data["annual"]
+    days = 365 if is_annual else 30
+    expires_at = datetime.utcnow() + timedelta(days=days)
+    
+    # Upsert subscription
+    sub = db.query(UserSubscription).filter(UserSubscription.user_id == user_id).first()
+    if sub:
+        sub.plan_name = plan_name
+        sub.status = "active"
+        sub.mpesa_receipt = mpesa_receipt
+        sub.expires_at = expires_at
+    else:
+        sub = UserSubscription(
+            user_id=user_id,
+            plan_name=plan_name,
+            status="active",
+            mpesa_receipt=mpesa_receipt,
+            expires_at=expires_at
+        )
+        db.add(sub)
+    
+    db.commit()
+    return {"ResultCode": 0, "ResultDesc": "Success"}
 
 if __name__ == "__main__":
     import uvicorn
