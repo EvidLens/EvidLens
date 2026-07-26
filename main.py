@@ -855,6 +855,49 @@ ALC = {"CUSTOM_REPORT": {"name": "Custom Market Report", "price": 25000}, "DATA_
 
 ALC = {...}
 
+def get_daraja_token():
+    res = requests.get("https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials",
+      auth=(DARAJA_CONSUMER_KEY, DARAJA_CONSUMER_SECRET))
+    return res.json()["access_token"]
+
+@app.post("/api/checkout")
+def checkout(req: dict, user: AuthUser = Depends(get_current_user), session: Session = Depends(get_session)):
+    plan = req["plan"]
+    billing = req["billing"]
+    phone = req["phone"] # 2547XXXXXXXX
+
+    price = PRICING[plan][billing] # 1500, 15000 etc
+
+    # Map plan to credits
+    credits_map = {"BASIC": 10, "PROFESSIONAL": 100, "ENTERPRISE": 99999}
+
+    token = get_daraja_token()
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+    password = base64.b64encode(f"{DARAJA_SHORTCODE}{DARAJA_PASSKEY}{timestamp}".encode()).decode()
+
+    payload = {
+        "BusinessShortCode": DARAJA_SHORTCODE,
+        "Password": password,
+        "Timestamp": timestamp,
+        "TransactionType": "CustomerPayBillOnline",
+        "Amount": price,
+        "PartyA": phone,
+        "PartyB": DARAJA_SHORTCODE,
+        "PhoneNumber": phone,
+        "CallBackURL": "https://evidlens.co.ke/api/mpesa/callback",
+        "AccountReference": f"EvidLens-{plan}",
+        "TransactionDesc": f"{plan} {billing} subscription"
+    }
+
+    headers = {"Authorization": f"Bearer {token}"}
+    res = requests.post("https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest", json=payload, headers=headers)
+
+    # Save pending subscription
+    session.add(Subscription(user_id=user.id, plan=plan, billing=billing, status="Pending", credits=credits_map[plan]))
+    session.commit()
+
+    return res.json()
+
 @app.get("/billing", response_class=HTMLResponse)
 def billing(request: Request, user: AuthUser = Depends(get_current_user)): 
     return templates.TemplateResponse("billing.html", {"request": request, "current_user": user, "plans": PRICING})
