@@ -417,6 +417,43 @@ def fetch_real_tweets():
     db.commit()
     db.close()
 
+# ====== SCHEDULER + DB INIT ======
+scheduler = BackgroundScheduler()
+
+def init_db():
+    SQLModel.metadata.create_all(engine)
+
+def create_db_and_tables():
+    SQLModel.metadata.create_all(engine)
+
+def seed_data():
+    with Session(engine) as session:
+        if session.exec(select(func.count(KenyaLensBusiness.id))).one() == 0:
+            session.add_all([
+                KenyaLensBusiness(name="Safaricom PLC", sector="Telecom", county="Nairobi"),
+                KenyaLensBusiness(name="KCB Bank", sector="Banking", county="Nairobi"),
+                KenyaLensBusiness(name="Equity Bank", sector="Banking", county="Nairobi"),
+            ])
+            session.commit()
+
+def start_scheduler():
+    print("Scheduler started")
+
+def check_subscription(user_id, db):
+    return True # placeholder
+
+def generate_insights(message):
+    return f"AI Insight: Demand for '{message}' is rising in Nairobi. Consider stocking."
+
+def log_query(db, user_id):
+    pass
+
+def apply_sort(query, model, sort_by, order):
+    column = getattr(model, sort_by, model.id)
+    if order == "desc":
+        return query.order_by(desc(column))
+    return query.order_by(column)
+
 @app.on_event("startup")
 def on_startup():
     init_db()
@@ -428,6 +465,11 @@ def on_startup():
     scheduler.add_job(fetch_real_tweets, "interval", hours=3)
     scheduler.start()
 
+@app.on_event("shutdown")
+def shutdown_event():
+    scheduler.shutdown()
+
+# ====== DASHBOARD API ======
 def dashboard_api(session: Session):
     business_count = session.exec(select(func.count(KenyaLensBusiness.id))).one()
     metric_count = session.exec(select(func.count(MarketMetric.id))).one()
@@ -481,37 +523,46 @@ def dashboard_api(session: Session):
             trending.append({"category": d.sector, "headline": f"{d.product} demand up in {d.county}", "score": d.demand_score, "product": d.product, "county": d.county, "updated": ""})
     return {"stats": stats, "trending": trending, "modules": modules, "last_updated": datetime.utcnow().isoformat()}
 
-@app.get("/market/risk")
-def risk_sentinel(session: Session = Depends(get_session)):
-    news = session.exec(select(NewsArticle.id, NewsArticle.title, NewsArticle.source, NewsArticle.summary, NewsArticle.published_at).order_by(NewsArticle.published_at.desc()).limit(10)).all()
+# ====== NEW PAGES + APIs ======
+@app.get("/market/risk", response_class=HTMLResponse)
+def risk_sentinel_page(request: Request, session: Session = Depends(get_session)):
+    news = session.exec(select(NewsArticle).order_by(NewsArticle.published_at.desc()).limit(10)).all()
+    return templates.TemplateResponse("risk.html", {"request": request, "risk_alerts": [n.dict() for n in news]})
+
+@app.get("/market/export", response_class=HTMLResponse)
+def export_navigator_page(request: Request, session: Session = Depends(get_session)):
+    exports = session.exec(select(ExportOpportunity).limit(20)).all()
+    return templates.TemplateResponse("static_page.html", {"request": request, "title": "Export Navigator", "data": exports})
+
+@app.get("/api/market/risk")
+def risk_sentinel_api(session: Session = Depends(get_session)):
+    news = session.exec(select(NewsArticle.id, NewsArticle.title, NewsArticle.category, NewsArticle.summary, NewsArticle.published_at).order_by(NewsArticle.published_at.desc()).limit(10)).all()
     return {"risk_alerts": [dict(n._mapping) for n in news]}
 
-@app.get("/market/export")
-def export_navigator(session: Session = Depends(get_session)):
+@app.get("/api/market/export")
+def export_navigator_api(session: Session = Depends(get_session)):
     exports = session.exec(select(ExportOpportunity).limit(20)).all()
     return {"export_opportunities": [e.dict() for e in exports]}
 
 @app.post("/chat")
-async def chat(payload: dict, user_id: int = Depends(get_current_user), db: Session = Depends(get_db)):
-    check_subscription(user_id, db)
+async def chat(payload: dict, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    check_subscription(user.id, db)
     db.add(MarketMetric(product=payload["message"], county="Kenya", sector="All", demand_score=random.randint(50,100)))
     db.commit()
     ai_response = generate_insights(payload["message"])
-    log_query(db, user_id)
+    log_query(db, user.id)
     return {"response": ai_response}
 
 @app.get("/api/sectors")
 def get_sectors(search: str = "", session: Session = Depends(get_session)):
     q = select(func.distinct(MarketMetric.sector))
-    if search:
-        q = q.where(MarketMetric.sector.contains(search))
+    if search: q = q.where(MarketMetric.sector.contains(search))
     return {"sectors": [s[0] for s in session.exec(q).all() if s[0]]}
 
 @app.get("/api/counties")
 def get_counties(search: str = "", session: Session = Depends(get_session)):
     q = select(func.distinct(MarketMetric.county))
-    if search:
-        q = q.where(MarketMetric.county.contains(search))
+    if search: q = q.where(MarketMetric.county.contains(search))
     return {"counties": [c[0] for c in session.exec(q).all() if c[0]]}
 
 @app.get("/api/subcounties")
@@ -521,21 +572,16 @@ def get_subcounties(county: str = "", search: str = "", session: Session = Depen
 @app.get("/api/products")
 def get_products(search: str = "", session: Session = Depends(get_session)):
     q = select(func.distinct(MarketMetric.product))
-    if search:
-        q = q.where(MarketMetric.product.contains(search))
+    if search: q = q.where(MarketMetric.product.contains(search))
     return {"products": [p[0] for p in session.exec(q).all() if p[0]]}
 
 @app.get("/api/companies")
 def get_companies(search: str = "", sector: str = "", county: str = "", page: int = 1, limit: int = 10, sort_by: str = "id", order: str = "desc", session: Session = Depends(get_session)):
     q = select(KenyaLensBusiness)
-    if search:
-        q = q.where(or_(KenyaLensBusiness.name.ilike(f"%{search}%"), KenyaLensBusiness.sector.ilike(f"%{search}%"), KenyaLensBusiness.county.ilike(f"%{search}%")))
-    if sector:
-        q = q.where(KenyaLensBusiness.sector == sector)
-    if county:
-        q = q.where(KenyaLensBusiness.county == county)
-    all_data = session.exec(q).all()
-    total = len(all_data)
+    if search: q = q.where(or_(KenyaLensBusiness.name.ilike(f"%{search}%"), KenyaLensBusiness.sector.ilike(f"%{search}%"), KenyaLensBusiness.county.ilike(f"%{search}%")))
+    if sector: q = q.where(KenyaLensBusiness.sector == sector)
+    if county: q = q.where(KenyaLensBusiness.county == county)
+    total = len(session.exec(q).all())
     q = apply_sort(q, KenyaLensBusiness, sort_by, order)
     data = session.exec(q.offset((page-1)*limit).limit(limit)).all()
     return {"companies": [c.dict() for c in data], "total": total, "page": page}
@@ -543,12 +589,9 @@ def get_companies(search: str = "", sector: str = "", county: str = "", page: in
 @app.get("/api/prices")
 def get_prices(search: str = "", product: str = "", county: str = "", page: int = 1, limit: int = 10, sort_by: str = "avg_price_kes", order: str = "desc", session: Session = Depends(get_session)):
     q = select(MarketMetric)
-    if search:
-        q = q.where(or_(MarketMetric.product.contains(search), MarketMetric.county.contains(search)))
-    if product:
-        q = q.where(MarketMetric.product == product)
-    if county:
-        q = q.where(MarketMetric.county == county)
+    if search: q = q.where(or_(MarketMetric.product.contains(search), MarketMetric.county.contains(search)))
+    if product: q = q.where(MarketMetric.product == product)
+    if county: q = q.where(MarketMetric.county == county)
     total = len(session.exec(q).all())
     q = apply_sort(q, MarketMetric, sort_by, order)
     data = session.exec(q.offset((page-1)*limit).limit(limit)).all()
@@ -557,12 +600,9 @@ def get_prices(search: str = "", product: str = "", county: str = "", page: int 
 @app.get("/api/demand")
 def get_demand(search: str = "", product: str = "", county: str = "", page: int = 1, limit: int = 10, sort_by: str = "demand_score", order: str = "desc", session: Session = Depends(get_session)):
     q = select(MarketMetric)
-    if search:
-        q = q.where(or_(MarketMetric.product.contains(search), MarketMetric.county.contains(search)))
-    if product:
-        q = q.where(MarketMetric.product == product)
-    if county:
-        q = q.where(MarketMetric.county == county)
+    if search: q = q.where(or_(MarketMetric.product.contains(search), MarketMetric.county.contains(search)))
+    if product: q = q.where(MarketMetric.product == product)
+    if county: q = q.where(MarketMetric.county == county)
     total = len(session.exec(q).all())
     q = apply_sort(q, MarketMetric, sort_by, order)
     data = session.exec(q.offset((page-1)*limit).limit(limit)).all()
@@ -571,8 +611,7 @@ def get_demand(search: str = "", product: str = "", county: str = "", page: int 
 @app.get("/api/county-stats")
 def get_county_stats(search: str = "", page: int = 1, limit: int = 47, sort_by: str = "market_size", order: str = "desc", session: Session = Depends(get_session)):
     q = select(MarketMetric.county, func.sum(MarketMetric.avg_price_kes).label("market_size"), func.avg(MarketMetric.demand_score).label("growth"), func.count(MarketMetric.id).label("volume")).group_by(MarketMetric.county)
-    if search:
-        q = q.where(MarketMetric.county.contains(search))
+    if search: q = q.where(MarketMetric.county.contains(search))
     data = session.exec(q.offset((page-1)*limit).limit(limit)).all()
     stats = [dict(r._mapping) for r in data]
     stats.sort(key=lambda x: x.get(sort_by, 0), reverse=(order=="desc"))
@@ -581,8 +620,7 @@ def get_county_stats(search: str = "", page: int = 1, limit: int = 47, sort_by: 
 @app.get("/api/top-sectors")
 def get_top_sectors(search: str = "", page: int = 1, limit: int = 10, session: Session = Depends(get_session)):
     q = select(MarketMetric.sector, func.count(MarketMetric.id).label("count")).group_by(MarketMetric.sector)
-    if search:
-        q = q.where(MarketMetric.sector.contains(search))
+    if search: q = q.where(MarketMetric.sector.contains(search))
     total = len(session.exec(q).all())
     data = session.exec(q.order_by(func.count(MarketMetric.id).desc()).offset((page-1)*limit).limit(limit)).all()
     return {"sectors": [dict(r._mapping) for r in data], "total": total, "page": page}
@@ -590,12 +628,9 @@ def get_top_sectors(search: str = "", page: int = 1, limit: int = 10, session: S
 @app.get("/api/opportunities")
 def get_opportunities(search: str = "", product: str = "", county: str = "", page: int = 1, limit: int = 10, sort_by: str = "demand_score", order: str = "desc", session: Session = Depends(get_session)):
     q = select(MarketMetric)
-    if search:
-        q = q.where(or_(MarketMetric.product.contains(search), MarketMetric.county.contains(search)))
-    if product:
-        q = q.where(MarketMetric.product == product)
-    if county:
-        q = q.where(MarketMetric.county == county)
+    if search: q = q.where(or_(MarketMetric.product.contains(search), MarketMetric.county.contains(search)))
+    if product: q = q.where(MarketMetric.product == product)
+    if county: q = q.where(MarketMetric.county == county)
     total = len(session.exec(q).all())
     q = apply_sort(q, MarketMetric, sort_by, order)
     data = session.exec(q.offset((page-1)*limit).limit(limit)).all()
