@@ -11,6 +11,7 @@ import traceback
 from datetime import datetime, date, timedelta
 from collections import Counter
 from email.mime.text import MIMEText
+import requests
 
 # 3rd party
 import pandas as pd
@@ -59,6 +60,7 @@ from app.modules.data_layer.seed import seed_data
 from app.modules.auth.models import AuthUser
 from app.modules.auth.dependencies import get_current_user, require_active_subscription
 from app.modules.auth.router import router as auth_router
+from app.modules.core.service import _core
 
 # KenyaLens Core Models
 from app.modules.kenyalensiq.models import (
@@ -765,39 +767,37 @@ def detailed_analysis(req: DetailedAnalysisRequest, session: Session = Depends(g
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
-# ====== 1. CONFIG + CONSTANTS ======
-CURRENCY = "KES"
-CURRENCY_SYMBOL = "KSh"
-
-PRICING = {
-    "BASIC": {"monthly": 500, "yearly": 5000, "currency": "KES"}, 
-    "PROFESSIONAL": {"monthly": 1500, "yearly": 15000, "currency": "KES"}, 
-    "ENTERPRISE": {"monthly": 5000, "yearly": 50000, "currency": "KES"}
-}
-ADDONS = {
-    "EXTRA_REPORTS_10": {"name": "10 Extra Reports", "one_time": 1000, "currency": "KES"}, 
-    "API_ACCESS": {"name": "API Access", "monthly": 2000, "currency": "KES"}, 
-    "TEAM_SEAT": {"name": "Extra Team Seat", "monthly": 500, "currency": "KES"}, 
-    "DATA_EXPORT": {"name": "Bulk Data Export", "one_time": 5000, "currency": "KES"}
-}
-ALC = {
-    "CUSTOM_REPORT": {"name": "Custom Market Report", "price": 25000, "currency": "KES"}, 
-    "DATA_ONBOARDING": {"name": "Data Onboarding", "price": 50000, "currency": "KES"}, 
-    "TRAINING": {"name": "Team Training", "price": 15000, "currency": "KES"}
-}
+# Pull from settings.py - Single source of truth
+CURRENCY = settings.CURRENCY
+CURRENCY_SYMBOL = settings.CURRENCY_SYMBOL
+MPESA_ENV = settings.MPESA_ENV
+DARAJA_CONSUMER_KEY = settings.MPESA_CONSUMER_KEY
+DARAJA_CONSUMER_SECRET = settings.MPESA_CONSUMER_SECRET
+MPESA_SHORTCODE = settings.MPESA_SHORTCODE
+MPESA_PASSKEY = settings.MPESA_PASSKEY
 
 def format_kes(amount: int) -> str:
+    if amount == -1: 
+        return "Unlimited"
     return f"{CURRENCY_SYMBOL} {amount:,}"
 
-# Usage: format_kes(25000) -> "KSh 25,000"
+# Pull pricing from core.service.py - Single source of truth
+PRICING = _core.PRICING
+ADDONS = _core.ADDONS
+ALC = _core.ALC
 
+# ====== 2. M-PESA DARAJA HELPERS ======
 def get_daraja_token():
-    api_url = ("https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials" if MPESA_ENV == "sandbox" else "https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials")
+    api_url = "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials" if MPESA_ENV == "sandbox" else "https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
     r = requests.get(api_url, auth=(DARAJA_CONSUMER_KEY, DARAJA_CONSUMER_SECRET))
+    r.raise_for_status()
     return r.json()["access_token"]
 
-def get_timestamp(): return datetime.now().strftime('%Y%m%d%H%M%S')
-def get_password(shortcode, passkey, timestamp): return base64.b64encode((shortcode + passkey + timestamp).encode()).decode('utf-8')
+def get_timestamp(): 
+    return datetime.now().strftime('%Y%m%d%H%M%S')
+
+def get_password(shortcode, passkey, timestamp): 
+    return base64.b64encode((shortcode + passkey + timestamp).encode()).decode('utf-8')
 
 # ====== 2. DB MODELS ======
 class User(SQLModel, table=True):
