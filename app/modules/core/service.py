@@ -1,6 +1,5 @@
 import os
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlmodel import Session, select, func
 from typing import Dict, Any, List, Union
 from app.core.config import settings
 from app.modules.core.models import Plan, AddOn, ALCService, UserSubscription
@@ -55,8 +54,8 @@ class CoreService:
         return data
 
     def get_all_pricing(self, db: Session) -> Dict[str, Any]:
-        sectors_count = db.query(func.count_distinct(MarketSearch.sector)).scalar() or 75
-        products_count = db.query(func.count_distinct(MarketSearch.product)).scalar() or 21
+        sectors_count = db.exec(select(func.count(func.distinct(MarketSearch.sector)))).one() or 75
+        products_count = db.exec(select(func.count(func.distinct(MarketSearch.product)))).one() or 21
         return {
             "currency": settings.CURRENCY,
             "currency_symbol": settings.CURRENCY_SYMBOL,
@@ -70,17 +69,19 @@ class CoreService:
 
     def get_platform_stats(self, db: Session) -> Dict[str, int]:
         return {
-            "insights": db.query(func.count(MarketSearch.id)).scalar() or 0,
-            "active_products": db.query(func.count_distinct(MarketSearch.product)).scalar() or 21, 
-            "sectors": db.query(func.count_distinct(MarketSearch.sector)).scalar() or 75,
-            "reports": db.query(func.count(Report.id)).scalar() or 0
+            "insights": db.exec(select(func.count(MarketSearch.id))).one() or 0,
+            "active_products": db.exec(select(func.count(func.distinct(MarketSearch.product)))).one() or 21, 
+            "sectors": db.exec(select(func.count(func.distinct(MarketSearch.sector)))).one() or 75,
+            "reports": db.exec(select(func.count(Report.id))).one() or 0
         }
 
     def check_access(self, db: Session, user_id: int, area_name: str) -> Dict[str, Any]:
-        sub = db.query(UserSubscription).filter(UserSubscription.user_id == user_id).first()
-        if not sub: return {"allowed": False, "plan": "EV-FREE"}
+        sub = db.exec(select(UserSubscription).where(UserSubscription.user_id == user_id, UserSubscription.status == "active")).first()
+        if not sub: 
+            return {"allowed": False, "plan": "EV-FREE"}
         
-        plan_name = sub.plan.name
+        # CHANGED: use plan_code instead of sub.plan.name
+        plan_name = sub.plan_code
         plan_name = self.PLAN_NAME_MAP.get(plan_name, plan_name) # THIS FIXES BASIC -> EV-SME
         
         plan = self.PRICING.get(plan_name, self.PRICING["EV-FREE"])
