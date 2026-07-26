@@ -7,13 +7,12 @@ from app.modules.core.models import Plan, AddOn, ALCService, UserSubscription
 from app.modules.report_builder.models import Report
 from app.modules.market_engine.models import MarketSearch
 
-UNLIMITED = -1 # use -1 for math. Frontend shows "Unlimited"
+UNLIMITED = -1
 
 class CoreService:
     def __init__(self):
         pass
 
-    # SOURCE OF TRUTH - Move to DB in V2
     PRICING = {
         "EV-FREE": {"monthly": 0, "annual": 0, "areas": 1, "products": 1, "users": 1, "competitors": 1, "lens": "Lite", "data_delay": "14 Days", "watermark": True},
         "EV-STARTER": {"monthly": 0, "annual": 0, "areas": 1, "products": 1, "users": 1, "competitors": 1, "lens": "Lite", "data_delay": "Forever", "watermark": True},
@@ -21,6 +20,13 @@ class CoreService:
         "EV-GROWTH": {"monthly": 50000, "annual": 510000, "areas": 3, "products": 9, "users": 5, "competitors": 10, "leads_qtr": 250, "lens": "Pro", "flag": "⭐"},
         "EV-PRO": {"monthly": 100000, "annual": 1020000, "areas": 6, "products": 15, "users": UNLIMITED, "competitors": UNLIMITED, "leads_qtr": 1000, "lens": "Pro"},
         "EV-ENT": {"monthly": 200000, "annual": 2040000, "areas": 9, "products": 21, "users": UNLIMITED, "competitors": UNLIMITED, "leads_qtr": UNLIMITED, "lens": "Enterprise", "api": True, "briefings": "Weekly"}
+    }
+
+    # TRANSLATE OLD UI NAMES TO NEW BACKEND NAMES
+    PLAN_NAME_MAP = {
+        "BASIC": "EV-SME",
+        "PROFESSIONAL": "EV-GROWTH", 
+        "ENTERPRISE": "EV-ENT"
     }
 
     ADDONS = {
@@ -73,13 +79,16 @@ class CoreService:
     def check_access(self, db: Session, user_id: int, area_name: str) -> Dict[str, Any]:
         sub = db.query(UserSubscription).filter(UserSubscription.user_id == user_id).first()
         if not sub: return {"allowed": False, "plan": "EV-FREE"}
-        plan = self.PRICING.get(sub.plan.name, self.PRICING["EV-FREE"])
-        return {"allowed": True, "plan": sub.plan.name, "limits": plan}
+        
+        plan_name = sub.plan.name
+        plan_name = self.PLAN_NAME_MAP.get(plan_name, plan_name) # THIS FIXES BASIC -> EV-SME
+        
+        plan = self.PRICING.get(plan_name, self.PRICING["EV-FREE"])
+        return {"allowed": True, "plan": plan_name, "limits": plan}
 
     def health_check(self) -> Dict[str, Any]:
         return {"status": "ok", "service": "evidlens-api", "currency": settings.CURRENCY}
 
-# MODULE LEVEL ALIASES - for backward compatibility
 _core = CoreService()
 
 def get_all_pricing(db: Session) -> Dict[str, Any]:
