@@ -1,5 +1,6 @@
 # Standard lib
 from io import BytesIO
+import os
 import statistics
 import smtplib
 import json
@@ -7,6 +8,7 @@ from datetime import datetime, timedelta
 from collections import Counter
 
 # 3rd party
+import matplotlib.pyplot as plt
 from dotenv import load_dotenv
 from groq import Groq
 from supabase import create_client, Client
@@ -30,8 +32,9 @@ from sqlalchemy import func as sqlfunc
 # ReportLab
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.units import mm
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
 from reportlab.pdfgen import canvas
 
 # Email
@@ -1478,81 +1481,235 @@ def seed_geo_data(db: Session):
             db.add(SectorReport(sector=s, title=f"{s} Report", summary="Seeded"))
     db.commit()
 
+NAVY = colors.HexColor("#0B1D3A")
+TEAL = colors.HexColor("#009688")
+LIGHT_TEAL = colors.HexColor("#E0F2F1")
+GREEN = colors.HexColor("#10B981")
+YELLOW = colors.HexColor("#F59E0B")
+RED = colors.HexColor("#EF4444")
+
+def create_chart(fig_func):
+    buf = BytesIO()
+    fig_func()
+    plt.savefig(buf, format='png', dpi=200, bbox_inches='tight', transparent=True)
+    plt.close()
+    buf.seek(0)
+    return Image(buf, width=80*mm, height=50*mm)
+
+def donut_chart(data, labels, title):
+    def _plot():
+        fig, ax = plt.subplots(figsize=(3,3))
+        ax.pie(data, labels=labels, autopct='%1.0f%%', startangle=90,
+               wedgeprops=dict(width=0.4), colors=['#009688','#26A69A','#4DB6AC','#80CBC4','#B2DFDB'])
+        ax.set_title(title, fontsize=10, color="#0B1D3A", fontweight='bold')
+    return create_chart(_plot)
+
+def bar_chart(data, labels, title):
+    def _plot():
+        fig, ax = plt.subplots(figsize=(4,3))
+        ax.barh(labels, data, color='#009688')
+        ax.set_title(title, fontsize=10, color="#0B1D3A", fontweight='bold')
+        ax.invert_yaxis()
+        for i, v in enumerate(data): ax.text(v, i, f" {v}", va='center', fontsize=8)
+        plt.tight_layout()
+    return create_chart(_plot)
+
 @app.post("/analysis/download-pdf")
 def download_pdf(req: DetailedAnalysisRequest, session: Session = Depends(get_session)):
-    # 1. First run the analysis - NO HARDCODING
     analysis_data = detailed_analysis(req, session)
-    
-    # 2. Generate PDF from that FULL data
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=10*mm, leftMargin=10*mm, topMargin=10*mm, bottomMargin=10*mm)
+
     styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name='TitleNavy', fontSize=20, textColor=NAVY, fontName="Helvetica-Bold"))
+    styles.add(ParagraphStyle(name='SubtitleTeal', fontSize=12, textColor=TEAL, fontName="Helvetica-Bold"))
+    styles.add(ParagraphStyle(name='Sidebar', fontSize=9, textColor=colors.white, leading=12))
+    styles.add(ParagraphStyle(name='KPIBig', fontSize=22, textColor=NAVY, fontName="Helvetica-Bold", alignment=1))
+    styles.add(ParagraphStyle(name='KPISmall', fontSize=9, textColor=NAVY, alignment=1))
+    styles.add(ParagraphStyle(name='Insight', fontSize=9, backColor=LIGHT_TEAL, borderPadding=4))
+
     story = []
-    
-    # HEADER
-    story.append(Paragraph(f"<b>EvidLens Market Report: {req.product}</b>", styles['Title']))
-    story.append(Paragraph(f"County: {req.county} | Subcounties: {', '.join(req.subcounties)} | Sector: {req.sector}", styles['Normal']))
-    story.append(Spacer(1, 12))
-    
-    # 1. MARKET OVERVIEW
-    story.append(Paragraph("<b>1. Market Overview</b>", styles['Heading2']))
     mo = analysis_data['market_overview']
-    data = [
-        ["Current Price", f"KES {mo['current_price_kes']}"],
-        ["30 Day Avg", f"KES {mo['30_day_avg_kes']}"],
-        ["90 Day Forecast", f"KES {mo['90_day_forecast_kes']}"],
-        ["Trend", mo['price_trend']],
-        ["Seasonality", mo['seasonality']]
-    ]
-    t = Table(data, colWidths=[200, 200])
-    t.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 0.5, colors.grey)]))
-    story.append(t)
-    story.append(Spacer(1, 12))
-    
-    # 2. FINANCIALS
-    story.append(Paragraph("<b>2. Financials & Budget</b>", styles['Heading2']))
     fin = analysis_data['financials']
-    data = [
-        ["Budget", f"KES {fin['budget_kes']}"],
-        ["Units You Can Buy", fin['units_you_can_buy']],
-        ["Est. Monthly Profit", f"KES {fin['estimated_monthly_profit']}"],
-        ["Est. ROI", f"{fin['estimated_roi_percent']}%"],
-        ["Business Model", fin['business_model']]
-    ]
-    t = Table(data, colWidths=[200, 200])
-    t.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 0.5, colors.grey)]))
-    story.append(t)
-    story.append(Spacer(1, 12))
-    
-    # 3. DEMAND + COMPETITION
-    story.append(Paragraph("<b>3. Demand & Competition</b>", styles['Heading2']))
-    dc = analysis_data['demand_competition']
-    story.append(Paragraph(f"Demand Level: {dc['demand_level']} - Score: {dc['avg_demand_score']}/10", styles['Normal']))
-    story.append(Paragraph(f"Top Competitors: {', '.join(dc['top_competitors'])}", styles['Normal']))
-    story.append(Spacer(1, 12))
-    
-    # 4. RISK
-    story.append(Paragraph("<b>4. Risk Intelligence</b>", styles['Heading2']))
-    ri = analysis_data['risk_intelligence']
-    story.append(Paragraph(f"Risk Score: {ri['risk_score_10']}/10 - {ri['risk_level']}", styles['Normal']))
-    
-    # 5. FINAL VERDICT
-    story.append(Paragraph("<b>5. Final Verdict</b>", styles['Heading2']))
     fv = analysis_data['final_verdict']
-    story.append(Paragraph(f"<b>Score: {fv['overall_score_10']}/10</b>", styles['Heading3']))
-    story.append(Paragraph(f"<b>Recommendation: {fv['recommendation']}</b>", styles['Normal']))
+    dc = analysis_data['demand_competition']
+    ri = analysis_data['risk_intelligence']
+    ops = analysis_data['operations']
+    soc = analysis_data['social_intelligence']
+
+    logo_path = os.path.join(os.getcwd(), "app", "static", "logo.png")
+    icon_path = lambda name: os.path.join(os.getcwd(), "app", "static", "icons", f"{name}.png")
+
+    # ===== PAGE 1: EXECUTIVE SUMMARY =====
+    # LEFT SIDEBAR
+    sidebar_elements = []
+    if os.path.exists(logo_path): sidebar_elements.append(Image(logo_path, width=22*mm, height=22*mm))
+    sidebar_elements.append(Paragraph("EvidLens<br/>Research & Consulting", styles['Sidebar']))
+    sidebar_elements.append(Spacer(1, 8))
+    sidebar_elements.append(Paragraph("<font color='#26A69A'>REPORT OVERVIEW</font>", styles['Sidebar']))
+
+    for icon, label, value in [
+        ("date", "DATE", datetime.utcnow().strftime("%B %Y")),
+        ("location", "COVERAGE", f"{req.county} County"),
+        ("sector", "SECTOR", req.sector),
+        ("budget", "BUDGET", f"KES {fin['budget_kes']:,}")
+    ]:
+        row = [Image(icon_path(icon), 4*mm, 4*mm)] if os.path.exists(icon_path(icon)) else []
+        row.append(Paragraph(f"<b>{label}</b><br/>{value}", styles['Sidebar']))
+        sidebar_elements.append(Table([row], colWidths=[6*mm, 44*mm]))
+
+    sidebar_table = Table([[el] for el in sidebar_elements], colWidths=[50*mm])
+    sidebar_table.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), NAVY), ('PADDING', (0,0), (-1,-1), 6)]))
+
+    # RIGHT CONTENT
+    main_elements = []
+    main_elements.append(Paragraph("ANALYTICAL FINDINGS", styles['TitleNavy']))
+    main_elements.append(Paragraph(f"MARKET REPORT - {req.product.upper()} IN {req.county.upper()}", styles['SubtitleTeal']))
+    main_elements.append(Spacer(1, 6))
+
+    # KPI ROW
+    kpi_data = [
+        [Paragraph(f"KES {mo['current_price_kes'] or 'N/A'}", styles['KPIBig']),
+         Paragraph(f"{dc['demand_level']}", styles['KPIBig']),
+         Paragraph(f"{fv['overall_score_10']}/10", styles['KPIBig'])],
+        [Paragraph("Current Price", styles['KPISmall']),
+         Paragraph("Demand Level", styles['KPISmall']),
+         Paragraph("Overall Score", styles['KPISmall'])]
+    ]
+    kpi_table = Table(kpi_data, colWidths=[40*mm, 40*mm, 40*mm])
+    kpi_table.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 1, LIGHT_TEAL), ('BACKGROUND', (0,0), (-1,-1), LIGHT_TEAL)]))
+    main_elements.append(kpi_table)
+    main_elements.append(Spacer(1, 8))
+
+    # RECOMMENDATION
+    rec_color = GREEN if fv['overall_score_10'] >= 7 else YELLOW if fv['overall_score_10'] >= 4 else RED
+    rec_table = Table([[Paragraph(f"<b>{fv['recommendation']}</b>", styles['Normal'])]], colWidths=[120*mm])
+    rec_table.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), rec_color), ('TEXTCOLOR', (0,0), (-1,-1), colors.white), ('PADDING', (0,0), (-1,-1), 8)]))
+    main_elements.append(rec_table)
     for reason in fv['key_reasons']:
-        story.append(Paragraph(f"- {reason}", styles['Normal']))
-    
+        main_elements.append(Paragraph(f"• {reason}", styles['Normal']))
+    main_elements.append(Spacer(1, 8))
+
+    # CHARTS ROW
+    price_data = [mo['current_price_kes'] or 0, mo['30_day_avg_kes'] or 0, mo['90_day_forecast_kes'] or 0]
+    price_labels = ['Current', '30D Avg', '90D Forecast']
+    donut = donut_chart(price_data, price_labels, "Price Trend")
+
+    comp_data = [p['count'] for p in dc['top_products_in_sector'][:5]]
+    comp_labels = [p['product'][:15] for p in dc['top_products_in_sector'][:5]]
+    bar = bar_chart(comp_data, comp_labels, "Top Products in Sector")
+
+    charts_table = Table([[donut, bar]], colWidths=[85*mm, 85*mm])
+    main_elements.append(charts_table)
+    main_elements.append(Spacer(1, 8))
+
+    # INSIGHT BOX
+    main_elements.append(Paragraph(f"<b>Insight:</b> {mo['price_trend']} trend with {mo['seasonality']}. Risk level is {ri['risk_level']}.", styles['Insight']))
+
+    # COMBINE PAGE 1
+    page1 = Table([[sidebar_table, main_elements]], colWidths=[55*mm, 125*mm])
+    page1.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'TOP')]))
+    story.append(page1)
+    story.append(PageBreak())
+
+    # ===== PAGE 2: DETAILS =====
+    story.append(Paragraph("DETAILED ANALYSIS", styles['TitleNavy']))
+    story.append(Spacer(1, 6))
+
+    # FINANCIALS
+    story.append(Paragraph("1. FINANCIALS & FEASIBILITY", styles['SubtitleTeal']))
+    fin_data = [["Metric", "Value"],
+        ["Budget KES", f"{fin['budget_kes']:,}"],
+        ["Business Model", fin['business_model']],
+        ["Units You Can Buy", fin['units_you_can_buy']],
+        ["Est. Cost Per Unit", f"KES {fin['estimated_cost_per_unit']}"],
+        ["Est. Monthly Profit", f"KES {fin['estimated_monthly_profit']:,}"],
+        ["Est. ROI", f"{fin['estimated_roi_percent']}%"]]
+    fin_table = Table(fin_data, colWidths=[90*mm, 90*mm])
+    fin_table.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 0.5, colors.grey), ('BACKGROUND', (0,0), (-1,0), NAVY), ('TEXTCOLOR', (0,0), (-1,0), colors.white)]))
+    story.append(fin_table)
+    story.append(Spacer(1, 8))
+
+    # DEMAND + COMPETITION
+    story.append(Paragraph("2. DEMAND & COMPETITION", styles['SubtitleTeal']))
+    story.append(Paragraph(f"<b>Demand Score:</b> {dc['avg_demand_score']}/10 - {dc['demand_level']}", styles['Normal']))
+    story.append(Paragraph(f"<b>Top Competitors:</b> {', '.join(dc['top_competitors']) or 'None'}", styles['Normal']))
+    story.append(Spacer(1, 8))
+
+    # OPERATIONS + RISK
+    story.append(Paragraph("3. OPERATIONS & RISK", styles['SubtitleTeal']))
+    story.append(Paragraph(f"<b>Distribution:</b> {', '.join(ops['recommended_distribution'])}", styles['Normal']))
+    story.append(Paragraph(f"<b>Supply Chain Risk:</b> {ops['supply_chain_risk']} - {ops['supply_risk_events']} events", styles['Normal']))
+    story.append(Paragraph(f"<b>Risk Score:</b> {ri['risk_score_10']}/10 - {ri['risk_level']}", styles['Normal']))
+    story.append(Spacer(1, 8))
+
+    # SOCIAL
+    story.append(Paragraph("4. SOCIAL INTELLIGENCE - 7 DAYS", styles['SubtitleTeal']))
+    story.append(Paragraph(f"Mentions: {soc['mentions_7d']} | Sentiment: {soc['sentiment_score_10']}/10", styles['Normal']))
+    story.append(Paragraph(f"Platforms: {', '.join(soc['platforms'].keys())}", styles['Normal']))
+    story.append(Spacer(1, 8))
+
+    # NEXT STEPS
+    story.append(Paragraph("5. RECOMMENDATIONS & NEXT STEPS", styles['SubtitleTeal']))
+    for i, step in enumerate(fv['next_steps'], 1):
+        story.append(Paragraph(f"{i}. {step}", styles['Normal']))
+
+    story.append(Spacer(1, 15))
+    story.append(Paragraph("Powered by EvidLens AI RAG | Data is indicative and for decision support only.", styles['Italic']))
+
     doc.build(story)
     buffer.seek(0)
-    
-    return StreamingResponse(buffer, media_type="application/pdf", 
-        headers={"Content-Disposition": f"attachment; filename=EvidLens_{req.product}_{req.county}.pdf"})
+    return StreamingResponse(buffer, media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=EvidLens_Report_{req.product}_{req.county}.pdf"})
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
 def catch_all(path: str):
     return {"status": "ok"}
+
+@app.get("/analysis/trending")
+def get_trending(session: Session = Depends(get_session)):
+    two_weeks_ago = datetime.utcnow() - timedelta(days=14)
+    
+    stmt = select(
+        MarketMetric.product,
+        MarketMetric.county,
+        MarketMetric.sector,
+        func.avg(MarketMetric.demand_score).label("avg_demand"),
+        func.avg(MarketMetric.current_price_kes).label("avg_price"),
+        func.count(MarketMetric.id).label("activity_count")
+    ).where(MarketMetric.timestamp > two_weeks_ago) \
+     .group_by(MarketMetric.product, MarketMetric.county, MarketMetric.sector) \
+     .order_by(desc("activity_count")).limit(6)
+    
+    results = session.exec(stmt).all()
+    
+    trending_list = []
+    for r in results:
+        old_stmt = select(func.avg(MarketMetric.current_price_kes)).where(
+            MarketMetric.product == r.product,
+            MarketMetric.county == r.county,
+            MarketMetric.timestamp.between(two_weeks_ago - timedelta(days=30), two_weeks_ago)
+        )
+        old_avg = session.exec(old_stmt).first() or r.avg_price
+        
+        price_change = 0
+        if old_avg and old_avg > 0:
+            price_change = round(((r.avg_price - old_avg) / old_avg) * 100, 1)
+        
+        trend = "up" if price_change > 0 else "down" if price_change < 0 else "stable"
+        
+        trending_list.append({
+            "product": r.product,
+            "county": r.county,
+            "sector": r.sector,
+            "demand_score": round(r.avg_demand or 0, 1),
+            "current_price_kes": int(r.avg_price or 0),
+            "price_change_percent": price_change,
+            "trend": trend,
+            "activity": r.activity_count
+        })
+    
+    return {"trending": trending_list} # <-- NO FALLBACK
 
 if __name__ == "__main__":
     import uvicorn
