@@ -87,7 +87,15 @@ const tableConfig = {
 
 <main class="px-4 md:px-6 lg:px-8 py-6">
   <div class="max-w-[1400px] mx-auto">
-    <div class="card mb-6"><div class="flex items-center gap-3 text-gray-400"><span>🔍</span><input id="searchInput" placeholder="Search insights, lanes, or questions..." class="w-full outline-none text-base bg-transparent"></div></div>
+
+    <!-- UPDATED SEARCH BAR -->
+    <div class="card mb-6 relative">
+      <div class="flex items-center gap-3 text-gray-400">
+        <span>🔍</span>
+        <input id="search-input" placeholder="Search insights, lanes, or questions..." class="w-full outline-none text-base bg-transparent">
+      </div>
+      <div id="search-results" class="absolute bg-white shadow-lg rounded-xl mt-2 w-full hidden max-h-96 overflow-y-auto z-50"></div>
+    </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
       <div class="card teal-card"><p class="text-sm text-gray-500">Total Insights</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">{{ data.stats.insights_generated }}</p></div>
@@ -96,7 +104,11 @@ const tableConfig = {
       <div class="card teal-card"><p class="text-sm text-gray-500">AI Queries</p><p class="text-4xl font-bold mt-1" style="color:#0A1F44">{{ data.stats.insights_generated }}</p></div>
     </div>
 
-    <div class="mb-8"><h2 class="font-bold text-xl mb-4 flex items-center gap-2" style="color:#0A1F44">Trending Now</h2><div id="trendingCard" class="trending text-white p-6 rounded-2xl"><p class="text-sm font-semibold opacity-90 uppercase">{{ data.trending.category }}</p><p class="font-semibold text-lg mt-2">{{ data.trending.headline }}</p></div></div>
+    <!-- UPDATED TRENDING NOW -->
+    <div class="mb-8">
+      <h2 class="font-bold text-xl mb-4 flex items-center gap-2" style="color:#0A1F44">Trending Now</h2>
+      <div id="trending-container" class="grid grid-cols-2 md:grid-cols-3 gap-4"></div>
+    </div>
 
     <div class="mb-8"><h2 class="font-bold text-xl mb-4" style="color:#0A1F44">WAVE 2 Intelligence Modules</h2><div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4">
       {% for module in data.modules %}
@@ -127,7 +139,7 @@ const tableConfig = {
       <div class="card">
         <h2 class="font-bold text-xl mb-3" style="color:#0A1F44">Quick Business Analysis</h2>
         <form id="searchForm" class="space-y-3">
-          <input name="product" placeholder="e.g maize flour, milk, soap" class="w-full p-3 border rounded-lg text-sm" required>
+          <input name="product" id="product" placeholder="e.g maize flour, milk, soap" class="w-full p-3 border rounded-lg text-sm" required>
           <div class="flex gap-3">
             <select name="sector" id="sectorSelect" class="w-1/2 p-3 border rounded-lg text-sm" required><option value="">Select Sector</option></select>
             <select name="county" id="countySelect" class="w-1/2 p-3 border rounded-lg text-sm" required><option value="">Select County</option></select>
@@ -136,7 +148,7 @@ const tableConfig = {
             <select name="subcounty" id="subcountySelect" class="w-1/2 p-3 border rounded-lg text-sm"><option value="">All Subcounties</option></select>
             <input name="budget_kes" type="number" placeholder="Budget KES" class="w-1/2 p-3 border rounded-lg text-sm">
           </div>
-          <button class="bg-[#F59E0B] text-white w-full p-3 rounded-lg font-bold hover:opacity-90">Analyze Market</button>
+          <button id="analyze-btn" class="bg-[#F59E0B] text-white w-full p-3 rounded-lg font-bold hover:opacity-90">Analyze Market</button>
         </form>
         <div id="result" class="mt-4 text-sm"></div>
       </div>
@@ -176,6 +188,97 @@ const tableConfig = {
 <div id="chatWidget"><div id="chatBox"><div id="chatHeader">🤖 Lens AI Assistant</div><div id="chatMessages"><div class="msg bot">Hi! I'm Lens. Ask me anything about Kenya markets.</div></div><div id="chatInputBox"><input id="chatInput" placeholder="Ask Lens anything..."><button id="chatSend">Send</button></div></div><button id="chatBtn">💬</button></div>
 
 <script>
+// TRENDING SCRIPT - ADDED
+async function loadTrending(){
+  const res = await fetch('/analysis/trending')
+  const data = await res.json()
+
+  const container = document.getElementById('trending-container')
+  container.innerHTML = ''
+
+  if(data.trending.length === 0){
+    container.innerHTML = `<p class="text-gray-500 col-span-3 text-center">No trending data yet. Run your first analysis above 👆</p>`
+    return
+  }
+
+  data.trending.forEach(item => {
+    const trendColor = item.trend === 'up'? 'text-green-600' : item.trend === 'down'? 'text-red-600' : 'text-gray-600'
+    const trendIcon = item.trend === 'up'? '▲' : item.trend === 'down'? '▼' : '—'
+
+    container.innerHTML += `
+      <div onclick="analyzeProduct('${item.product}', '${item.county}')"
+           class="p-4 bg-white border-teal-200 rounded-xl shadow-sm hover:shadow-md cursor-pointer transition">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="font-bold text-[#0A1F44]">${item.product}</p>
+            <p class="text-sm text-gray-500">${item.county} County • ${item.sector}</p>
+          </div>
+          <span class="text-xs bg-teal-100 text-[#14B8A6] px-2 py-1 rounded">Demand: ${item.demand_score}/10</span>
+        </div>
+        <div class="mt-3 flex justify-between items-center">
+          <p class="font-bold">KES ${item.current_price_kes.toLocaleString()}</p>
+          <p class="${trendColor} font-semibold">${trendIcon} ${Math.abs(item.price_change_percent)}%</p>
+        </div>
+      </div>
+    `
+  })
+}
+
+function analyzeProduct(product, county){
+  document.querySelector('#product').value = product
+  document.querySelector('#countySelect').value = county
+  document.querySelector('#analyze-btn').click()
+}
+
+// SEARCH SCRIPT - ADDED
+let searchTimeout;
+document.getElementById('search-input').addEventListener('input', (e) => {
+  clearTimeout(searchTimeout);
+  const q = e.target.value;
+  if(q.length < 2) {
+    document.getElementById('search-results').classList.add('hidden');
+    return;
+  }
+
+  searchTimeout = setTimeout(async () => {
+    const res = await fetch(`/analysis/search?q=${q}`)
+    const data = await res.json()
+    renderSearchResults(data.results)
+  }, 300)
+})
+
+function renderSearchResults(results){
+  const container = document.getElementById('search-results')
+  if(results.length === 0){
+    container.innerHTML = `<p class="p-4 text-gray-500">No results found</p>`
+  } else {
+    container.innerHTML = results.map(r => `
+      <div onclick="openInsight(${r.id})" class="p-3 hover:bg-teal-50 cursor-pointer border-b">
+        <p class="font-bold">${r.product} <span class="text-xs text-gray-500">${r.county}</span></p>
+        <p class="text-sm">${r.snippet}</p>
+        <div class="flex gap-2 mt-1">
+          <span class="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">Demand: ${r.demand_score}</span>
+          <span class="text-xs bg-gray-100 px-2 py-0.5 rounded">KES ${r.current_price_kes}</span>
+        </div>
+      </div>
+    `).join('')
+  }
+  container.classList.remove('hidden')
+}
+
+function openInsight(id){
+  window.location.href = `/analysis/${id}`
+}
+
+document.addEventListener('click', (e) => {
+  if(!e.target.closest('#search-input') &&!e.target.closest('#search-results')){
+    document.getElementById('search-results').classList.add('hidden')
+  }
+})
+
+loadTrending()
+
+// YOUR EXISTING SCRIPT BELOW - UNCHANGED
 document.getElementById('profileBtn').onclick = (e) => {e.stopPropagation(); document.getElementById('profileDropdown').classList.toggle('hidden');}
 document.addEventListener('click', (e) => {if(!document.getElementById('profileMenu').contains(e.target)){document.getElementById('profileDropdown').classList.add('hidden');}})
 async function logout(){await fetch(API.logout, {method:'POST'}); window.location = API.login;}
