@@ -4,15 +4,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }} - EvidLens</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link href="/static/css/style.css" rel="stylesheet">
 </head>
-<body>
-    <div class="container mx-auto p-8">
-        <a href="/" class="text-blue-600">← Back to Dashboard</a>
-        <h1 class="text-3xl font-bold mt-4 mb-6">{{ title }}</h1>
-        <div class="prose">
-            <p>This is the {{ title }} page. Content coming soon.</p>
-            <p>Contact: support@evidlens.co.ke</p>
+<body class="bg-[#F5F7FA]">
+    <!-- Header with logo so user doesn't get lost -->
+    <header class="bg-[#0A1F44] text-white px-6 py-4">
+      <div class="max-w-7xl mx-auto flex items-center gap-3">
+        <a href="/" class="font-bold text-2xl"><span>Evid</span><span style="color:#14B8A6">Lens</span></a>
+      </div>
+    </header>
+
+    <div class="container mx-auto p-8 max-w-4xl">
+        <a href="/" class="text-[#14B8A6] font-semibold">← Back to Dashboard</a>
+        <h1 class="text-3xl font-bold mt-4 mb-6 text-[#0A1F44]">{{ title }}</h1>
+        
+        <div class="bg-white p-8 rounded-2xl shadow-sm prose max-w-none">
+            {{ content | safe }}
+        </div>
+
+        <div class="mt-6 text-center text-sm text-gray-500">
+            Need help? Contact: <a href="mailto:support@evidlens.co.ke" class="text-[#14B8A6]">support@evidlens.co.ke</a>
         </div>
     </div>
 </body>
