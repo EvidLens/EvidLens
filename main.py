@@ -853,6 +853,20 @@ PRICING = {"BASIC": {"monthly": 500, "yearly": 5000}, "PROFESSIONAL": {"monthly"
 ADDONS = {"EXTRA_REPORTS_10": {"name": "10 Extra Reports", "one_time": 1000}, "API_ACCESS": {"name": "API Access", "monthly": 2000}, "TEAM_SEAT": {"name": "Extra Team Seat", "monthly": 500}, "DATA_EXPORT": {"name": "Bulk Data Export", "one_time": 5000}}
 ALC = {"CUSTOM_REPORT": {"name": "Custom Market Report", "price": 25000}, "DATA_ONBOARDING": {"name": "Data Onboarding", "price": 50000}, "TRAINING": {"name": "Team Training", "price": 15000}}
 
+ALC = {...}
+
+@app.get("/billing", response_class=HTMLResponse)
+def billing(request: Request, user: AuthUser = Depends(get_current_user)): 
+    return templates.TemplateResponse("billing.html", {"request": request, "current_user": user, "plans": PRICING})
+
+@app.get("/", response_class=HTMLResponse)
+def home(request: Request, user: AuthUser = Depends(get_current_user)):
+    return templates.TemplateResponse("index.html", {
+        "request": request, 
+        "current_user": user,  # <-- THIS MAKES THE DROPDOWN WORK
+        "data": data
+    })
+
 def get_mpesa_token():
     api_url = ("https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials" if MPESA_ENV == "sandbox" else "https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials")
     r = requests.get(api_url, auth=HTTPBasicAuth(MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET))
