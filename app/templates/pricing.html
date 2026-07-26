@@ -1,70 +1,77 @@
-<!DOCTYPE html>
-<html>
-<head>
-<title>EvidLens Pricing</title>
-<script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-50">
-<section class="py-16"><div class="max-w-7xl mx-auto px-4">
-<h1 class="text-4xl font-bold text-center" style="color:#0A1F44">Choose Your Plan</h1>
-<p class="text-center text-gray-600 mt-2">Kenya-First Data. 9 Lanes. 19 Modules. Exportable Reports</p>
-
-<div class="flex justify-center items-center gap-4 mt-8">
-  <span class="font-semibold" id="monthlyLabel" style="color:#0A1F44">Monthly</span>
-  <button id="billingToggle" onclick="toggleBilling()" class="relative w-14 h-7 bg-gray-300 rounded-full transition">
-    <span id="toggleCircle" class="absolute left-1 top-1 w-5 h-5 bg-white rounded-full transition"></span>
-  </button>
-  <span class="font-semibold text-gray-400" id="yearlyLabel">Yearly <span class="text-xs text-[#14B8A6]">Save 17%</span></span>
-</div>
-
-<div class="grid md:grid-cols-3 gap-6 mt-8" id="plans-grid"></div>
-
-<div class="mt-12">
-  <h2 class="text-xl font-bold text-center mb-4" style="color:#0A1F44">Add-Ons</h2>
-  <div class="grid md:grid-cols-4 gap-4" id="addons-grid"></div>
-
-  <h2 class="mt-8 text-xl font-bold text-center mb-4" style="color:#0A1F44">À La Carte Services</h2>
-  <div class="grid md:grid-cols-3 gap-4" id="alc-grid"></div>
-</div>
-</div></section>
-
 <script>
 let billing = 'monthly';
+let PRICING = {}; // will be loaded from backend
+let plansMeta = [];
 
-const PRICING = {
-  "BASIC": {"monthly": 500, "yearly": 5000},
-  "PROFESSIONAL": {"monthly": 1500, "yearly": 15000},
-  "ENTERPRISE": {"monthly": 5000, "yearly": 50000}
-};
+function formatKES(n){ 
+  if(n === -1) return 'Unlimited';
+  return 'KES ' + n.toLocaleString() 
+}
 
-const plansMeta = [
-  {key: "BASIC", name: "BASIC", features: ["3 Free Queries/mo", "Email Support", "Export to PDF"]},
-  {key: "PROFESSIONAL", name: "PROFESSIONAL", features: ["100 Queries/mo", "API Access", "Priority Support", "CSV Export"]},
-  {key: "ENTERPRISE", name: "ENTERPRISE", features: ["Unlimited Queries", "Dedicated Analyst", "Custom Data", "SLA"]},
-];
-
-const addons = [
-  {key: "EXTRA_REPORTS_10", name: "10 Extra Reports", price: 1000, type: "one_time"},
-  {key: "API_ACCESS", name: "API Access", price: 2000, type: "monthly"},
-  {key: "TEAM_SEAT", name: "Extra Team Seat", price: 500, type: "monthly"},
-  {key: "DATA_EXPORT", name: "Bulk Data Export", price: 5000, type: "one_time"}
-];
-
-const alc = [
-  {key: "CUSTOM_REPORT", name: "Custom Market Report", price: 25000},
-  {key: "DATA_ONBOARDING", name: "Data Onboarding", price: 50000},
-  {key: "TRAINING", name: "Team Training", price: 15000}
-];
-
-function formatKES(n){ return 'KES ' + n.toLocaleString() }
+async function loadPricing() {
+  try {
+    const res = await fetch('/pricing'); // hits your core/service.py
+    const data = await res.json();
+    
+    PRICING = data.plans; // EV-SME, EV-GROWTH etc
+    
+    // Map backend to UI cards
+    plansMeta = [
+      {
+        key: "EV-SME", 
+        name: "SME", 
+        features: [
+          `${PRICING["EV-SME"].areas} Area`, 
+          `${PRICING["EV-SME"].products} Products`, 
+          `${PRICING["EV-SME"].users} User`, 
+          `${PRICING["EV-SME"].competitors} Competitors`,
+          "Basic Lens"
+        ]
+      },
+      {
+        key: "EV-GROWTH", 
+        name: "GROWTH", 
+        features: [
+          `${PRICING["EV-GROWTH"].areas} Areas`, 
+          `${PRICING["EV-GROWTH"].products} Products`, 
+          `${PRICING["EV-GROWTH"].users} Users`, 
+          `${PRICING["EV-GROWTH"].competitors} Competitors`,
+          `${PRICING["EV-GROWTH"].leads_qtr} Leads/Qtr`
+        ]
+      },
+      {
+        key: "EV-PRO", 
+        name: "PRO", 
+        features: [
+          `${PRICING["EV-PRO"].areas} Areas`, 
+          `${PRICING["EV-PRO"].products} Products`, 
+          "Unlimited Users", 
+          "Unlimited Competitors",
+          `${PRICING["EV-PRO"].leads_qtr} Leads/Qtr`
+        ]
+      }
+    ];
+    
+    renderPlans();
+    renderAddons(data.addons);
+    renderALC(data.ala_carte);
+    
+  } catch(e) {
+    console.error("Failed to load pricing", e)
+  }
+}
 
 function renderPlans(){
   const grid = document.getElementById('plans-grid');
   grid.innerHTML = '';
   plansMeta.forEach(p=>{
-    const price = PRICING[p.key][billing];
+    const planData = PRICING[p.key];
+    if(!planData) return;
+    
+    const price = billing === 'monthly' ? planData.monthly : planData.annual;
     const sub = billing === 'monthly'? '/month' : '/year';
-    const isPopular = p.key === "PROFESSIONAL";
+    const isPopular = p.key === "EV-GROWTH";
+    
     grid.innerHTML += `
     <div class="bg-white p-6 rounded-2xl shadow ${isPopular? 'border-4 border-[#14B8A6]' : 'border border-gray-200'}">
       ${isPopular? '<p class="text-xs bg-[#14B8A6] text-white px-2 py-1 rounded-full inline-block mb-2">MOST POPULAR</p>' : ''}
@@ -80,27 +87,28 @@ function renderPlans(){
   })
 }
 
-function renderAddons(){
+function renderAddons(addonsData){
   const grid = document.getElementById('addons-grid');
   grid.innerHTML = '';
-  addons.forEach(a=>{
-    const priceText = a.type === 'monthly'? formatKES(a.price)+'/mo' : formatKES(a.price);
+  Object.entries(addonsData).forEach(([key, a])=>{
+    const price = billing === 'monthly' ? a.annual/12 : a.annual;
+    const priceText = formatKES(Math.round(price));
     grid.innerHTML += `
     <div class="bg-white p-4 rounded-lg border flex justify-between items-center">
-      <div><p class="font-semibold">${a.name}</p><p class="text-sm text-gray-600">${priceText}</p></div>
-      <button onclick="checkoutAddon('${a.key}')" class="bg-[#14B8A6] text-white px-3 py-1 rounded text-sm">Add</button>
+      <div><p class="font-semibold">${key}</p><p class="text-sm text-gray-600">${priceText}</p></div>
+      <button onclick="checkoutAddon('${key}')" class="bg-[#14B8A6] text-white px-3 py-1 rounded text-sm">Add</button>
     </div>`
   })
 }
 
-function renderALC(){
+function renderALC(alcData){
   const grid = document.getElementById('alc-grid');
   grid.innerHTML = '';
-  alc.forEach(a=>{
+  Object.entries(alcData).forEach(([key, a])=>{
     grid.innerHTML += `
     <div class="bg-white p-4 rounded-lg border flex justify-between items-center">
-      <div><p class="font-semibold">${a.name}</p><p class="text-sm text-gray-600">${formatKES(a.price)}</p></div>
-      <button onclick="contactSales('${a.key}')" class="bg-[#F59E0B] text-white px-3 py-1 rounded text-sm">Contact</button>
+      <div><p class="font-semibold">${key}</p><p class="text-sm text-gray-600">${formatKES(a.price)}</p></div>
+      <button onclick="contactSales('${key}')" class="bg-[#F59E0B] text-white px-3 py-1 rounded text-sm">Contact</button>
     </div>`
   })
 }
@@ -119,10 +127,12 @@ async function checkout(plan){
   const btn = event.target;
   btn.innerText = "Processing...";
   btn.disabled = true;
+  
+  // CRITICAL: send plan_code like EV-GROWTH
   const res = await fetch('/api/checkout', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({plan, billing, phone})
+    body: JSON.stringify({plan_code: plan, billing, phone})
   })
   const data = await res.json();
   btn.innerText = "Get Started";
@@ -146,7 +156,6 @@ function contactSales(key){
   window.location.href = "/contact?service=" + key;
 }
 
-renderPlans();
-renderAddons();
-renderALC();
-</script></body></html>
+// Load from backend on page load
+loadPricing();
+</script>
