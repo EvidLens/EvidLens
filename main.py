@@ -1,3 +1,4 @@
+from sqlmodel import SQLModel
 from app.modules.database import get_db
 from app.modules.kenyalensiq.models import KenyaLensBusiness, MarketMetric
 from groq import Groq
@@ -79,6 +80,11 @@ from app.modules.chatbot.router import router as chatbot_router
 scheduler = AsyncIOScheduler()
 
 app = FastAPI(title="EvidLens API", version="2.5.12")
+
+@app.on_event("startup")
+def on_startup():
+    SQLModel.metadata.create_all(engine)
+    print("DB tables checked/created")
 
 app.add_middleware(
     CORSMiddleware,
