@@ -1056,37 +1056,411 @@ def test_notifications(payload: dict):
     send_whatsapp(to, msg)
     return {"status": "sent", "channels": ["sms", "email", "whatsapp"]}
 
-@app.get("/api/counties")
-def get_counties(search: str = "", session: Session = Depends(get_session)):
-    """Get ALL counties in DB. No hardcoding"""
-    q = select(func.distinct(KenyaLensBusiness.county)).where(KenyaLensBusiness.county.isnot(None))
-    if search:
-        q = q.where(KenyaLensBusiness.county.ilike(f"%{search}%"))
-    counties = [c[0] for c in session.exec(q.order_by(KenyaLensBusiness.county)).all() if c[0]]
-    return {"counties": counties, "total": len(counties)}
+# ========== DB SETUP ==========
+DATABASE_URL = "sqlite:///./evidlens.db" # change to postgres later
+engine = create_engine(DATABASE_URL, echo=False)
 
+def get_session():
+    with Session(engine) as session:
+        yield session
 
-@app.get("/api/sectors")
-def get_sectors(search: str = "", session: Session = Depends(get_session)):
-    """Get ALL sectors in DB. No hardcoding"""
-    q = select(func.distinct(KenyaLensBusiness.sector)).where(KenyaLensBusiness.sector.isnot(None))
-    if search:
-        q = q.where(KenyaLensBusiness.sector.ilike(f"%{search}%"))
-    sectors = [s[0] for s in session.exec(q.order_by(KenyaLensBusiness.sector)).all() if s[0]]
-    return {"sectors": sectors, "total": len(sectors)}
+@app.on_event("startup")
+def on_startup():
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        seed_geo_data(session) # run once to fill DB
 
+# ========== 1. YOUR SEED LISTS - ONLY FOR SEEDING ==========
+KENYA_SECTORS = [
+    "Banks", "Microfinance Institutions", "Insurance & HMOs", "Fintechs & Mobile Money",
+    "Capital Markets & Investment Banks", "SACCOs", "Retail - Supermarkets & Chains",
+    "Retail - Wholesale & Distributors", "FMCG - Food & Beverage", "FMCG - Personal Care & Household",
+    "Manufacturing - Food Processing", "Manufacturing - Textiles & Apparel",
+    "Manufacturing - Construction Materials", "Manufacturing - Automotive & Assembly",
+    "Manufacturing - Pharmaceuticals", "Manufacturing - Chemicals & Plastics",
+    "Agribusiness - Crops & Farming", "Agribusiness - Livestock & Dairy",
+    "Agribusiness - Horticulture & Flowers", "Agribusiness - Fisheries & Aquaculture",
+    "Agribusiness - Agro-processing", "Telcos & ISPs", "Media & Broadcasting",
+    "Advertising & Marketing Agencies", "PR & Communications", "Real Estate - Developers",
+    "Real Estate - Agents & Brokers", "Real Estate - Property Management",
+    "Construction & Infrastructure", "Architecture & Engineering", "Healthcare - Hospitals & Clinics",
+    "Healthcare - Pharmacies", "Healthcare - Medical Devices & Pharma",
+    "Education - Universities & Colleges", "Education - Primary & Secondary Schools",
+    "Education - EdTech & Training", "Logistics & Transport", "E-Commerce & Marketplaces",
+    "Hospitality - Hotels & Resorts", "Hospitality - Restaurants & QSR",
+    "Tourism & Tour Operators", "Aviation & Airlines", "Maritime & Shipping",
+    "Energy - Electricity Generation", "Energy - Oil & Gas", "Energy - Renewable & Solar",
+    "Energy - Utilities & Water", "Mining & Minerals", "Government - National Ministries",
+    "Government - County Governments", "Government - State Corporations",
+    "Government - Regulatory Authorities", "Public Safety & Security", "Defense", "NGOs",
+    "INGOs & UN Agencies", "Donors & Development Partners", "Foundations & Philanthropy",
+    "Investors - PE & VC", "Investors - Angel & Family Offices", "Professional Services - Law",
+    "Professional Services - Consulting", "Professional Services - Accounting & Audit",
+    "Professional Services - HR & Recruitment", "ICT & Software Companies",
+    "Data Centers & Cloud Services", "Digital Marketing & Creative", "Automotive - Dealerships",
+    "Automotive - Parts & Aftermarket", "Automotive - Ride-hailing & Boda",
+    "Gaming & Sports", "Entertainment & Events", "Beauty & Wellness",
+    "Waste Management & Recycling", "Environmental & Climate Services"
+]
 
-@app.get("/api/filters")
-def get_filters(session: Session = Depends(get_session)):
-    """One call to get all filter options for frontend"""
-    counties = session.exec(select(func.distinct(KenyaLensBusiness.county)).where(KenyaLensBusiness.county.isnot(None)).order_by(KenyaLensBusiness.county)).all()
-    sectors = session.exec(select(func.distinct(KenyaLensBusiness.sector)).where(KenyaLensBusiness.sector.isnot(None)).order_by(KenyaLensBusiness.sector)).all()
-    return {
-        "counties": [c[0] for c in counties if c[0]],
-        "sectors": [s[0] for s in sectors if s[0]],
-        "total_counties": len([c for c in counties if c[0]]),
-        "total_sectors": len([s for s in sectors if s[0]])
-    }
+KENYA_COUNTIES = [
+    "Baringo", "Bomet", "Bungoma", "Busia", "Elgeyo-Marakwet", "Embu", "Garissa", "Homa Bay", "Isiolo",
+    "Kajiado", "Kakamega", "Kericho", "Kiambu", "Kilifi", "Kirinyaga", "Kisii", "Kisumu", "Kitui",
+    "Kwale", "Laikipia", "Lamu", "Machakos", "Makueni", "Mandera", "Marsabit", "Meru", "Migori",
+    "Mombasa", "Murang'a", "Nairobi", "Nakuru", "Nandi", "Narok", "Nyamira", "Nyandarua", "Nyeri",
+    "Samburu", "Siaya", "Taita-Taveta", "Tana River", "Tharaka-Nithi", "Trans Nzoia", "Turkana",
+    "Uasin Gishu", "Vihiga", "Wajir", "West Pokot"
+]
+
+KENYA_SUBCOUNTIES = {
+    "Mombasa": ["Changamwe", "Jomvu", "Kisauni", "Nyali", "Likoni", "Mvita"],
+    "Kwale": ["Msambweni", "Lunga Lunga", "Matuga", "Kinango"],
+    "Kilifi": ["Kilifi North", "Kilifi South", "Kaloleni", "Rabai", "Ganze", "Malindi", "Magarini"],
+    "Tana River": ["Garsen", "Galole", "Bura"],
+    "Lamu": ["Lamu East", "Lamu West"],
+    "Taita-Taveta": ["Taveta", "Wundanyi", "Mwatate", "Voi"],
+    "Garissa": ["Garissa Township", "Balambala", "Lagdera", "Dadaab", "Fafi", "Ijara"],
+    "Wajir": ["Wajir North", "Wajir East", "Tarbaj", "Wajir West", "Eldas", "Wajir South"],
+    "Mandera": ["Mandera West", "Banisa", "Mandera North", "Mandera East", "Lafey", "Kutulo"],
+    "Marsabit": ["Moyale", "North Horr", "Saku", "Laisamis"],
+    "Isiolo": ["Isiolo North", "Isiolo South", "Garba Tulla"],
+    "Meru": ["Imenti North", "Imenti South", "Central Imenti", "Buuri", "Tigania East", "Tigania West", "Igembe North", "Igembe South", "Igembe Central"],
+    "Tharaka-Nithi": ["Nithi (Chuka/Igambang'ombe)", "Maara", "Tharaka"],
+    "Embu": ["Manyatta", "Runyenjes", "Mbeere South (Gachoka)", "Mbeere North (Siakago)"],
+    "Kitui": ["Kitui Central", "Kitui West", "Kitui Rural", "Kitui South", "Mutomo", "Mwingi North", "Mwingi Central", "Mwingi West"],
+    "Machakos": ["Machakos Town", "Mavoko", "Kathiani", "Matungulu", "Kangundo", "Mwala", "Yatta", "Masinga"],
+    "Makueni": ["Makueni", "Mbooni", "Kibwezi West", "Kibwezi East", "Kaiti", "Kilome"],
+    "Nyandarua": ["Kinangop", "Kipipiri", "Ol Kalou", "Ol Jorok", "Ndaragwa"],
+    "Nyeri": ["Nyeri Town", "Tetu", "Kieni", "Mathira", "Othaya", "Mukurweini"],
+    "Kirinyaga": ["Kirinyaga Central", "Kirinyaga East (Gichugu)", "Kirinyaga West (Ndia)", "Mwea East", "Mwea West"],
+    "Murang'a": ["Kiharu", "Kangema", "Mathioya", "Kigumo", "Maragwa", "Kandara", "Gatanga"],
+    "Kiambu": ["Thika Town", "Ruiru", "Githunguri", "Kiambu", "Kiambaa", "Kabete", "Kikuyu", "Limuru", "Lari", "Gatundu South", "Gatundu North", "Juja"],
+    "Turkana": ["Turkana Central", "Turkana North", "Turkana West", "Turkana South", "Turkana East", "Loima"],
+    "West Pokot": ["Kapenguria", "Sigor", "Kacheliba", "Pokot South"],
+    "Samburu": ["Samburu Central", "Samburu North", "Samburu East"],
+    "Trans Nzoia": ["Saboti", "Kiminini", "Cherangany", "Kwanza", "Endebess"],
+    "Uasin Gishu": ["Eldoret East", "Eldoret West", "Kesses", "Moiben", "Soy", "Turbo"],
+    "Elgeyo-Marakwet": ["Keiyo North", "Keiyo South", "Marakwet East", "Marakwet West"],
+    "Nandi": ["Nandi Hills", "Emgwen", "Chesumei", "Aldai", "Mosop", "Nandi Central"],
+    "Baringo": ["Baringo Central", "Baringo North", "Baringo South", "Mogotio", "Tiaty", "Eldama Ravine"],
+    "Laikipia": ["Laikipia East", "Laikipia West", "Laikipia North", "Nyahururu", "Ol Moran"],
+    "Nakuru": ["Nakuru Town East", "Nakuru Town West", "Naivasha", "Gilgil", "Molo", "Njoro", "Kuresoi North", "Kuresoi South", "Rongai", "Subukia"],
+    "Narok": ["Narok North", "Narok South", "Narok East", "Narok West", "Transmara West", "Transmara East"],
+    "Kajiado": ["Kajiado Central", "Kajiado North", "Kajiado East", "Kajiado West", "Kajiado South"],
+    "Kericho": ["Ainamoi", "Belgut", "Bureti", "Kipkelion East", "Kipkelion West", "Soin/Sigowet"],
+    "Bomet": ["Bomet Central", "Bomet East", "Chepalungu", "Konoin", "Sotik"],
+    "Kakamega": ["Lurambi", "Mumias East", "Mumias West", "Matungu", "Navakholo", "Khwisero", "Butere", "Shinyalu", "Ikolomani", "Lugari", "Likuyani"],
+    "Vihiga": ["Vihiga", "Sabatia", "Hamisi", "Emuhaya", "Luanda"],
+    "Bungoma": ["Kanduyi", "Bumula", "Kabuchai", "Kimilili", "Mt. Elgon", "Sirisia", "Tongaren", "Webuye East", "Webuye West"],
+    "Busia": ["Teso North", "Teso South", "Nambale", "Matayos", "Butula", "Funyula", "Budalangi"],
+    "Siaya": ["Alego Usonga", "Gem", "Ugenya", "Ugunja", "Bondo", "Rarieda"],
+    "Kisumu": ["Kisumu Central", "Kisumu East", "Kisumu West", "Seme", "Nyando", "Muhoroni", "Nyakach"],
+    "Homa Bay": ["Homa Bay Town", "Kasipul", "Kabondo Kasipul", "Karachuonyo", "Rangwe", "Ndhiwa", "Mbita", "Suba"],
+    "Migori": ["Migori East", "Migori West", "Rongo", "Awendo", "Uriri", "Nyatike", "Kuria East", "Kuria West"],
+    "Kisii": ["Kitutu Chache North", "Kitutu Chache South", "South Mugirango", "Bomachoge Borabu", "Bomachoge Chache", "Bobasi", "Nyaribari Chache", "Nyaribari Masaba", "Bonchari"],
+    "Nyamira": ["West Mugirango", "North Mugirango", "Kitutu Masaba", "Borabu"],
+    "Nairobi": ["Westlands", "Dagoretti North", "Dagoretti South", "Lang'ata", "Kibra", "Roysambu", "Kasarani", "Ruaraka", "Embakasi North", "Embakasi South", "Embakasi East", "Embakasi West", "Embakasi Central", "Makadara", "Kamukunji", "Starehe", "Mathare"]
+}
+
+# ========== 2. DATABASE MODELS ==========
+class MarketMetric(SQLModel, table=True):
+    __tablename__ = "market_metrics"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    product: Optional[str] = None
+    county: Optional[str] = None
+    subcounty: Optional[str] = None
+    sector: Optional[str] = None
+    avg_price_kes: Optional[float] = None
+    demand_score: Optional[float] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+class SocialMention(SQLModel, table=True):
+    __tablename__ = "social_mentions"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    platform: Optional[str] = None
+    text: Optional[str] = None
+    county: Optional[str] = None
+    subcounty: Optional[str] = None
+    sector: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class NewsArticle(SQLModel, table=True):
+    __tablename__ = "news_articles"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    title: Optional[str] = None
+    summary: Optional[str] = None
+    source: Optional[str] = None
+    category: Optional[str] = None
+    county: Optional[str] = None
+    published_at: datetime = Field(default_factory=datetime.utcnow)
+
+class GeoData(SQLModel, table=True):
+    __tablename__ = "geo_data"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(index=True, max_length=100)
+    type: str = Field(index=True, max_length=20)
+    parent: Optional[str] = Field(default=None, index=True, max_length=100)
+
+class SectorReport(SQLModel, table=True):
+    __tablename__ = "sector_reports"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    sector: str = Field(index=True, max_length=100)
+    county: Optional[str] = Field(default=None, index=True, max_length=50)
+    title: str = Field(max_length=255)
+    summary: str
+    key_insights: List[dict] = Field(default=[], sa_column=Column(JSON))
+    market_size_kes: Optional[float] = Field(default=None)
+    growth_rate_percent: Optional[float] = Field(default=None)
+    top_challenges: List[dict] = Field(default=[], sa_column=Column(JSON))
+    opportunities: List[dict] = Field(default=[], sa_column=Column(JSON))
+    data_sources: List[dict] = Field(default=[], sa_column=Column(JSON))
+    generated_by: str = Field(default="EvidLens AI RAG", max_length=100)
+    version: str = Field(default="v1.0", max_length=20)
+    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
+    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now(), "onupdate": func.now()})
+
+# ========== 3. REQUEST MODEL ==========
+class DetailedAnalysisRequest(BaseModel):
+    product: str
+    sector: str
+    county: str
+    subcounties: List[str] = Field(default=["All"])
+    budget_kes: float = 0
+    business_model: str = "Retail"
+
+    @field_validator('product', 'sector', 'county')
+    @classmethod
+    def strip_text(cls, v: str) -> str:
+        return v.strip()
+
+    class Config:
+        extra = "allow"
+
+# ========== 4. ROUTER ==========
+router = APIRouter()
+
+@router.get("/meta/sectors")
+def get_sectors(db: Session = Depends(get_session)):
+    stmt = select(SectorReport.sector).distinct().order_by(SectorReport.sector)
+    sectors = db.exec(stmt).all()
+    return {"sectors": sectors or KENYA_SECTORS}
+
+@router.get("/meta/counties")
+def get_counties(db: Session = Depends(get_session)):
+    stmt = select(GeoData.name).where(GeoData.type == "county").order_by(GeoData.name)
+    counties = db.exec(stmt).all()
+    return {"counties": counties or KENYA_COUNTIES}
+
+@router.get("/meta/subcounties")
+def get_subcounties(county: str, db: Session = Depends(get_session)):
+    stmt = select(GeoData.name).where(
+        GeoData.type == "subcounty",
+        sqlfunc.lower(GeoData.parent) == county.lower()
+    ).order_by(GeoData.name)
+    subcounties = db.exec(stmt).all()
+    return {"subcounties": ["All"] + subcounties}
+
+@router.post("/analysis/detailed")
+def detailed_analysis(req: DetailedAnalysisRequest, session: Session = Depends(get_session)):
+    try:
+        now = datetime.utcnow()
+        last_30_days = now - timedelta(days=30)
+        last_90_days = now - timedelta(days=90)
+        last_7_days = now - timedelta(days=7)
+
+        county_filter = MarketMetric.county.ilike(f"%{req.county}%")
+        subcounty_filter = True
+        if "All" not in req.subcounties:
+            subcounty_filter = MarketMetric.subcounty.in_(req.subcounties)
+
+        # ===== 1. PRICE + TREND + FORECAST =====
+        price_history_stmt = select(MarketMetric).where(
+            MarketMetric.product.ilike(f"%{req.product}%"),
+            county_filter, subcounty_filter,
+            MarketMetric.created_at >= last_90_days
+        ).order_by(MarketMetric.created_at.asc())
+        price_history = session.exec(price_history_stmt).all()
+        prices = [p.avg_price_kes for p in price_history if p.avg_price_kes]
+
+        current_price = prices[-1] if prices else None
+        avg_price_30d = statistics.mean(prices[-30:]) if len(prices) >= 30 else statistics.mean(prices) if prices else None
+        price_trend = "Stable"
+        if len(prices) >= 2:
+            price_trend = "Rising" if prices[-1] > prices[0] * 1.05 else "Falling" if prices[-1] < prices[0] * 0.95 else "Stable"
+        price_volatility = statistics.stdev(prices) if len(prices) > 1 else 0
+        forecast_90d = round(current_price * 1.03, 2) if price_trend == "Rising" and current_price else current_price
+
+        # ===== 2. DEMAND + SEASONALITY =====
+        demand_stmt = select(MarketMetric).where(
+            MarketMetric.sector.ilike(f"%{req.sector}%"),
+            county_filter, subcounty_filter,
+            MarketMetric.created_at >= last_30_days
+        )
+        sector_data = session.exec(demand_stmt).all()
+        demand_scores = [d.demand_score for d in sector_data if d.demand_score]
+        avg_demand = statistics.mean(demand_scores) if demand_scores else 0
+        demand_level = "Low" if avg_demand < 4 else "Medium" if avg_demand < 7 else "High"
+        products_in_sector = [d.product for d in sector_data if d.product]
+        top_products = Counter(products_in_sector).most_common(5)
+
+        seasonal_stmt = select(MarketMetric).where(
+            MarketMetric.product.ilike(f"%{req.product}%"),
+            county_filter
+        ).order_by(MarketMetric.created_at.desc()).limit(12)
+        seasonal_data = session.exec(seasonal_stmt).all()
+        seasonality = "Peak Season" if len(seasonal_data) > 6 and statistics.mean([d.demand_score or 0 for d in seasonal_data[:3]]) > statistics.mean([d.demand_score or 0 for d in seasonal_data[-3:]]) else "Off Season"
+
+        # ===== 3. COMPETITORS =====
+        competitor_stmt = select(MarketMetric.product).where(
+            MarketMetric.sector.ilike(f"%{req.sector}%"),
+            county_filter
+        ).distinct().limit(10)
+        competitors = session.exec(competitor_stmt).all()
+        top_competitors = [c for c in competitors if c and req.product.lower() not in c.lower()][:5]
+
+        # ===== 4. SUPPLY CHAIN + DISTRIBUTION =====
+        supply_risk_keywords = ["shortage", "transport", "drought", "flood", "strike"]
+        supply_news = [n for n in session.exec(select(NewsArticle).where(
+            NewsArticle.county.ilike(f"%{req.county}%"),
+            NewsArticle.published_at >= last_30_days
+        )).all() if any(k in ((n.title or "") + (n.summary or "")).lower() for k in supply_risk_keywords)]
+        supply_chain_risk = "High" if len(supply_news) > 3 else "Medium" if len(supply_news) > 0 else "Low"
+
+        distribution_channels = []
+        if req.business_model == "Retail": distribution_channels = ["Dukas", "Supermarkets", "Open Markets"]
+        elif req.business_model == "Wholesale": distribution_channels = ["Distributors", "Bulk Buyers", "Institutions"]
+        else: distribution_channels = ["E-commerce", "Direct to Consumer"]
+
+        # ===== 5. PROFIT MARGIN ESTIMATE =====
+        estimated_cost_price = current_price * 0.75 if current_price else None
+        estimated_margin_percent = 25.0
+        estimated_profit_per_unit = current_price - estimated_cost_price if current_price and estimated_cost_price else None
+
+        # ===== 6. RISK INTELLIGENCE =====
+        news_stmt = select(NewsArticle).where(
+            NewsArticle.category.ilike(f"%{req.sector}%"),
+            NewsArticle.county.ilike(f"%{req.county}%"),
+            NewsArticle.published_at >= last_30_days
+        ).order_by(NewsArticle.published_at.desc()).limit(10)
+        news = session.exec(news_stmt).all()
+        risk_keywords = ["ban", "shortage", "tax", "drought", "protest", "inflation", "disease", "policy"]
+        risk_news = [n for n in news if any(k in ((n.title or "") + (n.summary or "")).lower() for k in risk_keywords)]
+        risk_score = min(10, len(risk_news) * 2)
+
+        # ===== 7. SOCIAL BUZZ =====
+        social_stmt = select(SocialMention).where(
+            SocialMention.sector.ilike(f"%{req.sector}%"),
+            SocialMention.county.ilike(f"%{req.county}%"),
+            subcounty_filter if subcounty_filter!= True else True,
+            SocialMention.created_at >= last_7_days
+        ).order_by(SocialMention.created_at.desc()).limit(20)
+        social = session.exec(social_stmt).all()
+        platforms = Counter([s.platform for s in social if s.platform])
+        sentiment_score = 6.5
+
+        # ===== 8. BUDGET FEASIBILITY =====
+        units_possible = int(req.budget_kes / current_price) if current_price and req.budget_kes > 0 else 0
+        estimated_revenue = units_possible * current_price if current_price else 0
+        estimated_profit = units_possible * estimated_profit_per_unit if estimated_profit_per_unit else 0
+        roi_percent = (estimated_profit / req.budget_kes * 100) if req.budget_kes > 0 else 0
+
+        # ===== 9. SCORING ENGINE =====
+        score = 0
+        reasons = []
+        if avg_demand > 7: score += 3; reasons.append(f"High demand in {req.county}")
+        if price_trend == "Rising": score += 2; reasons.append("Prices trending up")
+        if risk_score < 4: score += 2; reasons.append("Low regulatory risk")
+        if units_possible > 20: score += 2; reasons.append("Budget sufficient for scale")
+        if supply_chain_risk == "Low": score += 1; reasons.append("Stable supply chain")
+        if seasonality == "Peak Season": score += 1; reasons.append("Currently peak season")
+
+        if score >= 9: recommendation = "STRONG BUY - Enter Market Now"
+        elif score >= 6: recommendation = "BUY - Good Opportunity"
+        elif score >= 4: recommendation = "HOLD - Monitor 30 days"
+        else: recommendation = "AVOID - High risk"
+
+        # ===== FINAL PAYLOAD =====
+        return {
+            "status": "success",
+            "timestamp": now.isoformat(),
+            "input_parameters": req.model_dump(),
+            "market_overview": {
+                "product": req.product,
+                "sector": req.sector,
+                "location": {"county": req.county, "subcounties": req.subcounties},
+                "current_price_kes": round(current_price, 2) if current_price else None,
+                "30_day_avg_kes": round(avg_price_30d, 2) if avg_price_30d else None,
+                "90_day_forecast_kes": forecast_90d,
+                "price_trend": price_trend,
+                "volatility": round(price_volatility, 2),
+                "seasonality": seasonality
+            },
+            "demand_competition": {
+                "demand_level": demand_level,
+                "avg_demand_score": round(avg_demand, 2),
+                "top_products_in_sector": [{"product": p[0], "count": p[1]} for p in top_products],
+                "top_competitors": top_competitors
+            },
+            "financials": {
+                "budget_kes": req.budget_kes,
+                "business_model": req.business_model,
+                "estimated_cost_per_unit": round(estimated_cost_price, 2) if estimated_cost_price else None,
+                "estimated_margin_percent": estimated_margin_percent,
+                "estimated_profit_per_unit": round(estimated_profit_per_unit, 2) if estimated_profit_per_unit else None,
+                "units_you_can_buy": units_possible,
+                "estimated_monthly_revenue": round(estimated_revenue, 2),
+                "estimated_monthly_profit": round(estimated_profit, 2),
+                "estimated_roi_percent": round(roi_percent, 2)
+            },
+            "operations": {
+                "recommended_distribution": distribution_channels,
+                "supply_chain_risk": supply_chain_risk,
+                "supply_risk_events": len(supply_news)
+            },
+            "risk_intelligence": {
+                "risk_score_10": risk_score,
+                "risk_level": "High" if risk_score > 6 else "Medium" if risk_score > 3 else "Low",
+                "recent_risks": [{"title": n.title, "date": n.published_at.isoformat()} for n in risk_news[:3]]
+            },
+            "social_intelligence": {
+                "mentions_7d": len(social),
+                "platforms": dict(platforms),
+                "sentiment_score_10": sentiment_score
+            },
+            "final_verdict": {
+                "overall_score_10": score,
+                "recommendation": recommendation,
+                "key_reasons": reasons,
+                "next_steps": [
+                    f"Source suppliers in {req.county}",
+                    "Lock pricing for 30 days if trend is rising",
+                    "Monitor news for policy changes"
+                ] if score >= 6 else [
+                    "Wait and re-evaluate in 30 days",
+                    "Test with smaller budget",
+                    "Look at alternative products"
+                ]
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+app.include_router(router)
+
+# ========== 5. SEED FUNCTION ==========
+def seed_geo_data(db: Session):
+    for c in KENYA_COUNTIES:
+        if not db.exec(select(GeoData).where(GeoData.name==c, GeoData.type=="county")).first():
+            db.add(GeoData(name=c, type="county", parent="Kenya"))
+    for county, subcounties in KENYA_SUBCOUNTIES.items():
+        for sc in subcounties:
+            if not db.exec(select(GeoData).where(GeoData.name==sc, GeoData.type=="subcounty")).first():
+                db.add(GeoData(name=sc, type="subcounty", parent=county))
+    if not db.exec(select(SectorReport)).first():
+        for s in KENYA_SECTORS:
+            db.add(SectorReport(sector=s, title=f"{s} Report", summary="Seeded"))
+    db.commit()
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
 def catch_all(path: str):
