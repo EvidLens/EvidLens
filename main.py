@@ -1,3 +1,4 @@
+from app.modules.lens_engine.service import LensEngineService, scrape_kpin_prices, fetch_real_news, fetch_real_tweets
 import io, csv, secrets, os, base64, requests
 from typing import Optional
 from datetime import datetime, timedelta
@@ -996,6 +997,17 @@ def workspaces(request: Request, user: User = Depends(get_current_user)): return
 def forgot_page(request: Request): return templates.TemplateResponse("forgot.html", {"request": request})
 @app.get("/reset-password", response_class=HTMLResponse)
 def reset_page(request: Request, token: str): return templates.TemplateResponse("reset.html", {"request": request, "token": token})
+
+@app.post("/chat")
+async def chat(payload: dict, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    engine = LensEngineService(db)
+    return await engine.chat(payload.get("message", ""), user.email)
+
+@app.get("/api/lens/insights")
+async def get_lens_insights(sector: str = Query(...), county: str = None, db: Session = Depends(get_db)):
+    service = LensEngineService(db)
+    return await service.generate_sector_insights(sector, county)
+
 
 # ====== APIs ======
 @app.get("/api/export/{table}")
