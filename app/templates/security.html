@@ -1,1 +1,64 @@
-<!DOCTYPE html><html><head><title>Security - EvidLens</title><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-[#F5F7FA]"><div class="max-w-4xl mx-auto p-6 space-y-6"><div class="bg-white p-6 rounded-2xl"><h1 class="text-2xl font-bold text-[#0A1F44] mb-4">Profile & Preferences</h1><form id="profileForm" class="space-y-3"><input name="full_name" value="{{ current_user.full_name }}" class="w-full p-3 border rounded-lg"><input name="phone" value="{{ current_user.phone }}" class="w-full p-3 border rounded-lg"><select name="theme" class="w-full p-3 border rounded-lg"><option value="light">Light</option><option value="dark">Dark</option></select><select name="language" class="w-full p-3 border rounded-lg"><option value="en">English</option><option value="sw">Kiswahili</option></select><button class="bg-[#14B8A6] text-white px-4 py-2 rounded-lg">Save</button></form><p id="profileMsg"></p></div><div class="bg-white p-6 rounded-2xl"><h1 class="text-2xl font-bold text-[#0A1F44] mb-4">Change Password</h1><form id="passwordForm" class="space-y-3"><input name="old_password" type="password" class="w-full p-3 border rounded-lg" placeholder="Current Password"><input name="new_password" type="password" class="w-full p-3 border rounded-lg" placeholder="New Password"><button class="bg-[#F59E0B] text-white px-4 py-2 rounded-lg">Update</button></form><p id="passMsg"></p></div></div><script>document.getElementById('profileForm').onsubmit=async e=>{e.preventDefault();const res=await fetch('/auth/update-profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});document.getElementById('profileMsg').innerText=(await res.json()).message};document.getElementById('passwordForm').onsubmit=async e=>{e.preventDefault();const res=await fetch('/auth/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});document.getElementById('passMsg').innerText=(await res.json()).message||(await res.json()).detail};</script></body></html>
+<!DOCTYPE html>
+<html>
+<head>
+<title>Risk Sentinel - EvidLens</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif}
+.card{background:white; border-radius:16px; padding:24px; box-shadow:0 1px 4px rgba(16,24,40,0.06)}
+.badge{font-size:11px; font-weight:700; padding:4px 10px; border-radius:999px}
+</style>
+</head>
+<body class="bg-[#F5F7FA]">
+  <!-- Header -->
+  <header class="bg-[#0A1F44] text-white px-6 py-4">
+    <div class="max-w-7xl mx-auto flex items-center gap-3">
+      <a href="/" class="font-bold text-2xl"><span>Evid</span><span style="color:#14B8A6">Lens</span></a>
+    </div>
+  </header>
+
+  <div class="max-w-7xl mx-auto p-6">
+    <div class="card">
+      <div class="flex justify-between items-center mb-6">
+        <div>
+          <h1 class="text-3xl font-bold text-[#0A1F44] flex items-center gap-2">⚠️ Risk Sentinel</h1>
+          <p class="text-gray-500">Live market and regulatory risks for your sector</p>
+        </div>
+        <a href="/" class="bg-[#14B8A6] text-white px-4 py-2 rounded-lg font-bold">New Analysis</a>
+      </div>
+
+      <!-- Alerts List -->
+      <div class="space-y-4">
+        {% for n in news %}
+        <div class="border rounded-xl p-4 hover:shadow-md transition">
+          <div class="flex items-start justify-between">
+            <div class="flex-1">
+              <div class="flex items-center gap-2 mb-2">
+                {% if n.severity == 'High' %}
+                  <span class="badge bg-red-100 text-red-700">HIGH RISK</span>
+                {% elif n.severity == 'Medium' %}
+                  <span class="badge bg-yellow-100 text-yellow-700">MEDIUM</span>
+                {% else %}
+                  <span class="badge bg-blue-100 text-blue-700">LOW</span>
+                {% endif %}
+                <span class="text-xs text-gray-500">{{ n.published_at.strftime('%b %d, %Y') if n.published_at else 'Today' }}</span>
+              </div>
+              <h3 class="font-bold text-[#0A1F44] text-lg mb-1">{{ n.title }}</h3>
+              <p class="text-sm text-gray-600 mb-2">{{ n.summary }}</p>
+              <p class="text-xs text-gray-500">Source: {{ n.source }}</p>
+            </div>
+            <a href="{{ n.url }}" target="_blank" class="ml-4 text-[#14B8A6] text-sm font-bold whitespace-nowrap">Read Full →</a>
+          </div>
+        </div>
+        {% else %}
+        <div class="text-center p-10 text-gray-500">
+          <p class="text-4xl mb-2">✅</p>
+          <p>No active risks detected for your sector right now.</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</body>
+</html>
