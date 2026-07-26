@@ -1,5 +1,6 @@
 from app.modules.core.models import UserSubscription
 from datetime import datetime, timedelta
+from app.modules.core.service import get_all_pricing
 
 # Standard lib
 import os
@@ -38,7 +39,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
 from pydantic import BaseModel, Field, field_validator
 
 # SQLModel + SQLAlchemy
-from sqlmodel import SQLModel, Session, create_engine, select, func, or_, desc, asc, Field, Column, JSON
+from sqlmodel import SQLModel, Session, create_engine, select, func, or_, desc, asc, Field as SQLField, Column, JSON
 
 # ReportLab
 from reportlab.lib.pagesizes import A4
@@ -1965,6 +1966,10 @@ async def mpesa_callback(payload: dict, db: Session = Depends(get_db)):
     
     db.commit()
     return {"ResultCode": 0, "ResultDesc": "Success"}
+
+@app.get("/pricing")
+def api_get_pricing(db: Session = Depends(get_db)):
+    return get_all_pricing(db)
 
 if __name__ == "__main__":
     import uvicorn
