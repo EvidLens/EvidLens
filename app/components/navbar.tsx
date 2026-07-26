@@ -7,6 +7,7 @@ export default function Navbar() {
   const [user, setUser] = useState<any>(null)
   const [showDropdown, setShowDropdown] = useState(false)
   const [notifications, setNotifications] = useState(0)
+  const [planDisplay, setPlanDisplay] = useState("FREE") // NEW
   const router = useRouter()
 
   useEffect(() => {
@@ -19,6 +20,15 @@ export default function Navbar() {
       .then(res => res.json())
       .then(data => setNotifications(data.count))
       .catch(() => setNotifications(0))
+
+    // NEW: Fetch real plan from backend
+    fetch('/api/check-access', { credentials: 'include' })
+      .then(res => res.json())
+      .then(data => {
+        let plan = data.plan || "EV-FREE"; // EV-SME
+        setPlanDisplay(plan.replace("EV-", "")); // SME
+      })
+      .catch(() => setPlanDisplay("FREE"))
   }, [])
 
   const handleLogout = async () => {
@@ -76,7 +86,8 @@ export default function Navbar() {
             <div className="absolute right-0 mt-2 w-56 bg-white shadow-xl rounded-lg py-2 border">
               <div className="px-4 py-2 border-b">
                 <p className="font-semibold text-sm">{user.email}</p>
-                <p className="text-xs text-gray-500">{user.plan} Plan</p>
+                {/* CHANGED: use planDisplay instead of user.plan */}
+                <p className="text-xs text-gray-500">{planDisplay} Plan</p>
               </div>
               
               <Link href="/dashboard" className="block px-4 py-2 hover:bg-gray-100 text-sm">Dashboard</Link>
