@@ -943,6 +943,54 @@ def privacy(request: Request):
 def terms(request: Request):
     return templates.TemplateResponse("terms.html", {"request": request})
 
+import secrets
+from datetime import timedelta
+
+@app.post("/auth/forgot-password")
+def forgot_password(req: dict, session: Session = Depends(get_session)):
+    email = req["email"]
+    user = session.exec(select(User).where(User.email == email)).first()
+
+    if not user:
+        return {"message": "If an account exists, a reset link has been sent"} # don't reveal if email exists
+
+    # 1. Generate token
+    token = secrets.token_urlsafe(32)
+    user.reset_token = token
+    user.reset_token_expires = datetime.utcnow() + timedelta(hours=1)
+    session.add(user)
+    session.commit()
+
+    # 2. Send email - use Resend, Sendgrid, or Gmail SMTP
+    reset_link = f"https://evidlens.co.ke/auth/reset-password?token={token}"
+    send_email(
+        to=email,
+        subject="Reset your EvidLens password",
+        body=f"Click here to reset: {reset_link}. Link expires in 1 hour."
+    )
+
+    return {"message": "Password reset link sent to your email"}
+
+@app.get("/auth/reset-password")
+def reset_page(request: Request, token: str, session: Session = Depends(get_session)):
+    user = session.exec(select(User).where(User.reset_token == token, User.reset_token_expires > datetime.utcnow())).first()
+    if not user:
+        return HTMLResponse("Link expired or invalid")
+    return templates.TemplateResponse("reset_password.html", {"request": request, "token": token})
+
+@app.post("/auth/reset-password")
+def reset_password(token: str = Form(...), password: str = Form(...), session: Session = Depends(get_session)):
+    user = session.exec(select(User).where(User.reset_token == token, User.reset_token_expires > datetime.utcnow())).first()
+    if not user:
+        return {"error": "Invalid token"}
+
+    user.hashed_password = get_password_hash(password)
+    user.reset_token = None
+    user.reset_token_expires = None
+    session.add(user)
+    session.commit()
+    return RedirectResponse("/login?success=Password reset", status_code=303)
+
 @app.get("/contact", response_class=HTMLResponse)
 def contact(request: Request):
     return templates.TemplateResponse("contact.html", {"request": request})
