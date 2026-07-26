@@ -1059,6 +1059,28 @@ def forgot_page(request: Request):
 def reset_page(request: Request, token: str): 
     return templates.TemplateResponse("reset.html", {"request": request, "token": token})
 
+    @app.get("/history", response_class=HTMLResponse)
+def history(request: Request, session: Session = Depends(get_session), user: AuthUser = Depends(get_current_user)):
+    stmt = select(MarketMetric).where(MarketMetric.user_id == user.id).order_by(desc(MarketMetric.timestamp)).limit(50)
+    analyses = session.exec(stmt).all()
+    return templates.TemplateResponse("history.html", {"request": request, "current_user": user, "analyses": analyses})
+
+@app.get("/stats", response_class=HTMLResponse)
+def stats(request: Request, session: Session = Depends(get_session), user: AuthUser = Depends(get_current_user)):
+    total = session.exec(select(func.count()).where(MarketMetric.user_id == user.id)).first()
+
+    # Top counties
+    county_stmt = select(MarketMetric.county, func.count().label("c")).where(MarketMetric.user_id == user.id).group_by(MarketMetric.county).order_by(desc("c")).limit(5)
+    top_counties = session.exec(county_stmt).all()
+
+    return templates.TemplateResponse("stats.html", {
+        "request": request,
+        "current_user": user,
+        "total_analyses": total,
+        "credits_spent": total, # 1 credit per analysis
+        "top_counties": top_counties
+    })
+
 @app.get("/kenyalensiq/embed/money")
 def money_module_embed(query: str = "", session: Session = Depends(get_session)):
     funding_count = session.exec(select(func.count(KenyaLensBusiness.id)).where(or_(KenyaLensBusiness.sector.ilike("%Financial%"),KenyaLensBusiness.sector.ilike("%Banking%"),KenyaLensBusiness.sector.ilike("%Insurance%"),KenyaLensBusiness.sector.ilike("%SACCO%"),KenyaLensBusiness.sector.ilike("%Microfinance%"),KenyaLensBusiness.sector.ilike("%FinTech%")))).one()
