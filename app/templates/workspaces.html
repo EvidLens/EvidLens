@@ -1,1 +1,58 @@
-<!DOCTYPE html><html><head><title>Workspaces - EvidLens</title><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-[#F5F7FA]"><div class="max-w-4xl mx-auto p-6"><div class="bg-white p-6 rounded-2xl"><h1 class="text-2xl font-bold text-[#0A1F44]">Workspaces</h1><p>Switch between workspaces</p></div></div></body></html>
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-5xl mx-auto p-6">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold text-[#0A1F44]">Workspaces</h1>
+    <button onclick="document.getElementById('newWsModal').classList.remove('hidden')" class="bg-[#14B8A6] text-white px-4 py-2 rounded-lg font-bold">+ New Workspace</button>
+  </div>
+  <p class="text-gray-500 mb-6">Collaborate with your team. Share credits and analyses.</p>
+
+  <!-- Workspace List -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    {% for ws in workspaces %}
+    <div class="bg-white p-6 rounded-2xl shadow-sm border-2 {% if ws.id == current_workspace_id %}border-[#14B8A6]{% else %}border-transparent{% endif %}">
+      <div class="flex justify-between items-start">
+        <div>
+          <h2 class="text-xl font-bold text-[#0A1F44]">{{ ws.name }}</h2>
+          <p class="text-sm text-gray-500">{{ ws.members|length }} Members • {{ ws.credits }} Credits</p>
+        </div>
+        {% if ws.id == current_workspace_id %}
+          <span class="bg-teal-100 text-teal-700 text-xs font-bold px-3 py-1 rounded-full">ACTIVE</span>
+        {% endif %}
+      </div>
+
+      <div class="mt-4">
+        <p class="text-sm font-semibold mb-2">Members</p>
+        <div class="flex -space-x-2">
+          {% for m in ws.members %}
+          <img src="https://ui-avatars.com/api/?name={{ m.full_name }}&background=14B8A6&color=fff" class="w-8 h-8 rounded-full border-2 border-white">
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="mt-4 flex gap-2">
+        {% if ws.id!= current_workspace_id %}
+        <form action="/workspaces/switch" method="post">
+          <input type="hidden" name="workspace_id" value="{{ ws.id }}">
+          <button class="bg-[#0A1F44] text-white px-4 py-2 rounded-lg text-sm font-bold">Switch</button>
+        </form>
+        {% endif %}
+        <button class="border border-gray-300 px-4 py-2 rounded-lg text-sm font-bold">Manage</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- New Workspace Modal -->
+<div id="newWsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+  <div class="bg-white p-6 rounded-2xl w-96">
+    <h2 class="text-xl font-bold mb-4">Create New Workspace</h2>
+    <form action="/workspaces/create" method="post">
+      <input name="name" placeholder="e.g Acme Ltd Marketing" required class="w-full border p-3 rounded-lg mb-4">
+      <button class="w-full bg-[#14B8A6] text-white p-3 rounded-lg font-bold">Create</button>
+    </form>
+    <button onclick="document.getElementById('newWsModal').classList.add('hidden')" class="w-full mt-2 text-gray-500">Cancel</button>
+  </div>
+</div>
+{% endblock %}
