@@ -1,4 +1,77 @@
-<!DOCTYPE html><html><head><title>Competitive Engine</title></head>
-<body><h1>Companies</h1>
-<table border="1">{% for c in companies %}<tr><td>{{c.name}}</td><td>{{c.sector}}</td><td>{{c.county}}</td><td>Rating: {{c.rating}}</td></tr>{% endfor %}</table>
-</body></html>
+<!DOCTYPE html>
+<html>
+<head>
+<title>Competitive Engine - EvidLens</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif}
+.card{background:white; border-radius:16px; padding:24px; box-shadow:0 1px 4px rgba(16,24,40,0.06)}
+</style>
+</head>
+<body class="bg-[#F5F7FA]">
+  <!-- Header -->
+  <header class="bg-[#0A1F44] text-white px-6 py-4">
+    <div class="max-w-7xl mx-auto flex items-center gap-3">
+      <a href="/" class="font-bold text-2xl"><span>Evid</span><span style="color:#14B8A6">Lens</span></a>
+    </div>
+  </header>
+
+  <div class="max-w-7xl mx-auto p-6">
+    <div class="card">
+      <div class="flex justify-between items-center mb-6">
+        <div>
+          <h1 class="text-3xl font-bold text-[#0A1F44]">Competitive Engine</h1>
+          <p class="text-gray-500">See who else is in {{ sector if sector else 'your sector' }} in {{ county if county else 'your county' }}</p>
+        </div>
+        <a href="/" class="bg-[#14B8A6] text-white px-4 py-2 rounded-lg font-bold">New Analysis</a>
+      </div>
+
+      <!-- Table -->
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead>
+            <tr class="text-left text-sm text-gray-500 border-b">
+              <th class="p-3">Company</th>
+              <th>Sector</th>
+              <th>County</th>
+              <th>Rating</th>
+              <th>Strength</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in companies %}
+            <tr class="border-b hover:bg-gray-50">
+              <td class="p-3 font-semibold text-[#0A1F44]">{{ c.name }}</td>
+              <td>{{ c.sector }}</td>
+              <td>{{ c.county }}</td>
+              <td>
+                <div class="flex items-center gap-1">
+                  {% for i in range(5) %}
+                    {% if i < c.rating %}<span class="text-[#F59E0B]">★</span>{% else %}<span class="text-gray-300">★</span>{% endif %}
+                  {% endfor %}
+                  <span class="text-sm ml-1">{{ c.rating }}/5</span>
+                </div>
+              </td>
+              <td>
+                {% if c.rating >= 4 %}
+                  <span class="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full">High Threat</span>
+                {% elif c.rating >= 3 %}
+                  <span class="bg-yellow-100 text-yellow-700 text-xs px-2 py-1 rounded-full">Medium</span>
+                {% else %}
+                  <span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">Low</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center p-10 text-gray-500">
+              No competitors found yet. Run an analysis to populate this.
+            </td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
