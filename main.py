@@ -1,29 +1,45 @@
-from fastapi import Depends, HTTPException
-from sqlmodel import Session, select, func
-from pydantic import BaseModel
+# Standard lib
+from io import BytesIO
+import statistics
+import smtplib
+import json
 from datetime import datetime, timedelta
 from collections import Counter
-import statistics
-from sqlmodel import SQLModel
-from app.modules.database import get_db
-from app.modules.kenyalensiq.models import KenyaLensBusiness, MarketMetric
+
+# 3rd party
+from dotenv import load_dotenv
 from groq import Groq
-import smtplib, json
-from email.mime.text import MIMEText
-from fastapi import Depends
-from fastapi import FastAPI, Request, Depends, HTTPException
+from supabase import create_client, Client
+from bs4 import BeautifulSoup
+# import tweepy
+
+# FastAPI
+from fastapi import FastAPI, APIRouter, Request, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, StreamingResponse
-from sqlmodel import Session, select, func, or_, desc, asc
-from pydantic import BaseModel
-from dotenv import load_dotenv
-from sqlmodel import select, func
-from sqlmodel import select, func, or_
-from bs4 import BeautifulSoup
-# import tweepy
-from supabase import create_client, Client
+
+# Pydantic
+from pydantic import BaseModel, Field, field_validator
+
+# SQLModel + SQLAlchemy
+from sqlmodel import SQLModel, Session, create_engine, select, func, or_, desc, asc, Field, Column, JSON
+from sqlalchemy import func as sqlfunc
+
+# ReportLab
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.pdfgen import canvas
+
+# Email
+from email.mime.text import MIMEText
+
+# Your modules
+from app.modules.database import get_db
+from app.modules.kenyalensiq.models import KenyaLensBusiness, MarketMetric
 
 from app.modules.kenyalensiq.models import (
     MarketMetric, PriceData, NewsArticle, SocialMention,
@@ -1461,6 +1477,78 @@ def seed_geo_data(db: Session):
         for s in KENYA_SECTORS:
             db.add(SectorReport(sector=s, title=f"{s} Report", summary="Seeded"))
     db.commit()
+
+@app.post("/analysis/download-pdf")
+def download_pdf(req: DetailedAnalysisRequest, session: Session = Depends(get_session)):
+    # 1. First run the analysis - NO HARDCODING
+    analysis_data = detailed_analysis(req, session)
+    
+    # 2. Generate PDF from that FULL data
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    styles = getSampleStyleSheet()
+    story = []
+    
+    # HEADER
+    story.append(Paragraph(f"<b>EvidLens Market Report: {req.product}</b>", styles['Title']))
+    story.append(Paragraph(f"County: {req.county} | Subcounties: {', '.join(req.subcounties)} | Sector: {req.sector}", styles['Normal']))
+    story.append(Spacer(1, 12))
+    
+    # 1. MARKET OVERVIEW
+    story.append(Paragraph("<b>1. Market Overview</b>", styles['Heading2']))
+    mo = analysis_data['market_overview']
+    data = [
+        ["Current Price", f"KES {mo['current_price_kes']}"],
+        ["30 Day Avg", f"KES {mo['30_day_avg_kes']}"],
+        ["90 Day Forecast", f"KES {mo['90_day_forecast_kes']}"],
+        ["Trend", mo['price_trend']],
+        ["Seasonality", mo['seasonality']]
+    ]
+    t = Table(data, colWidths=[200, 200])
+    t.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 0.5, colors.grey)]))
+    story.append(t)
+    story.append(Spacer(1, 12))
+    
+    # 2. FINANCIALS
+    story.append(Paragraph("<b>2. Financials & Budget</b>", styles['Heading2']))
+    fin = analysis_data['financials']
+    data = [
+        ["Budget", f"KES {fin['budget_kes']}"],
+        ["Units You Can Buy", fin['units_you_can_buy']],
+        ["Est. Monthly Profit", f"KES {fin['estimated_monthly_profit']}"],
+        ["Est. ROI", f"{fin['estimated_roi_percent']}%"],
+        ["Business Model", fin['business_model']]
+    ]
+    t = Table(data, colWidths=[200, 200])
+    t.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 0.5, colors.grey)]))
+    story.append(t)
+    story.append(Spacer(1, 12))
+    
+    # 3. DEMAND + COMPETITION
+    story.append(Paragraph("<b>3. Demand & Competition</b>", styles['Heading2']))
+    dc = analysis_data['demand_competition']
+    story.append(Paragraph(f"Demand Level: {dc['demand_level']} - Score: {dc['avg_demand_score']}/10", styles['Normal']))
+    story.append(Paragraph(f"Top Competitors: {', '.join(dc['top_competitors'])}", styles['Normal']))
+    story.append(Spacer(1, 12))
+    
+    # 4. RISK
+    story.append(Paragraph("<b>4. Risk Intelligence</b>", styles['Heading2']))
+    ri = analysis_data['risk_intelligence']
+    story.append(Paragraph(f"Risk Score: {ri['risk_score_10']}/10 - {ri['risk_level']}", styles['Normal']))
+    
+    # 5. FINAL VERDICT
+    story.append(Paragraph("<b>5. Final Verdict</b>", styles['Heading2']))
+    fv = analysis_data['final_verdict']
+    story.append(Paragraph(f"<b>Score: {fv['overall_score_10']}/10</b>", styles['Heading3']))
+    story.append(Paragraph(f"<b>Recommendation: {fv['recommendation']}</b>", styles['Normal']))
+    for reason in fv['key_reasons']:
+        story.append(Paragraph(f"- {reason}", styles['Normal']))
+    
+    doc.build(story)
+    buffer.seek(0)
+    
+    return StreamingResponse(buffer, media_type="application/pdf", 
+        headers={"Content-Disposition": f"attachment; filename=EvidLens_{req.product}_{req.county}.pdf"})
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
 def catch_all(path: str):
