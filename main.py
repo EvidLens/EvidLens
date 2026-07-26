@@ -1,43 +1,40 @@
-from app.modules.lens_engine.service import LensEngineService, scrape_kpin_prices, fetch_real_news, fetch_real_tweets
-import io, csv, secrets, os, base64, requests
-from typing import Optional
-from datetime import datetime, timedelta
-from fastapi import FastAPI, Request, Depends, Form, HTTPException
-from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
-from sqlmodel import SQLModel, Field, Column, JSON, Session, create_engine, select, func, desc, or_
-
 # Standard lib
-from io import BytesIO
 import os
-import statistics
-import smtplib
+import io
+import csv
 import json
-from datetime import datetime, timedelta
+import base64
+import secrets
+import random
+import smtplib
+import traceback
+from datetime import datetime, date, timedelta
 from collections import Counter
+from email.mime.text import MIMEText
 
 # 3rd party
-from sqlalchemy import text
+import pandas as pd
+import requests
 import matplotlib.pyplot as plt
 from dotenv import load_dotenv
-from groq import Groq
 from supabase import create_client, Client
 from bs4 import BeautifulSoup
-# import tweepy
+from sqlalchemy import text, func as sqlfunc
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 # FastAPI
-from fastapi import FastAPI, APIRouter, Request, Depends, HTTPException
+from fastapi import FastAPI, APIRouter, Request, Depends, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
 
 # Pydantic
 from pydantic import BaseModel, Field, field_validator
 
 # SQLModel + SQLAlchemy
 from sqlmodel import SQLModel, Session, create_engine, select, func, or_, desc, asc, Field, Column, JSON
-from sqlalchemy import func as sqlfunc
 
 # ReportLab
 from reportlab.lib.pagesizes import A4
@@ -47,53 +44,36 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
 from reportlab.pdfgen import canvas
 
-# Email
-from email.mime.text import MIMEText
-
-# Your modules
-from app.modules.database import get_db
-from app.modules.kenyalensiq.models import KenyaLensBusiness, MarketMetric
-
-from app.modules.kenyalensiq.models import (
-    MarketMetric, PriceData, NewsArticle, SocialMention,
-    KenyaTenant, KenyaLensBusiness, KenyaLensSurvey,
-    KenyaLensSubscription, KenyaLensAlert, KenyaLensMember
-)
-
-import os
-import csv
-import io
-import base64
-import random
-import requests
-from requests.auth import HTTPBasicAuth
-import pandas as pd
+# Groq - ADDED SO client = Groq() WORKS
 from groq import Groq
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from datetime import datetime, date, timedelta
 
-from app.modules.kenyalensiq.models import (
-    KenyaTenant,
-    KenyaLensBusiness,
-    KenyaLensSurvey,
-    KenyaLensResponse,
-    KenyaLensSubscription,
-    KenyaLensAlert,
-    KenyaLensMember,
-    KenyaLensApiUsage,
-    ExportOpportunity
-)
-from app.modules.auth.models import AuthUser
-from app.modules.auth.dependencies import get_current_user
+# Your modules - MERGED BLOCK, NO DUPLICATES
+from app.core.config import settings
 
-load_dotenv()
-
-from app.modules.database import engine, create_db_and_tables
+# DB
+from app.modules.database import get_db, engine
 from app.modules.db import init_db
 from app.modules.data_layer.seed import seed_data
-from app.modules.cron.price_cron import start_scheduler
+
+# Auth
+from app.modules.auth.models import AuthUser
+from app.modules.auth.dependencies import get_current_user, require_active_subscription
+from app.modules.auth.router import router as auth_router
+
+# KenyaLens Core Models
+from app.modules.kenyalensiq.models import (
+    MarketMetric, PriceData, NewsArticle, SocialMention,
+    KenyaTenant, KenyaLensBusiness, KenyaLensSurvey, KenyaLensResponse,
+    KenyaLensSubscription, KenyaLensAlert, KenyaLensMember,
+    KenyaLensApiUsage, ExportOpportunity
+)
+
+# Lens Engine
+from app.modules.lens_engine.service import LensEngineService, scrape_kpin_prices, fetch_real_news, fetch_real_tweets
+from app.modules.lens_engine.router import router as lens_router
+
+# All Product Routers
 from app.modules.kenyalensiq.router import router as kenyalensiq_router
-from app.modules.auth.dependencies import require_active_subscription
 from app.modules.competitive_engine.router import router as competitive_router
 from app.modules.market_engine.router import router as market_router
 from app.modules.location_intel.router import router as location_router
@@ -102,24 +82,58 @@ from app.modules.knowledge_base.router import router as kb_router
 from app.modules.report_builder.router import router as reports_router
 from app.modules.ai_insights.router import router as ai_insights_router
 from app.modules.business_os.router import router as business_os_router
-from app.modules.auth.router import router as auth_router
 from app.modules.rag.router import router as rag_router
 from app.modules.payments.router import router as payments_router
 from app.modules.api.routes import router as api_router
 from app.modules.cron.router import router as cron_router
-from app.modules.lens_engine.router import router as lens_router
 from app.modules.core.router import router as core_router
 from app.modules.storage.router import router as storage_router
 from app.modules.chatbot.router import router as chatbot_router
 
-scheduler = AsyncIOScheduler()
+# Cron
+from app.modules.cron.price_cron import start_scheduler
 
+scheduler = AsyncIOScheduler(timezone=settings.SCHEDULER_TIMEZONE)
 app = FastAPI(title="EvidLens API", version="2.5.12")
+
+def safe_job(job_func, job_name):
+    """Wrapper so 1 job failing doesn't kill others"""
+    try:
+        print(f"[{job_name}] Running...")
+        job_func()
+        print(f"[{job_name}] Success")
+    except Exception as e:
+        print(f"[{job_name}] FAILED: {e}")
+        traceback.print_exc()
 
 @app.on_event("startup")
 def on_startup():
     SQLModel.metadata.create_all(engine)
     print("DB tables checked/created")
+
+    # Jobs
+    scheduler.add_job(
+        lambda: safe_job(scrape_kpin_prices, "KPIN"),
+        CronTrigger(hour=settings.KPIN_SCRAPE_HOUR, minute=settings.KPIN_SCRAPE_MINUTE),
+        id="kpin_scrape", replace_existing=True
+    )
+    scheduler.add_job(
+        lambda: safe_job(fetch_real_news, "NEWS"),
+        CronTrigger(hour=settings.NEWS_SCRAPE_HOUR, minute=settings.NEWS_SCRAPE_MINUTE),
+        id="news_scrape", replace_existing=True
+    )
+    scheduler.add_job(
+        lambda: safe_job(fetch_real_tweets, "TWEETS"),
+        CronTrigger(hour=settings.TWEETS_SCRAPE_HOUR, minute=settings.TWEETS_SCRAPE_MINUTE),
+        id="tweets_scrape", replace_existing=True
+    )
+    scheduler.start()
+    print(f"Scheduler started. Timezone: {settings.SCHEDULER_TIMEZONE}")
+
+@app.on_event("shutdown")
+def shutdown_event():
+    scheduler.shutdown()
+    print("Scheduler shut down")
 
 app.add_middleware(
     CORSMiddleware,
@@ -158,8 +172,6 @@ WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
 X_BEARER_TOKEN = os.getenv("X_BEARER_TOKEN")
 
 client = Groq(api_key=GROQ_API_KEY)
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-APP_SUPABASE_KEY = os.getenv("APP_SUPABASE_KEY")
 
 supabase: Client = None
 if SUPABASE_URL and APP_SUPABASE_KEY:
@@ -754,9 +766,30 @@ def detailed_analysis(req: DetailedAnalysisRequest, session: Session = Depends(g
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 # ====== 1. CONFIG + CONSTANTS ======
-PRICING = {"BASIC": {"monthly": 500, "yearly": 5000}, "PROFESSIONAL": {"monthly": 1500, "yearly": 15000}, "ENTERPRISE": {"monthly": 5000, "yearly": 50000}}
-ADDONS = {"EXTRA_REPORTS_10": {"name": "10 Extra Reports", "one_time": 1000}, "API_ACCESS": {"name": "API Access", "monthly": 2000}, "TEAM_SEAT": {"name": "Extra Team Seat", "monthly": 500}, "DATA_EXPORT": {"name": "Bulk Data Export", "one_time": 5000}}
-ALC = {"CUSTOM_REPORT": {"name": "Custom Market Report", "price": 25000}, "DATA_ONBOARDING": {"name": "Data Onboarding", "price": 50000}, "TRAINING": {"name": "Team Training", "price": 15000}}
+CURRENCY = "KES"
+CURRENCY_SYMBOL = "KSh"
+
+PRICING = {
+    "BASIC": {"monthly": 500, "yearly": 5000, "currency": "KES"}, 
+    "PROFESSIONAL": {"monthly": 1500, "yearly": 15000, "currency": "KES"}, 
+    "ENTERPRISE": {"monthly": 5000, "yearly": 50000, "currency": "KES"}
+}
+ADDONS = {
+    "EXTRA_REPORTS_10": {"name": "10 Extra Reports", "one_time": 1000, "currency": "KES"}, 
+    "API_ACCESS": {"name": "API Access", "monthly": 2000, "currency": "KES"}, 
+    "TEAM_SEAT": {"name": "Extra Team Seat", "monthly": 500, "currency": "KES"}, 
+    "DATA_EXPORT": {"name": "Bulk Data Export", "one_time": 5000, "currency": "KES"}
+}
+ALC = {
+    "CUSTOM_REPORT": {"name": "Custom Market Report", "price": 25000, "currency": "KES"}, 
+    "DATA_ONBOARDING": {"name": "Data Onboarding", "price": 50000, "currency": "KES"}, 
+    "TRAINING": {"name": "Team Training", "price": 15000, "currency": "KES"}
+}
+
+def format_kes(amount: int) -> str:
+    return f"{CURRENCY_SYMBOL} {amount:,}"
+
+# Usage: format_kes(25000) -> "KSh 25,000"
 
 def get_daraja_token():
     api_url = ("https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials" if MPESA_ENV == "sandbox" else "https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials")
