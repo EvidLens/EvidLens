@@ -1,23 +1,26 @@
 import os
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Union
+from app.core.config import settings
 from app.modules.core.models import Plan, AddOn, ALCService, UserSubscription
 from app.modules.report_builder.models import Report
 from app.modules.market_engine.models import MarketSearch
+
+UNLIMITED = -1 # use -1 for math. Frontend shows "Unlimited"
 
 class CoreService:
     def __init__(self):
         pass
 
-    # EXACT FROM SPEC PART 3
+    # SOURCE OF TRUTH - Move to DB in V2
     PRICING = {
         "EV-FREE": {"monthly": 0, "annual": 0, "areas": 1, "products": 1, "users": 1, "competitors": 1, "lens": "Lite", "data_delay": "14 Days", "watermark": True},
         "EV-STARTER": {"monthly": 0, "annual": 0, "areas": 1, "products": 1, "users": 1, "competitors": 1, "lens": "Lite", "data_delay": "Forever", "watermark": True},
         "EV-SME": {"monthly": 20000, "annual": 204000, "areas": 1, "products": 3, "users": 1, "competitors": 3, "leads_qtr": 0, "lens": "Basic"},
         "EV-GROWTH": {"monthly": 50000, "annual": 510000, "areas": 3, "products": 9, "users": 5, "competitors": 10, "leads_qtr": 250, "lens": "Pro", "flag": "⭐"},
-        "EV-PRO": {"monthly": 100000, "annual": 1020000, "areas": 6, "products": 15, "users": 15, "competitors": "Unlimited", "leads_qtr": 1000, "lens": "Pro"},
-        "EV-ENT": {"monthly": 200000, "annual": 2040000, "areas": 9, "products": 21, "users": "Unlimited", "competitors": "Unlimited", "leads_qtr": "Unlimited", "lens": "Enterprise", "api": True, "briefings": "Weekly"}
+        "EV-PRO": {"monthly": 100000, "annual": 1020000, "areas": 6, "products": 15, "users": UNLIMITED, "competitors": UNLIMITED, "leads_qtr": 1000, "lens": "Pro"},
+        "EV-ENT": {"monthly": 200000, "annual": 2040000, "areas": 9, "products": 21, "users": UNLIMITED, "competitors": UNLIMITED, "leads_qtr": UNLIMITED, "lens": "Enterprise", "api": True, "briefings": "Weekly"}
     }
 
     ADDONS = {
@@ -33,16 +36,37 @@ class CoreService:
         "Year in Review": {"price": 250000}, "County Deep Dive": {"price": 300000}
     }
 
+    def _format_price(self, amount: Union[int, float]) -> str:
+        if amount == UNLIMITED: return "Unlimited"
+        return f"{settings.CURRENCY_SYMBOL} {amount:,}"
+    
+    def _add_display_prices(self, data: dict) -> dict:
+        for k, v in data.items():
+            if isinstance(v, dict):
+                for price_key in ["monthly", "annual", "one_time", "setup", "price"]:
+                    if price_key in v: v[f"{price_key}_display"] = self._format_price(v[price_key])
+                v["currency"] = settings.CURRENCY
+        return data
+
     def get_all_pricing(self, db: Session) -> Dict[str, Any]:
+        sectors_count = db.query(func.count_distinct(MarketSearch.sector)).scalar() or 75
+        products_count = db.query(func.count_distinct(MarketSearch.product)).scalar() or 21
         return {
-            "plans": self.PRICING, "addons": self.ADDONS, "ala_carte": self.ALC,
-            "sectors": 75, "products": 21, "vat_note": "All prices Ksh. VAT excluded. Annual = -15%"
+            "currency": settings.CURRENCY,
+            "currency_symbol": settings.CURRENCY_SYMBOL,
+            "plans": self._add_display_prices(self.PRICING), 
+            "addons": self._add_display_prices(self.ADDONS), 
+            "ala_carte": self._add_display_prices(self.ALC),
+            "sectors": sectors_count, 
+            "products": products_count, 
+            "vat_note": f"All prices {settings.CURRENCY_SYMBOL}. VAT excluded. Annual = -15%"
         }
 
     def get_platform_stats(self, db: Session) -> Dict[str, int]:
         return {
             "insights": db.query(func.count(MarketSearch.id)).scalar() or 0,
-            "active_products": 21, "sectors": 75,
+            "active_products": db.query(func.count_distinct(MarketSearch.product)).scalar() or 21, 
+            "sectors": db.query(func.count_distinct(MarketSearch.sector)).scalar() or 75,
             "reports": db.query(func.count(Report.id)).scalar() or 0
         }
 
@@ -53,7 +77,7 @@ class CoreService:
         return {"allowed": True, "plan": sub.plan.name, "limits": plan}
 
     def health_check(self) -> Dict[str, Any]:
-        return {"status": "ok", "service": "evidlens-api"}
+        return {"status": "ok", "service": "evidlens-api", "currency": settings.CURRENCY}
 
 # MODULE LEVEL ALIASES - for backward compatibility
 _core = CoreService()
