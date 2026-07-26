@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from collections import Counter
 
 # 3rd party
+from sqlalchemy import text
 import matplotlib.pyplot as plt
 from dotenv import load_dotenv
 from groq import Groq
@@ -1709,9 +1710,7 @@ def get_trending(session: Session = Depends(get_session)):
             "activity": r.activity_count
         })
     
-    return {"trending": trending_list} # <-- NO FALLBACK
-
-from sqlalchemy import text
+    return {"trending": trending_list}
 
 @app.get("/analysis/search")
 def search_insights(
