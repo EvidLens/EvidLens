@@ -1,12 +1,17 @@
-import os, json, httpx, requests, pandas as pd
+import os, json, httpx, requests, pandas as pd, tweepy
 from sqlalchemy.orm import Session
 from sqlmodel import select, func, desc, asc
 from datetime import datetime
 from typing import Dict, Any
-from app.modules.database import MarketMetric, KenyaLensBusiness, Session as DBSession, engine, send_support_ticket # add this import
+from app.modules.database import (
+    MarketMetric, KenyaLensBusiness, NewsArticle, SocialMention,
+    Session as DBSession, engine
+)
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_MODEL = "llama-3.3-70b-versatile"
+NEWS_API_KEY = os.getenv("NEWS_API_KEY")
+X_BEARER_TOKEN = os.getenv("X_BEARER_TOKEN")
 
 SYSTEM_PROMPT = """You are EvidLens AI. You give market insights for Kenyan farmers and SMEs.
 Rules:
@@ -16,6 +21,84 @@ Rules:
 4. If no data, say "No data yet for X county".
 5. Always give 1 actionable next step.
 """
+
+def send_support_ticket(subject: str, description: str, user_email: str) -> bool:
+    """Placeholder. Connect to SMTP or Sendgrid later"""
+    print(f"[TICKET] From: {user_email} | Subject: {subject} | {description}")
+    return True
+
+def get_lat_lng(county: str):
+    return -1.286389, 36.817223 # TODO: use geopy
+
+def apply_sort(q, model, sort_by: str, order: str):
+    if not sort_by or not hasattr(model, sort_by):
+        return q
+    col = getattr(model, sort_by)
+    return q.order_by(desc(col) if order == "desc" else asc(col))
+
+def scrape_kpin_prices():
+    url = "https://www.kpin.go.ke/market-prices"
+    with DBSession(engine) as session:
+        try:
+            r = requests.get(url, timeout=30)
+            df = pd.read_html(r.text)[0]
+            df.columns = ['date', 'county', 'market', 'product', 'price', 'unit']
+            df['price'] = df['price'].astype(str).str.replace(',', '').astype(float)
+            today = datetime.utcnow().date()
+            for _, row in df.iterrows():
+                existing = session.exec(select(MarketMetric).where(
+                    MarketMetric.product == row['product'],
+                    MarketMetric.company_name == row['market'],
+                    func.date(MarketMetric.created_at) == today
+                )).first()
+                if not existing:
+                    session.add(MarketMetric(
+                        product=row['product'], company_name=row['market'],
+                        avg_price_kes=row['price'], county=row['county'], sector=row['unit']
+                    ))
+            session.commit()
+            print("KPIN prices scraped")
+        except Exception as e:
+            print("Scrape error:", e)
+
+def fetch_real_news():
+    if not NEWS_API_KEY: return
+    with DBSession(engine) as db:
+        url = f"https://newsapi.org/v2/everything?q=Kenya&language=en&pageSize=100&apiKey={NEWS_API_KEY}"
+        try:
+            r = requests.get(url, timeout=30)
+            data = r.json()
+            for article in data.get("articles", []):
+                if not article["title"]: continue
+                existing = db.exec(select(NewsArticle).where(NewsArticle.title == article["title"])).first()
+                if not existing:
+                    db.add(NewsArticle(
+                        title=article["title"],
+                        source=article["source"]["name"],
+                        summary=article["description"] or ""
+                    ))
+            db.commit()
+            print("News scraped")
+        except Exception as e:
+            print("News error:", e)
+
+def fetch_real_tweets():
+    if not X_BEARER_TOKEN: return
+    with DBSession(engine) as db:
+        client_t = tweepy.Client(bearer_token=X_BEARER_TOKEN)
+        queries = ["Kenya price", "Kenya maize", "Kenya fuel"]
+        try:
+            for query in queries:
+                tweets = client_t.search_recent_tweets(query=query, max_results=50)
+                if tweets.data:
+                    for t in tweets.data:
+                        existing = db.exec(select(SocialMention).where(SocialMention.text == t.text)).first()
+                        if not existing:
+                            db.add(SocialMention(text=t.text, platform="Twitter"))
+            db.commit()
+            print("Tweets scraped")
+        except Exception as e:
+            print("Twitter error:", e)
 
 class LensEngineService:
     def __init__(self, db: Session):
@@ -40,7 +123,7 @@ class LensEngineService:
                         "type": "function",
                         "function": {
                             "name": "raise_ticket",
-                            "description": "Raise a support ticket to EvidLens team at support@evidlens.co.ke",
+                            "description": "Raise a support ticket to EvidLens team",
                             "parameters": {
                                 "type": "object",
                                 "properties": {
@@ -56,7 +139,6 @@ class LensEngineService:
             data = r.json()
             message = data["choices"][0]["message"]
 
-        # 2. HANDLE FUNCTION CALL
         if "tool_calls" in message:
             for tool_call in message["tool_calls"]:
                 if tool_call["function"]["name"] == "raise_ticket":
@@ -69,10 +151,9 @@ class LensEngineService:
         return message.get("content", "No response")
 
     async def chat(self, user_message: str, user_email: str) -> Dict[str, Any]:
-        stats = dashboard_api(self.db) # reuse your function
+        stats = {"total_businesses": 0} # replace with dashboard_api(self.db)
         market = [m.dict() for m in self.db.exec(select(MarketMetric).limit(5)).all()]
-        context = f"\nData: Stats={json.dumps(stats['stats'])} Market={json.dumps(market)}"
-
+        context = f"\nData Available: Stats={json.dumps(stats)} Market={json.dumps(market)}"
         reply = await self.call_groq(user_message, context, user_email)
         return {"reply": reply, "source": "EvidLens DB + Groq"}
 
@@ -83,6 +164,6 @@ class LensEngineService:
         if not market:
             return {"reply": f"No data yet for {county or sector} county", "source": "EvidLens DB"}
 
-        context = f"\nData: Market={json.dumps(market)}"
-        reply = await self.call_groq(f"Give insights for {sector} in {county}", context, "")
+        context = f"\nData Available: Market={json.dumps(market)}"
+        reply = await self.call_groq(f"Give 3 insights for {sector} in {county or 'Kenya'}", context, "")
         return {"insights": reply, "source": "EvidLens DB + Groq"}
