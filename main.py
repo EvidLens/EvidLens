@@ -1,3 +1,9 @@
+from fastapi import Depends, HTTPException
+from sqlmodel import Session, select, func
+from pydantic import BaseModel
+from datetime import datetime, timedelta
+from collections import Counter
+import statistics
 from sqlmodel import SQLModel
 from app.modules.database import get_db
 from app.modules.kenyalensiq.models import KenyaLensBusiness, MarketMetric
@@ -575,16 +581,220 @@ class DetailedAnalysisRequest(BaseModel):
     budget_kes: float = 0
     business_model: str = "Retail"
 
-@app.post("/api/analyze-detailed")
-async def analyze_detailed(req: DetailedAnalysisRequest, user_id: int = Depends(get_current_user), db: Session = Depends(get_db)):
-    check_subscription(user_id, db)
-    competitors = db.exec(select(KenyaLensBusiness).where(KenyaLensBusiness.sector==req.sector, KenyaLensBusiness.county==req.county).limit(10)).all()
-    prices = db.exec(select(MarketMetric).where(MarketMetric.product.contains(req.product), MarketMetric.county==req.county).limit(5)).all()
-    demand = db.exec(select(MarketMetric).where(MarketMetric.product.contains(req.product), MarketMetric.county==req.county).first())
-    prompt = f"Product: {req.product} Sector: {req.sector} Location: {req.subcounty}, {req.county} Budget: KES {req.budget_kes} Model: {req.business_model} Competitors: {[c.name for c in competitors]} Avg Price: {[p.avg_price_kes for p in prices]} Demand Score: {demand.demand_score if demand else 'N/A'} Market Size: KES {demand.avg_price_kes if demand else 'N/A'}"
-    ai_response = generate_insights(prompt)
-    log_query(db, user_id)
-    return {"summary": ai_response, "competitors": [c.dict() for c in competitors], "prices": [p.dict() for p in prices], "demand": demand.dict() if demand else None}
+# ========== 1. DATABASE MODELS ==========
+class MarketMetric(SQLModel, table=True):
+    __tablename__ = "market_metrics"
+
+    id: int | None = Field(default=None, primary_key=True)
+    product: str | None = None
+    county: str | None = None
+    sector: str | None = None
+    avg_price_kes: float | None = None
+    demand_score: float | None = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+class SocialMention(SQLModel, table=True):
+    __tablename__ = "social_mentions"
+
+    id: int | None = Field(default=None, primary_key=True)
+    platform: str | None = None
+    text: str | None = None
+    county: str | None = None
+    sector: str | None = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class NewsArticle(SQLModel, table=True):
+    __tablename__ = "news_articles"
+
+    id: int | None = Field(default=None, primary_key=True)
+    title: str | None = None
+    summary: str | None = None
+    source: str | None = None
+    category: str | None = None
+    published_at: datetime = Field(default_factory=datetime.utcnow)
+
+# ========== 2. REQUEST MODEL ==========
+class DetailedAnalysisRequest(BaseModel):
+    product: str
+    sector: str
+    county: str
+    subcounty: str = ""
+    budget_kes: float = 0
+    business_model: str = "Retail"
+
+
+@app.post("/analysis/detailed")
+def detailed_analysis(req: DetailedAnalysisRequest, session: Session = Depends(get_session)):
+    try:
+        now = datetime.utcnow()
+        last_30_days = now - timedelta(days=30)
+        last_7_days = now - timedelta(days=7)
+
+        # ===== 1. MARKET PRICE ANALYSIS =====
+        price_history_stmt = (
+            select(MarketMetric)
+           .where(MarketMetric.product.ilike(f"%{req.product}%"))
+           .where(MarketMetric.county.ilike(f"%{req.county}%"))
+           .where(MarketMetric.created_at >= last_30_days)
+           .order_by(MarketMetric.created_at.asc())
+        )
+        price_history = session.exec(price_history_stmt).all()
+
+        prices = [p.avg_price_kes for p in price_history if p.avg_price_kes]
+        current_price = prices[-1] if prices else None
+        avg_price_30d = statistics.mean(prices) if prices else None
+        price_trend = "Stable"
+        if len(prices) >= 2:
+            price_trend = "Rising" if prices[-1] > prices[0] else "Falling"
+        price_volatility = statistics.stdev(prices) if len(prices) > 1 else 0
+
+        # ===== 2. DEMAND & SECTOR ANALYSIS =====
+        demand_stmt = (
+            select(MarketMetric)
+           .where(MarketMetric.sector.ilike(f"%{req.sector}%"))
+           .where(MarketMetric.county.ilike(f"%{req.county}%"))
+           .where(MarketMetric.created_at >= last_30_days)
+        )
+        sector_data = session.exec(demand_stmt).all()
+        demand_scores = [d.demand_score for d in sector_data if d.demand_score]
+        avg_demand = statistics.mean(demand_scores) if demand_scores else 0
+        demand_level = "Low" if avg_demand < 4 else "Medium" if avg_demand < 7 else "High"
+
+        # Top products in sector
+        products_in_sector = [d.product for d in sector_data if d.product]
+        top_products = Counter(products_in_sector).most_common(3)
+
+        # ===== 3. NEWS SENTIMENT & RISK =====
+        news_stmt = (
+            select(NewsArticle)
+           .where(NewsArticle.category.ilike(f"%{req.sector}%"))
+           .where(NewsArticle.published_at >= last_30_days)
+           .order_by(NewsArticle.published_at.desc())
+           .limit(10)
+        )
+        news = session.exec(news_stmt).all()
+
+        risk_keywords = ["ban", "shortage", "tax", "drought", "protest", "inflation", "disease"]
+        risk_news = [n for n in news if any(k in (n.title + n.summary).lower() for k in risk_keywords)]
+        risk_score = min(10, len(risk_news) * 2) # 0-10
+
+        # ===== 4. SOCIAL BUZZ ANALYSIS =====
+        social_stmt = (
+            select(SocialMention)
+           .where(SocialMention.sector.ilike(f"%{req.sector}%"))
+           .where(SocialMention.county.ilike(f"%{req.county}%"))
+           .where(SocialMention.created_at >= last_7_days)
+           .order_by(SocialMention.created_at.desc())
+           .limit(20)
+        )
+        social = session.exec(social_stmt).all()
+        platforms = Counter([s.platform for s in social if s.platform])
+
+        # ===== 5. BUDGET FEASIBILITY =====
+        units_possible = 0
+        budget_rating = "N/A"
+        if current_price and req.budget_kes > 0:
+            units_possible = int(req.budget_kes / current_price)
+            if units_possible > 100:
+                budget_rating = "Excellent - Can buy in bulk"
+            elif units_possible > 20:
+                budget_rating = "Good - Can start small"
+            else:
+                budget_rating = "Tight - Consider smaller scale"
+
+        # ===== 6. AI-STYLE RECOMMENDATION ENGINE =====
+        score = 0
+        reasons = []
+
+        if avg_demand > 7:
+            score += 3
+            reasons.append(f"High demand in {req.county} for {req.sector}")
+        if price_trend == "Rising":
+            score += 2
+            reasons.append("Prices are trending up - good margins")
+        if risk_score < 4:
+            score += 2
+            reasons.append("Low risk news detected")
+        if units_possible > 20:
+            score += 2
+            reasons.append("Budget is sufficient for market entry")
+        if len(social) > 5:
+            score += 1
+            reasons.append("Active social buzz around sector")
+
+        if score >= 8: recommendation = "STRONG BUY - Enter Market Now"
+        elif score >= 5: recommendation = "CAUTIOUS BUY - Monitor and Enter"
+        elif score >= 3: recommendation = "HOLD - Wait for better conditions"
+        else: recommendation = "AVOID - High risk, Low demand"
+
+        # ===== 7. FINAL EXTREMELY DETAILED REPORT =====
+        return {
+            "status": "success",
+            "timestamp": now.isoformat(),
+            "input_parameters": req.model_dump(),
+
+            "market_summary": {
+                "product": req.product,
+                "sector": req.sector,
+                "county": req.county,
+                "subcounty": req.subcounty,
+                "current_avg_price_kes": round(current_price, 2) if current_price else None,
+                "30_day_avg_price_kes": round(avg_price_30d, 2) if avg_price_30d else None,
+                "price_trend_30d": price_trend,
+                "price_volatility": round(price_volatility, 2),
+                "data_points": len(prices)
+            },
+
+            "demand_analysis": {
+                "avg_demand_score_30d": round(avg_demand, 2),
+                "demand_level": demand_level,
+                "top_products_in_sector": [{"product": p[0], "mentions": p[1]} for p in top_products]
+            },
+
+            "risk_intelligence": {
+                "risk_score_out_of_10": risk_score,
+                "risk_level": "High" if risk_score > 6 else "Medium" if risk_score > 3 else "Low",
+                "risk_headlines_found": len(risk_news),
+                "recent_risks": [{"title": n.title, "date": n.published_at.isoformat()} for n in risk_news[:3]]
+            },
+
+            "social_intelligence": {
+                "mentions_last_7_days": len(social),
+                "platform_breakdown": dict(platforms),
+                "sample_mentions": [{"platform": s.platform, "text": s.text[:100]} for s in social[:3]]
+            },
+
+            "budget_feasibility": {
+                "budget_kes": req.budget_kes,
+                "business_model": req.business_model,
+                "estimated_units_you_can_buy": units_possible,
+                "budget_rating": budget_rating
+            },
+
+            "final_verdict": {
+                "overall_score_out_of_10": score,
+                "recommendation": recommendation,
+                "key_reasons": reasons,
+                "next_steps": [
+                    "Monitor prices weekly",
+                    "Engage with local suppliers in " + req.county,
+                    "Track news for " + req.sector + " sector"
+                ] if score >= 5 else [
+                    "Wait 2-4 weeks and re-check demand",
+                    "Reduce initial budget risk",
+                    "Look at alternative products"
+                ]
+            },
+
+            "raw_data": {
+                "news": [{"title": n.title, "source": n.source, "date": n.published_at.isoformat()} for n in news[:5]],
+                "social": [{"platform": s.platform, "text": s.text[:150]} for s in social[:5]]
+            }
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 @app.get("/api/export/{table}")
 def export_csv(table: str, search: str = "", session: Session = Depends(get_session)):
