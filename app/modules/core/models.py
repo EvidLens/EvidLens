@@ -153,6 +153,160 @@ class DetailedAnalysisRequest(BaseModel):
     @field_validator('product', 'sector', 'county')
     @classmethod
     def strip_text(cls, v: str) -> str:
+
+# ========== 1. DATABASE MODELS ==========
+class MarketMetric(SQLModel, table=True):
+    __tablename__ = "market_metrics"
+
+    id: int | None = Field(default=None, primary_key=True)
+    product: str | None = None
+    county: str | None = None
+    sector: str | None = None
+    avg_price_kes: float | None = None
+    demand_score: float | None = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+class SocialMention(SQLModel, table=True):
+    __tablename__ = "social_mentions"
+
+    id: int | None = Field(default=None, primary_key=True)
+    platform: str | None = None
+    text: str | None = None
+    county: str | None = None
+    sector: str | None = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class NewsArticle(SQLModel, table=True):
+    __tablename__ = "news_articles"
+
+    id: int | None = Field(default=None, primary_key=True)
+    title: str | None = None
+    summary: str | None = None
+    source: str | None = None
+    category: str | None = None
+    published_at: datetime = Field(default_factory=datetime.utcnow)
+
+# ========== 2. REQUEST MODEL ==========
+class DetailedAnalysisRequest(BaseModel):
+    product: str
+    sector: str
+    county: str
+    subcounty: str = ""
+    budget_kes: float = 0
+    business_model: str = "Retail"
+
+# ====== 2. DB MODELS ======
+class User(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    email: str = Field(index=True, unique=True)
+    hashed_password: str
+    name: str
+    phone: Optional[str] = None
+    county: Optional[str] = None
+    sector: Optional[str] = None
+    current_workspace_id: Optional[int] = Field(default=None, foreign_key="workspace.id")
+    reset_token: Optional[str] = None
+    reset_token_expires: Optional[datetime] = None
+    consent_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class Workspace(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    owner_id: int = Field(foreign_key="user.id")
+    credits: int = Field(default=0)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class Subscription(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id")
+    plan: str
+    billing: str
+    status: str = Field(default="Pending")
+    credits: int
+    expires_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class MarketMetric(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[int] = Field(default=None, foreign_key="user.id")
+    product: str
+    sector: str
+    county: str
+    company_name: Optional[str] = None
+    avg_price_kes: float = 0
+    demand_score: int = 0
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class KenyaLensBusiness(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    sector: str
+    county: str
+    address: Optional[str] = None
+    lat: float = 0
+    lng: float = 0
+
+class Funder(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    type: str
+    sector: str
+    county: str
+    rating: int
+    min_amount: int
+    max_amount: int
+    interest_rate: float
+    requirements: str
+    apply_link: str
+
+class Policy(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    title: str
+    summary: str
+    impact_statement: str
+    category: str
+    sector: str
+    county: str
+    impact: str
+    url: str
+    published_at: datetime = Field(default_factory=datetime.utcnow)
+
+class SocialMention(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    platform: str
+    author: str
+    content: str
+    sentiment: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class NewsArticle(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    title: str
+    summary: str
+    category: str
+    url: str
+    published_at: datetime = Field(default_factory=datetime.utcnow)
+
+class Company(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    sector: str
+    county: str
+
+class Report(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id")
+    title: str
+    data: dict = Field(sa_column=Column(JSON))
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class KenyaLensSurvey(SQLModel, table=True): id: Optional[int] = Field(default=None, primary_key=True)
+class KenyaLensResponse(SQLModel, table=True): id: Optional[int] = Field(default=None, primary_key=True)
+class KenyaTenant(SQLModel, table=True): id: Optional[int] = Field(default=None, primary_key=True)
+class KenyaLensMember(SQLModel, table=True): id: Optional[int] = Field(default=None, primary_key=True)
         return v.strip()
 
     class Config:
