@@ -166,3 +166,5 @@ def stk_push(user_id: int, plan_name: str, phone: str):
     headers = {"Authorization": "Bearer " + token}
     r = requests.post(api_url, json=payload, headers=headers)
     return r.json()
+def get_timestamp(): 
+    return datetime.now().strftime('%Y%m%d%H%M%S
