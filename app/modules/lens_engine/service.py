@@ -134,3 +134,29 @@ class LensEngineService(BaseService): # 3. INHERIT
         context = f"\nData Available: Market={json.dumps(market)}"
         reply = await self.call_groq_with_tools(f"Give 3 insights for {sector} in {county or 'Kenya'}", context, "")
         return {"insights": reply, "source": "EvidLens DB + Groq"}
+
+   def generate_insights(user_message: str, user_email: str = "user@evidlens.co.ke", db: Session = Depends(get_db)):
+    try:
+        # 1. PULL REAL DATA
+        top_counties = db.exec(
+            select(KenyaLensBusiness.county, func.count(KenyaLensBusiness.id))
+          .group_by(KenyaLensBusiness.county)
+          .order_by(func.count(KenyaLensBusiness.id).desc())
+          .limit(5)
+        ).all()
+
+        avg_prices = db.exec(
+            select(MarketMetric.sector, func.avg(MarketMetric.metric_value))
+          .filter(MarketMetric.metric_type == "price_avg")
+          .group_by(MarketMetric.sector)
+          .limit(10)
+        ).all()
+
+        context = f"""
+        REAL DATA CONTEXT:
+        Top Counties by Business: {top_counties}
+        Avg Prices KES: {avg_prices}
+        APP FEATURES: /api/competitive, /api/price-oracle, /api/demand, /api/county, /api/consumer, /report-builder, /ai-insights
+        SUPPORT: support@evidlens.co.ke
+        Currency: KES. Location: Kenya Counties only.
+        """
