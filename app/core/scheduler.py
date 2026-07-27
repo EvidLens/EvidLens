@@ -1,7 +1,17 @@
-scheduler = AsyncIOScheduler(timezone=settings.SCHEDULER_TIMEZONE)
-app = FastAPI(title="EvidLens API", version="2.5.12")
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
+from sqlmodel import Session, select, func
+import traceback
 
-def safe_job(job_func, job_name):
+from app.core import settings
+from app.modules.core.db import engine
+from app.modules.kenyalensiq.models import KenyaLensBusiness
+from app.modules.jobs.scrapers import scrape_kpin_prices, fetch_real_news, fetch_real_tweets
+
+# ====== SCHEDULER INSTANCE ======
+scheduler = BackgroundScheduler(timezone=settings.SCHEDULER_TIMEZONE)
+
+def safe_job(job_func, job_name: str):
     """Wrapper so 1 job failing doesn't kill others"""
     try:
         print(f"[{job_name}] Running...")
@@ -11,12 +21,22 @@ def safe_job(job_func, job_name):
         print(f"[{job_name}] FAILED: {e}")
         traceback.print_exc()
 
-@app.on_event("startup")
-def on_startup():
+def init_db():
+    """Create tables on startup"""
+    from sqlmodel import SQLModel
     SQLModel.metadata.create_all(engine)
     print("DB tables checked/created")
 
-    # Jobs
+def seed_data():
+    """No hardcoded businesses. DB starts empty"""
+    with Session(engine) as session:
+        count = session.exec(select(func.count(KenyaLensBusiness.id))).one()
+        if count == 0:
+            print("DB is empty. No hardcoded seed data added. Use /api/import to load businesses.")
+
+def start_scheduler():
+    """Register all cron jobs and start scheduler"""
+    # Jobs - Using CronTrigger so we respect settings.py times
     scheduler.add_job(
         lambda: safe_job(scrape_kpin_prices, "KPIN"),
         CronTrigger(hour=settings.KPIN_SCRAPE_HOUR, minute=settings.KPIN_SCRAPE_MINUTE),
@@ -35,71 +55,7 @@ def on_startup():
     scheduler.start()
     print(f"Scheduler started. Timezone: {settings.SCHEDULER_TIMEZONE}")
 
-@app.on_event("shutdown")
-def shutdown_event():
+def shutdown_scheduler():
+    """Graceful shutdown"""
     scheduler.shutdown()
     print("Scheduler shut down")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
-templates = Jinja2Templates(directory="app/templates", auto_reload=True
-
-   # ====== SCHEDULER + DB INIT ======
-scheduler = BackgroundScheduler()
-
-def init_db():
-    SQLModel.metadata.create_all(engine)
-
-def create_db_and_tables():
-    SQLModel.metadata.create_all(engine)
-
-def seed_data():
-    with Session(engine) as session:
-        if session.exec(select(func.count(KenyaLensBusiness.id))).one() == 0:
-            session.add_all([
-                KenyaLensBusiness(name="Safaricom PLC", sector="Telecom", county="Nairobi"),
-                KenyaLensBusiness(name="KCB Bank", sector="Banking", county="Nairobi"),
-                KenyaLensBusiness(name="Equity Bank", sector="Banking", county="Nairobi"),
-            ])
-            session.commit()
-
-def start_scheduler():
-    print("Scheduler started")
-
-def check_subscription(user_id, db):
-    return True # placeholder
-
-def generate_insights(message):
-    return f"AI Insight: Demand for '{message}' is rising in Nairobi. Consider stocking."
-
-def log_query(db, user_id):
-    pass
-
-def apply_sort(query, model, sort_by, order):
-    column = getattr(model, sort_by, model.id)
-    if order == "desc":
-        return query.order_by(desc(column))
-    return query.order_by(column)
-
-@app.on_event("startup")
-def on_startup():
-    init_db()
-    create_db_and_tables()
-    seed_data()
-    start_scheduler()
-    scheduler.add_job(scrape_kpin_prices, "cron", hour="0,6,12,18")
-    scheduler.add_job(fetch_real_news, "interval", hours=6)
-    scheduler.add_job(fetch_real_tweets, "interval", hours=3)
-    scheduler.start()
-
-@app.on_event("shutdown")
-def shutdown_event():
-    scheduler.shutdown()
-                         
