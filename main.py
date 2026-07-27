@@ -1,3 +1,5 @@
+from app.routers.pages import router as pages_router
+app.include_router(pages_router)
 from app.modules.core.models import UserSubscription
 from datetime import datetime, timedelta
 from app.modules.core.service import get_all_pricing
