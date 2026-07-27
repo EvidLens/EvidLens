@@ -1,3 +1,5 @@
+
+from app.core.scheduler import init_db, seed_data, start_scheduler, shutdown_scheduler
 from app.routers.pages import router as pages_router
 from app.modules.analysis.service import router as analysis_router
 from app.modules.payments.mpesa import router as mpesa_router
@@ -121,6 +123,16 @@ def safe_job(job_func, job_name):
     except Exception as e:
         print(f"[{job_name}] FAILED: {e}")
         traceback.print_exc()
+
+@app.on_event("startup")
+def on_startup():
+    init_db()
+    seed_data()
+    start_scheduler()
+
+@app.on_event("shutdown")
+def shutdown_event():
+    shutdown_scheduler()
 
 @app.on_event("startup")
 def on_startup():
