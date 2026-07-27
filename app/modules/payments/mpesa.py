@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, HTTPException
 from sqlmodel import Session
 from datetime import datetime, timedelta
 import requests
@@ -77,7 +77,7 @@ def mpesa_stk_push(payload: dict, user: User = Depends(get_current_user), sessio
         "PartyB": MPESA_SHORTCODE,
         "PhoneNumber": phone,
         "CallBackURL": MPESA_CALLBACK_URL,
-        "AccountReference": f"EvidLens-{plan}-{user.id}",
+        "AccountReference": f"EvidLens-{plan}-{user.id}", # Format: EvidLens-BASIC-123
         "TransactionDesc": f"{plan} {billing} Subscription"
     }
     r = requests.post(api_url, json=payload_mpesa, headers=headers)
@@ -88,24 +88,53 @@ def mpesa_stk_push(payload: dict, user: User = Depends(get_current_user), sessio
 
 @router.post("/api/mpesa-callback")
 async def mpesa_callback(request: Request, db: Session = Depends(get_db)):
+    """Daraja will POST here after payment"""
     data = await request.json()
     try:
         stk = data["Body"]["stkCallback"]
-        if stk["ResultCode"] == 0:
-            items = {i["Name"]: i["Value"] for i in stk["CallbackMetadata"]["Item"]}
-            account_ref = items["AccountReference"]
-            plan = account_ref.split("-")[1]
-            user_id = int(account_ref.split("-")[2])
-            expires = datetime.utcnow() + timedelta(days=30)
-            sub = get_subscription(db, user_id)
-            if sub:
-                sub.plan = plan
-                sub.status = "active"
-                sub.expires_at = expires
-            else:
-                db.add(Subscription(user_id=user_id, plan=plan, billing="monthly", status="active", expires_at=expires, credits=PRICING[plan]["monthly"]))
-            db.commit()
-    except Exception:
+        if stk["ResultCode"]!= 0:
+            return {"ResultCode": 0, "ResultDesc": "Failed"}
+
+        items = {i["Name"]: i["Value"] for i in stk["CallbackMetadata"]["Item"]}
+        account_ref = items["AccountReference"]
+        mpesa_receipt = items["MpesaReceiptNumber"]
+        amount = items["Amount"]
+
+        # AccountReference format: "EvidLens-BASIC-123"
+        parts = account_ref.split("-")
+        plan = parts[1]
+        user_id = int(parts[2])
+
+        # Give 30 days for monthly, 365 for annual
+        plan_data = PRICING.get(plan)
+        if not plan_data:
+            return {"ResultCode": 0, "ResultDesc": "Plan not found"}
+
+        is_annual = amount == plan_data["annual"]
+        days = 365 if is_annual else 30
+        expires = datetime.utcnow() + timedelta(days=days)
+
+        sub = get_subscription(db, user_id)
+        if sub:
+            sub.plan = plan
+            sub.billing = "annual" if is_annual else "monthly"
+            sub.status = "active"
+            sub.expires_at = expires
+            sub.mpesa_receipt = mpesa_receipt
+            sub.credits = plan_data["annual"] if is_annual else plan_data["monthly"]
+        else:
+            db.add(Subscription(
+                user_id=user_id,
+                plan=plan,
+                billing="annual" if is_annual else "monthly",
+                status="active",
+                expires_at=expires,
+                mpesa_receipt=mpesa_receipt,
+                credits=plan_data["annual"] if is_annual else plan_data["monthly"]
+            ))
+        db.commit()
+    except Exception as e:
+        print(f"MPESA Callback Error: {e}")
         pass
     return {"ResultCode": 0, "ResultDesc": "Accepted"}
 
@@ -113,7 +142,7 @@ def stk_push(user_id: int, plan_name: str, phone: str):
     plan_data = _core.PRICING.get(plan_name)
     amount = plan_data["monthly"]
 
-    account_ref = f"{user_id}_{plan_name}" # THIS CONNECTS PAYMENT TO USER + PLAN
+    account_ref = f"EvidLens-{plan_name}-{user_id}" # MATCH checkout format
 
     token = get_daraja_token()
     timestamp = get_timestamp()
