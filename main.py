@@ -1,6 +1,7 @@
 from app.routers.pages import router as pages_router
 from app.modules.analysis.service import router as analysis_router
-
+from app.modules.payments.mpesa import router as mpesa_router
+app.include_router(mpesa_router)
 app.include_router(pages_router)
 app.include_router(analysis_router)
 from app.routers.api import router as api_router
