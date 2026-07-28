@@ -21,8 +21,8 @@ class Settings(BaseSettings):
 
     # DATA APIS - EARS
     NEWS_API_KEY: str = os.getenv("NEWS_API_KEY")
-    REDDIT_CLIENT_ID: str = os.getenv("REDDIT_CLIENT_ID")
-    REDDIT_CLIENT_SECRET: str = os.getenv("REDDIT_CLIENT_SECRET")
+    # REDDIT_CLIENT_ID: str = os.getenv("REDDIT_CLIENT_ID")
+    # REDDIT_CLIENT_SECRET: str = os.getenv("REDDIT_CLIENT_SECRET")
     X_BEARER_TOKEN: str = os.getenv("X_BEARER_TOKEN")
     AFRICA_IS_TALKING_API_KEY: str = os.getenv("AFRICA_IS_TALKING_API_KEY")
     AFRICA_IS_TALKING_USERNAME: str = os.getenv("AFRICA_IS_TALKING_USERNAME")
@@ -39,9 +39,9 @@ class Settings(BaseSettings):
     MPESA_SHORTCODE: str = os.getenv("MPESA_SHORTCODE")
 
     # STORAGE
-    AWS_ACCESS_KEY_ID: str = os.getenv("AWS_ACCESS_KEY_ID")
-    AWS_SECRET_ACCESS_KEY: str = os.getenv("AWS_SECRET_ACCESS_KEY")
-    S3_BUCKET_NAME: str = os.getenv("S3_BUCKET_NAME")
+    # AWS_ACCESS_KEY_ID: str = os.getenv("AWS_ACCESS_KEY_ID")
+    # AWS_SECRET_ACCESS_KEY: str = os.getenv("AWS_SECRET_ACCESS_KEY")
+    # S3_BUCKET_NAME: str = os.getenv("S3_BUCKET_NAME")
 
     # CORS
     ALLOWED_ORIGINS: List[str] = [
