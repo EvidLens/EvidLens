@@ -2,7 +2,7 @@ import os
 from sqlmodel import Session, select, func
 from typing import Dict, Any, List, Union
 from app.core.config import settings
-from app.modules.core.models import Plan, AddOn, ALCService, UserSubscription
+from app.core.models import Plan, AddOn, ALCService, UserSubscription
 from app.modules.report_builder.models import Report
 from app.modules.market_engine.models import MarketSearch
 
