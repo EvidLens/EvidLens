@@ -10,7 +10,7 @@ import httpx
 
 from app.modules.ai_insights.service import AIInsightsService
 from app.modules.core.guards import require_module, consume_credits
-from app.modules.core.models import UserSubscription
+from app.core.models import UserSubscription
 from app.modules.database import get_session
 
 __all__ = ["router", "ask_lens_chat", "ChatRequest"]
