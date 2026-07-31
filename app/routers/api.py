@@ -3,8 +3,8 @@ from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select, func, desc, or_
 import io, csv
 
-from app.modules.core.db import get_session
-from app.modules.core.models import MarketMetric, KenyaLensBusiness, NewsArticle, SocialMention, ExportOpportunity, User, Subscription, UserSubscription
+from app.core.db import get_session
+from app.core.models import MarketMetric, KenyaLensBusiness, NewsArticle, SocialMention, ExportOpportunity, User, Subscription, UserSubscription
 from app.modules.auth.dependencies import get_current_user
 from app.modules.lens_engine.service import LensEngineService, scrape_kpin_prices, fetch_real_news, fetch_real_tweets
 from app.core.service import _core
