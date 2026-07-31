@@ -17,7 +17,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 import matplotlib.pyplot as plt
 from sqlalchemy import sqlfunc
 
-from app.modules.core.db import get_session, get_db
+from app.core.db import get_session, get_db
 from app.modules.kenyalensiq.models import MarketMetric, NewsArticle, SocialMention
 from main import DetailedAnalysisRequest, UserSubscription, _core
 
