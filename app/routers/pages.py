@@ -6,8 +6,8 @@ from datetime import datetime, timedelta
 import secrets
 import os
 
-from app.modules.core.db import get_session, get_db
-from app.modules.core.models import User, MarketMetric, KenyaLensBusiness, NewsArticle, SocialMention, Company, ExportOpportunity, KenyaLensSurvey, KenyaLensResponse, KenyaTenant, KenyaLensMember
+from app.core.db import get_session, get_db
+from app.core.models import User, MarketMetric, KenyaLensBusiness, NewsArticle, SocialMention, Company, ExportOpportunity, KenyaLensSurvey, KenyaLensResponse, KenyaTenant, KenyaLensMember
 from app.modules.auth.dependencies import get_current_user
 from app.core.service import _core
 from main import dashboard_api, send_email, get_password_hash, LensEngineService
