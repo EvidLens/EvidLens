@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from .service import create_business, get_business, add_product, create_invoice, add_employee, mark_invoice_paid
 from .models import Business, Product, Invoice, Employee
 from app.modules.database import get_session
-from app.modules.core.guards import require_module, consume_credits
+from app.core.guards import require_module, consume_credits
 
 router = APIRouter(prefix="/os", tags=["Business OS"])
 
