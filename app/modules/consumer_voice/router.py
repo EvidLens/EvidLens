@@ -5,7 +5,7 @@ from typing import List, Optional
 from .service import aggregate_sentiment, fetch_reddit_data
 from .models import ConsumerFeedback, SentimentSummary
 from app.modules.database import get_session as get_db
-from app.modules.core.guards import require_module, consume_credits
+from app.core.guards import require_module, consume_credits
 
 router = APIRouter(prefix="/consumer-voice", tags=["Consumer Voice"])
 
