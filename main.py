@@ -13,7 +13,7 @@ from email.mime.text import MIMEText
 import requests
 
 import pandas as pd
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from bs4 import BeautifulSoup
