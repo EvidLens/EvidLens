@@ -4,8 +4,8 @@ from datetime import datetime, timedelta
 import requests
 import base64
 
-from app.modules.core.db import get_session, get_db
-from app.modules.core.models import User, Subscription
+from app.core.db import get_session, get_db
+from app.core.models import User, Subscription
 from app.modules.auth.dependencies import get_current_user
 from app.core.service import _core
 from app.core import settings
