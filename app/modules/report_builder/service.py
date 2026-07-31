@@ -3,7 +3,7 @@ import json
 from datetime import datetime
 from fpdf import FPDF
 from sqlalchemy.orm import Session
-from app.modules.market_intel.service import search_market
+from app.modules.market_engine.service import search_market
 from app.modules.ai_insights.service import AIInsightsService
 from app.modules.knowledge_base.service import get_sector_benchmark
 
