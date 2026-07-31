@@ -41,14 +41,11 @@ async def generate_market_report_pdf(
     town: str = None
 ) -> bytes:
     try:
-        # market_data = search_market(db, q, sector, country, county, sub_county, ward, town)
-        market_data = {"demand_level": "N/A", "market_size_kes": 0, "price_range": {"avg": 0}, "competitor_count": 0, "growth_rate": 0}
-
+        market_data = await search_market(q, sector, county)
         location_str = town or ward or sub_county or county or country
         market_dict = {"sector": sector, "county": county, "sub_county": sub_county, "ward": ward}
-
         ai_json = await ai_service.generate_insights(q, market_dict)
-        benchmark = get_sector_benchmark(sector)
+        benchmark = get_sector_benchmark(db, sector)
 
     except Exception as e:
         ai_json = {"answer": str(e), "verdict": "N/A", "chart": None, "table": [], "map": None, "sources": []}
