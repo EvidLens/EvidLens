@@ -15,6 +15,8 @@ class Notification(SQLModel, table=True):
 
 class MarketMetric(SQLModel, table=True):
     __tablename__ = "market_metrics"
+    __table_args__ = {"extend_existing": True}
+    
     id: Optional[int] = Field(default=None, primary_key=True)
     # tenant_id: str = Field(index=True)
     product: str
