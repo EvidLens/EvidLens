@@ -2,6 +2,7 @@ from sqlmodel import SQLModel, Field, Relationship, Column
 from typing import Optional, List
 from datetime import datetime
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.sql import func
 
 class Notification(SQLModel, table=True):
     __tablename__ = "notifications"
@@ -15,13 +16,22 @@ class Notification(SQLModel, table=True):
 
 class MarketMetric(SQLModel, table=True):
     __tablename__ = "market_metrics"
+
     id: Optional[int] = Field(default=None, primary_key=True)
-    # tenant_id: str = Field(index=True)
-    product: str
-    county: str
-    sector: str
-    demand_score: float = 0.0
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    sector: str = Field(index=True, max_length=100)
+    product: str = Field(index=True, max_length=100)
+    country: str = Field(default="Kenya", max_length=50)
+    county: str = Field(index=True, max_length=100)
+    sub_county: Optional[str] = Field(default=None, max_length=100, index=True)
+    ward: Optional[str] = Field(default=None, max_length=100, index=True)
+    town: Optional[str] = Field(default=None, max_length=100, index=True)
+    demand_score: float = Field(default=0.0)
+    metric_value: Optional[float] = Field(default=None)
+    metric_type: Optional[str] = Field(default=None, max_length=100)
+    period: Optional[str] = Field(default=None, max_length=20)
+    source: str = Field(default="evidlens", max_length=100)
+    timestamp: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
+    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now(), "onupdate": func.now()})
 
 class PriceData(SQLModel, table=True):
     __tablename__ = "price_data"
