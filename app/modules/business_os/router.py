@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlmodel import Session
+from sqlmodel import Session, select
 from pydantic import BaseModel
 from .service import create_business, get_business, add_product, create_invoice, add_employee, mark_invoice_paid
 from .models import Business, Product, Invoice, Employee
-from app.modules.database import get_session
+from app.core.db import get_session
 from app.core.guards import require_module, consume_credits
 
 router = APIRouter(prefix="/os", tags=["Business OS"])
@@ -43,7 +43,8 @@ def list_products(request: Request, business_id: int, session: Session = Depends
     user_id = request.state.user.id
     business = get_business(session, business_id)
     if not business or business.owner_id != user_id: raise HTTPException(status_code=403, detail="Not your business")
-    return session.query(Product).filter(Product.business_id == business_id).all()
+    stmt = select(Product).where(Product.business_id == business_id)
+    return session.exec(stmt).all()
 
 @router.post("/accounting/invoice")
 @require_module(module_number=8)
@@ -64,7 +65,8 @@ def list_invoices(request: Request, business_id: int, session: Session = Depends
     user_id = request.state.user.id
     business = get_business(session, business_id)
     if not business or business.owner_id != user_id: raise HTTPException(status_code=403, detail="Not your business")
-    return session.query(Invoice).filter(Invoice.business_id == business_id).all()
+    stmt = select(Invoice).where(Invoice.business_id == business_id)
+    return session.exec(stmt).all()
 
 @router.post("/hr/employee")
 @require_module(module_number=8)
@@ -79,4 +81,5 @@ def list_employees(request: Request, business_id: int, session: Session = Depend
     user_id = request.state.user.id
     business = get_business(session, business_id)
     if not business or business.owner_id != user_id: raise HTTPException(status_code=403, detail="Not your business")
-    return session.query(Employee).filter(Employee.business_id == business_id).all()
+    stmt = select(Employee).where(Employee.business_id == business_id)
+    return session.exec(stmt).all()
