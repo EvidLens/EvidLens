@@ -4,6 +4,7 @@ from typing import List, Optional
 import httpx, os, json
 from sqlmodel import Session
 from app.core.db import get_session
+from app.modules.kenyalensiq.services import LensEngineService
 
 router = APIRouter(prefix="/lens", tags=["Ask Lens"])
 GROQ_KEY = os.getenv("GROQ_API_KEY")
@@ -34,21 +35,14 @@ TOOLS = [
     {"type": "function", "function": {"name": "viability_check", "description": "Go, No-Go, Needs Research for a business", "parameters": {"type": "object", "properties": {"business": {"type": "string"}, "county": {"type": "string"}}, "required": ["business", "county"]}}}
 ]
 
-def generate_insights_local(user_message: str, context: dict):
-    from groq import Groq
-    client = Groq(api_key=GROQ_KEY)
-    completion = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "system", "content": "You are EvidLens AI. Give market insights for Kenyan farmers and SMEs. Be concise. Use KES and Counties."},{"role": "user", "content": user_message}],
-        max_tokens=800, temperature=0.3
-    )
-    return completion.choices[0].message.content
-
 async def call_tool(name: str, args: dict, user_id: int, session: Session):
+    service = LensEngineService(session)
     if name == "data_qa":
-        return {"answer": generate_insights_local(args["query"], args)}
+        result = await service.chat(args["query"], f"user{user_id}@evidlens.co.ke")
+        return {"answer": result["reply"]}
     if name == "viability_check":
-        return {"answer": generate_insights_local(f"Should I start {args['business']} in {args['county']}? Give Go/No-Go with 3 reasons.", args)}
+        result = await service.chat(f"Should I start {args['business']} in {args['county']}? Give Go/No-Go with 3 reasons.", f"user{user_id}@evidlens.co.ke")
+        return {"answer": result["reply"]}
     if name == "generate_report":
         return {"status": "Report queued", "type": args["type"]}
     if name == "create_alert":
