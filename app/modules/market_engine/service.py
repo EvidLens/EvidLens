@@ -1,8 +1,7 @@
 from typing import Dict, Any, List
 from sqlmodel import Session, select, func, desc
 from datetime import datetime, timedelta
-from app.modules.kenyalensiq.models import MarketMetric
-from app.modules.data_layer.models import MarketSearch
+from app.core.models import MarketMetric, MarketSearch # FIXED IMPORT
 import httpx
 import os
 
@@ -23,13 +22,15 @@ class MarketEngineService:
         q = select(MarketMetric)
         if sector:
             q = q.where(MarketMetric.sector == sector)
+        q = q.order_by(desc(MarketMetric.created_at)).limit(100) # ADDED ORDER + LIMIT
         results = self.db.exec(q).all()
         return [
             {
                 "product": m.product,
                 "price": m.avg_price_kes,
                 "county": m.county,
-                "sector": m.sector
+                "sector": m.sector,
+                "created_at": m.created_at.isoformat() if m.created_at else None
             } for m in results
         ]
 
@@ -37,6 +38,7 @@ class MarketEngineService:
         q = select(MarketMetric).where(MarketMetric.sector==sector)
         if county:
             q = q.where(MarketMetric.county==county)
+        q = q.order_by(desc(MarketMetric.created_at)) # ADDED ORDER
         competitors = self.db.exec(q).all()
         return {
             "sector": sector,
@@ -54,35 +56,49 @@ class MarketEngineService:
         }
 
     async def search_market(self, q: str, sector: str, county: str) -> Dict[str, Any]:
+        # CHANGED TO SQLMODEL SYNTAX
         self.db.add(MarketSearch(query=q, sector=sector, county=county, created_at=datetime.utcnow()))
         self.db.commit()
+        
         last_30 = datetime.utcnow() - timedelta(days=30)
-        volume_30d = self.db.query(MarketSearch).filter(MarketSearch.sector==sector, MarketSearch.county==county, MarketSearch.created_at >= last_30).count()
-        total = self.db.query(MarketSearch).filter(MarketSearch.sector==sector, MarketSearch.county==county).count()
+        stmt_30 = select(func.count(MarketSearch.id)).where(MarketSearch.sector==sector, MarketSearch.county==county, MarketSearch.created_at >= last_30)
+        volume_30d = self.db.exec(stmt_30).one()
+        
+        stmt_total = select(func.count(MarketSearch.id)).where(MarketSearch.sector==sector, MarketSearch.county==county)
+        total = self.db.exec(stmt_total).one()
+
         macro_data = {}
         if NEWS_API_KEY:
             news_url = f"https://newsapi.org/v2/everything?q={sector}+Kenya&apiKey={NEWS_API_KEY}&pageSize=3"
             news = await self._call_api(news_url)
             macro_data["latest_news"] = [n["title"] for n in news.get("articles", [])]
+            
         return {
             "query": q,
             "sector": sector,
             "county": county,
-            "searches_30_days": volume_30d,
-            "total_searches_all_time": total,
-            "market_size_estimate_kes": volume_30d * 3500000,
+            "searches_30_days": volume_30d or 0,
+            "total_searches_all_time": total or 0,
+            "market_size_estimate_kes": (volume_30d or 0) * 3500000,
             "macro_signals": macro_data,
             "data_source": "EvidLens DB + NewsAPI"
         }
 
     async def get_dashboard_stats(self) -> Dict[str, Any]:
-        total_searches = self.db.query(MarketSearch).count()
-        total_companies = self.db.query(MarketMetric.company_name).distinct().count()
-        top_sector = self.db.query(MarketSearch.sector, func.count(MarketSearch.id).label('c')).group_by(MarketSearch.sector).order_by(desc('c')).first()
-        top_county = self.db.query(MarketSearch.county, func.count(MarketSearch.id).label('c')).group_by(MarketSearch.county).order_by(desc('c')).first()
-        trending = self.db.query(MarketSearch.query, func.count(MarketSearch.id).label('c')).group_by(MarketSearch.query).order_by(desc('c')).limit(5).all()
+        total_searches = self.db.exec(select(func.count(MarketSearch.id))).one()
+        total_companies = self.db.exec(select(func.count(func.distinct(MarketMetric.company_name)))).one()
+        
+        top_sector_stmt = select(MarketSearch.sector, func.count(MarketSearch.id).label('c')).group_by(MarketSearch.sector).order_by(desc('c')).limit(1)
+        top_sector = self.db.exec(top_sector_stmt).first()
+        
+        top_county_stmt = select(MarketSearch.county, func.count(MarketSearch.id).label('c')).group_by(MarketSearch.county).order_by(desc('c')).limit(1)
+        top_county = self.db.exec(top_county_stmt).first()
+        
+        trending_stmt = select(MarketSearch.query, func.count(MarketSearch.id).label('c')).group_by(MarketSearch.query).order_by(desc('c')).limit(5)
+        trending = self.db.exec(trending_stmt).all()
+        
         return {
-            "insights_generated": total_searches,
+            "insights_generated": total_searches or 0,
             "active_products": 5,
             "sectors_covered": 75,
             "reports_exported": 0,
@@ -93,16 +109,23 @@ class MarketEngineService:
 
     async def get_real_time_terminal(self, sector: str, county: str) -> Dict[str, Any]:
         now = datetime.utcnow()
-        last_1h = self.db.query(MarketSearch).filter(MarketSearch.sector==sector, MarketSearch.county==county, MarketSearch.created_at >= now - timedelta(hours=1)).count()
-        last_24h = self.db.query(MarketSearch).filter(MarketSearch.sector==sector, MarketSearch.county==county, MarketSearch.created_at >= now - timedelta(days=1)).count()
-        last_7d = self.db.query(MarketSearch).filter(MarketSearch.sector==sector, MarketSearch.county==county, MarketSearch.created_at >= now - timedelta(days=7)).count()
-        trend = "UP" if last_1h > (last_24h/24) else "DOWN"
+        
+        stmt_1h = select(func.count(MarketSearch.id)).where(MarketSearch.sector==sector, MarketSearch.county==county, MarketSearch.created_at >= now - timedelta(hours=1))
+        last_1h = self.db.exec(stmt_1h).one()
+        
+        stmt_24h = select(func.count(MarketSearch.id)).where(MarketSearch.sector==sector, MarketSearch.county==county, MarketSearch.created_at >= now - timedelta(days=1))
+        last_24h = self.db.exec(stmt_24h).one()
+        
+        stmt_7d = select(func.count(MarketSearch.id)).where(MarketSearch.sector==sector, MarketSearch.county==county, MarketSearch.created_at >= now - timedelta(days=7))
+        last_7d = self.db.exec(stmt_7d).one()
+        
+        trend = "UP" if (last_1h or 0) > ((last_24h or 0)/24) else "DOWN"
         return {
             "sector": sector,
             "county": county,
-            "intent_searches_1h": last_1h,
-            "intent_searches_24h": last_24h,
-            "intent_searches_7d": last_7d,
+            "intent_searches_1h": last_1h or 0,
+            "intent_searches_24h": last_24h or 0,
+            "intent_searches_7d": last_7d or 0,
             "trend": trend,
             "last_updated": now.isoformat()
         }
@@ -113,6 +136,7 @@ class MarketEngineService:
         url = f"https://us1.locationiq.com/v1/search.php?key={LOCATIONIQ_KEY}&q={county},Kenya&format=json"
         data = await self._call_api(url)
         return {"county": county, "geo_data": data}
+
 
 from app.core.db import SessionLocal
 
