@@ -3,8 +3,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 import httpx, os, json
 from sqlmodel import Session
-from app.modules.data_layer.models import *
-from app.modules.data_layer.db import get_session
+from app.core.db import get_session
 
 router = APIRouter(prefix="/lens", tags=["Ask Lens"])
 GROQ_KEY = os.getenv("GROQ_API_KEY")
