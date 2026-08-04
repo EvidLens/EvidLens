@@ -2,14 +2,15 @@ import json
 import pandas as pd
 import requests
 import tweepy
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any
-from sqlalchemy.orm import Session
-from sqlmodel import select, func, desc, asc
+from sqlmodel import Session, select, func, desc, asc
+from app.services.base_service import BaseService
+from app.modules.kenyalensiq.models import MarketMetric, NewsArticle, SocialMention, KenyaLensBusiness
+from app.core.db import Session as DBSession, engine
+from app.core.config import settings
 
-from app.services.base_service import BaseService # 1. INHERIT
-from app.modules.database import MarketMetric, NewsArticle, SocialMention, Session as DBSession, engine
-from app.core.config import settings # 2. Use settings not os.getenv
+UTC = timezone.utc
 
 SYSTEM_PROMPT = """You are EvidLens AI. You give market insights for Kenyan farmers and SMEs.
 Rules:
@@ -40,17 +41,19 @@ def scrape_kpin_prices():
             df = pd.read_html(r.text)[0]
             df.columns = ['date', 'county', 'market', 'product', 'price', 'unit']
             df['price'] = df['price'].astype(str).str.replace(',', '').astype(float)
-            today = datetime.utcnow().date()
+            today = datetime.now(UTC).date()
             for _, row in df.iterrows():
                 existing = session.exec(select(MarketMetric).where(
                     MarketMetric.product == row['product'],
-                    MarketMetric.company_name == row['market'],
-                    func.date(MarketMetric.created_at) == today
+                    MarketMetric.county == row['county'],
+                    func.date(MarketMetric.timestamp) == today
                 )).first()
                 if not existing:
                     session.add(MarketMetric(
-                        product=row['product'], company_name=row['market'],
-                        avg_price_kes=row['price'], county=row['county'], sector=row['unit']
+                        product=row['product'],
+                        county=row['county'],
+                        sector=row['unit'],
+                        demand_score=row['price']
                     ))
             session.commit()
         except Exception as e: print("Scrape error:", e)
@@ -65,7 +68,7 @@ def fetch_real_news():
                 if not article["title"]: continue
                 existing = db.exec(select(NewsArticle).where(NewsArticle.title == article["title"])).first()
                 if not existing:
-                    db.add(NewsArticle(title=article["title"], source=article["source"]["name"], summary=article["description"] or ""))
+                    db.add(NewsArticle(title=article["title"], product="general", tenant_id="system"))
             db.commit()
         except Exception as e: print("News error:", e)
 
@@ -78,12 +81,12 @@ def fetch_real_tweets():
                 tweets = client_t.search_recent_tweets(query=query, max_results=50)
                 if tweets.data:
                     for t in tweets.data:
-                        existing = db.exec(select(SocialMention).where(SocialMention.text == t.text)).first()
-                        if not existing: db.add(SocialMention(text=t.text, platform="Twitter"))
+                        existing = db.exec(select(SocialMention).where(SocialMention.product == query, SocialMention.platform == "Twitter")).first()
+                        if not existing: db.add(SocialMention(product=query, platform="Twitter", tenant_id="system"))
                 db.commit()
             except Exception as e: print("Twitter error:", e)
 
-class LensEngineService(BaseService): # 3. INHERIT
+class LensEngineService(BaseService):
     def __init__(self, db: Session):
         super().__init__(db)
 
@@ -104,7 +107,6 @@ class LensEngineService(BaseService): # 3. INHERIT
             "tool_choice": "auto"
         }
         try:
-            # 4. USE self.client from BaseService instead of creating new one
             r = await self.client.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers={"Authorization": f"Bearer {settings.GROQ_API_KEY}"})
             r.raise_for_status()
             message = r.json()["choices"][0]["message"]
@@ -120,9 +122,22 @@ class LensEngineService(BaseService): # 3. INHERIT
         return message.get("content", "No response")
 
     async def chat(self, user_message: str, user_email: str) -> Dict[str, Any]:
-        stats = {"total_businesses": 0}
+        top_counties = self.db.exec(
+            select(KenyaLensBusiness.county, func.count(KenyaLensBusiness.id))
+         .group_by(KenyaLensBusiness.county)
+         .order_by(func.count(KenyaLensBusiness.id).desc())
+         .limit(5)
+        ).all()
+
+        avg_prices = self.db.exec(
+            select(MarketMetric.sector, func.avg(MarketMetric.demand_score))
+         .group_by(MarketMetric.sector)
+         .limit(10)
+        ).all()
+
+        stats = {"top_counties": top_counties, "avg_prices": avg_prices}
         market = [m.dict() for m in self.db.exec(select(MarketMetric).limit(5)).all()]
-        context = f"\nData Available: Stats={json.dumps(stats)} Market={json.dumps(market)}"
+        context = f"\nREAL DATA CONTEXT: Stats={json.dumps(stats)} Market={json.dumps(market)} APP FEATURES: /api/competitive, /api/price-oracle, /api/demand, /api/county, /api/consumer, /report-builder, /ai-insights SUPPORT: support@evidlens.co.ke Currency: KES. Location: Kenya Counties only."
         reply = await self.call_groq_with_tools(user_message, context, user_email)
         return {"reply": reply, "source": "EvidLens DB + Groq"}
 
@@ -134,29 +149,3 @@ class LensEngineService(BaseService): # 3. INHERIT
         context = f"\nData Available: Market={json.dumps(market)}"
         reply = await self.call_groq_with_tools(f"Give 3 insights for {sector} in {county or 'Kenya'}", context, "")
         return {"insights": reply, "source": "EvidLens DB + Groq"}
-
-   def generate_insights(user_message: str, user_email: str = "user@evidlens.co.ke", db: Session = Depends(get_db)):
-    try:
-        # 1. PULL REAL DATA
-        top_counties = db.exec(
-            select(KenyaLensBusiness.county, func.count(KenyaLensBusiness.id))
-          .group_by(KenyaLensBusiness.county)
-          .order_by(func.count(KenyaLensBusiness.id).desc())
-          .limit(5)
-        ).all()
-
-        avg_prices = db.exec(
-            select(MarketMetric.sector, func.avg(MarketMetric.metric_value))
-          .filter(MarketMetric.metric_type == "price_avg")
-          .group_by(MarketMetric.sector)
-          .limit(10)
-        ).all()
-
-        context = f"""
-        REAL DATA CONTEXT:
-        Top Counties by Business: {top_counties}
-        Avg Prices KES: {avg_prices}
-        APP FEATURES: /api/competitive, /api/price-oracle, /api/demand, /api/county, /api/consumer, /report-builder, /ai-insights
-        SUPPORT: support@evidlens.co.ke
-        Currency: KES. Location: Kenya Counties only.
-        """
