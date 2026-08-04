@@ -1,15 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, Request
+from sqlmodel import Session, select, desc
 from pydantic import BaseModel
 from typing import List, Optional
-from .service import get_sector_report, search_knowledge, ingest_sector_data, generate_report_with_groq
-from .models import SectorReport, KnowledgeChunk
-from app.modules.data.models import DataSource
-from app.modules.database import get_db
+from.service import get_sector_report, search_knowledge, ingest_sector_data, generate_report_with_groq
+from app.core.models import SectorReport, KnowledgeChunk, DataSource
+from app.core.db import get_session as get_db
+from app.core.guards import require_module
 
-router = APIRouter()
+router = APIRouter(prefix="/knowledge", tags=["Knowledge Base"])
 
-# Use all 75 sectors from your pricing doc
 KENYA_SECTORS = [
     "Banks", "Microfinance Institutions", "Insurance & HMOs", "Fintechs & Mobile Money",
     "Capital Markets & Investment Banks", "SACCOs", "Retail - Supermarkets & Chains",
@@ -59,45 +58,45 @@ class SearchRequest(BaseModel):
 
 @router.get("/sectors")
 def list_sectors():
-    """Return all 75 Kenya sectors. Used for Zero Setup dropdown"""
     return {"sectors": KENYA_SECTORS, "total": len(KENYA_SECTORS)}
 
 @router.get("/report/{sector}", response_model=ReportResponse)
+@require_module(module_number=3)
 def get_report(
+    request: Request,
     sector: str,
     county: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
-    """Get prebuilt industry report. Auto-loads on signup. Auto-generates if missing"""
     if sector not in KENYA_SECTORS:
         raise HTTPException(status_code=404, detail="Sector not found. Use /sectors to list all 75")
 
     report = get_sector_report(db, sector, county)
     if not report:
-        # Auto-generate if missing using Groq + data layer
         report = generate_report_with_groq(db, sector, county)
 
     return report
 
 @router.post("/search")
-def search_kb(request: SearchRequest, db: Session = Depends(get_db)):
-    """RAG search for Lens chatbot and AI Insight Generator across all 9 lanes"""
-    results = search_knowledge(db, request.query, request.sector, request.county, request.top_k)
+@require_module(module_number=3)
+def search_kb(request: Request, req: SearchRequest, db: Session = Depends(get_db)):
+    results = search_knowledge(db, req.query, req.sector, req.county, req.top_k)
     return {
-        "query": request.query,
+        "query": req.query,
         "results": [
             {
                 "chunk_text": r.chunk_text,
                 "sector": r.sector,
                 "county": r.county,
-                "source": r.source
+                "source": r.source,
+                "published_at": r.published_at.isoformat() if hasattr(r, 'published_at') and r.published_at else None
             } for r in results
         ]
     }
 
 @router.post("/ingest")
-def ingest_data(background_tasks: BackgroundTasks, sector: str, db: Session = Depends(get_db)):
-    """Admin endpoint to trigger data refresh for a sector"""
+@require_module(module_number=3)
+def ingest_data(request: Request, background_tasks: BackgroundTasks, sector: str, db: Session = Depends(get_db)):
     if sector not in KENYA_SECTORS:
         raise HTTPException(status_code=404, detail="Sector not found")
     background_tasks.add_task(ingest_sector_data, db, sector)
