@@ -9,9 +9,9 @@ import os
 import httpx
 
 from app.modules.ai_insights.service import AIInsightsService
-from app.modules.core.guards import require_module, consume_credits
+from app.core.guards import require_module, consume_credits
 from app.core.models import UserSubscription
-from app.modules.database import get_session
+from app.core.db import get_session
 
 __all__ = ["router", "ask_lens_chat", "ChatRequest"]
 
@@ -19,7 +19,6 @@ router = APIRouter(prefix="/ai", tags=["Ask Lens"])
 GROQ_KEY = os.getenv("GROQ_API_KEY")
 ai_service = AIInsightsService()
 
-# EXISTING MODELS
 class InsightRequest(BaseModel):
     query: str
     sector: str
