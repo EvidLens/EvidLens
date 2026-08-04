@@ -1,4 +1,4 @@
-from sqlmodel import Session, create_engine
+from sqlmodel import Session, create_engine, delete
 from app.modules.core.models import Plan, Module, Sector, AddOn, ALCService
 import os, json
 
@@ -7,7 +7,12 @@ engine = create_engine(DATABASE_URL)
 
 def seed_all():
     with Session(engine) as session:
-        session.query(Plan).delete(); session.query(Module).delete(); session.query(Sector).delete(); session.query(AddOn).delete(); session.query(ALCService).delete()
+        # SQLModel doesn't have .query(). Use delete() instead
+        session.exec(delete(Plan))
+        session.exec(delete(Module))
+        session.exec(delete(Sector))
+        session.exec(delete(AddOn))
+        session.exec(delete(ALCService))
 
         plans = [
             Plan(code="EV-FREE", name="Free Trial", monthly_price=0, annual_price=0, lanes=1, modules=1, users=1, competitors=1, leads_per_quarter=0, support_sla="None", description="14 Days", features=json.dumps(["14 Days Access","1 Lane, 1 Module","1 User","Watermarked Exports"])),
@@ -23,5 +28,7 @@ def seed_all():
         alc = [ALCService(code="ALC-BENCH",name="Sector Benchmark Report",price=175000,best_for="All"),ALCService(code="ALC-DUE",name="Due Diligence Pack",price=375000,best_for="All"),ALCService(code="ALC-LEAD",name="B2B Lead List - 500 contacts",price=90000,best_for="All"),ALCService(code="ALC-SOCIAL",name="Brand Health + Social Listening",price=225000,best_for="All"),ALCService(code="ALC-YIR",name="Annual Year in Review",price=250000,best_for="All"),ALCService(code="ALC-GEO",name="County/Constituency Data Pack",price=300000,best_for="All")]
         for item in plans + modules + sectors + addons + alc: session.add(item)
         session.commit()
+        print(f"Seeded: {len(plans)} plans, {len(modules)} modules, {len(sectors)} sectors, {len(addons)} addons, {len(alc)} services")
 
-if __name__ == "__main__": seed_all()
+if __name__ == "__main__": 
+    seed_all()
