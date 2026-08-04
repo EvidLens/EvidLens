@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends
 from sqlmodel import Session
-from app.modules.database import get_session
+from app.core.db import get_session
 from app.modules.api.service import APIService
 
-router = APIRouter()
+router = APIRouter(prefix="/api", tags=["Public API"])
 
 @router.get("/competitive")
 async def get_competitive(sector: str, county: str = None, db: Session = Depends(get_session)):
