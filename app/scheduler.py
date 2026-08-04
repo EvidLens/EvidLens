@@ -1,7 +1,9 @@
-from app.modules.database import MarketMetric, PriceData, NewsArticle, SocialMention, engine
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
 from sqlmodel import Session, select, func
+
+from app.core.db import engine
+from app.core.models import MarketMetric, PriceData, NewsArticle, SocialMention
 
 scheduler = BackgroundScheduler()
 
@@ -17,7 +19,7 @@ def update_demand_scores():
 
             price_data = session.exec(
                 select(PriceData).where(PriceData.product_name==product, PriceData.county==county)
-             .order_by(PriceData.timestamp.desc()).limit(2)
+            .order_by(PriceData.timestamp.desc()).limit(2)
             ).all()
             if len(price_data) == 2:
                 change = (price_data[0].price - price_data[1].price) / price_data[1].price
@@ -25,13 +27,13 @@ def update_demand_scores():
 
             news_count = session.exec(
                 select(func.count()).select_from(NewsArticle)
-             .where(NewsArticle.product==product, NewsArticle.timestamp > yesterday)
+            .where(NewsArticle.product==product, NewsArticle.timestamp > yesterday)
             ).one()
             score += news_count * 30
 
             social_count = session.exec(
                 select(func.count()).select_from(SocialMention)
-             .where(SocialMention.product==product, SocialMention.timestamp > yesterday)
+            .where(SocialMention.product==product, SocialMention.timestamp > yesterday)
             ).one()
             score += (social_count // 100) * 10
 
