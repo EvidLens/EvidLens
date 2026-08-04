@@ -1,13 +1,9 @@
-from sqlmodel import SQLModel, Field, Relationship
-from sqlalchemy import Index, Column
+from sqlmodel import SQLModel, Field, Relationship, Column, Index
+from sqlalchemy import ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
 from typing import Optional, Dict, List
 from datetime import datetime
 import uuid
-from sqlalchemy.orm import declarative_base, relationship, Session
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text
-
-Base = declarative_base()
 
 class LensSubscription(SQLModel, table=True):
     __tablename__ = "lens_subscriptions"
@@ -60,7 +56,7 @@ class LensBusiness(SQLModel, table=True):
     employees_total: Optional[int] = None
     extra_data: Dict = Field(default_factory=dict, sa_column=Column(JSONB))
     updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-    surveys: List["app.models.LensSurvey"] = Relationship(back_populates="business")
+    surveys: List["LensSurvey"] = Relationship(back_populates="business")
 
 class LensSurvey(SQLModel, table=True):
     __tablename__ = "lens_surveys"
@@ -71,7 +67,7 @@ class LensSurvey(SQLModel, table=True):
     source: str = Field(default="api")
     module: str = Field(default="core", index=True)
     data: Dict = Field(default_factory=dict, sa_column=Column(JSONB))
-    business: "app.models.LensBusiness" = Relationship(back_populates="surveys")
+    business: "LensBusiness" = Relationship(back_populates="surveys")
 
 class LensMember(SQLModel, table=True):
     __tablename__ = "lens_members"
@@ -121,12 +117,12 @@ class LensResponse(SQLModel, table=True):
     data: Dict = Field(default_factory=dict, sa_column=Column(JSONB))
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-class Notification(Base):
+class Notification(SQLModel, table=True):
     __tablename__ = "notifications"
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    message = Column(String)
-    is_read = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id")
+    message: str
+    is_read: bool = False
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 Subscription = LensSubscription
