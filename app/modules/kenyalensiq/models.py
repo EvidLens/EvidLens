@@ -36,6 +36,7 @@ class PriceData(SQLModel, table=True):
 
 class NewsArticle(SQLModel, table=True):
     __tablename__ = "news_articles"
+    __table_args__ = {'extend_existing': True}
     id: Optional[int] = Field(default=None, primary_key=True)
     tenant_id: str = Field(index=True)
     product: str
