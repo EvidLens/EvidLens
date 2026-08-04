@@ -3,13 +3,13 @@ from apscheduler.triggers.cron import CronTrigger
 from sqlmodel import Session, select, func
 import traceback
 
-from app.core import settings
-from app.modules.core.db import engine
-from app.modules.kenyalensiq.models import KenyaLensBusiness
+from app.core.config import settings
+from app.core.db import engine
+from app.modules.core.models import KenyaLensBusiness
 from app.modules.jobs.scrapers import scrape_kpin_prices, fetch_real_news, fetch_real_tweets
 
 # ====== SCHEDULER INSTANCE ======
-scheduler = BackgroundScheduler(timezone=settings.SCHEDULER_TIMEZONE)
+scheduler = BackgroundScheduler(timezone="Africa/Nairobi")
 
 def safe_job(job_func, job_name: str):
     """Wrapper so 1 job failing doesn't kill others"""
@@ -53,7 +53,7 @@ def start_scheduler():
         id="tweets_scrape", replace_existing=True
     )
     scheduler.start()
-    print(f"Scheduler started. Timezone: {settings.SCHEDULER_TIMEZONE}")
+    print(f"Scheduler started. Timezone: Africa/Nairobi")
 
 def shutdown_scheduler():
     """Graceful shutdown"""
