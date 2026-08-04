@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session
-from app.modules.database import get_session
-from app.modules.lens_engine.service import LensEngineService
+from app.core.db import get_session
+from app.modules.kenyalensiq.services import LensEngineService
 
 router = APIRouter()
 
