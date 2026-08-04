@@ -1,8 +1,10 @@
 from sqlmodel import SQLModel, Field, Column, JSON
 from typing import Optional, List, Dict
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, field_validator
 from sqlalchemy.sql import func
+
+UTC = timezone.utc
 
 # ========== CORE MODELS - USED BY CoreService ==========
 class Plan(SQLModel, table=True):
@@ -70,7 +72,7 @@ class User(SQLModel, table=True):
     reset_token: Optional[str] = None
     reset_token_expires: Optional[datetime] = None
     consent_at: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class Workspace(SQLModel, table=True):
     __tablename__ = "workspace"
@@ -79,7 +81,7 @@ class Workspace(SQLModel, table=True):
     name: str
     owner_id: int = Field(foreign_key="user.id")
     credits: int = Field(default=0)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class Subscription(SQLModel, table=True):
     __tablename__ = "subscription"
@@ -91,7 +93,7 @@ class Subscription(SQLModel, table=True):
     status: str = Field(default="Pending")
     credits: int
     expires_at: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 # ========== BUSINESS MODELS ==========
 class GeoFilter(SQLModel, table=True):
@@ -165,8 +167,8 @@ class MarketMetric(SQLModel, table=True):
     company_name: Optional[str] = None
     avg_price_kes: Optional[float] = None
     demand_score: Optional[float] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class SocialMention(SQLModel, table=True):
     __tablename__ = "social_mentions"
@@ -180,7 +182,7 @@ class SocialMention(SQLModel, table=True):
     county: Optional[str] = None
     subcounty: Optional[str] = None
     sector: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class NewsArticle(SQLModel, table=True):
     __tablename__ = "news_articles"
@@ -192,7 +194,7 @@ class NewsArticle(SQLModel, table=True):
     category: Optional[str] = None
     url: Optional[str] = None
     county: Optional[str] = None
-    published_at: datetime = Field(default_factory=datetime.utcnow)
+    published_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class SectorReport(SQLModel, table=True):
     __tablename__ = "sector_reports"
@@ -210,8 +212,8 @@ class SectorReport(SQLModel, table=True):
     data_sources: List[dict] = Field(default=[], sa_column=Column(JSON))
     generated_by: str = Field(default="EvidLens AI RAG", max_length=100)
     version: str = Field(default="v1.0", max_length=20)
-    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
-    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now(), "onupdate": func.now()})
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), sa_column_kwargs={"server_default": func.now()})
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC), sa_column_kwargs={"server_default": func.now(), "onupdate": func.now()})
 
 class Report(SQLModel, table=True):
     __tablename__ = "report"
@@ -220,7 +222,7 @@ class Report(SQLModel, table=True):
     user_id: int = Field(foreign_key="user.id")
     title: str
     data: dict = Field(sa_column=Column(JSON))
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class Funder(SQLModel, table=True):
     __tablename__ = "funder"
@@ -249,7 +251,7 @@ class Policy(SQLModel, table=True):
     county: str
     impact: str
     url: str
-    published_at: datetime = Field(default_factory=datetime.utcnow)
+    published_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class KenyaLensSurvey(SQLModel, table=True):
     __tablename__ = "kenyalens_survey"
@@ -285,5 +287,4 @@ class DetailedAnalysisRequest(BaseModel):
     def strip_text(cls, v: str) -> str:
         return v.strip()
 
-    class Config:
-        extra = "allow"
+    model_config = {"extra": "allow"}
