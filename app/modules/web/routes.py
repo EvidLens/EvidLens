@@ -1,11 +1,10 @@
 from app.modules.kenyalensiq.models import KenyaLensBusiness
-from sqlalchemy import distinct
+from sqlalchemy import distinct, func, desc
 from fastapi import APIRouter, Request, Form, Depends, Response
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
-from sqlalchemy.orm import Session
-from sqlalchemy import func, desc
-from app.modules.database import get_db
+from sqlmodel import Session, select
+from app.core.db import get_db
 from app.modules.auth.service import create_user, login_user, get_user_by_email
 from app.modules.market_engine.models import MarketSearch, Competitor, MarketMetric
 from app.modules.market_engine.service import MarketEngineService, get_competitor_overview
@@ -17,11 +16,10 @@ from app.modules.knowledge_base.service import get_sector_benchmark
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
-# ========== 9 REAL DETAILED API ENDPOINTS - ENTERPRISE READY ==========
-
 @router.get("/api/competitive")
 def get_competitive(db: Session = Depends(get_db)):
-    competitors = db.query(Competitor).order_by(desc(Competitor.avg_rating)).limit(100).all()
+    stmt = select(Competitor).order_by(desc(Competitor.avg_rating)).limit(100)
+    competitors = db.exec(stmt).all()
     data = [{
         "id": c.id,
         "business_name": c.business_name,
@@ -38,7 +36,8 @@ def get_competitive(db: Session = Depends(get_db)):
         "source": c.source,
         "last_seen_at": c.last_seen_at
     } for c in competitors]
-    top_sectors = db.query(Competitor.sector, func.count(Competitor.id)).group_by(Competitor.sector).all()
+    stmt2 = select(Competitor.sector, func.count(Competitor.id)).group_by(Competitor.sector)
+    top_sectors = db.exec(stmt2).all()
     return {
         "service": "Competitive Engine",
         "status": "LIVE",
@@ -49,8 +48,10 @@ def get_competitive(db: Session = Depends(get_db)):
 
 @router.get("/api/price-oracle")
 def get_price_oracle(db: Session = Depends(get_db)):
-    prices = db.query(MarketMetric).filter(MarketMetric.metric_type == "price_avg").order_by(desc(MarketMetric.updated_at)).limit(100).all()
-    by_sector = db.query(MarketMetric.sector, func.avg(MarketMetric.metric_value)).filter(MarketMetric.metric_type == "price_avg").group_by(MarketMetric.sector).all()
+    stmt = select(MarketMetric).where(MarketMetric.metric_type == "price_avg").order_by(desc(MarketMetric.updated_at)).limit(100)
+    prices = db.exec(stmt).all()
+    stmt2 = select(MarketMetric.sector, func.avg(MarketMetric.metric_value)).where(MarketMetric.metric_type == "price_avg").group_by(MarketMetric.sector)
+    by_sector = db.exec(stmt2).all()
     data = [{
         "id": p.id,
         "sector": p.sector,
@@ -70,8 +71,10 @@ def get_price_oracle(db: Session = Depends(get_db)):
 
 @router.get("/api/demand")
 def get_demand(db: Session = Depends(get_db)):
-    demand = db.query(MarketMetric).filter(MarketMetric.metric_type == "demand_score").order_by(desc(MarketMetric.metric_value)).limit(100).all()
-    by_county = db.query(MarketMetric.county, func.avg(MarketMetric.metric_value)).filter(MarketMetric.metric_type == "demand_score").group_by(MarketMetric.county).all()
+    stmt = select(MarketMetric).where(MarketMetric.metric_type == "demand_score").order_by(desc(MarketMetric.metric_value)).limit(100)
+    demand = db.exec(stmt).all()
+    stmt2 = select(MarketMetric.county, func.avg(MarketMetric.metric_value)).where(MarketMetric.metric_type == "demand_score").group_by(MarketMetric.county)
+    by_county = db.exec(stmt2).all()
     data = [{
         "id": d.id,
         "sector": d.sector,
@@ -113,13 +116,13 @@ def get_funding(db: Session = Depends(get_db)):
 
 @router.get("/api/risk")
 def get_risk(db: Session = Depends(get_db)):
-    # Risk = counties with low competitor density + high demand
-    risk_zones = db.query(MarketSearch.county).filter(MarketSearch.demand_level == "High").limit(20).all()
+    stmt = select(MarketSearch.county).where(MarketSearch.demand_level == "High").limit(20)
+    risk_zones = db.exec(stmt).all()
     return {
         "service": "Risk Sentinel",
         "status": "LIVE",
         "alerts": len(risk_zones),
-        "high_opportunity_low_competition": [r[0] for r in risk_zones],
+        "high_opportunity_low_competition": [r for r in risk_zones],
         "data": []
     }
 
@@ -137,7 +140,8 @@ def get_export(db: Session = Depends(get_db)):
 @router.get("/api/consumer")
 def get_consumer(db: Session = Depends(get_db)):
     insights = generate_insights("consumer", {"source": "MarketSearch"})
-    searches = db.query(MarketSearch.sector, func.count(MarketSearch.id)).group_by(MarketSearch.sector).order_by(desc(func.count(MarketSearch.id))).limit(10).all()
+    stmt = select(MarketSearch.sector, func.count(MarketSearch.id)).group_by(MarketSearch.sector).order_by(desc(func.count(MarketSearch.id))).limit(10)
+    searches = db.exec(stmt).all()
     return {
         "service": "Consumer Pulse",
         "status": "LIVE",
@@ -147,12 +151,13 @@ def get_consumer(db: Session = Depends(get_db)):
 
 @router.get("/api/county")
 def get_county(db: Session = Depends(get_db)):
-    counties = db.query(
+    stmt = select(
         MarketSearch.county,
         func.sum(MarketSearch.market_size_kes),
         func.avg(MarketSearch.growth_rate),
         func.count(MarketSearch.id)
-    ).group_by(MarketSearch.county).all()
+    ).group_by(MarketSearch.county)
+    counties = db.exec(stmt).all()
     data = [{
         "county": c[0],
         "total_market_size_kes": float(c[1] or 0),
@@ -168,9 +173,9 @@ def get_county(db: Session = Depends(get_db)):
 
 @router.get("/api/counties")
 def get_counties(db: Session = Depends(get_db)):
-    """Get all unique counties from KenyaLensBusiness table"""
-    counties = db.query(distinct(KenyaLensBusiness.county)).filter(KenyaLensBusiness.county.isnot(None)).order_by(KenyaLensBusiness.county).all()
-    county_list = [c[0] for c in counties if c[0]]
+    stmt = select(distinct(KenyaLensBusiness.county)).where(KenyaLensBusiness.county.isnot(None)).order_by(KenyaLensBusiness.county)
+    counties = db.exec(stmt).all()
+    county_list = [c for c in counties if c]
     return {
         "service": "Counties",
         "status": "LIVE",
@@ -180,9 +185,9 @@ def get_counties(db: Session = Depends(get_db)):
 
 @router.get("/api/sectors")
 def get_sectors(db: Session = Depends(get_db)):
-    """Get all unique sectors from KenyaLensBusiness table"""
-    sectors = db.query(distinct(KenyaLensBusiness.sector)).filter(KenyaLensBusiness.sector.isnot(None)).order_by(KenyaLensBusiness.sector).all()
-    sector_list = [s[0] for s in sectors if s[0]]
+    stmt = select(distinct(KenyaLensBusiness.sector)).where(KenyaLensBusiness.sector.isnot(None)).order_by(KenyaLensBusiness.sector)
+    sectors = db.exec(stmt).all()
+    sector_list = [s for s in sectors if s]
     return {
         "service": "Sectors",
         "status": "LIVE",
@@ -192,10 +197,11 @@ def get_sectors(db: Session = Depends(get_db)):
 
 @router.get("/api/filters")
 def get_filters(db: Session = Depends(get_db)):
-    """Combined endpoint for dropdowns"""
-    counties = db.query(distinct(KenyaLensBusiness.county)).filter(KenyaLensBusiness.county.isnot(None)).all()
-    sectors = db.query(distinct(KenyaLensBusiness.sector)).filter(KenyaLensBusiness.sector.isnot(None)).all()
+    stmt1 = select(distinct(KenyaLensBusiness.county)).where(KenyaLensBusiness.county.isnot(None))
+    stmt2 = select(distinct(KenyaLensBusiness.sector)).where(KenyaLensBusiness.sector.isnot(None))
+    counties = db.exec(stmt1).all()
+    sectors = db.exec(stmt2).all()
     return {
-        "counties": sorted([c[0] for c in counties if c[0]]),
-        "sectors": sorted([s[0] for s in sectors if s[0]])
+        "counties": sorted([c for c in counties if c]),
+        "sectors": sorted([s for s in sectors if s])
     }
