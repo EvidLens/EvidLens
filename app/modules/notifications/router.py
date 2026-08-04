@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
-from app.modules.database import get_session
+from sqlmodel import Session
+from app.core.db import get_session
 from app.modules.notifications.service import NotificationService
 
-router = APIRouter(prefix="/api/notifications", tags=["Notifications"])
+router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
 class NotificationRequest(BaseModel):
     user_id: int
