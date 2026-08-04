@@ -2,13 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from sqlmodel import Session
 from pydantic import BaseModel, EmailStr
-from.service import *
-from.models import AuthUser
+from .service import *
+from .models import AuthUser
 from .dependencies import get_current_user, require_active_subscription, require_admin
-from app.modules.database import get_session as get_db
+from app.core.db import get_session as get_db
 import secrets
 
-router = APIRouter()
+router = APIRouter(prefix="/auth", tags=["Auth"])
 
 class SignupRequest(BaseModel):
     email: EmailStr
