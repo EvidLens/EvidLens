@@ -1,12 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, Request
+from sqlmodel import Session, select
 from pydantic import BaseModel
 from typing import List, Optional
 from.service import get_location_comparison, generate_heatmap, fetch_osm_businesses, calculate_price_arbitrage, seed_geo_data
-from.models import KENYA_COUNTIES, LocationGeo
-from app.modules.database import get_db
+from app.core.models import KENYA_COUNTIES, LocationGeo
+from app.core.db import get_session as get_db
+from app.core.guards import require_module
 
-router = APIRouter()
+router = APIRouter(prefix="/location", tags=["Location Intel"])
 
 class ComparisonRequest(BaseModel):
     sector: str
@@ -19,29 +20,36 @@ def list_counties():
     return {"country": "Kenya", "counties": KENYA_COUNTIES}
 
 @router.get("/geo/subcounties")
-def list_subcounties(county: str = Query(...), db: Session = Depends(get_db)):
-    results = db.query(LocationGeo).filter(LocationGeo.level=="subcounty", LocationGeo.parent==county).all()
+@require_module(module_number=4)
+def list_subcounties(request: Request, county: str = Query(...), db: Session = Depends(get_db)):
+    stmt = select(LocationGeo).where(LocationGeo.level=="subcounty", LocationGeo.parent==county)
+    results = db.exec(stmt).all()
     return {"county": county, "subcounties": [r.name for r in results]}
 
 @router.get("/geo/wards")
-def list_wards(subcounty: str = Query(...), db: Session = Depends(get_db)):
-    results = db.query(LocationGeo).filter(LocationGeo.level=="ward", LocationGeo.parent==subcounty).all()
+@require_module(module_number=4)
+def list_wards(request: Request, subcounty: str = Query(...), db: Session = Depends(get_db)):
+    stmt = select(LocationGeo).where(LocationGeo.level=="ward", LocationGeo.parent==subcounty)
+    results = db.exec(stmt).all()
     return {"subcounty": subcounty, "wards": [r.name for r in results]}
 
 @router.get("/geo/towns")
-def list_towns(county: Optional[str] = Query(None), db: Session = Depends(get_db)):
-    q = db.query(LocationGeo).filter(LocationGeo.level=="town")
+@require_module(module_number=4)
+def list_towns(request: Request, county: Optional[str] = Query(None), db: Session = Depends(get_db)):
+    stmt = select(LocationGeo).where(LocationGeo.level=="town")
     if county:
-        q = q.filter(LocationGeo.parent==county)
-    results = q.all()
+        stmt = stmt.where(LocationGeo.parent==county)
+    results = db.exec(stmt).all()
     return {"towns": [r.name for r in results]}
 
 @router.post("/geo/seed")
-def seed_geo(background_tasks: BackgroundTasks):
+@require_module(module_number=4)
+def seed_geo(request: Request, background_tasks: BackgroundTasks):
     background_tasks.add_task(seed_geo_data)
     return {"status": "seeding_started", "sources": ["OSM Overpass", "IEBC", "KNBS"]}
 
 @router.post("/compare")
-def compare_locations(request: ComparisonRequest):
-    result = get_location_comparison(request.sector, request.location_a, request.location_b, request.location_type)
+@require_module(module_number=4)
+def compare_locations(request: Request, req: ComparisonRequest):
+    result = get_location_comparison(req.sector, req.location_a, req.location_b, req.location_type)
     return result
