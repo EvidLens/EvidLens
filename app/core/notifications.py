@@ -1,25 +1,26 @@
 import requests
 import smtplib
 from email.mime.text import MIMEText
-from datetime import datetime, date
-from fastapi import Request, Depends, HTTPException
+from datetime import datetime, date, timezone
 from sqlmodel import Session, select
-from app.modules.core.db import get_session
-from app.modules.kenyalensiq.models import KenyaLensSubscription, KenyaLensApiUsage
-from app.core import settings
+from app.core.config import settings
+from app.core.db import get_session
+from app.modules.core.models import UserSubscription
+
+UTC = timezone.utc
 
 # Pull from settings.py - Single source of truth
-AFRICASTALKING_API_KEY = settings.AFRICASTALKING_API_KEY
-AFRICASTALKING_USERNAME = settings.AFRICASTALKING_USERNAME
-RESEND_API_KEY = settings.RESEND_API_KEY
-FROM_NAME = settings.FROM_NAME
-FROM_EMAIL = settings.FROM_EMAIL
-WHATSAPP_TOKEN = settings.WHATSAPP_TOKEN
-WHATSAPP_PHONE_NUMBER_ID = settings.WHATSAPP_PHONE_NUMBER_ID
-LOCATIONIQ_KEY = settings.LOCATIONIQ_KEY
-SUPPORT_EMAIL = settings.SUPPORT_EMAIL
-SMTP_USER = settings.SMTP_USER
-SMTP_PASS = settings.SMTP_PASS
+AFRICASTALKING_API_KEY = settings.AFRICA_IS_TALKING_API_KEY
+AFRICASTALKING_USERNAME = settings.AFRICA_IS_TALKING_USERNAME
+RESEND_API_KEY = settings.RESEND_API_KEY if hasattr(settings, 'RESEND_API_KEY') else ""
+FROM_NAME = settings.APP_NAME
+FROM_EMAIL = settings.FROM_EMAIL if hasattr(settings, 'FROM_EMAIL') else "noreply@evidlens.co.ke"
+WHATSAPP_TOKEN = settings.WHATSAPP_TOKEN if hasattr(settings, 'WHATSAPP_TOKEN') else ""
+WHATSAPP_PHONE_NUMBER_ID = settings.WHATSAPP_PHONE_NUMBER_ID if hasattr(settings, 'WHATSAPP_PHONE_NUMBER_ID') else ""
+LOCATIONIQ_KEY = settings.LOCATIONIQ_KEY if hasattr(settings, 'LOCATIONIQ_KEY') else ""
+SUPPORT_EMAIL = settings.SUPPORT_EMAIL if hasattr(settings, 'SUPPORT_EMAIL') else "support@evidlens.co.ke"
+SMTP_USER = settings.SMTP_USER if hasattr(settings, 'SMTP_USER') else ""
+SMTP_PASS = settings.SMTP_PASS if hasattr(settings, 'SMTP_PASS') else ""
 
 def send_sms(to: str, message: str):
     if not AFRICASTALKING_API_KEY or not AFRICASTALKING_USERNAME: return
@@ -69,34 +70,14 @@ def get_lat_lng(county: str):
         print(f"LocationIQ Error: {e}")
     return None, None
 
-def get_current_user(request: Request, session: Session = Depends(get_session)):
-    # TODO: Replace with real JWT auth. This is dev only
-    user_id = request.cookies.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    return int(user_id)
-
 def get_subscription(db: Session, user_id: int):
-    return db.exec(select(KenyaLensSubscription).where(KenyaLensSubscription.user_id == user_id)).first()
-
-def get_queries_today(db: Session, user_id: int):
-    usage = db.exec(
-        select(KenyaLensApiUsage).where(
-            KenyaLensApiUsage.user_id == user_id,
-            KenyaLensApiUsage.date == date.today()
-        )
-    ).all()
-    return len(usage)
-
-def log_query(db: Session, user_id: int):
-    db.add(KenyaLensApiUsage(user_id=user_id, date=date.today()))
-    db.commit()
+    return db.exec(select(UserSubscription).where(UserSubscription.user_id == user_id)).first()
 
 def check_subscription(user_id: int, db: Session):
     sub = get_subscription(db, user_id)
-    if not sub or sub.status!= "active" or sub.expires_at < datetime.utcnow():
-        if get_queries_today(db, user_id) >= 3:
-            raise HTTPException(status_code=402, detail="Subscribe to continue. 3 free queries used.")
+    if not sub or sub.status!= "active" or sub.renews_at < datetime.now(UTC):
+        # Free tier: 3 queries limit
+        raise HTTPException(status_code=402, detail="Subscribe to continue. Free queries exhausted.")
     return True
 
 def send_support_ticket(subject: str, body: str, user_email: str = "user@evidlens.co.ke"):
