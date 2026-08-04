@@ -1,15 +1,12 @@
-import os
-import redis
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
+from sqlmodel import SQLModel, Session, create_engine
 from typing import Generator
+from .config import settings
+import redis
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-REDIS_URL = os.getenv("REDIS_URL")
-
-if not DATABASE_URL:
+if not settings.DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is not set")
+
+DATABASE_URL = settings.DATABASE_URL
 
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
@@ -28,21 +25,14 @@ else:
         max_overflow=20
     )
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-redis_client = redis.from_url(REDIS_URL, decode_responses=True) if REDIS_URL else None
+redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True) if settings.REDIS_URL else None
 
-def get_db() -> Generator[Session, None, None]:
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-def get_session():
-    return get_db()
+def get_session() -> Generator[Session, None, None]:
+    with Session(engine) as session:
+        yield session
 
 def init_db():
+    # Import all SQLModel tables so metadata is registered
     from app.modules.auth.models import User, UserRole
     from app.modules.models import Sector, County, CoreProduct
     from app.modules.payments.models import Payment, Subscription, MpesaTransaction
@@ -57,4 +47,4 @@ def init_db():
     from app.modules.knowledge_base.models import KnowledgeDocument
     from app.modules.core.models import Plan, Module, AddOn, ALCService, UserSubscription, GeoFilter
     
-    Base.metadata.create_all(bind=engine)
+    SQLModel.metadata.create_all(bind=engine)
