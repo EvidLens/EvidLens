@@ -1,20 +1,19 @@
-# DEPLOY_FIX_v4_2026-07-14
-
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session
+from sqlmodel import Session, select, desc
 from pydantic import BaseModel
 from typing import Optional
 import os
 from datetime import datetime, timedelta
 import httpx
 
-from .service import generate_market_report_pdf, generate_market_report_excel
-from .models import Report, ReportType, ReportFormat, ReportStatus
+from.service import generate_market_report_pdf, generate_market_report_excel
+from app.core.models import Report, ReportType, ReportFormat, ReportStatus
 from app.modules.payments.service import get_subscription
-from app.modules.database import get_session as get_db
+from app.core.db import get_session as get_db
+from app.core.guards import require_module
 
-router = APIRouter()
+router = APIRouter(prefix="/report-builder", tags=["Report Builder"])
 GROQ_KEY = os.getenv("GROQ_API_KEY")
 
 class GenerateReportRequest(BaseModel):
@@ -29,13 +28,15 @@ class GenerateReportRequest(BaseModel):
     format: ReportFormat = ReportFormat.PDF
 
 @router.post("/generate")
+@require_module(module_number=5)
 def generate_report(
+    request: Request,
     req: GenerateReportRequest,
     user_id: int,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
-    """Generate report. Checks subscription limits first."""
+    user_id = request.state.user.id
     sub = get_subscription(db, user_id)
 
     if sub.reports_left <= 0 and sub.tier.value == "free":
@@ -74,8 +75,8 @@ def generate_report(
     }
 
 async def process_report_generation(db: Session, report_id: int, req: GenerateReportRequest):
-    """Background task to generate PDF/Excel"""
-    report = db.query(Report).filter(Report.id==report_id).first()
+    stmt = select(Report).where(Report.id==report_id)
+    report = db.exec(stmt).first()
     try:
         prompt = f"Generate 6 sections for investor PDF on '{req.query}' in {req.sector} sector, {req.town or req.ward or req.sub_county or req.county}. Kenya context."
         insight = "Add GROQ_API_KEY for full AI report"
@@ -110,8 +111,11 @@ async def process_report_generation(db: Session, report_id: int, req: GenerateRe
         db.commit()
 
 @router.get("/download/{report_id}")
-def download_report(report_id: int, user_id: int, db: Session = Depends(get_db)):
-    report = db.query(Report).filter(Report.id==report_id, Report.user_id==user_id).first()
+@require_module(module_number=5)
+def download_report(request: Request, report_id: int, db: Session = Depends(get_db)):
+    user_id = request.state.user.id
+    stmt = select(Report).where(Report.id==report_id, Report.user_id==user_id)
+    report = db.exec(stmt).first()
     if not report: raise HTTPException(status_code=404, detail="Report not found")
     if report.status!= ReportStatus.READY: raise HTTPException(status_code=400, detail="Report not ready yet")
     if report.expires_at and report.expires_at < datetime.now():
@@ -126,8 +130,11 @@ def download_report(report_id: int, user_id: int, db: Session = Depends(get_db))
     return FileResponse(report.file_path, filename=f"EvidLens_{report.report_type.value}.{report.format.value}", media_type=media_type)
 
 @router.get("/list")
-def list_reports(user_id: int, db: Session = Depends(get_db)):
-    reports = db.query(Report).filter(Report.user_id==user_id).order_by(Report.created_at.desc()).limit(50).all()
+@require_module(module_number=5)
+def list_reports(request: Request, db: Session = Depends(get_db)):
+    user_id = request.state.user.id
+    stmt = select(Report).where(Report.user_id==user_id).order_by(desc(Report.created_at)).limit(50)
+    reports = db.exec(stmt).all()
     return {
         "reports": [
             {
