@@ -2,9 +2,7 @@ import os
 from sqlmodel import Session, select, func
 from typing import Dict, Any, List, Union
 from app.core.config import settings
-from app.core.models import Plan, AddOn, ALCService, UserSubscription
-from app.modules.report_builder.models import Report
-from app.modules.market_engine.models import MarketSearch
+from app.modules.core.models import Plan, AddOn, ALCService, UserSubscription, MarketMetric, Report
 
 UNLIMITED = -1
 
@@ -54,8 +52,8 @@ class CoreService:
         return data
 
     def get_all_pricing(self, db: Session) -> Dict[str, Any]:
-        sectors_count = db.exec(select(func.count(func.distinct(MarketSearch.sector)))).one() or 75
-        products_count = db.exec(select(func.count(func.distinct(MarketSearch.product)))).one() or 21
+        sectors_count = db.exec(select(func.count(func.distinct(MarketMetric.sector)))).one() or 75
+        products_count = db.exec(select(func.count(func.distinct(MarketMetric.product)))).one() or 21
         return {
             "currency": settings.CURRENCY,
             "currency_symbol": settings.CURRENCY_SYMBOL,
@@ -69,9 +67,9 @@ class CoreService:
 
     def get_platform_stats(self, db: Session) -> Dict[str, int]:
         return {
-            "insights": db.exec(select(func.count(MarketSearch.id))).one() or 0,
-            "active_products": db.exec(select(func.count(func.distinct(MarketSearch.product)))).one() or 21, 
-            "sectors": db.exec(select(func.count(func.distinct(MarketSearch.sector)))).one() or 75,
+            "insights": db.exec(select(func.count(MarketMetric.id))).one() or 0,
+            "active_products": db.exec(select(func.count(func.distinct(MarketMetric.product)))).one() or 21, 
+            "sectors": db.exec(select(func.count(func.distinct(MarketMetric.sector)))).one() or 75,
             "reports": db.exec(select(func.count(Report.id))).one() or 0
         }
 
@@ -80,15 +78,17 @@ class CoreService:
         if not sub: 
             return {"allowed": False, "plan": "EV-FREE"}
         
-        # CHANGED: use plan_code instead of sub.plan.name
         plan_name = sub.plan_code
         plan_name = self.PLAN_NAME_MAP.get(plan_name, plan_name) # THIS FIXES BASIC -> EV-SME
         
         plan = self.PRICING.get(plan_name, self.PRICING["EV-FREE"])
         return {"allowed": True, "plan": plan_name, "limits": plan}
 
-    def health_check(self) -> Dict[str, Any]:
+    def health(self) -> Dict[str, Any]:
         return {"status": "ok", "service": "evidlens-api", "currency": settings.CURRENCY}
+
+    def version(self) -> Dict[str, Any]:
+        return {"version": "1.0.0", "env": settings.ENV}
 
 _core = CoreService()
 
