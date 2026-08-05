@@ -37,6 +37,10 @@ KENYA_SECTORS = [
 
 class SectorReport(SQLModel, table=True):
     __tablename__ = "sector_reports"
+    __table_args__ = (
+        {"extend_existing": True},
+        Index('ix_sector_county', 'sector', 'county'),
+    )
 
     id: Optional[int] = Field(default=None, primary_key=True)
     sector: str = Field(index=True, max_length=100)
@@ -54,12 +58,12 @@ class SectorReport(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
     updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now(), "onupdate": func.now()})
 
-    __table_args__ = (
-        Index('ix_sector_county', 'sector', 'county'),
-    )
-
 class KnowledgeChunk(SQLModel, table=True):
     __tablename__ = "knowledge_chunks"
+    __table_args__ = (
+        {"extend_existing": True},
+        Index('ix_chunk_sector_type', 'sector', 'chunk_type'),
+    )
 
     id: Optional[int] = Field(default=None, primary_key=True)
     sector: str = Field(index=True, max_length=100)
@@ -70,7 +74,3 @@ class KnowledgeChunk(SQLModel, table=True):
     embedding: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
     chunk_metadata: Dict = Field(default={}, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
-
-    __table_args__ = (
-        Index('ix_chunk_sector_type', 'sector', 'chunk_type'),
-    )
