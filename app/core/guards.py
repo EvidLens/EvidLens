@@ -1,6 +1,6 @@
 from fastapi import Request, HTTPException
 from sqlmodel import Session, select
-from app.modules.core.models import Module, UserSubscription
+from app.core.models import Module, UserSubscription
 
 def require_module(module_number: int):
     def decorator(func):
