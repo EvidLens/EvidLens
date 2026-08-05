@@ -6,12 +6,11 @@ from sqlalchemy.sql import func
 
 UTC = timezone.utc
 
-# ========== CORE MODELS - USED BY CoreService ==========
 class Plan(SQLModel, table=True):
     __tablename__ = "plan"
     __table_args__ = {"extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
-    code: str = Field(index=True, unique=True) # EV-SME, EV-GROWTH etc
+    code: str = Field(index=True, unique=True)
     name: str
     monthly_price: int
     annual_price: int
@@ -48,16 +47,15 @@ class UserSubscription(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(index=True)
-    plan_code: str # used in service.py
+    plan_code: str
     lead_credits: int = 0
     api_credits: int = 0
-    status: str = "active" # used in service.py
+    status: str = "active"
     renews_at: datetime
     default_county: Optional[str] = None
     default_sub_county: Optional[str] = None
     default_ward: Optional[str] = None
 
-# ========== AUTH + WORKSPACE ==========
 class User(SQLModel, table=True):
     __tablename__ = "user"
     __table_args__ = {"extend_existing": True}
@@ -95,7 +93,6 @@ class Subscription(SQLModel, table=True):
     expires_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-# ========== BUSINESS MODELS ==========
 class GeoFilter(SQLModel, table=True):
     __tablename__ = "geofilter"
     __table_args__ = {"extend_existing": True}
@@ -154,7 +151,6 @@ class KenyaLensBusiness(SQLModel, table=True):
     lat: float = 0
     lng: float = 0
 
-# ========== DATA MODELS ==========
 class MarketMetric(SQLModel, table=True):
     __tablename__ = "market_metrics"
     __table_args__ = {"extend_existing": True}
@@ -273,7 +269,6 @@ class KenyaLensMember(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
 
-# ========== REQUEST MODEL ==========
 class DetailedAnalysisRequest(BaseModel):
     product: str
     sector: str
