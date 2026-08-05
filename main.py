@@ -35,6 +35,7 @@ from app.core.scheduler import init_db, seed_data, start_scheduler, shutdown_sch
 from app.modules.database import get_db, engine
 from app.modules.db import init_db
 from app.modules.data_layer.seed import seed_data
+from app.core import billing
 
 from app.modules.auth.router import router as auth_router
 from app.modules.core.router import router as core_router
@@ -119,6 +120,7 @@ app.include_router(lens_router, tags=["Lens"])
 app.include_router(core_router, tags=["Core"])
 app.include_router(storage_router, tags=["Storage"])
 app.include_router(chatbot_router)
+app.include_router(billing.router)
 
 def get_session():
     with Session(engine) as session:
