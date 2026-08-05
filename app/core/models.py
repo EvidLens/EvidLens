@@ -295,3 +295,16 @@ class MarketSearch(SQLModel, table=True):
     product: Optional[str] = Field(default=None, index=True)
     filters: Optional[Dict] = Field(default={}, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+class KnowledgeChunk(SQLModel, table=True):
+    __tablename__ = "knowledge_chunks"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    sector: str = Field(index=True, max_length=100)
+    county: Optional[str] = Field(default=None, index=True, max_length=50)
+    chunk_text: str
+    chunk_type: str = Field(max_length=50)
+    source: str = Field(max_length=100)
+    embedding: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
+    chunk_metadata: Dict = Field(default={}, sa_column=Column(JSON))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
