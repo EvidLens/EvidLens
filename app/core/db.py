@@ -1,4 +1,5 @@
 from sqlmodel import SQLModel, Session, create_engine
+from sqlalchemy.orm import sessionmaker
 from typing import Generator
 from .config import settings
 import redis
@@ -25,11 +26,23 @@ else:
         max_overflow=20
     )
 
+# THIS IS THE FIX: Add SessionLocal for imports
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=Session)
+
 redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True) if settings.REDIS_URL else None
 
+# Keep your old one for backward compat, add new one for FastAPI
 def get_session() -> Generator[Session, None, None]:
     with Session(engine) as session:
         yield session
+
+# THIS IS WHAT FASTAPI EXPECTS
+def get_db() -> Generator[Session, None, None]:
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 def init_db():
     # Import all SQLModel tables so metadata is registered
