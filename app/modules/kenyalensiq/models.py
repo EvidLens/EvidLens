@@ -1,15 +1,11 @@
-from app.core.models import SocialMention
+from app.core.models import SocialMention as _SocialMention
+from app.core.models import MarketMetric as _MarketMetric, UserSubscription as _UserSubscription
 from sqlmodel import SQLModel, Field, Column
 from typing import Optional, List
 from datetime import datetime
 from sqlalchemy.dialects.postgresql import JSONB
 import json
 import secrets
-
-from app.modules.core.models import (
-    UserSubscription as _UserSubscription,
-    MarketMetric as _MarketMetric
-)
 
 class KenyaLensSubscription(_UserSubscription, table=True):
     __tablename__ = "kenya_lens_subscriptions"
@@ -38,6 +34,11 @@ class KenyaLensSubscription(_UserSubscription, table=True):
 
 class MarketMetric(_MarketMetric, table=True):
     __tablename__ = "market_metrics"
+    __table_args__ = {'extend_existing': True}
+    tenant_id: Optional[str] = Field(default=None, index=True)
+
+class SocialMention(_SocialMention, table=True):
+    __tablename__ = "social_mentions"
     __table_args__ = {'extend_existing': True}
     tenant_id: Optional[str] = Field(default=None, index=True)
 
