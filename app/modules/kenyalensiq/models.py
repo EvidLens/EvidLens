@@ -120,14 +120,6 @@ class NewsArticle(SQLModel, table=True):
     title: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
-class SocialMention(SQLModel, table=True):
-    __tablename__ = "social_mentions"
-    id: Optional[int] = Field(default=None, primary_key=True)
-    tenant_id: Optional[str] = Field(index=True, default=None)
-    product: str
-    platform: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-
 class ExportOpportunity(SQLModel, table=True):
     __tablename__ = "export_opportunities"
     id: Optional[int] = Field(default=None, primary_key=True)
