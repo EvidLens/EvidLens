@@ -26,17 +26,14 @@ else:
         max_overflow=20
     )
 
-# THIS IS THE FIX: Add SessionLocal for imports
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=Session)
 
 redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True) if settings.REDIS_URL else None
 
-# Keep your old one for backward compat, add new one for FastAPI
 def get_session() -> Generator[Session, None, None]:
     with Session(engine) as session:
         yield session
 
-# THIS IS WHAT FASTAPI EXPECTS
 def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
@@ -45,19 +42,17 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 def init_db():
-    # Import all SQLModel tables so metadata is registered
-    from app.modules.auth.models import User, UserRole
-    from app.modules.models import Sector, County, CoreProduct
-    from app.modules.payments.models import Payment, Subscription, MpesaTransaction
-    from app.modules.report_builder.models import Report, ReportTemplate, ReportShare
-    from app.modules.market_engine.models import MarketSearch, Competitor, MarketMetric
-    from app.modules.competitive_engine.models import Company, Deal, Funding
+    from app.core.models import Plan, Module, AddOn, ALCService, UserSubscription, GeoFilter, User, Workspace, Subscription, MarketMetric, MarketSearch, SocialMention, Report, SectorReport, NewsArticle, Company, KenyaLensBusiness, GeoData, Sector, Funder, Policy
+    from app.modules.auth.models import UserRole
+    from app.modules.payments.models import Payment, Subscription as PaymentSubscription, MpesaTransaction
+    from app.modules.report_builder.models import ReportTemplate, ReportShare
+    from app.modules.market_engine.models import Competitor
+    from app.modules.competitive_engine.models import Deal, Funding
     from app.modules.pricing_engine.models import ProductPrice, RetailOutlet
     from app.modules.regulatory_engine.models import Regulation, ComplianceDeadline
-    from app.modules.consumer_engine.models import SocialMention, BrandSentiment
+    from app.modules.consumer_engine.models import BrandSentiment
     from app.modules.location_engine.models import LocationDemand, PropertyListing
     from app.modules.business_os.models import Contact, Battlecard
     from app.modules.knowledge_base.models import KnowledgeDocument
-    from app.modules.core.models import Plan, Module, AddOn, ALCService, UserSubscription, GeoFilter
-    
+    from app.modules.kenyalensiq.models import KenyaLensAlert, KenyaLensSubscription, KenyaLensMember, KenyaLensApiUsage
     SQLModel.metadata.create_all(bind=engine)
