@@ -1,8 +1,12 @@
 import os
 from sqlmodel import Session, select, func
 from typing import Dict, Any, List, Union
+
 from app.core.config import settings
-from app.modules.core.models import Plan, AddOn, ALCService, UserSubscription, MarketMetric, Report
+# FIXED: Import from app.core.models instead of app.modules.core.models
+from app.core.models import Plan, AddOn, ALCService, UserSubscription
+from app.modules.report_builder.models import Report
+from app.modules.market_engine.models import MarketMetric
 
 UNLIMITED = -1
 
@@ -19,7 +23,6 @@ class CoreService:
         "EV-ENT": {"monthly": 200000, "annual": 2040000, "areas": 9, "products": 21, "users": UNLIMITED, "competitors": UNLIMITED, "leads_qtr": UNLIMITED, "lens": "Enterprise", "api": True, "briefings": "Weekly"}
     }
 
-    # TRANSLATE OLD UI NAMES TO NEW BACKEND NAMES
     PLAN_NAME_MAP = {
         "BASIC": "EV-SME",
         "PROFESSIONAL": "EV-GROWTH", 
@@ -79,7 +82,7 @@ class CoreService:
             return {"allowed": False, "plan": "EV-FREE"}
         
         plan_name = sub.plan_code
-        plan_name = self.PLAN_NAME_MAP.get(plan_name, plan_name) # THIS FIXES BASIC -> EV-SME
+        plan_name = self.PLAN_NAME_MAP.get(plan_name, plan_name)
         
         plan = self.PRICING.get(plan_name, self.PRICING["EV-FREE"])
         return {"allowed": True, "plan": plan_name, "limits": plan}
