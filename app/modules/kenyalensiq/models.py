@@ -1,3 +1,4 @@
+from app.core.models import SocialMention
 from sqlmodel import SQLModel, Field, Column
 from typing import Optional, List
 from datetime import datetime
