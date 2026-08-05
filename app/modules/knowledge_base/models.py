@@ -2,7 +2,10 @@ from datetime import datetime
 from typing import Optional, List, Dict
 from sqlmodel import SQLModel, Field, Column, JSON, Index
 from sqlalchemy.sql import func
-from app.core.models import SectorReport as _SectorReport, KnowledgeChunk as _KnowledgeChunk
+# Just import from core. Don't redefine.
+from app.core.models import SectorReport, KnowledgeChunk
+
+__all__ = ["SectorReport", "KnowledgeChunk"]
 
 KENYA_SECTORS = [
     "Banks", "Microfinance Institutions", "Insurance & HMOs", "Fintechs & Mobile Money",
@@ -35,17 +38,3 @@ KENYA_SECTORS = [
     "Gaming & Sports", "Entertainment & Events", "Beauty & Wellness",
     "Waste Management & Recycling", "Environmental & Climate Services"
 ]
-
-class SectorReport(_SectorReport, table=True):
-    __tablename__ = "sector_reports"
-    __table_args__ = (
-        {"extend_existing": True},
-        Index('ix_sector_county', 'sector', 'county'),
-    )
-
-class KnowledgeChunk(_KnowledgeChunk, table=True):
-    __tablename__ = "knowledge_chunks"
-    __table_args__ = (
-        {"extend_existing": True},
-        Index('ix_chunk_sector_type', 'sector', 'chunk_type'),
-    )
