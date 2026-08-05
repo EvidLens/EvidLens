@@ -288,3 +288,15 @@ class DetailedAnalysisRequest(BaseModel):
         return v.strip()
 
     model_config = {"extra": "allow"}
+
+class MarketSearch(SQLModel, table=True):
+    __tablename__ = "market_searches"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(index=True, foreign_key="user.id")
+    query: str
+    sector: Optional[str] = Field(default=None, index=True)
+    county: Optional[str] = Field(default=None, index=True)
+    product: Optional[str] = Field(default=None, index=True)
+    filters: Optional[Dict] = Field(default={}, sa_column=Column(JSON))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
