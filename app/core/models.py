@@ -442,7 +442,8 @@ class PaymentStatus(str, Enum):
 
 class SubscriptionTier(str, Enum):
     FREE = "free"
-    SME_STARTER = "sme_starter"
+    SME_STARTER = "sme_starter" 
+    SME_PRO = "sme_pro"
     GROWTH = "growth"
     ENTERPRISE = "enterprise"
     
