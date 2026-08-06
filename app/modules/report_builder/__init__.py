@@ -2,7 +2,7 @@ from .router import router
 from .service import (
     generate_market_report_pdf,
     generate_market_report_excel,
-    generate_report_pdf # alias
+    generate_report_pdf
 )
 from .models import Report, ReportType, ReportFormat, ReportStatus, ReportTemplate, ReportShare
 
