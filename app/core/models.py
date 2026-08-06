@@ -436,14 +436,14 @@ class KenyaLensSubscription(SQLModel, table=True):
     status: str
 
 class PaymentStatus(str, Enum):
-    pending = "pending"
-    paid = "paid"
-    failed = "failed"
+    PENDING = "pending"
+    PAID = "paid"
+    FAILED = "failed"
 
 class SubscriptionTier(str, Enum):
-    free = "free"
-    pro = "pro"
-    enterprise = "enterprise"
+    FREE = "free"
+    PRO = "pro"
+    ENTERPRISE = "enterprise"
 
 class Payment(SQLModel, table=True):
     __tablename__ = "payment"
