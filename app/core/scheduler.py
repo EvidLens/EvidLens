@@ -5,7 +5,7 @@ import traceback
 
 from app.core.config import settings
 from app.core.db import engine
-from app.modules.core.models import KenyaLensBusiness
+from app.core.models import KenyaLensBusiness
 from app.modules.jobs.scrapers import scrape_kpin_prices, fetch_real_news, fetch_real_tweets
 
 # ====== SCHEDULER INSTANCE ======
