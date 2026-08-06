@@ -426,3 +426,30 @@ class DataSource(SQLModel, table=True):
     name: str
     url: Optional[str] = None
     last_fetched: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+class KenyaLensSubscription(SQLModel, table=True):
+    __tablename__ = "kenyalens_subscription"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id")
+    plan: str
+    status: str
+
+class PaymentStatus(str, Enum):
+    pending = "pending"
+    paid = "paid"
+    failed = "failed"
+
+class SubscriptionTier(str, Enum):
+    free = "free"
+    pro = "pro"
+    enterprise = "enterprise"
+
+class Payment(SQLModel, table=True):
+    __tablename__ = "payment"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id")
+    amount: float
+    status: PaymentStatus
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
