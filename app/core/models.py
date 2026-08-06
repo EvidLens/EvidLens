@@ -319,3 +319,13 @@ class ConsumerFeedback(SQLModel, table=True):
     county: Optional[str] = None
     sector: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+class SentimentSummary(SQLModel, table=True):
+    __tablename__ = "sentiment_summaries"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    sector: str
+    county: str
+    sentiment: str
+    count: int
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
