@@ -103,6 +103,7 @@ class ProductCatalog(Base):
 
 class MarketMetric(SQLModel, table=True):
     __tablename__ = "market_metrics"
+    __table_args__ = {'extend_existing': True}
 
     id: Optional[int] = Field(default=None, primary_key=True)
     sector: str = Field(index=True)
