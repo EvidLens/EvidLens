@@ -442,10 +442,10 @@ class PaymentStatus(str, Enum):
 
 class SubscriptionTier(str, Enum):
     FREE = "free"
-    PRO = "pro"
+    SME_STARTER = "sme_starter"
+    GROWTH = "growth"
     ENTERPRISE = "enterprise"
-    PRO = "pro"
-
+    
 class Payment(SQLModel, table=True):
     __tablename__ = "payment"
     __table_args__ = {"extend_existing": True}
