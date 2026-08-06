@@ -111,5 +111,5 @@ class MarketMetric(SQLModel, table=True):
     metric_value: float
     year: int
     source: Optional[str] = Field(default=None)
-    metadata: dict = Field(default={}, sa_column=Column(JSON))
+    extra_data: dict = Field(default={}, sa_column=Column("metadata", JSON))
     created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
