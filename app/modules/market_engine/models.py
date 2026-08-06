@@ -1,6 +1,9 @@
 from sqlalchemy import Column, Integer, String, Float, Text, DateTime, JSON, Index
 from sqlalchemy.sql import func
 from app.modules.database import Base
+from datetime import datetime
+from typing import Optional
+from sqlmodel import SQLModel, Field, Column, JSON
 
 class MarketSearch(Base):
     __tablename__ = "market_searches"
@@ -97,3 +100,16 @@ class ProductCatalog(Base):
     product_name = Column(String(255), nullable=False)
     category = Column(String(100), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class MarketMetric(SQLModel, table=True):
+    __tablename__ = "market_metrics"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    sector: str = Field(index=True)
+    county: Optional[str] = Field(default=None, index=True)
+    metric_name: str
+    metric_value: float
+    year: int
+    source: Optional[str] = Field(default=None)
+    metadata: dict = Field(default={}, sa_column=Column(JSON))
+    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
