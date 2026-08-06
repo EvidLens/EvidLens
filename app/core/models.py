@@ -329,3 +329,28 @@ class SentimentSummary(SQLModel, table=True):
     sentiment: str
     count: int
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+class SectorReport(SQLModel, table=True):
+    __tablename__ = "sector_reports"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    sector: str
+    report_data: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+class KnowledgeChunk(SQLModel, table=True):
+    __tablename__ = "knowledge_chunks"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    content: str
+    sector: str
+    source: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+class DataSource(SQLModel, table=True):
+    __tablename__ = "data_sources"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    url: Optional[str] = None
+    last_fetched: datetime = Field(default_factory=lambda: datetime.now(UTC))
