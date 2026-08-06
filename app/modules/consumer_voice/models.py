@@ -19,7 +19,7 @@ class Source(str, enum.Enum):
     manual = "manual"
 
 class ConsumerFeedback(SQLModel, table=True):
-    __tablename__ = "consumer_feedback"
+    __table_args__ = {"extend_existing": True}
 
     id: Optional[int] = Field(default=None, primary_key=True)
     sector: str = Field(index=True)
