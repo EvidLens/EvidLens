@@ -1,4 +1,3 @@
-import os; print("LOADING NEW MODELS.PY FROM", os.getcwd())
 from datetime import datetime
 from typing import Optional, List, Dict
 from sqlmodel import SQLModel, Field, Column, JSON, Relationship
