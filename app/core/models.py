@@ -444,6 +444,7 @@ class SubscriptionTier(str, Enum):
     FREE = "free"
     PRO = "pro"
     ENTERPRISE = "enterprise"
+    PRO = "pro"
 
 class Payment(SQLModel, table=True):
     __tablename__ = "payment"
