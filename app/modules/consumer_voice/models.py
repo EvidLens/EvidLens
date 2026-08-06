@@ -1,3 +1,4 @@
+from app.core.models import ConsumerFeedback
 from datetime import datetime
 from typing import Optional
 from sqlmodel import SQLModel, Field, Column
