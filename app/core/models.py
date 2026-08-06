@@ -444,6 +444,7 @@ class SubscriptionTier(str, Enum):
     FREE = "free"
     SME_STARTER = "sme_starter" 
     SME_PRO = "sme_pro"
+    PROFESSIONAL = "professional"
     GROWTH = "growth"
     ENTERPRISE = "enterprise"
     
