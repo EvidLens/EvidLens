@@ -308,3 +308,14 @@ class KnowledgeChunk(SQLModel, table=True):
     embedding: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
     chunk_metadata: Dict = Field(default={}, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+class ConsumerFeedback(SQLModel, table=True):
+    __tablename__ = "consumer_feedback"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[int] = Field(index=True, default=None)
+    text: str
+    sentiment: Optional[str] = None
+    county: Optional[str] = None
+    sector: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
