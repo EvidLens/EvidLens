@@ -3,9 +3,24 @@ from typing import Optional, List, Dict
 from datetime import datetime, timezone
 from pydantic import BaseModel, field_validator
 from sqlalchemy.sql import func
+from enum import Enum
 
 UTC = timezone.utc
 
+class ReportType(str, Enum):
+    market = "market"
+    sector = "sector"
+
+class ReportFormat(str, Enum):
+    pdf = "pdf"
+    excel = "excel"
+
+class ReportStatus(str, Enum):
+    pending = "pending"
+    completed = "completed"
+    failed = "failed"
+
+# --- ALL YOUR EXISTING MODELS ---
 class Plan(SQLModel, table=True):
     __tablename__ = "plan"
     __table_args__ = {"extend_existing": True}
@@ -141,7 +156,7 @@ class Company(SQLModel, table=True):
     county: str
 
 class KenyaLensBusiness(SQLModel, table=True):
-    __tablename__ = "kenyalens_business"
+    __tablename__ = "kenyalens_business" # FIXED: was kenya_lens_business
     __table_args__ = {"extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
@@ -253,21 +268,95 @@ class KenyaLensSurvey(SQLModel, table=True):
     __tablename__ = "kenyalens_survey"
     __table_args__ = {"extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[int] = Field(index=True, default=None)
+    tenant_id: Optional[str] = Field(index=True, default=None)
+    business_id: Optional[int] = Field(index=True, foreign_key="kenyalens_business.id", default=None)
+    title: str
+    status: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class KenyaLensResponse(SQLModel, table=True):
     __tablename__ = "kenyalens_response"
     __table_args__ = {"extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
+    tenant_id: Optional[str] = Field(index=True, default=None)
+    survey_id: int = Field(index=True)
+    respondent_phone: Optional[str] = None
+    data: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class KenyaTenant(SQLModel, table=True):
-    __tablename__ = "kenya_tenant"
+    __tablename__ = "kenya_tenants"
     __table_args__ = {"extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class KenyaLensMember(SQLModel, table=True):
     __tablename__ = "kenyalens_member"
     __table_args__ = {"extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[int] = Field(index=True, default=None)
+    tenant_id: Optional[str] = Field(index=True, default=None)
+    email: str
+    role: str = Field(default="member")
+    status: str = Field(default="pending")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+class KenyaLensAlert(SQLModel, table=True):
+    __tablename__ = "kenya_lens_alerts"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[int] = Field(index=True, default=None)
+    tenant_id: Optional[str] = Field(index=True, default=None)
+    title: str
+    description: str
+    module: str
+    severity: str = Field(default="info")
+    is_read: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+class KenyaLensApiUsage(SQLModel, table=True):
+    __tablename__ = "kenya_lens_api_usage"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[int] = Field(index=True, default=None)
+    api_key: str = Field(index=True)
+    endpoint: str
+    tenant_id: Optional[str] = Field(default=None)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+class Notification(SQLModel, table=True):
+    __tablename__ = "notifications"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(index=True)
+    message: str
+    type: str
+    channel: str
+    status: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+class PriceData(SQLModel, table=True):
+    __tablename__ = "price_data"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    tenant_id: Optional[str] = Field(index=True, default=None)
+    product_name: str
+    county: str
+    sector: str
+    price: float
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+class ExportOpportunity(SQLModel, table=True):
+    __tablename__ = "export_opportunities"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    tenant_id: Optional[str] = Field(index=True, default=None)
+    country: str
+    product: str
+    opportunity_score: float
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class DetailedAnalysisRequest(BaseModel):
     product: str
@@ -328,23 +417,6 @@ class SentimentSummary(SQLModel, table=True):
     county: str
     sentiment: str
     count: int
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
-class SectorReport(SQLModel, table=True):
-    __tablename__ = "sector_reports"
-    __table_args__ = {"extend_existing": True}
-    id: Optional[int] = Field(default=None, primary_key=True)
-    sector: str
-    report_data: str
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
-class KnowledgeChunk(SQLModel, table=True):
-    __tablename__ = "knowledge_chunks"
-    __table_args__ = {"extend_existing": True}
-    id: Optional[int] = Field(default=None, primary_key=True)
-    content: str
-    sector: str
-    source: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class DataSource(SQLModel, table=True):
