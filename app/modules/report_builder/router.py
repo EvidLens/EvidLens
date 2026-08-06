@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import httpx
 
 from.service import generate_market_report_pdf, generate_market_report_excel
-from app.core.models import Report, ReportType, ReportFormat, ReportStatus
+from app.modules.report_builder.models import Report, ReportType, ReportFormat, ReportStatus
 from app.modules.payments.service import get_subscription
 from app.core.db import get_session as get_db
 from app.core.guards import require_module
