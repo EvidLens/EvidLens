@@ -1,4 +1,4 @@
-from sqlmodel import Session, select
+from sqlmodel import Session, select, SQLModel, Field
 from app.modules.data_layer.db import engine
 import logging
 import json
@@ -9,7 +9,10 @@ logger = logging.getLogger(__name__)
 from app.modules.report_builder.models import ReportTemplate, ReportType
 from app.modules.consumer_voice.models import SentimentSummary, Sentiment
 from app.modules.payments.models import SubscriptionTier, Subscription
-from app.modules.location_intel.models import County
+
+class County(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    name: str
 
 def load_kenya_sectors():
     path = os.path.join(os.path.dirname(__file__), "..", "seed_data", "kenya_sectors.json")
