@@ -181,20 +181,6 @@ class MarketMetric(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-class SocialMention(SQLModel, table=True):
-    __tablename__ = "social_mentions"
-    __table_args__ = {"extend_existing": True}
-    id: Optional[int] = Field(default=None, primary_key=True)
-    platform: Optional[str] = None
-    author: Optional[str] = None
-    text: Optional[str] = None
-    content: Optional[str] = None
-    sentiment: Optional[str] = None
-    county: Optional[str] = None
-    subcounty: Optional[str] = None
-    sector: Optional[str] = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
 class NewsArticle(SQLModel, table=True):
     __tablename__ = "news_articles"
     __table_args__ = {"extend_existing": True}
