@@ -1,5 +1,5 @@
 from sqlmodel import Session, select
-from app.modules.db import engine
+from app.db import engine
 import logging
 from datetime import datetime, timedelta
 import enum
