@@ -1,22 +1,18 @@
 from sqlmodel import Session, select
-from app.db import engine
+from app.modules.data_layer.db import engine
 import logging
 from datetime import datetime, timedelta
 import enum
 
 logger = logging.getLogger(__name__)
 
-# Import your models
 from app.modules.report_builder.models import ReportTemplate, ReportType
 from app.modules.consumer_voice.models import SentimentSummary, Sentiment
 from app.modules.payments.models import SubscriptionTier, Subscription
 
 def seed_data():
-    """Seed initial data for SME Intelligence"""
     logger.info("Running seed data...")
     with Session(engine) as session:
-        
-        # 1. SEED REPORT TEMPLATES
         templates = [
             ReportTemplate(
                 name="Market Feasibility - Free",
@@ -60,7 +56,6 @@ def seed_data():
             if not existing:
                 session.add(template)
         
-        # 2. SEED SENTIMENT SUMMARY FOR TOP SECTORS
         sectors = ["retail", "agriculture", "matatu", "salon", "restaurant"]
         counties = ["Nairobi", "Kiambu", "Mombasa", "Kisumu"]
         
@@ -87,12 +82,10 @@ def seed_data():
                     )
                     session.add(summary)
         
-        # 3. SEED DEFAULT SUBSCRIPTION TIERS INFO
-        # This is just for reference - actual subscriptions are created per user
         logger.info(f"Seeded {len(templates)} templates and base sentiment tables")
         
         session.commit()
-        logger.info("Seed data complete ✅")
+        logger.info("Seed data complete")
 
 if __name__ == "__main__":
     seed_data()
