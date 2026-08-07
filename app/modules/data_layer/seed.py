@@ -9,7 +9,6 @@ logger = logging.getLogger(__name__)
 from app.modules.report_builder.models import ReportTemplate, ReportType
 from app.modules.consumer_voice.models import SentimentSummary, Sentiment
 from app.modules.payments.models import SubscriptionTier, Subscription
-from app.modules.knowledge_base.models import Sector
 from app.modules.location_intel.models import County
 
 def load_kenya_sectors():
