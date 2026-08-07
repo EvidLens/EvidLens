@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from app.modules.auth.dependencies import get_current_user
 from sqlmodel import Session, select, delete
 from pydantic import BaseModel
 from datetime import datetime, timedelta, timezone
