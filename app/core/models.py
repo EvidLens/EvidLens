@@ -443,3 +443,17 @@ class Payment(SQLModel, table=True):
     amount: float
     status: PaymentStatus
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+class SocialMention(SQLModel, table=True):
+    __tablename__ = "social_mentions"
+    __table_args__ = {"extend_existing": True}
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    platform: Optional[str] = Field(default=None, index=True, max_length=50)
+    content: Optional[str] = None
+    author: Optional[str] = Field(default=None, max_length=255)
+    url: Optional[str] = None
+    sentiment: Optional[str] = Field(default=None, max_length=50)
+    county: Optional[str] = Field(default=None, index=True, max_length=50)
+    sector: Optional[str] = Field(default=None, index=True, max_length=100)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
