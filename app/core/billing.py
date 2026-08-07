@@ -1,4 +1,4 @@
-from app.modules.auth.dependencies import get_current_user
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select, delete
 from pydantic import BaseModel
 from datetime import datetime, timedelta, timezone
@@ -6,7 +6,7 @@ from typing import List
 
 from app.core.db import get_session
 from app.core.models import UserSubscription
-from app.core.auth import get_current_user
+from app.modules.auth.dependencies import get_current_user
 
 UTC = timezone.utc
 router = APIRouter(prefix="/api/billing", tags=["billing"])
