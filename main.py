@@ -39,7 +39,7 @@ from app.core import billing
 from app.modules.auth.router import router as auth_router
 from app.core.router import router as core_router
 from app.modules.kenyalensiq.models import *
-from app.modules.lens_engine.service import scrape_kpin_prices, fetch_real_news, fetch_real_tweets
+from app.modules.kenyalensiq.models import KenyaLensAlert, KenyaLensSubscription, KenyaLensMember, KenyaLensApiUsage
 from app.modules.lens_engine.router import router as lens_router
 
 from app.modules.kenyalensiq.router import router as kenyalensiq_router
