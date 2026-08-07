@@ -16,21 +16,21 @@ export default function KenyaLensIQ() {
   useEffect(() => { if(tab) setActiveTab(tab) }, [tab])
 
   useEffect(() => {
-    fetch('/kenyalensiq/me', { headers: { Authorization: `Bearer ${localStorage.token}` }})
-    .then(res => res.status === 403? setHasAccess(false) : res.json().then(d => {setHasAccess(true); setSub(d)}))
-    .finally(() => setLoading(false))
+    fetch('/kenyalens/me', { headers: { Authorization: `Bearer ${localStorage.token}` }})
+   .then(res => res.status === 403? setHasAccess(false) : res.json().then(d => {setHasAccess(true); setSub(d)}))
+   .finally(() => setLoading(false))
   }, [])
 
   useEffect(() => {
     if(!hasAccess ||!sub) return;
     if(!sub.modules.includes(activeTab)) return;
     setLoading(true)
-    fetch(`/kenyalensiq/${activeTab}`, { headers: { Authorization: `Bearer ${localStorage.token}` }})
-    .then(res => res.json()).then(d => setData(d)).finally(() => setLoading(false))
+    fetch(`/kenyalens/${activeTab}`, { headers: { Authorization: `Bearer ${localStorage.token}` }})
+   .then(res => res.json()).then(d => setData(d)).finally(() => setLoading(false))
   }, [activeTab, hasAccess, sub])
 
   const handleExport = () => {
-    window.location = `/kenyalensiq/export?module=${activeTab}&token=${localStorage.token}`
+    window.location = `/kenyalens/export?module=${activeTab}&token=${localStorage.token}`
   }
 
   if(loading &&!data) return <div className="p-8">Loading...</div>
@@ -40,7 +40,7 @@ export default function KenyaLensIQ() {
     <div className="p-6 max-w-7xl mx-auto">
       {sub.is_trial && <TrialBanner days={sub.days_left} />}
       <div className="flex justify-between items-center mb-4">
-        <LensDashboardTabs allowedModules={sub.modules} activeTab={activeTab} onTabClick={(id) => sub.modules.includes(id) && navigate(`/kenyalensiq/${id}`)} />
+        <LensDashboardTabs allowedModules={sub.modules} activeTab={activeTab} onTabClick={(id) => sub.modules.includes(id) && navigate(`/kenyalens/${id}`)} />
         <button onClick={handleExport} className="px-4 py-2 border rounded-lg">Export CSV</button>
       </div>
       <TabRouter tab={activeTab} data={data} loading={loading} isAllowed={sub.modules.includes(activeTab)} />
@@ -51,7 +51,6 @@ export default function KenyaLensIQ() {
 function TabRouter({ tab, data, loading, isAllowed }) {
   if(!isAllowed) return <LockedTab tab={tab} />
   if(loading) return <div>Loading {tab}...</div>
-
   const map = {
     core: <CoreTab data={data} />,
     health: <HealthTab data={data} />,
@@ -82,12 +81,11 @@ function LockedTab({ tab }) {
       <div className="text-5xl mb-4">🔒</div>
       <h3 className="text-2xl font-bold">{tab.toUpperCase()} is locked</h3>
       <p className="text-gray-500 mb-4">Upgrade to unlock this module</p>
-      <button onClick={() => window.location = `/billing/checkout?product=kenyalensiq&plan=Pro`} className="bg-black text-white px-6 py-2 rounded-lg">Upgrade</button>
+      <button onClick={() => window.location = `/billing/checkout?product=kenyalens&plan=Pro`} className="bg-black text-white px-6 py-2 rounded-lg">Upgrade</button>
     </div>
   )
 }
 
-// ====== 9 TAB COMPONENTS ======
 function CoreTab({ data }) {
   return (
     <>
@@ -154,7 +152,7 @@ function BrandTab({ data }) {
       <div className="border p-4 rounded-xl">
         <h3 className="font-bold mb-2">Sentiment Breakdown</h3>
         <ResponsiveContainer width="100%" height={300}>
-          <PieChart><Pie data={data.sentiment_breakdown} dataKey="value" nameKey="name"><{data.sentiment_breakdown?.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}</Pie><Tooltip /></PieChart>
+          <PieChart><Pie data={data.sentiment_breakdown} dataKey="value" nameKey="name">{data.sentiment_breakdown?.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}</Pie><Tooltip /></PieChart>
         </ResponsiveContainer>
       </div>
     </>
@@ -252,7 +250,7 @@ function TrialBanner({ days }) {
   return (
     <div className={`${urgency} text-white p-3 mb-4 rounded-lg text-center font-semibold`}>
       ⚠️ {days} {days === 1? "day" : "days"} left in your free trial.
-      <button onClick={() => window.location = `/billing/checkout?product=kenyalensiq&plan=Pro`} className="ml-3 underline font-bold">Upgrade Now</button>
+      <button onClick={() => window.location = `/billing/checkout?product=kenyalens&plan=Pro`} className="ml-3 underline font-bold">Upgrade Now</button>
     </div>
   )
 }
@@ -282,7 +280,7 @@ function PaymentPrompt() {
   const [startingTrial, setStartingTrial] = useState(false)
   const handleTrial = async () => {
     setStartingTrial(true)
-    const res = await fetch('/kenyalensiq/trial/start', {method: 'POST', headers: {Authorization: `Bearer ${localStorage.token}`}})
+    const res = await fetch('/kenyalens/trial/start', {method: 'POST', headers: {Authorization: `Bearer ${localStorage.token}`}})
     if(res.ok) window.location.reload()
     else alert("Trial already used")
   }
