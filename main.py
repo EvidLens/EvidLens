@@ -13,7 +13,6 @@ from email.mime.text import MIMEText
 import requests
 
 import pandas as pd
-# import matplotlib.pyplot as plt
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from bs4 import BeautifulSoup
@@ -27,13 +26,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
 
-from sqlmodel import SQLModel, Session, create_engine, select, func, or_, desc, asc
+from sqlmodel import SQLModel, Session, select, func, or_, desc, asc
 from groq import Groq
 
 from app.core.config import settings
-from app.core.scheduler import init_db, seed_data, start_scheduler, shutdown_scheduler
+from app.core.db import init_db
+from app.core.scheduler import start_scheduler, shutdown_scheduler
 from app.modules.database import get_db, engine
-# from app.modules.db import init_db
 from app.modules.data_layer.seed import seed_data
 from app.core import billing
 
@@ -101,7 +100,6 @@ supabase: Client = None
 if SUPABASE_URL and APP_SUPABASE_KEY:
     supabase = create_client(SUPABASE_URL, APP_SUPABASE_KEY)
 
-# ALL ROUTERS - ONLY ONCE
 app.include_router(kenyalensiq_router, prefix="/kenyalensiq", tags=["kenyalensiq"])
 app.include_router(competitive_router, prefix="/competitive", tags=["Competitive"])
 app.include_router(market_router, prefix="/market", tags=["Market"])
