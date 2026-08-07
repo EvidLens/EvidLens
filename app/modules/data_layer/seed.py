@@ -1,14 +1,29 @@
 from sqlmodel import Session, select
 from app.modules.data_layer.db import engine
 import logging
-from datetime import datetime, timedelta
-import enum
+import json
+import os
 
 logger = logging.getLogger(__name__)
 
 from app.modules.report_builder.models import ReportTemplate, ReportType
 from app.modules.consumer_voice.models import SentimentSummary, Sentiment
 from app.modules.payments.models import SubscriptionTier, Subscription
+from app.modules.knowledge_base.models import Sector
+from app.modules.location_intel.models import County
+
+def load_kenya_sectors():
+    path = os.path.join(os.path.dirname(__file__), "..", "seed_data", "kenya_sectors.json")
+    path = os.path.abspath(path)
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return [s["name"] for s in data["sectors"]]
+
+def get_counties(session):
+    counties = session.exec(select(County.name)).all()
+    if counties:
+        return counties
+    return ["Nairobi", "Kiambu", "Mombasa", "Kisumu"]
 
 def seed_data():
     logger.info("Running seed data...")
@@ -56,8 +71,8 @@ def seed_data():
             if not existing:
                 session.add(template)
         
-        sectors = ["retail", "agriculture", "matatu", "salon", "restaurant"]
-        counties = ["Nairobi", "Kiambu", "Mombasa", "Kisumu"]
+        sectors = load_kenya_sectors()
+        counties = get_counties(session)
         
         for sector in sectors:
             for county in counties:
