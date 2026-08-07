@@ -1,8 +1,7 @@
 from typing import Dict, Any, List
 from sqlmodel import Session, select, func, desc
 from datetime import datetime, timedelta
-# from app.modules.kenyalensiq.models import MarketMetric
-MarketMetric = None
+from app.modules.kenyalensiq.models import MarketMetric
 import httpx
 import os
 
