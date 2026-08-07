@@ -33,7 +33,7 @@ from groq import Groq
 from app.core.config import settings
 from app.core.scheduler import init_db, seed_data, start_scheduler, shutdown_scheduler
 from app.modules.database import get_db, engine
-from app.modules.db import init_db
+# from app.modules.db import init_db
 from app.modules.data_layer.seed import seed_data
 from app.core import billing
 
