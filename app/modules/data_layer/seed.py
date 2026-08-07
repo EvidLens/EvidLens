@@ -9,10 +9,13 @@ logger = logging.getLogger(__name__)
 from app.modules.report_builder.models import ReportTemplate, ReportType
 from app.modules.consumer_voice.models import SentimentSummary, Sentiment
 from app.modules.payments.models import SubscriptionTier, Subscription
+from app.core.models import Sector
 
 class County(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     name: str
+    __tablename__ = "county"
+    __table_args__ = {"extend_existing": True}
 
 def load_kenya_sectors():
     path = os.path.join(os.path.dirname(__file__), "..", "seed_data", "kenya_sectors.json")
