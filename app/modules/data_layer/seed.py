@@ -20,10 +20,7 @@ def load_kenya_sectors():
     return [s["name"] for s in data["sectors"]]
 
 def get_counties(session):
-    counties = session.exec(select(County.name)).all()
-    if counties:
-        return counties
-    return ["Nairobi", "Kiambu", "Mombasa", "Kisumu"]
+    return session.exec(select(County.name)).all()
 
 def seed_data():
     logger.info("Running seed data...")
@@ -97,7 +94,8 @@ def seed_data():
                     )
                     session.add(summary)
         
-        logger.info(f"Seeded {len(templates)} templates and base sentiment tables")
+        logger.info(f"Seeded {len(templates)} templates")
+        logger.info(f"Using {len(sectors)} sectors from json and {len(counties)} counties from DB")
         
         session.commit()
         logger.info("Seed data complete")
