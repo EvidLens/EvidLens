@@ -40,8 +40,7 @@ from app.modules.auth.router import router as auth_router
 from app.core.router import router as core_router
 from app.modules.lens_engine.router import router as lens_router
 
-# TEMP DISABLED TO FIX DEPLOY
-# from app.modules.kenyalensiq.router import router as kenyalensiq_router
+from app.modules.kenyalensiq.router import router as kenyalensiq_router
 from app.modules.competitive_engine.router import router as competitive_router
 from app.modules.market_engine.router import router as market_router
 from app.modules.location_intel.router import router as location_router
@@ -99,8 +98,7 @@ supabase: Client = None
 if SUPABASE_URL and APP_SUPABASE_KEY:
     supabase = create_client(SUPABASE_URL, APP_SUPABASE_KEY)
 
-# TEMP DISABLED TO FIX DEPLOY
-# app.include_router(kenyalensiq_router, prefix="/kenyalensiq", tags=["kenyalensiq"])
+app.include_router(kenyalensiq_router, prefix="/kenyalensiq", tags=["kenyalensiq"])
 app.include_router(competitive_router, prefix="/competitive", tags=["Competitive"])
 app.include_router(market_router, prefix="/market", tags=["Market"])
 app.include_router(location_router, prefix="/location", tags=["Location"])
