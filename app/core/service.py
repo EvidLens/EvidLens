@@ -3,7 +3,6 @@ from sqlmodel import Session, select, func
 from typing import Dict, Any, List, Union
 
 from app.core.config import settings
-# FIXED: Import from app.core.models instead of app.modules.core.models
 from app.core.models import Plan, AddOn, ALCService, UserSubscription
 from app.modules.report_builder.models import Report
 from app.modules.market_engine.models import MarketMetric
