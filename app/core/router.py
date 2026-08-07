@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select, func, or_, desc
 from datetime import datetime, timezone
 
+from app.core.models import KenyaLensBusiness, MarketMetric, NewsArticle, SocialMention, Sector, UserSubscription
 from app.core.db import get_session
 from app.core.service import CoreService
-from app.core.models import KenyaLensBusiness, MarketMetric, NewsArticle, SocialMention, Sector, UserSubscription
 from app.modules.auth.dependencies import get_current_user
 
 UTC = timezone.utc
