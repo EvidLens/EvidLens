@@ -1,4 +1,3 @@
-from app.modules.kenyalensiq.models import KenyaLensAlert, KenyaLensSubscription, KenyaLensMember, KenyaLensApiUsage
 from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect, Header, BackgroundTasks, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from fastapi.templating import Jinja2Templates
@@ -21,8 +20,8 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/modules/kenyalensiq/templates")
 limiter = Limiter(key_func=lambda req: req.query_params.get("api_key", get_remote_address(req)))
 
-# HELPER: map old fields to new fields
-def _to_old_format(sub: KenyaLensSubscription):
+def _to_old_format(sub):
+    from app.modules.kenyalensiq.models import KenyaLensSubscription
     if not sub: return None
     return {
         "tenant_id": str(sub.user_id),
@@ -37,12 +36,14 @@ def get_tenant(authorization: str = Header(...)) -> str:
     return authorization.split(" ")[1]
 
 def get_tenant_api(x_api_key: str = Header(...), session: Session = Depends(get_session)) -> str:
+    from app.modules.kenyalensiq.models import KenyaLensSubscription
     sub = session.exec(select(KenyaLensSubscription).where(KenyaLensSubscription.api_key == x_api_key)).first()
     if not sub:
         raise HTTPException(401, "Invalid API Key")
     return str(sub.user_id)
 
 def require_active_subscription(tenant_id: str = Depends(get_tenant), session: Session = Depends(get_session)):
+    from app.modules.kenyalensiq.models import KenyaLensSubscription
     sub = services.get_subscription(session, int(tenant_id))
     if not sub or datetime.now(UTC) > sub.renews_at or sub.status!= "active":
         raise HTTPException(402, "Subscription required")
@@ -55,6 +56,7 @@ def mpesa_stk(tenant_id: str, amount: int, phone: str):
 
 @router.post("/webhooks/mpesa")
 async def mpesa_callback(req: Request, session: Session = Depends(get_session)):
+    from app.modules.kenyalensiq.models import KenyaLensSubscription
     body = await req.json()
     callback = body.get("Body", {}).get("stkCallback", {})
     if callback.get("ResultCode")!= 0:
@@ -62,11 +64,9 @@ async def mpesa_callback(req: Request, session: Session = Depends(get_session)):
     items = {i["Name"]: i["Value"] for i in callback["CallbackMetadata"]["Item"]}
     user_id = int(items["AccountReference"])
     receipt = items["MpesaReceiptNumber"]
-
     metadata = json.loads(sub.metadata_json or '{}') if (sub := session.exec(select(KenyaLensSubscription).where(KenyaLensSubscription.user_id == user_id)).first()) else {}
     if metadata.get("last_payment") == receipt:
         return {"ResultCode": 0, "ResultDesc": "Already processed"}
-
     sub = sub or KenyaLensSubscription(user_id=user_id)
     amount = items["Amount"]
     sub.plan_code = "EV-PRO" if amount == 5000 else "EV-ENT"
@@ -74,17 +74,16 @@ async def mpesa_callback(req: Request, session: Session = Depends(get_session)):
     sub.renews_at = datetime.now(UTC) + timedelta(days=30)
     sub.api_credits = 1000 if amount == 5000 else 5000
     sub.lead_credits = 250 if amount == 5000 else 1000
-
     metadata["last_payment"] = receipt
     metadata["last_phone"] = items["PhoneNumber"]
     sub.metadata_json = json.dumps(metadata)
-
     session.add(sub)
     session.commit()
     return {"ResultCode": 0, "ResultDesc": "Success"}
 
 @router.post("/webhooks/payment")
 async def payment_webhook(req: Request, session: Session = Depends(get_session)):
+    from app.modules.kenyalensiq.models import KenyaLensSubscription
     payload = await req.json()
     if payload.get("payment_status") == "Completed":
         user_id = int(payload.get("merchant_reference"))
@@ -111,7 +110,8 @@ async def ingest(payload: Dict, bg: BackgroundTasks, tenant_id: str = Depends(ge
     return {"status": "accepted"}
 
 @router.post("/alerts")
-def create_alert(alert: KenyaLensAlert, tenant_id: str = Depends(get_tenant), session: Session = Depends(get_session)):
+def create_alert(alert, tenant_id: str = Depends(get_tenant), session: Session = Depends(get_session)):
+    from app.modules.kenyalensiq.models import KenyaLensAlert
     services.check_module_access(session, int(tenant_id), "policy")
     alert.user_id = int(tenant_id)
     session.add(alert)
@@ -127,40 +127,40 @@ def export(module: str, tenant_id: str = Depends(get_tenant), session: Session =
     return StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
 
 @router.get("/core")
-def core(sub: KenyaLensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
+def core(sub = Depends(require_active_subscription), session: Session = Depends(get_session)):
     services.log_audit(session, sub.user_id, sub.user_id, "view", "core")
     return services.query_aggregate(session, sub.user_id, "core", "sector")
 
 @router.get("/health")
-def health(sub: KenyaLensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
+def health(sub = Depends(require_active_subscription), session: Session = Depends(get_session)):
     return services.query_aggregate(session, sub.user_id, "health", "performance_last_year")
 
 @router.get("/money")
-def money(sub: KenyaLensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
+def money(sub = Depends(require_active_subscription), session: Session = Depends(get_session)):
     return services.query_aggregate(session, sub.user_id, "money", "payment_methods_used")
 
 @router.get("/brand")
-def brand(sub: KenyaLensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
+def brand(sub = Depends(require_active_subscription), session: Session = Depends(get_session)):
     return services.query_aggregate(session, sub.user_id, "brand", "brand_awareness")
 
 @router.get("/demand")
-def demand(sub: KenyaLensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
+def demand(sub = Depends(require_active_subscription), session: Session = Depends(get_session)):
     return services.query_aggregate(session, sub.user_id, "demand", "has_health_cover")
 
 @router.get("/behavior")
-def behavior(sub: KenyaLensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
+def behavior(sub = Depends(require_active_subscription), session: Session = Depends(get_session)):
     return services.query_aggregate(session, sub.user_id, "behavior", "channel_usage")
 
 @router.get("/policy")
-def policy(sub: KenyaLensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
+def policy(sub = Depends(require_active_subscription), session: Session = Depends(get_session)):
     return services.query_aggregate(session, sub.user_id, "policy", "top_challenges")
 
 @router.get("/capital")
-def capital(sub: KenyaLensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
+def capital(sub = Depends(require_active_subscription), session: Session = Depends(get_session)):
     return services.query_aggregate(session, sub.user_id, "capital", "funding_need")
 
 @router.get("/trade")
-def trade(sub: KenyaLensSubscription = Depends(require_active_subscription), session: Session = Depends(get_session)):
+def trade(sub = Depends(require_active_subscription), session: Session = Depends(get_session)):
     return services.query_aggregate(session, sub.user_id, "trade", "geographic_scope")
 
 @router.get("/api/{module}")
@@ -174,6 +174,7 @@ async def run_connectors(bg: BackgroundTasks, tenant_id: str = Depends(get_tenan
 
 @router.post("/trial/start")
 def start_trial(tenant_id: str = Depends(get_tenant), session: Session = Depends(get_session)):
+    from app.modules.kenyalensiq.models import KenyaLensSubscription
     existing = services.get_subscription(session, int(tenant_id))
     if existing:
         raise HTTPException(400, "You already have a subscription")
@@ -186,7 +187,7 @@ def start_trial(tenant_id: str = Depends(get_tenant), session: Session = Depends
     return {"status": "trial_started", "expires_at": new_sub.renews_at}
 
 @router.get("/me")
-def me(sub: KenyaLensSubscription = Depends(require_active_subscription)):
+def me(sub = Depends(require_active_subscription)):
     days_left = (sub.renews_at - datetime.now(UTC)).days
     old = _to_old_format(sub)
     return {
@@ -196,6 +197,7 @@ def me(sub: KenyaLensSubscription = Depends(require_active_subscription)):
 
 @router.get("/admin/stats")
 def admin_stats(session: Session = Depends(get_session)):
+    from app.modules.kenyalensiq.models import KenyaLensSubscription
     total_subs = session.exec(select(func.count()).select_from(KenyaLensSubscription)).first()
     trial_subs = session.exec(select(func.count()).select_from(KenyaLensSubscription).where(KenyaLensSubscription.plan_code == "EV-FREE")).first()
     paid_subs = session.exec(select(func.count()).select_from(KenyaLensSubscription).where(KenyaLensSubscription.plan_code!= "EV-FREE")).first()
@@ -204,6 +206,7 @@ def admin_stats(session: Session = Depends(get_session)):
 
 @router.post("/admin/grant")
 def grant_access(tenant_id: str, plan: str, session: Session = Depends(get_session)):
+    from app.modules.kenyalensiq.models import KenyaLensSubscription
     sub = services.get_subscription(session, int(tenant_id))
     if not sub:
         sub = KenyaLensSubscription(user_id=int(tenant_id))
@@ -219,10 +222,12 @@ def grant_access(tenant_id: str, plan: str, session: Session = Depends(get_sessi
 
 @router.get("/team")
 def get_team(tenant_id: str, session: Session = Depends(get_session)):
+    from app.modules.kenyalensiq.models import KenyaLensMember
     return session.exec(select(KenyaLensMember).where(KenyaLensMember.user_id == int(tenant_id))).all()
 
 @router.post("/team/invite")
 def invite_member(tenant_id: str, email: str, role: str, user_id: str, session: Session = Depends(get_session)):
+    from app.modules.kenyalensiq.models import KenyaLensMember
     member = KenyaLensMember(user_id=int(tenant_id), email=email, role=role)
     session.add(member)
     session.commit()
@@ -230,6 +235,7 @@ def invite_member(tenant_id: str, email: str, role: str, user_id: str, session: 
 
 @router.delete("/team/{member_id}")
 def remove_member(member_id: int, session: Session = Depends(get_session)):
+    from app.modules.kenyalensiq.models import KenyaLensMember
     member = session.get(KenyaLensMember, member_id)
     session.delete(member)
     session.commit()
@@ -248,6 +254,7 @@ def export_report(report_id: str):
 @router.get("/embed/{module}")
 @limiter.limit("100/hour")
 def embed_widget(module: str, request: Request, api_key: str, session: Session = Depends(get_session)):
+    from app.modules.kenyalensiq.models import KenyaLensSubscription, KenyaLensApiUsage
     sub = session.exec(select(KenyaLensSubscription).where(KenyaLensSubscription.api_key == api_key)).first()
     if not sub:
         return templates.TemplateResponse("embed_locked.html", {"request": request, "reason": "Invalid API Key"})
