@@ -1,4 +1,4 @@
-from app.core.models import KenyaLensAlert, KenyaLensSubscription, KenyaLensMember, KenyaLensApiUsage
+from app.core.models import KenyaLensApiUsage
 from fastapi.responses import StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select, func
