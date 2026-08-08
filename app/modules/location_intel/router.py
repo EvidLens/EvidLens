@@ -3,7 +3,7 @@ from sqlmodel import Session, select
 from pydantic import BaseModel
 from typing import List, Optional
 from.service import get_location_comparison, generate_heatmap, fetch_osm_businesses, calculate_price_arbitrage, seed_geo_data
-from app.core.models import KENYA_COUNTIES, LocationGeo
+from app.modules.location_intel.models import KENYA_COUNTIES, LocationGeo
 from app.core.db import get_session as get_db
 from app.core.guards import require_module
 
