@@ -40,7 +40,8 @@ from app.modules.auth.router import router as auth_router
 from app.core.router import router as core_router
 from app.modules.lens_engine.router import router as lens_router
 
-from app.modules.kenyalensiq.router import router as kenyalensiq_router
+# CHANGED: kenyalensiq -> kenyalens
+from app.modules.kenyalens.router import router as kenyalens_router 
 from app.modules.competitive_engine.router import router as competitive_router
 from app.modules.market_engine.router import router as market_router
 from app.modules.location_intel.router import router as location_router
@@ -74,11 +75,11 @@ def on_startup():
     seed_data()
     SQLModel.metadata.create_all(engine)
     print("DB tables checked/created")
-    scheduler.add_job(lambda: safe_job(scrape_kpin_prices, "KPIN"), CronTrigger(hour=settings.KPIN_SCRAPE_HOUR, minute=settings.KPIN_SCRAPE_MINUTE), id="kpin_scrape", replace_existing=True)
-    scheduler.add_job(lambda: safe_job(fetch_real_news, "NEWS"), CronTrigger(hour=settings.NEWS_SCRAPE_HOUR, minute=settings.NEWS_SCRAPE_MINUTE), id="news_scrape", replace_existing=True)
-    scheduler.add_job(lambda: safe_job(fetch_real_tweets, "TWEETS"), CronTrigger(hour=settings.TWEETS_SCRAPE_HOUR, minute=settings.TWEETS_SCRAPE_MINUTE), id="tweets_scrape", replace_existing=True)
+    scheduler.add_job(lambda: safe_job(scrape_kpin_prices, "KPIN"), CronTrigger(hour=getattr(settings, "KPIN_SCRAPE_HOUR", 3), minute=getattr(settings, "KPIN_SCRAPE_MINUTE", 0)), id="kpin_scrape", replace_existing=True)
+    scheduler.add_job(lambda: safe_job(fetch_real_news, "NEWS"), CronTrigger(hour=getattr(settings, "NEWS_SCRAPE_HOUR", 4), minute=getattr(settings, "NEWS_SCRAPE_MINUTE", 0)), id="news_scrape", replace_existing=True)
+    scheduler.add_job(lambda: safe_job(fetch_real_tweets, "TWEETS"), CronTrigger(hour=getattr(settings, "TWEETS_SCRAPE_HOUR", 5), minute=getattr(settings, "TWEETS_SCRAPE_MINUTE", 0)), id="tweets_scrape", replace_existing=True)
     scheduler.start()
-    print(f"Scheduler started. Timezone: {settings.SCHEDULER_TIMEZONE}")
+    print(f"Scheduler started. Timezone: {getattr(settings, 'SCHEDULER_TIMEZONE', 'Africa/Nairobi')}")
 
 @app.on_event("shutdown")
 def shutdown_event():
@@ -90,16 +91,15 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates", auto_reload=True)
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-APP_SUPABASE_KEY = os.getenv("APP_SUPABASE_KEY")
+GROQ_API_KEY = settings.GROQ_API_KEY
+SUPABASE_URL = settings.SUPABASE_URL
+APP_SUPABASE_KEY = settings.APP_SUPABASE_KEY
 client = Groq(api_key=GROQ_API_KEY)
 supabase: Client = None
 if SUPABASE_URL and APP_SUPABASE_KEY:
-from supabase import create_client
-supabase = create_client(settings.SUPABASE_URL, settings.APP_SUPABASE_KEY)
+    supabase = create_client(SUPABASE_URL, APP_SUPABASE_KEY)
 
-app.include_router(kenyalensiq_router, prefix="/kenyalensiq", tags=["kenyalensiq"])
+app.include_router(kenyalens_router, prefix="/kenyalens", tags=["kenyalens"])
 app.include_router(competitive_router, prefix="/competitive", tags=["Competitive"])
 app.include_router(market_router, prefix="/market", tags=["Market"])
 app.include_router(location_router, prefix="/location", tags=["Location"])
