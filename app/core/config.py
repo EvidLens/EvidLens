@@ -83,6 +83,9 @@ class Settings(BaseSettings):
     REPORT_BRAND_NAME: str = "Powered by EvidLens Kenya Sector Data"
     REPORT_LOGO_URL: str = ""
 
+    # SCHEDULER
+    SCHEDULER_TIMEZONE: str = "Africa/Nairobi"
+
     # CORS - OPEN FOR ALL FOR NOW
     ALLOWED_ORIGINS: List[str] = ["*"]
 
