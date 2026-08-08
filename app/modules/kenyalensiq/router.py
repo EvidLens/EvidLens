@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 from app.core.models import KenyaLensAlert, KenyaLensSubscription, KenyaLensMember, KenyaLensApiUsage
+from app.modules.kenyalensiq.services import LensEngineService
 from fastapi.responses import StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select, func
