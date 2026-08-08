@@ -1,3 +1,4 @@
+from fastapi import APIRouter, Depends
 from app.core.models import KenyaLensAlert, KenyaLensSubscription, KenyaLensMember, KenyaLensApiUsage
 from fastapi.responses import StreamingResponse
 from fastapi.templating import Jinja2Templates
