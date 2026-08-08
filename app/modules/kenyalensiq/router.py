@@ -1,6 +1,4 @@
 from fastapi import APIRouter, Depends
-from app.core.models import KenyaLensAlert, KenyaLensSubscription, KenyaLensMember, KenyaLensApiUsage
-from app.modules.kenyalensiq.services import LensEngineService
 from fastapi.responses import StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select, func
@@ -12,6 +10,8 @@ import io
 import csv
 import json
 
+from app.core.models import KenyaLensAlert, KenyaLensSubscription, KenyaLensMember, KenyaLensApiUsage
+from app.modules.kenyalensiq.services import LensEngineService
 from app.core.db import get_session
 from app.modules.kenyalensiq.mpesa import stk_push
 from app.modules.kenyalensiq import services
