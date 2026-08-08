@@ -2,7 +2,13 @@ from sqlmodel import Session, select, func
 from typing import Dict, Any, List
 from datetime import datetime, timezone, timedelta
 from app.core.models import KenyaLensSubscription
-from app.modules.kenyalensiq.models import KenyaLensSubscription
+# NEW - IMPORT ALL 4
+from app.modules.kenyalensiq.models import (
+    KenyaLensSubscription, 
+    KenyaLensAlert, 
+    KenyaLensMember, 
+    KenyaLensApiUsage
+)
 from fastapi import WebSocket, HTTPException
 import httpx
 import json
