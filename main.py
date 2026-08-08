@@ -56,7 +56,7 @@ from app.modules.cron.router import router as cron_router
 from app.modules.storage.router import router as storage_router
 from app.modules.chatbot.router import router as chatbot_router
 
-scheduler = AsyncIOScheduler(timezone=settings.SCHEDULER_TIMEZONE)
+scheduler = AsyncIOScheduler(timezone=getattr(settings, "SCHEDULER_TIMEZONE", "Africa/Nairobi"))
 app = FastAPI(title="EvidLens API", version="2.5.12")
 
 def safe_job(job_func, job_name):
