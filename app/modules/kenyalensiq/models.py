@@ -3,10 +3,14 @@ from app.core.models import (
     KenyaLensAlert, 
     KenyaLensMember,
     KenyaLensApiUsage,
-    MarketMetric
+    KenyaLensBusiness,
+    KenyaLensSurvey,
+    MarketMetric,
+    SocialMention
 )
 
 __all__ = [
     "KenyaLensSubscription", "KenyaLensAlert", "KenyaLensMember", 
-    "KenyaLensApiUsage", "MarketMetric"
+    "KenyaLensApiUsage", "KenyaLensBusiness", "KenyaLensSurvey", 
+    "MarketMetric", "SocialMention"
 ]
