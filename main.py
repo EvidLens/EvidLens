@@ -96,7 +96,8 @@ APP_SUPABASE_KEY = os.getenv("APP_SUPABASE_KEY")
 client = Groq(api_key=GROQ_API_KEY)
 supabase: Client = None
 if SUPABASE_URL and APP_SUPABASE_KEY:
-    supabase = create_client(SUPABASE_URL, APP_SUPABASE_KEY)
+from supabase import create_client
+supabase = create_client(settings.SUPABASE_URL, settings.APP_SUPABASE_KEY)
 
 app.include_router(kenyalensiq_router, prefix="/kenyalensiq", tags=["kenyalensiq"])
 app.include_router(competitive_router, prefix="/competitive", tags=["Competitive"])
