@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, Depends, Header, Request, WebSocket
 from fastapi.responses import StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select, func
