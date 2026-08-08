@@ -1,3 +1,4 @@
+# app/modules/kenyalensiq/models.py
 from app.core.models import (
     KenyaLensSubscription,
     KenyaLensAlert, 
@@ -6,11 +7,12 @@ from app.core.models import (
     KenyaLensBusiness,
     KenyaLensSurvey,
     MarketMetric,
-    SocialMention
+    SocialMention,
+    NewsArticle  # ADD THIS
 )
 
 __all__ = [
     "KenyaLensSubscription", "KenyaLensAlert", "KenyaLensMember", 
     "KenyaLensApiUsage", "KenyaLensBusiness", "KenyaLensSurvey", 
-    "MarketMetric", "SocialMention"
+    "MarketMetric", "SocialMention", "NewsArticle"
 ]
