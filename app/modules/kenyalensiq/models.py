@@ -1,3 +1,5 @@
+# app/modules/kenyalensiq/models.py
+# PROXY ONLY - NO TABLE DEFINITIONS HERE AT ALL
 from app.core.models import (
     KenyaLensSubscription,
     KenyaLensAlert, 
@@ -6,7 +8,7 @@ from app.core.models import (
     KenyaLensBusiness,
     KenyaLensSurvey,
     MarketMetric,
-    SocialMention  # THIS WAS MISSING
+    SocialMention
 )
 
 __all__ = [
