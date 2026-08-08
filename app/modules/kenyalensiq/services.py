@@ -162,3 +162,11 @@ def start_paid_plan(session: Session, user_id: int, plan: str):
     session.add(sub)
     session.commit()
     return sub
+
+class LensEngineService:
+    def __init__(self, session: Session):
+        self.session = session
+    
+    async def run_scan(self):
+        # TODO: move your actual logic here
+        pass
