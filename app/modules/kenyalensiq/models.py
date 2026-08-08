@@ -6,7 +6,7 @@ from app.core.models import (
     KenyaLensBusiness,
     KenyaLensSurvey,
     MarketMetric,
-    SocialMention
+    SocialMention  # THIS WAS MISSING
 )
 
 __all__ = [
