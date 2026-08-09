@@ -99,7 +99,7 @@ supabase: Client = None
 if SUPABASE_URL and APP_SUPABASE_KEY:
     supabase = create_client(SUPABASE_URL, APP_SUPABASE_KEY)
 
-app.include_router(kenyalens_router, prefix="/kenyalens", tags=["kenyalens"])
+app.include_router(kenyalensiq_router, prefix="/kenyalens", tags=["kenyalens"])
 app.include_router(competitive_router, prefix="/competitive", tags=["Competitive"])
 app.include_router(market_router, prefix="/market", tags=["Market"])
 app.include_router(location_router, prefix="/location", tags=["Location"])
