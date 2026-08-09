@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Column, JSON
 from typing import Optional, List, Dict
-from datetime import datetime, UTC
+from datetime import datetime, timezone, UTC
 from pydantic import BaseModel, field_validator
 from sqlalchemy import Column, JSON
 from sqlalchemy.sql import func
