@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Header, Request, WebSocket, BackgroundTasks, HTTPException # you were missing HTTPException
+from fastapi import APIRouter, Depends, Header, Request, WebSocket, BackgroundTasks, HTTPException
 from fastapi.responses import StreamingResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select, func
@@ -11,9 +11,9 @@ import csv
 import json
 
 # IMPORT MODELS ONCE HERE
-from app.modules.kenyalensiq.models import (
-    KenyaLensAlert, KenyaLensSubscription, KenyaLensMember, 
-    KenyaLensApiUsage, MarketMetric, MarketSearch
+from app.core.models import (
+    KenyaLensAlert, KenyaLensSubscription, KenyaLensMember,
+    KenyaLensApiUsage, MarketMetric, SocialMention, NewsArticle
 )
 from app.modules.kenyalensiq.services import LensEngineService, get_subscription
 from app.core.db import get_session
