@@ -42,17 +42,24 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 def init_db():
-    from app.core.models import Plan, Module, AddOn, ALCService, UserSubscription, GeoFilter, User, Workspace, Subscription, MarketMetric, MarketSearch, SocialMention, Report, SectorReport, NewsArticle, Company, KenyaLensBusiness, GeoData, Sector, Funder, Policy
+    # Import all models here so SQLModel creates the tables
+    # Everything is now consolidated in app.core.models to avoid "Table already defined" errors
+    from app.core.models import (
+        Plan, Module, AddOn, ALCService, UserSubscription, GeoFilter, User, Workspace, 
+        Subscription, MarketMetric, MarketSearch, SocialMention, Report, SectorReport, 
+        NewsArticle, Company, KenyaLensBusiness, GeoData, Sector, Funder, Policy,
+        KenyaLensAlert, KenyaLensSubscription, KenyaLensMember, KenyaLensApiUsage,
+        Deal, Funding
+    )
     from app.modules.auth.models import UserRole
     from app.modules.payments.models import Payment, Subscription as PaymentSubscription, MpesaTransaction
     from app.modules.report_builder.models import ReportTemplate, ReportShare
     from app.modules.market_engine.models import Competitor
-    from app.modules.competitive_engine.models import Deal, Funding
     from app.modules.pricing_engine.models import ProductPrice, RetailOutlet
     from app.modules.regulatory_engine.models import Regulation, ComplianceDeadline
     from app.modules.consumer_engine.models import BrandSentiment
     from app.modules.location_engine.models import LocationDemand, PropertyListing
     from app.modules.business_os.models import Contact, Battlecard
     from app.modules.knowledge_base.models import KnowledgeDocument
-    from app.modules.kenyalensiq.models import KenyaLensAlert, KenyaLensSubscription, KenyaLensMember, KenyaLensApiUsage
+    
     SQLModel.metadata.create_all(bind=engine)
