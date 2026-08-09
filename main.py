@@ -38,7 +38,7 @@ from app.core import billing
 
 from app.modules.auth.router import router as auth_router
 from app.core.router import router as core_router
-from app.modules.lens_engine.router import router as lens_router
+from app.modules.kenyalensiq.router import router as lens_router
 
 # CHANGED: kenyalensiq -> kenyalens
 from app.modules.kenyalensiq.router import router as kenyalensiq_router 
