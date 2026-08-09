@@ -6,12 +6,24 @@ from sqlalchemy import Enum as SQLEnum
 import enum
 
 class ReportType(str, enum.Enum):
+    # Original
     MARKET_FEASIBILITY = "market_feasibility"
     CONSUMER_ANALYSIS = "consumer_analysis"
     BUSINESS_PLAN = "business_plan"
     KRA_TAX = "kra_tax"
     COMPETITOR_TRACKER = "competitor_tracker"
     INVESTOR_PITCH = "investor_pitch"
+
+    # Additional high-value reports
+    FINANCIAL_PROJECTIONS = "financial_projections"
+    SWOT_ANALYSIS = "swot_analysis"
+    RISK_ANALYSIS = "risk_analysis"
+    PRICING_STRATEGY = "pricing_strategy"
+    UNIT_ECONOMICS = "unit_economics"
+    GO_TO_MARKET = "go_to_market"
+    OPERATIONAL_PLAN = "operational_plan"
+    ESG_IMPACT = "esg_impact"
+    EXECUTIVE_SUMMARY = "executive_summary"
 
 class ReportFormat(str, enum.Enum):
     PDF = "pdf"
