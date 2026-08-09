@@ -479,3 +479,17 @@ class SocialMention(SQLModel, table=True):
     county: Optional[str] = Field(default=None, index=True, max_length=50)
     sector: Optional[str] = Field(default=None, index=True, max_length=100)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+class Funding(SQLModel, table=True):
+    __tablename__ = "fundings"
+    __table_args__ = {"extend_existing": True}
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    deal_id: int = Field(foreign_key="deals.id")
+    funder_id: int = Field(foreign_key="funder.id")
+    user_id: int = Field(foreign_key="user.id")
+    
+    amount: float
+    status: str = Field(default="applied")
+    application_date: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    funding_date: Optional[datetime] = None
