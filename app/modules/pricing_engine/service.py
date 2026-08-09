@@ -2,11 +2,10 @@ import os
 import json
 import httpx
 from datetime import datetime
-from sqlalchemy.orm import Session
-from sqlalchemy import func, desc
+from sqlmodel import Session, select, func, desc
 from typing import Dict, Any, List, Optional
-from app.modules.db import redis_client
-from app.modules.market_engine.models import MarketSearch, Competitor, MarketMetric
+from app.core.db import redis_client
+from app.core.models import MarketSearch, MarketMetric
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
