@@ -1,7 +1,8 @@
 from sqlmodel import SQLModel, Field, Column, JSON
 from typing import Optional, List, Dict
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pydantic import BaseModel, field_validator
+from sqlalchemy import Column, JSON
 from sqlalchemy.sql import func
 from enum import Enum
 
@@ -220,6 +221,27 @@ class Report(SQLModel, table=True):
     title: str
     data: dict = Field(sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+class Deal(SQLModel, table=True):
+    __tablename__ = "deals"
+    __table_args__ = {"extend_existing": True}
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id")
+    funder_id: Optional[int] = Field(default=None, foreign_key="funder.id")
+    
+    title: str
+    company_name: str
+    amount: float
+    deal_type: str = Field(description="Equity, Debt, Grant, etc")
+    stage: str = Field(description="Seed, Series A, etc")
+    status: str = Field(default="pending", description="pending, approved, rejected, closed")
+    
+    description: Optional[str] = None
+    terms: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+    
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    closed_at: Optional[datetime] = None
 
 class Funder(SQLModel, table=True):
     __tablename__ = "funder"
