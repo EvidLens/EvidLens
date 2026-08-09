@@ -5,7 +5,7 @@ from datetime import datetime
 from sqlmodel import Session, select, func, desc
 from typing import Dict, Any, List, Optional
 from app.core.db import redis_client
-from app.core.models import MarketSearch, MarketMetric
+from app.core.models import MarketSearch, MarketMetric, Competitor
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
