@@ -63,3 +63,4 @@ def init_db():
     from app.modules.knowledge_base.models import KnowledgeDocument
     
     SQLModel.metadata.create_all(bind=engine)
+    print("DB tables created successfully")
