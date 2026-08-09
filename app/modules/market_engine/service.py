@@ -1,3 +1,4 @@
+from app.modules.kenyalensiq.models import MarketMetric, MarketSearch
 from typing import Dict, Any, List
 from sqlmodel import Session, select, func, desc
 from datetime import datetime, timedelta
