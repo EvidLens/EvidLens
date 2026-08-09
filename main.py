@@ -41,7 +41,7 @@ from app.core.router import router as core_router
 from app.modules.lens_engine.router import router as lens_router
 
 # CHANGED: kenyalensiq -> kenyalens
-from app.modules.kenyalens.router import router as kenyalens_router 
+from app.modules.kenyalensiq.router import router as kenyalensiq_router 
 from app.modules.competitive_engine.router import router as competitive_router
 from app.modules.market_engine.router import router as market_router
 from app.modules.location_intel.router import router as location_router
