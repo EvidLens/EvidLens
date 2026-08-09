@@ -493,3 +493,13 @@ class Funding(SQLModel, table=True):
     status: str = Field(default="applied")
     application_date: datetime = Field(default_factory=lambda: datetime.now(UTC))
     funding_date: Optional[datetime] = None
+
+class Competitor(SQLModel, table=True):
+    __tablename__ = "competitor"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    sector: str
+    county: str
+    lat: float = 0
+    lng: float = 0
