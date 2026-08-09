@@ -25,30 +25,36 @@ async def call_groq(prompt: str) -> str:
         return r.json()["choices"][0]["message"]["content"]
 
 def search_market(db: Session, q: str, sector: str, county: str) -> Dict[str, Any]:
-    db.add(MarketSearch(query=q, sector=sector, county=county, country="Kenya"))
+    db.add(MarketSearch(query=q, sector=sector, county=county))
     db.commit()
+    
     metrics = db.query(MarketMetric).filter(MarketMetric.sector == sector, MarketMetric.county == county).all()
     competitors = db.query(Competitor).filter(Competitor.sector == sector, Competitor.county == county).limit(10).all()
-    prices = [m.price_kes for m in metrics if m.price_kes]
-    market_size = sum([m.market_size_kes for m in metrics if m.market_size_kes])
+    
+    prices = [m.avg_price_kes for m in metrics if m.avg_price_kes]
+    demand_scores = [m.demand_score for m in metrics if m.demand_score]
+    avg_demand = round(sum(demand_scores)/len(demand_scores), 2) if demand_scores else 0
+    
     return {
         "query": q, 
         "sector": sector, 
         "county": county, 
         "currency": CURRENCY,
-        "demand_level": "High" if len(metrics) > 10 else "Medium" if len(metrics) > 3 else "Low", 
-        "market_size_kes": market_size,
-        "market_size_display": f"{CURRENCY_SYMBOL} {market_size:,}",
+        "demand_level": "High" if avg_demand > 7 else "Medium" if avg_demand > 4 else "Low", 
+        "demand_score": avg_demand,
+        "market_size_kes": 0, # you don't track this yet
+        "market_size_display": "N/A",
         "price_range": {
             "min": min(prices) if prices else 0, 
             "max": max(prices) if prices else 0, 
             "avg": round(sum(prices)/len(prices), 2) if prices else 0,
             "display": f"{CURRENCY_SYMBOL} {min(prices):,} - {max(prices):,}" if prices else "N/A"
         }, 
+        "data_points": len(metrics),
         "competitors": [{"name": c.name, "lat": c.lat, "lng": c.lng} for c in competitors], 
         "competitor_count": len(competitors)
     }
-
+    
 async def analyze_with_ai(data: Dict) -> str:
     prompt = f"Analyze '{data['query']}' in {data['sector']}, {data['county']} Kenya. Demand:{data['demand_level']}. Market:{data['market_size_display']}. Competitors:{data['competitor_count']}. Return: 1.Demand Verdict 2.Top 3 Risks 3.Go/No-Go with 1 sentence reason. Under 100 words. Use KES."
     return await call_groq(prompt)
