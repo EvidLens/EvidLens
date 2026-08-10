@@ -1,13 +1,14 @@
 from sqlmodel import Session, select, func
 from typing import Dict, Any, List
 from datetime import datetime, timezone, timedelta
-from app.core.models import KenyaLensSubscription
-# NEW - IMPORT ALL 4
-from app.modules.kenyalensiq.models import (
-    KenyaLensSubscription, 
-    KenyaLensAlert, 
-    KenyaLensMember, 
-    KenyaLensApiUsage
+from app.core.models import (
+    KenyaLensSubscription,
+    KenyaLensAlert,
+    KenyaLensMember,
+    KenyaLensApiUsage,
+    KenyaLensBusiness,
+    KenyaLensSurvey,
+    MarketMetric
 )
 from fastapi import WebSocket, HTTPException
 import httpx
@@ -39,7 +40,7 @@ def _get_user_id(tenant_id: str) -> int:
 def get_subscription(session: Session, user_id: int) -> KenyaLensSubscription | None:
     sub = session.exec(select(KenyaLensSubscription).where(KenyaLensSubscription.user_id == user_id)).first()
     if sub and sub.renews_at and sub.renews_at < datetime.now(UTC):
-        if sub.plan_code == "EV-FREE":
+        if sub.plan == "EV-FREE":
             return None
     return sub
 
@@ -59,7 +60,7 @@ def check_module_access(session: Session, user_id: int, module: str) -> KenyaLen
     return sub
 
 def log_audit(session: Session, user_id: int, actor_id: int, action: str, module: str, payload: dict = {}):
-    pass # TODO: implement with AuditLog table
+    pass
 
 def get_all_active_tenants(session: Session):
     return session.exec(select(KenyaLensBusiness)).all()
@@ -104,32 +105,33 @@ def query_aggregate(session: Session, user_id: int, module: str, json_key: str):
     if module == "core":
         rows = session.exec(
             select(KenyaLensBusiness.sector, func.count(KenyaLensBusiness.id))
-           .group_by(KenyaLensBusiness.sector)
+          .group_by(KenyaLensBusiness.sector)
         ).all()
     elif module == "money":
         rows = session.exec(
-            select(MarketMetric.sector, func.avg(MarketMetric.price))
-           .group_by(MarketMetric.sector)
+            select(MarketMetric.sector, func.avg(MarketMetric.avg_price_kes)) # FIXED: was price
+          .group_by(MarketMetric.sector)
         ).all()
     elif module == "demand":
         rows = session.exec(
             select(MarketMetric.county, func.sum(MarketMetric.demand_score))
-           .group_by(MarketMetric.county)
+          .group_by(MarketMetric.county)
         ).all()
     else:
         rows = session.exec(
             select(KenyaLensBusiness.county, func.count(KenyaLensBusiness.id))
-           .group_by(KenyaLensBusiness.county)
+          .group_by(KenyaLensBusiness.county)
         ).all()
     return [{"label": r[0], "value": float(r[1] or 0)} for r in rows]
 
 def start_trial(session: Session, user_id: int):
     sub = KenyaLensSubscription(
         user_id=user_id,
-        plan_code="EV-FREE",
+        plan="EV-FREE",
         status="active",
         renews_at=datetime.now(UTC) + timedelta(days=7),
-        api_credits=10
+        api_credits=10,
+        features_json="[]"
     )
     session.add(sub)
     session.commit()
@@ -139,9 +141,9 @@ def check_trial_expiry_alerts(session: Session):
     tomorrow = datetime.now(UTC) + timedelta(days=1)
     expiring_trials = session.exec(
         select(KenyaLensSubscription)
-       .where(KenyaLensSubscription.plan_code == "EV-FREE")
-       .where(KenyaLensSubscription.renews_at <= tomorrow)
-       .where(KenyaLensSubscription.renews_at > datetime.now(UTC))
+      .where(KenyaLensSubscription.plan == "EV-FREE")
+      .where(KenyaLensSubscription.renews_at <= tomorrow)
+      .where(KenyaLensSubscription.renews_at > datetime.now(UTC))
     ).all()
 
     for sub in expiring_trials:
@@ -156,7 +158,7 @@ def check_trial_expiry_alerts(session: Session):
 def start_paid_plan(session: Session, user_id: int, plan: str):
     sub = get_subscription(session, user_id) or KenyaLensSubscription(user_id=user_id)
     plan_map = {"Pro": "EV-PRO", "Enterprise": "EV-ENT"}
-    sub.plan_code = plan_map.get(plan, "EV-PRO")
+    sub.plan = plan_map.get(plan, "EV-PRO")
     sub.status = "active"
     sub.renews_at = datetime.now(UTC) + timedelta(days=30 if plan == "Pro" else 365)
     session.add(sub)
@@ -166,7 +168,6 @@ def start_paid_plan(session: Session, user_id: int, plan: str):
 class LensEngineService:
     def __init__(self, session: Session):
         self.session = session
-    
+
     async def run_scan(self):
-        # TODO: move your actual logic here
         pass
