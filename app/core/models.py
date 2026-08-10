@@ -439,9 +439,13 @@ class KenyaLensSubscription(SQLModel, table=True):
     __tablename__ = "kenyalens_subscription"
     __table_args__ = {"extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="user.id")
-    plan: str
-    status: str
+    user_id: int = Field(foreign_key="user.id", index=True)
+    plan: str = Field(default="EV-FREE", index=True)
+    status: str = Field(default="active")
+    renews_at: Optional[datetime] = Field(default=None)
+    api_credits: int = Field(default=10)
+    features_json: str = Field(default="[]")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class PaymentStatus(str, Enum):
     PENDING = "pending"
