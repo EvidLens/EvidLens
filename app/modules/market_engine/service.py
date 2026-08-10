@@ -1,7 +1,7 @@
 from typing import Dict, Any, List
 from sqlmodel import Session, select, func, desc
 from datetime import datetime, timedelta
-from app.core.models import MarketMetric, Competitor, MarketSearch
+from app.modules.kenyalensiq.models import MarketMetric
 import httpx
 import os
 
