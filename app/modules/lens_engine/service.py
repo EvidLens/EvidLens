@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any
 from sqlmodel import Session, select, func, desc, asc
 from app.services.base_service import BaseService
-from app.modules.kenyalensiq.models import MarketMetric, NewsArticle, SocialMention, KenyaLensBusiness
+from app.core.models import MarketMetric, NewsArticle, SocialMention, KenyaLensBusiness
 from app.core.db import Session as DBSession, engine
 from app.core.config import settings
 
