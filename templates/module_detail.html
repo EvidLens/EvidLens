@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>{{module_name}} - EvidLens</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#F5F7FA]">
+<header class="bg-[#0A1F44] text-white px-6 py-4 sticky top-0 shadow-md">
+  <div class="max-w-[1400px] mx-auto flex items-center justify-between">
+    <h1 class="font-bold text-2xl"><span style="color:#FFFFFF">Evid</span><span style="color:#14B8A6">Lens</span></h1>
+    <a href="/dashboard" class="bg-[#14B8A6] px-4 py-2 rounded-lg font-semibold">← Dashboard</a>
+  </div>
+</header>
+
+<main class="p-6 max-w-[1400px] mx-auto">
+  <div class="bg-white rounded-2xl p-8 shadow-md mb-6">
+    <h2 class="text-3xl font-bold text-[#0A1F44] mb-2">{{module_name}}</h2>
+    <p class="text-gray-600">Real-time {{module_name}} intelligence for Kenya markets</p>
+  </div>
+
+  <div id="moduleContent" class="bg-white rounded-2xl p-8 shadow-md">
+    <p class="text-gray-500">Loading {{module_name}} data...</p>
+  </div>
+</main>
+
+<script>
+// THIS IS WHERE YOU WIRE YOUR REAL SERVICE
+async function loadModuleData(){
+    const slug = "{{module_slug}}";
+    const res = await fetch(`/api/${slug}`); // e.g /api/competitive
+    const data = await res.json();
+    
+    document.getElementById('moduleContent').innerHTML = `
+        <h3 class="text-xl font-bold mb-4">Live Data</h3>
+        <pre class="bg-gray-100 p-4 rounded-lg">${JSON.stringify(data, null, 2)}</pre>
+    `;
+}
+loadModuleData();
+</script>
+</body>
+</html>

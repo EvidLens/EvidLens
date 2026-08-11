@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-5xl mx-auto p-6">
+  <h1 class="text-3xl font-bold text-[#0A1F44] mb-2">Help & Support</h1>
+  <p class="text-gray-500 mb-6">How can we help you today?</p>
+
+  <!-- Search -->
+  <div class="bg-white p-4 rounded-xl shadow-sm mb-8">
+    <input id="searchHelp" type="text" placeholder="Search: 'How do I buy credits?' 'What is Demand Score?'"
+      class="w-full p-3 border rounded-lg focus:border-[#14B8A6] outline-none">
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <!-- FAQ -->
+    <div class="md:col-span-2">
+      <h2 class="text-xl font-bold mb-4">Frequently Asked Questions</h2>
+      <div class="space-y-3">
+        {% for faq in faqs %}
+        <details class="bg-white p-4 rounded-xl shadow-sm cursor-pointer">
+          <summary class="font-semibold text-[#0A1F44]">{{ faq.q }}</summary>
+          <p class="mt-3 text-gray-600">{{ faq.a }}</p>
+        </details>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Contact -->
+    <div>
+      <div class="bg-gradient-to-b from-[#0A1F44] to-[#14B8A6] p-6 rounded-2xl text-white mb-6">
+        <h2 class="text-xl font-bold mb-2">Talk to Us</h2>
+        <p class="text-sm opacity-90 mb-4">We reply in under 2 hours on weekdays</p>
+        <a href="https://wa.me/2547XXXXXXXX" target="_blank" class="block bg-white text-[#0A1F44] text-center py-2 rounded-lg font-bold mb-2">💬 WhatsApp</a>
+        <a href="mailto:support@evidlens.co.ke" class="block bg-white/20 text-center py-2 rounded-lg font-bold">support@evidlens.co.ke</a>
+      </div>
+
+      <!-- Contact Form -->
+      <div class="bg-white p-6 rounded-2xl shadow-sm">
+        <h2 class="text-lg font-bold mb-3">Send a Message</h2>
+        <form id="supportForm" class="space-y-3">
+          <input name="subject" placeholder="Subject" required class="w-full border p-2 rounded-lg text-sm">
+          <textarea name="message" placeholder="Describe your issue..." required class="w-full border p-2 rounded-lg text-sm h-24"></textarea>
+          <button class="w-full bg-[#14B8A6] text-white py-2 rounded-lg font-bold">Send</button>
+        </form>
+        <p id="supportMsg" class="text-sm mt-2"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('supportForm').onsubmit=async e=>{
+  e.preventDefault();
+  const res = await fetch('/help/contact', {method:'POST', body: new FormData(e.target)});
+  const data = await res.json();
+  document.getElementById('supportMsg').innerText = data.message;
+  document.getElementById('supportMsg').className = "text-sm mt-2 text-green-600";
+  e.target.reset();
+}
+</script>
+{% endblock %}

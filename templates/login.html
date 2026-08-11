@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Login - EvidLens</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#F5F7FA] flex items-center justify-center min-h-screen">
+<div class="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md">
+  <div class="text-center mb-6">
+    <a href="/" class="font-bold text-3xl"><span style="color:#0A1F44">Evid</span><span style="color:#14B8A6">Lens</span></a>
+    <p class="text-gray-500">Decision Intelligence for Kenya</p>
+  </div>
+
+  {% if error %}
+    <div class="bg-red-50 text-red-700 p-3 rounded-lg mb-4 text-sm">{{ error }}</div>
+  {% endif %}
+  {% if success %}
+    <div class="bg-green-50 text-green-700 p-3 rounded-lg mb-4 text-sm">{{ success }}</div>
+  {% endif %}
+  
+  <form method="POST" action="/do-login" class="space-y-4">
+    <div>
+      <label class="block text-sm font-semibold text-[#0A1F44] mb-2">Email</label>
+      <input type="email" name="email" required class="w-full p-3 border rounded-lg focus:border-[#14B8A6] outline-none">
+    </div>
+    <div>
+      <div class="flex justify-between">
+        <label class="block text-sm font-semibold text-[#0A1F44] mb-2">Password</label>
+        <a href="/forgot-password" class="text-sm text-[#14B8A6]">Forgot?</a>
+      </div>
+      <input type="password" name="password" required class="w-full p-3 border rounded-lg focus:border-[#14B8A6] outline-none">
+    </div>
+    <button class="w-full bg-[#14B8A6] text-white p-3 rounded-lg font-bold hover:bg-[#0e9a8c] transition">Login</button>
+  </form>
+  
+  <p class="text-center text-sm mt-6">Don't have an account? <a href="/signup" class="text-[#14B8A6] font-bold">Sign up</a></p>
+</div>
+</body>
+</html>
