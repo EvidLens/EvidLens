@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-5xl mx-auto mt-8 card">
+  <h1 class="text-2xl font-bold mb-4" style="color:#0A1F44">Activity & History</h1>
+  <div class="overflow-x-auto">
+    <table class="w-full">
+      <thead><tr class="text-left border-b"><th class="p-2">Product</th><th>County</th><th>Sector</th><th>Demand</th><th>Date</th></tr></thead>
+      <tbody>
+        {% for a in analyses %}
+        <tr class="border-b hover:bg-gray-50">
+          <td class="p-2 font-semibold">{{ a.product }}</td>
+          <td>{{ a.county }}</td>
+          <td>{{ a.sector }}</td>
+          <td><span class="bg-teal-100 text-teal-700 px-2 py-1 rounded">{{ a.demand_score }}/10</span></td>
+          <td>{{ a.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-center p-10 text-gray-500">No activity yet. Run your first analysis on the dashboard.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

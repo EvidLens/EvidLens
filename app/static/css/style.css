@@ -1,0 +1,4 @@
+body { font-family: Inter, sans-serif; }
+#chatbot-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; }
+.btn-primary { background: #0A1F44; color: white; padding: 10px 20px; border-radius: 8px; }
+.btn-primary:hover { opacity: 0.9; }

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-md mx-auto mt-16 p-8 bg-white rounded-xl shadow-lg border-gray-200">
+  <h2 class="text-2xl font-bold text-[#0A1F44] text-center">Create Your EvidLens Account</h2>
+  <p class="text-gray-500 text-center text-sm mt-1">Get 5 free credits to start</p>
+
+  {% if error %}<p class="text-red-500 bg-red-50 p-3 rounded-lg mt-4 text-sm">{{ error }}</p>{% endif %}
+  {% if success %}<p class="text-green-600 bg-green-50 p-3 rounded-lg mt-4 text-sm">{{ success }}</p>{% endif %}
+
+  <form action="/do-signup" method="post" class="mt-6 space-y-4">
+    <input name="full_name" placeholder="Full Name" required class="w-full border p-3 rounded-lg focus:border-[#14B8A6] outline-none">
+    <input name="email" type="email" placeholder="Email" required class="w-full border p-3 rounded-lg focus:border-[#14B8A6] outline-none">
+    <input name="phone" placeholder="07XXXXXXXX" required pattern="07[0-9]{8}" class="w-full border p-3 rounded-lg focus:border-[#14B8A6] outline-none">
+
+    <select name="sector" required class="w-full border p-3 rounded-lg focus:border-[#14B8A6] outline-none bg-white">
+      <option value="">Select Sector</option>
+      {% for s in sectors %}
+      <option value="{{ s.name }}">{{ s.name }}</option>
+      {% endfor %}
+    </select>
+
+    <select name="county" required class="w-full border p-3 rounded-lg focus:border-[#14B8A6] outline-none bg-white">
+      <option value="">Select County</option>
+      {% for c in counties %}
+      <option value="{{ c.name }}">{{ c.name }}</option>
+      {% endfor %}
+    </select>
+
+    <input name="password" type="password" placeholder="Password - min 8 chars" required minlength="8" class="w-full border p-3 rounded-lg focus:border-[#14B8A6] outline-none">
+
+    <button class="w-full bg-[#0A1F44] text-white p-3 rounded-lg font-bold hover:bg-[#14B8A6] transition">Create Account</button>
+  </form>
+
+  <p class="text-center text-sm mt-6">Already have an account? <a href="/login" class="text-[#14B8A6] font-bold">Login</a></p>
+</div>
+{% endblock %}
