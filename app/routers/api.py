@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select, func, desc, or_
 import io, csv
+import requests
+from datetime import datetime, timedelta
 
 from app.core.db import get_session
 from app.core.models import MarketMetric, KenyaLensBusiness, NewsArticle, SocialMention, ExportOpportunity, User, Subscription, UserSubscription
