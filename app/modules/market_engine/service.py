@@ -1,4 +1,4 @@
-from typing import Dict, Any, List
+﻿from typing import Dict, Any, List
 from sqlmodel import Session, select, func, desc
 from datetime import datetime, timedelta
 from app.core.models import MarketMetric

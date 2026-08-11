@@ -1,11 +1,11 @@
-import os
+﻿import os
 from sqlmodel import Session, select, func
 from typing import Dict, Any, List, Union
 
 from app.core.config import settings
 from app.core.models import Plan, AddOn, ALCService, UserSubscription
 from app.modules.report_builder.models import Report
-from app.modules.market_engine.models import MarketMetric
+from app.core.models import MarketMetric
 
 UNLIMITED = -1
 
@@ -17,7 +17,7 @@ class CoreService:
         "EV-FREE": {"monthly": 0, "annual": 0, "areas": 1, "products": 1, "users": 1, "competitors": 1, "lens": "Lite", "data_delay": "14 Days", "watermark": True},
         "EV-STARTER": {"monthly": 0, "annual": 0, "areas": 1, "products": 1, "users": 1, "competitors": 1, "lens": "Lite", "data_delay": "Forever", "watermark": True},
         "EV-SME": {"monthly": 20000, "annual": 204000, "areas": 1, "products": 3, "users": 1, "competitors": 3, "leads_qtr": 0, "lens": "Basic"},
-        "EV-GROWTH": {"monthly": 50000, "annual": 510000, "areas": 3, "products": 9, "users": 5, "competitors": 10, "leads_qtr": 250, "lens": "Pro", "flag": "⭐"},
+        "EV-GROWTH": {"monthly": 50000, "annual": 510000, "areas": 3, "products": 9, "users": 5, "competitors": 10, "leads_qtr": 250, "lens": "Pro", "flag": "â­"},
         "EV-PRO": {"monthly": 100000, "annual": 1020000, "areas": 6, "products": 15, "users": UNLIMITED, "competitors": UNLIMITED, "leads_qtr": 1000, "lens": "Pro"},
         "EV-ENT": {"monthly": 200000, "annual": 2040000, "areas": 9, "products": 21, "users": UNLIMITED, "competitors": UNLIMITED, "leads_qtr": UNLIMITED, "lens": "Enterprise", "api": True, "briefings": "Weekly"}
     }
