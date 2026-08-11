@@ -1,4 +1,4 @@
-from app.core.models import KenyaLensAlert, KenyaLensSubscription, KenyaLensMember, KenyaLensApiUsage
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select, func
@@ -10,19 +10,27 @@ import io
 import csv
 import json
 
-# IMPORT MODELS ONCE HERE
+# IMPORT MODELS ONCE HERE FROM CORE ONLY
 from app.core.models import (
-    KenyaLensAlert, KenyaLensSubscription, KenyaLensMember,
-    KenyaLensApiUsage, MarketMetric, SocialMention, NewsArticle
+    KenyaLensAlert, 
+    KenyaLensSubscription, 
+    KenyaLensMember,
+    KenyaLensApiUsage, 
+    MarketMetric, 
+    SocialMention, 
+    NewsArticle,
+    KenyaLensBusiness,
+    KenyaLensSurvey
 )
-from app.modules.kenyalensiq.services import LensEngineService, get_subscription
+
+from app.modules.kenyalensiq.services import LensEngineService, get_subscription, manager
 from app.core.db import get_session
 from app.modules.kenyalensiq.mpesa import stk_push
 from app.modules.kenyalensiq import services
 from app.modules.kenyalensiq import connectors
 
 UTC = timezone.utc
-router = APIRouter()
+router = APIRouter(prefix="/kenyalensiq", tags=["KenyaLensIQ"])
 templates = Jinja2Templates(directory="app/modules/kenyalensiq/templates")
 limiter = Limiter(key_func=lambda req: req.query_params.get("api_key", get_remote_address(req)))
 
