@@ -51,7 +51,7 @@ async def dashboard_api(
         {"id": 7, "name": "Policy Watch", "icon": "📜", "count": policy_count, "route": "/kb/policy", "required_module": "Regulatory Engine"},
         {"id": 8, "name": "Funding Radar", "icon": "🏦", "count": funding_count, "route": "/reports/funding", "required_module": "Competitive Engine"},
         {"id": 9, "name": "Export Navigator", "icon": "🚢", "count": 0, "route": "/market/export", "required_module": "Market Engine"},
-        {"id": 10, "name": "KenyaLensIQ", "icon": "📊", "count": 0, "route": "/kenyalensiq", "required_module": "KenyaLensIQ"},
+        #{"id": 10, "name": "KenyaLensIQ", "icon": "📊", "count": 0, "route": "/kenyalensiq", "required_module": "KenyaLensIQ"},
         {"id": 11, "name": "Report Builder", "icon": "📑", "count": subscription_count, "route": "/reports", "required_module": "Report Builder"},
         {"id": 12, "name": "AI Insights", "icon": "🧠", "count": 0, "route": "/ai", "required_module": "AI Insights"}
     ]
