@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-from app.modules.database import get_session as get_db
+from sqlmodel import Session
+from app.core.db import get_session
 from app.modules.market_engine.service import MarketEngineService
 
 router = APIRouter(prefix="/api/market", tags=["Market Engine"])
 
-def get_service(db: Session = Depends(get_db)):
+def get_service(db: Session = Depends(get_session)):
     return MarketEngineService(db)
 
 @router.post("/search")
