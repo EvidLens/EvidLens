@@ -33,6 +33,21 @@ class ReportStatus(str, Enum):
     FAILED = "FAILED"
     EXPIRED = "EXPIRED"
 
+class Plan(SQLModel, table=True):
+    __tablename__ = "plan"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    code: str = Field(index=True, unique=True)
+    name: str
+    monthly_kes: int
+    annual_kes: int
+    areas: int
+    products: int
+    users: int
+    competitors: int
+    leads_qtr: int = 0
+    lens_tier: str = "Basic"
+
 class Report(SQLModel, table=True):
     __tablename__ = "report"
     __table_args__ = {"extend_existing": True}
@@ -242,15 +257,6 @@ class SectorReport(SQLModel, table=True):
     version: str = Field(default="v1.0", max_length=20)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), sa_column_kwargs={"server_default": func.now()})
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC), sa_column_kwargs={"server_default": func.now(), "onupdate": func.now()})
-
-class Report(SQLModel, table=True):
-    __tablename__ = "report"
-    __table_args__ = {"extend_existing": True}
-    id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="user.id")
-    title: str
-    data: dict = Field(sa_column=Column(JSON))
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class Deal(SQLModel, table=True):
     __tablename__ = "deals"
