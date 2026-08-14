@@ -1,5 +1,6 @@
 import os
 import traceback
+from typing import Optional
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 
@@ -16,9 +17,10 @@ from apscheduler.triggers.cron import CronTrigger
 from app.core.config import settings
 from app.core.db import init_db, engine
 from app.core.scheduler import start_scheduler, shutdown_scheduler
+from app.core.models import User
 
 # Routers
-from app.core.auth import get_current_user_optional
+from app.core.auth import router as auth_router, get_current_user_optional # FIXED
 from app.core.router import router as core_router
 from app.modules.competitive_engine.router import router as competitive_router
 from app.modules.market_engine.router import router as market_router
@@ -58,10 +60,10 @@ def on_startup():
     init_db()
     SQLModel.metadata.create_all(engine)
     print("DB tables checked/created")
-    
+
     # Import jobs here to avoid circular imports
     from app.modules.cron.jobs import scrape_kpin_prices, fetch_real_news, fetch_real_tweets
-    
+
     scheduler.add_job(lambda: safe_job(scrape_kpin_prices, "KPIN"), CronTrigger(hour=getattr(settings, "KPIN_SCRAPE_HOUR", 3), minute=0), id="kpin_scrape", replace_existing=True)
     scheduler.add_job(lambda: safe_job(fetch_real_news, "NEWS"), CronTrigger(hour=getattr(settings, "NEWS_SCRAPE_HOUR", 4), minute=0), id="news_scrape", replace_existing=True)
     scheduler.add_job(lambda: safe_job(fetch_real_tweets, "TWEETS"), CronTrigger(hour=getattr(settings, "TWEETS_SCRAPE_HOUR", 5), minute=0), id="tweets_scrape", replace_existing=True)
@@ -75,10 +77,10 @@ def shutdown_event():
     print("Scheduler shut down")
 
 app.add_middleware(
-    CORSMiddleware, 
-    allow_origins=["*"], 
-    allow_credentials=True, 
-    allow_methods=["*"], 
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
     allow_headers=["*"]
 )
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -103,14 +105,14 @@ app.include_router(storage_router)
 app.include_router(chatbot_router)
 app.include_router(billing.router)
 
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
 def root(request: Request, current_user: Optional[User] = Depends(get_current_user_optional)):
     return templates.TemplateResponse("index.html", {
         "request": request,
         "now": datetime.now(UTC),
         "current_user": current_user
     })
-    
+
 def get_session():
     with Session(engine) as session:
         yield session
