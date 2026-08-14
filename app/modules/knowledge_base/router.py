@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, Request
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
 from sqlmodel import Session, select, desc
 from pydantic import BaseModel
 from typing import List, Optional
@@ -7,7 +9,8 @@ from app.core.models import SectorReport, KnowledgeChunk, DataSource
 from app.core.db import get_session as get_db
 from app.core.guards import require_module
 
-router = APIRouter(prefix="/knowledge", tags=["Knowledge Base"])
+router = APIRouter(prefix="/kb", tags=["Knowledge Base"])
+templates = Jinja2Templates(directory="app/templates")
 
 KENYA_SECTORS = [
     "Banks", "Microfinance Institutions", "Insurance & HMOs", "Fintechs & Mobile Money",
@@ -56,20 +59,19 @@ class SearchRequest(BaseModel):
     county: Optional[str] = None
     top_k: int = 5
 
+@router.get("/policy", response_class=HTMLResponse)
+async def policy_page(request: Request):
+    return templates.TemplateResponse("kb_policy.html", {"request": request})
+
 @router.get("/sectors")
 def list_sectors():
     return {"sectors": KENYA_SECTORS, "total": len(KENYA_SECTORS)}
 
 @router.get("/report/{sector}", response_model=ReportResponse)
 @require_module(module_number=3)
-def get_report(
-    request: Request,
-    sector: str,
-    county: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
-):
+def get_report(request: Request, sector: str, county: Optional[str] = Query(None), db: Session = Depends(get_db)):
     if sector not in KENYA_SECTORS:
-        raise HTTPException(status_code=404, detail="Sector not found. Use /sectors to list all 75")
+        raise HTTPException(status_code=404, detail="Sector not found. Use /kb/sectors to list all 75")
 
     report = get_sector_report(db, sector, county)
     if not report:
