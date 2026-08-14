@@ -90,7 +90,9 @@ class UserSubscription(SQLModel, table=True):
     __tablename__ = "usersubscription"
     __table_args__ = {"extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(index=True)
+    user_id: int = Field(index=True, foreign_key="user.id")
+    tenant_id: Optional[str] = Field(index=True, default=None)
+    module_name: Optional[str] = Field(index=True, default=None)
     plan_code: str
     lead_credits: int = 0
     api_credits: int = 0
