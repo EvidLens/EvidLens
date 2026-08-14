@@ -16,7 +16,7 @@
     <div class="relative" id="profileMenu">
       <button id="profileBtn" class="flex items-center gap-2">
         <div class="w-9 h-9 rounded-full bg-gradient-to-r from-[#14B8A6] to-[#0A1F44] flex items-center justify-center text-white font-bold">
-          {{ current_user.full_name[:1] }}
+          {{ current_user.full_name[:1] if current_user else 'G' }}
         </div>
       </button>
 
