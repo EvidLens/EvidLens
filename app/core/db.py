@@ -58,7 +58,7 @@ def init_db():
     from app.modules.pricing_engine.models import ProductPrice, RetailOutlet
     from app.modules.regulatory_engine.models import Regulation, ComplianceDeadline
     from app.modules.consumer_voice.models import ConsumerFeedback, SentimentSummary
-    from app.modules.location_intel.models import LocationDemand, PropertyListing
+    # from app.modules.location_intel.models import LocationDemand, PropertyListing
     from app.modules.business_os.models import Contact, Battlecard
     from app.modules.knowledge_base.models import KnowledgeDocument
     
