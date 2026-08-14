@@ -18,7 +18,7 @@ from app.core.db import init_db, engine
 from app.core.scheduler import start_scheduler, shutdown_scheduler
 
 # Routers
-from app.modules.auth.router import router as auth_router
+from app.core.auth import get_current_user_optional
 from app.core.router import router as core_router
 from app.modules.competitive_engine.router import router as competitive_router
 from app.modules.market_engine.router import router as market_router
@@ -103,10 +103,14 @@ app.include_router(storage_router)
 app.include_router(chatbot_router)
 app.include_router(billing.router)
 
-@app.get("/", response_class=HTMLResponse)
-async def root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request, "now": datetime.now(UTC)})
-
+@app.get("/")
+def root(request: Request, current_user: Optional[User] = Depends(get_current_user_optional)):
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "now": datetime.now(UTC),
+        "current_user": current_user
+    })
+    
 def get_session():
     with Session(engine) as session:
         yield session
