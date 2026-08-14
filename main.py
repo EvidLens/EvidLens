@@ -39,7 +39,6 @@ from app.core import billing
 from app.modules.auth.router import router as auth_router
 from app.core.router import router as core_router
 
-# CHANGED: kenyalensiq -> kenyalens
 from app.modules.competitive_engine.router import router as competitive_router
 from app.modules.market_engine.router import router as market_router
 from app.modules.location_intel.router import router as location_router
@@ -110,7 +109,6 @@ app.include_router(rag_router, prefix="/rag", tags=["RAG"])
 app.include_router(payments_router, prefix="/payments", tags=["Payments"])
 app.include_router(api_router, prefix="/api", tags=["API"])
 app.include_router(cron_router, tags=["Cron"])
-app.include_router(lens_router, tags=["Lens"])
 app.include_router(core_router, tags=["Core"])
 app.include_router(storage_router, tags=["Storage"])
 app.include_router(chatbot_router)
