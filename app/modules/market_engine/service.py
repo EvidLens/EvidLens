@@ -18,10 +18,14 @@ class MarketEngineService:
             r.raise_for_status()
             return r.json()
 
-    async def market_funding_trends(self, sector: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def market_funding_trends(self, sector: Optional[str] = None, county: Optional[str] = None, sub_county: Optional[str] = None) -> List[Dict[str, Any]]:
         q = select(MarketMetric)
         if sector:
             q = q.where(MarketMetric.sector == sector)
+        if county:
+            q = q.where(MarketMetric.county == county)
+        if sub_county:
+            q = q.where(MarketMetric.extra_data['sub_county'].astext == sub_county) # if stored in metadata
         q = q.order_by(desc(MarketMetric.created_at)).limit(100)
         results = self.db.exec(q).all()
         return [
@@ -37,15 +41,18 @@ class MarketEngineService:
             } for m in results
         ]
 
-    async def get_competitor_overview(self, sector: str, county: Optional[str] = None) -> Dict[str, Any]:
+    async def get_competitor_overview(self, sector: str, county: Optional[str] = None, sub_county: Optional[str] = None) -> Dict[str, Any]:
         q = select(Competitor).where(Competitor.sector == sector)
         if county:
             q = q.where(Competitor.county == county)
+        if sub_county:
+            q = q.where(Competitor.sub_county == sub_county)
         q = q.order_by(desc(Competitor.last_seen_at)).limit(50)
         competitors = self.db.exec(q).all()
         return {
             "sector": sector,
             "county": county,
+            "sub_county": sub_county,
             "total_companies_found": len(competitors),
             "companies": [
                 {
@@ -67,7 +74,7 @@ class MarketEngineService:
             ]
         }
 
-    async def search_market(self, q: str, sector: Optional[str], county: Optional[str]) -> Dict[str, Any]:
+    async def search_market(self, q: str, sector: Optional[str], county: Optional[str], sub_county: Optional[str] = None) -> Dict[str, Any]:
         self.db.add(MarketSearch(query=q, sector=sector, county=county))
         self.db.commit()
 
@@ -87,7 +94,7 @@ class MarketEngineService:
 
         macro_data = {}
         if NEWS_API_KEY and sector:
-            news_url = f"https://newsapi.org/v2/everything?q={sector}+Kenya&apiKey={NEWS_API_KEY}&pageSize=3&language=en&sortBy=publishedAt"
+            news_url = f"https://newsapi.org/v2/everything?q={sector}+{county}+Kenya&apiKey={NEWS_API_KEY}&pageSize=3&language=en&sortBy=publishedAt"
             try:
                 news = await self._call_api(news_url)
                 macro_data["latest_news"] = [n["title"] for n in news.get("articles", [])]
@@ -105,6 +112,7 @@ class MarketEngineService:
             "query": q,
             "sector": sector,
             "county": county,
+            "sub_county": sub_county,
             "searches_30_days": volume_30d or 0,
             "total_searches_all_time": total or 0,
             "market_size_estimate_kes": float(market_size),
@@ -133,6 +141,10 @@ class MarketEngineService:
         county_stmt = select(MarketSearch.county, func.count(MarketSearch.id).label('count')).group_by(MarketSearch.county).order_by(desc('count')).limit(5)
         top_counties = [{"county": c, "count": cnt} for c, cnt in self.db.exec(county_stmt).all() if c]
 
+        # NEW: TOP SUB-COUNTIES
+        sub_county_stmt = select(Competitor.sub_county, func.count(Competitor.id).label('count')).where(Competitor.sub_county.isnot(None)).group_by(Competitor.sub_county).order_by(desc('count')).limit(5)
+        top_sub_counties = [{"sub_county": s, "count": cnt} for s, cnt in self.db.exec(sub_county_stmt).all() if s]
+
         trending_stmt = select(MarketSearch.query, func.count(MarketSearch.id).label('c')).where(MarketSearch.created_at >= seven_days_ago).group_by(MarketSearch.query).order_by(desc('c')).limit(5)
         trending = [{"query": q, "count": c} for q, c in self.db.exec(trending_stmt).all() if q]
 
@@ -157,6 +169,7 @@ class MarketEngineService:
             "breakdowns": {
                 "top_sectors": top_sectors,
                 "top_counties": top_counties,
+                "top_sub_counties": top_sub_counties, # <-- NEW
                 "metrics_by_sector": metrics_by_sector
             },
             "trends": {
@@ -169,19 +182,24 @@ class MarketEngineService:
             "last_updated": now.isoformat()
         }
 
-    async def get_real_time_terminal(self, sector: str, county: str) -> Dict[str, Any]:
+    async def get_real_time_terminal(self, sector: str, county: str, sub_county: Optional[str] = None) -> Dict[str, Any]:
         now = datetime.utcnow()
-        stmt_1h = select(func.count(MarketSearch.id)).where(MarketSearch.sector == sector, MarketSearch.county == county, MarketSearch.created_at >= now - timedelta(hours=1))
+        q = select(func.count(MarketSearch.id)).where(MarketSearch.sector == sector, MarketSearch.county == county)
+        if sub_county:
+            q = q.where(MarketSearch.query.ilike(f"%{sub_county}%")) # rough filter if you log sub_county in query
+
+        stmt_1h = q.where(MarketSearch.created_at >= now - timedelta(hours=1))
         last_1h = self.db.exec(stmt_1h).one()
-        stmt_24h = select(func.count(MarketSearch.id)).where(MarketSearch.sector == sector, MarketSearch.county == county, MarketSearch.created_at >= now - timedelta(days=1))
+        stmt_24h = q.where(MarketSearch.created_at >= now - timedelta(days=1))
         last_24h = self.db.exec(stmt_24h).one()
-        stmt_7d = select(func.count(MarketSearch.id)).where(MarketSearch.sector == sector, MarketSearch.county == county, MarketSearch.created_at >= now - timedelta(days=7))
+        stmt_7d = q.where(MarketSearch.created_at >= now - timedelta(days=7))
         last_7d = self.db.exec(stmt_7d).one()
         avg_per_hour = (last_24h or 0) / 24 if last_24h else 0
         trend = "UP" if (last_1h or 0) > avg_per_hour else "DOWN"
         return {
             "sector": sector,
             "county": county,
+            "sub_county": sub_county,
             "intent_searches_1h": last_1h or 0,
             "intent_searches_24h": last_24h or 0,
             "intent_searches_7d": last_7d or 0,
@@ -189,15 +207,16 @@ class MarketEngineService:
             "last_updated": now.isoformat()
         }
 
-    async def get_location_data(self, county: str) -> Dict[str, Any]:
+    async def get_location_data(self, county: str, sub_county: Optional[str] = None) -> Dict[str, Any]:
         if not LOCATIONIQ_KEY:
             return {"error": "Set LOCATIONIQ_KEY in Render Env Vars"}
-        url = f"https://us1.locationiq.com/v1/search.php?key={LOCATIONIQ_KEY}&q={county},Kenya&format=json"
+        query = f"{sub_county}, {county}, Kenya" if sub_county else f"{county}, Kenya"
+        url = f"https://us1.locationiq.com/v1/search.php?key={LOCATIONIQ_KEY}&q={query}&format=json"
         try:
             data = await self._call_api(url)
-            return {"county": county, "geo_data": data}
+            return {"county": county, "sub_county": sub_county, "geo_data": data}
         except:
-            return {"county": county, "geo_data": None}
+            return {"county": county, "sub_county": sub_county, "geo_data": None}
 
 from app.core.db import SessionLocal
 
@@ -206,10 +225,10 @@ def _get_service():
     service = MarketEngineService(db)
     return service
 
-async def search_market(q, sector, county):
+async def search_market(q, sector, county, sub_county=None):
     s = _get_service()
     try:
-        return await s.search_market(q, sector, county)
+        return await s.search_market(q, sector, county, sub_county)
     finally:
         s.db.close()
 
@@ -220,24 +239,24 @@ async def get_dashboard_stats():
     finally:
         s.db.close()
 
-async def get_real_time_terminal(sector, county):
+async def get_real_time_terminal(sector, county, sub_county=None):
     s = _get_service()
     try:
-        return await s.get_real_time_terminal(sector, county)
+        return await s.get_real_time_terminal(sector, county, sub_county)
     finally:
         s.db.close()
 
-async def get_competitor_overview(sector, county):
+async def get_competitor_overview(sector, county, sub_county=None):
     s = _get_service()
     try:
-        return await s.get_competitor_overview(sector, county)
+        return await s.get_competitor_overview(sector, county, sub_county)
     finally:
         s.db.close()
 
-async def get_location_data(county):
+async def get_location_data(county, sub_county=None):
     s = _get_service()
     try:
-        return await s.get_location_data(county)
+        return await s.get_location_data(county, sub_county)
     finally:
         s.db.close()
 
