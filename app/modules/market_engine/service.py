@@ -133,7 +133,7 @@ class MarketEngineService:
             "total_metrics": total_metrics or 0,
             "total_companies": total_companies or 0,
             "sectors_covered": sectors_covered or 0,
-            "reports_exported": 0, # Will be real when you add a Report model
+            "reports_exported": 0,
             "top_sector": top_sector[0] if top_sector else "N/A",
             "top_county": top_county[0] if top_county else "N/A",
             "trending_queries": [{"query": q, "count": c} for q, c in trending]
