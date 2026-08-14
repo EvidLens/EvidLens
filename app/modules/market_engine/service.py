@@ -116,7 +116,7 @@ class MarketEngineService:
         total_searches = self.db.exec(select(func.count(MarketSearch.id))).one()
         total_metrics = self.db.exec(select(func.count(MarketMetric.id))).one()
         total_companies = self.db.exec(select(func.count(Competitor.id))).one()
-        total_reports = self.db.exec(select(func.count(Report.id))).one() # <-- REAL COUNT NOW
+        total_reports = self.db.exec(select(func.count(Report.id))).one()
 
         sectors_covered = self.db.exec(select(func.count(func.distinct(MarketSearch.sector)))).one()
 
