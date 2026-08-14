@@ -1,13 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlmodel import Session, select, desc # CHANGED: no more sqlalchemy.orm
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
+from sqlmodel import Session, select, desc
 from pydantic import BaseModel
 from typing import List, Optional
 from.service import aggregate_sentiment, fetch_reddit_data
-from app.core.models import ConsumerFeedback, SentimentSummary # CHANGED: use core.models
-from app.core.db import get_session as get_db # CHANGED: use core.db
+from app.core.models import ConsumerFeedback, SentimentSummary
+from app.core.db import get_session as get_db
 from app.core.guards import require_module, consume_credits
 
-router = APIRouter(prefix="/consumer-voice", tags=["Consumer Voice"])
+router = APIRouter(prefix="/voice", tags=["Consumer Voice"])
+templates = Jinja2Templates(directory="app/templates")
 
 class SentimentRequest(BaseModel):
     sector: str
@@ -26,6 +29,10 @@ class SentimentResponse(BaseModel):
     top_likes: List[str]
     top_complaints: List[str]
 
+@router.get("/", response_class=HTMLResponse)
+async def voice_page(request: Request):
+    return templates.TemplateResponse("voice.html", {"request": request})
+
 @router.post("/analyze", response_model=SentimentResponse)
 @require_module(module_number=2)
 def analyze_consumer_sentiment(request: Request, req: SentimentRequest, db: Session = Depends(get_db)):
@@ -40,18 +47,16 @@ def analyze_consumer_sentiment(request: Request, req: SentimentRequest, db: Sess
 @router.get("/feedback/{sector}")
 @require_module(module_number=2)
 def get_feedback_by_sector(request: Request, sector: str, county: Optional[str] = Query(None), limit: int = Query(50), db: Session = Depends(get_db)):
-    # CHANGED TO SQLMODEL
     stmt = select(ConsumerFeedback).where(ConsumerFeedback.sector == sector)
     if county:
         stmt = stmt.where(ConsumerFeedback.county == county)
-    stmt = stmt.order_by(desc(ConsumerFeedback.created_at)).limit(limit) # USE created_at
+    stmt = stmt.order_by(desc(ConsumerFeedback.created_at)).limit(limit)
     results = db.exec(stmt).all()
     return results
 
 @router.get("/summary/{sector}/{product}")
 @require_module(module_number=2)
 def get_summary(request: Request, sector: str, product: str, county: Optional[str] = Query(None), db: Session = Depends(get_db)):
-    # CHANGED TO SQLMODEL
     stmt = select(SentimentSummary).where(SentimentSummary.sector == sector, SentimentSummary.product_or_topic == product)
     if county:
         stmt = stmt.where(SentimentSummary.county == county)
