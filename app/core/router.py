@@ -3,7 +3,8 @@ from sqlmodel import Session, select, func, or_, desc
 from datetime import datetime, timezone
 from typing import Optional
 
-from app.core.models import KenyaLensBusiness, MarketMetric, NewsArticle, SocialMention, Sector, UserSubscription, Report, KnowledgeChunk, ExportOpportunity
+from app.core.models import KenyaLensBusiness, MarketMetric, NewsArticle, SocialMention, Sector, UserSubscription, KnowledgeChunk, ExportOpportunity
+from app.modules.report_builder.models import Report
 from app.core.db import get_session
 from app.core.service import CoreService
 from app.modules.auth.dependencies import get_current_user
