@@ -4,7 +4,6 @@ from typing import List, Optional
 import httpx, os, json
 from sqlmodel import Session
 from app.core.db import get_session
-from app.modules.kenyalensiq.services import LensEngineService
 
 router = APIRouter(prefix="/lens", tags=["Ask Lens"])
 GROQ_KEY = os.getenv("GROQ_API_KEY")
