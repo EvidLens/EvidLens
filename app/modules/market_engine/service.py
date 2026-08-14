@@ -113,60 +113,72 @@ class MarketEngineService:
         }
 
     async def get_dashboard_stats(self) -> Dict[str, Any]:
-        total_searches = self.db.exec(select(func.count(MarketSearch.id))).one()
-        total_metrics = self.db.exec(select(func.count(MarketMetric.id))).one()
-        total_companies = self.db.exec(select(func.count(Competitor.id))).one()
-        total_reports = self.db.exec(select(func.count(Report.id))).one()
+        now = datetime.utcnow()
+        seven_days_ago = now - timedelta(days=7)
+        thirty_days_ago = now - timedelta(days=30)
+        sixty_days_ago = now - timedelta(days=60)
 
-        sectors_covered = self.db.exec(select(func.count(func.distinct(MarketSearch.sector)))).one()
+        total_searches = self.db.exec(select(func.count(MarketSearch.id))).one() or 0
+        total_metrics = self.db.exec(select(func.count(MarketMetric.id))).one() or 0
+        total_companies = self.db.exec(select(func.count(Competitor.id))).one() or 0
+        total_reports = self.db.exec(select(func.count(Report.id))).one() or 0
 
-        top_sector_stmt = select(MarketSearch.sector, func.count(MarketSearch.id).label('c')).group_by(MarketSearch.sector).order_by(desc('c')).limit(1)
-        top_sector = self.db.exec(top_sector_stmt).first()
+        searches_last_7 = self.db.exec(select(func.count(MarketSearch.id)).where(MarketSearch.created_at >= seven_days_ago)).one() or 0
+        searches_prev_7 = self.db.exec(select(func.count(MarketSearch.id)).where(MarketSearch.created_at >= sixty_days_ago, MarketSearch.created_at < thirty_days_ago)).one() or 0
+        search_growth_pct = round(((searches_last_7 - searches_prev_7) / searches_prev_7 * 100), 2) if searches_prev_7 > 0 else 0
 
-        top_county_stmt = select(MarketSearch.county, func.count(MarketSearch.id).label('c')).group_by(MarketSearch.county).order_by(desc('c')).limit(1)
-        top_county = self.db.exec(top_county_stmt).first()
+        sector_stmt = select(MarketSearch.sector, func.count(MarketSearch.id).label('count')).group_by(MarketSearch.sector).order_by(desc('count')).limit(5)
+        top_sectors = [{"sector": s, "count": c} for s, c in self.db.exec(sector_stmt).all() if s]
 
-        trending_stmt = select(MarketSearch.query, func.count(MarketSearch.id).label('c')).group_by(MarketSearch.query).order_by(desc('c')).limit(5)
-        trending = self.db.exec(trending_stmt).all()
+        county_stmt = select(MarketSearch.county, func.count(MarketSearch.id).label('count')).group_by(MarketSearch.county).order_by(desc('count')).limit(5)
+        top_counties = [{"county": c, "count": cnt} for c, cnt in self.db.exec(county_stmt).all() if c]
+
+        trending_stmt = select(MarketSearch.query, func.count(MarketSearch.id).label('c')).where(MarketSearch.created_at >= seven_days_ago).group_by(MarketSearch.query).order_by(desc('c')).limit(5)
+        trending = [{"query": q, "count": c} for q, c in self.db.exec(trending_stmt).all() if q]
+
+        activity_stmt = select(func.date(MarketSearch.created_at).label('day'), func.count(MarketSearch.id)).where(MarketSearch.created_at >= thirty_days_ago).group_by(func.date(MarketSearch.created_at)).order_by('day')
+        activity = [{"date": str(d), "searches": cnt} for d, cnt in self.db.exec(activity_stmt).all()]
+
+        metrics_by_sector_stmt = select(MarketMetric.sector, func.avg(MarketMetric.metric_value).label('avg_value')).group_by(MarketMetric.sector).limit(10)
+        metrics_by_sector = [{"sector": s, "avg_metric_value": round(v, 2)} for s, v in self.db.exec(metrics_by_sector_stmt).all() if s and v]
+
+        latest_reports_stmt = select(Report).order_by(desc(Report.created_at)).limit(5)
+        latest_reports = [{"id": r.id, "title": r.title, "sector": r.sector, "county": r.county, "file_type": r.file_type, "created_at": r.created_at.isoformat()} for r in self.db.exec(latest_reports_stmt).all()]
 
         return {
-            "insights_generated": total_searches or 0,
-            "total_metrics": total_metrics or 0,
-            "total_companies": total_companies or 0,
-            "sectors_covered": sectors_covered or 0,
-            "reports_exported": total_reports or 0, # <-- NO MORE HARDCODE
-            "top_sector": top_sector[0] if top_sector else "N/A",
-            "top_county": top_county[0] if top_county else "N/A",
-            "trending_queries": [{"query": q, "count": c} for q, c in trending]
+            "overview": {
+                "insights_generated": total_searches,
+                "total_metrics": total_metrics,
+                "total_companies": total_companies,
+                "reports_exported": total_reports,
+                "sectors_covered": len(top_sectors),
+                "search_growth_7d_pct": search_growth_pct
+            },
+            "breakdowns": {
+                "top_sectors": top_sectors,
+                "top_counties": top_counties,
+                "metrics_by_sector": metrics_by_sector
+            },
+            "trends": {
+                "trending_queries_7d": trending,
+                "activity_last_30_days": activity
+            },
+            "latest": {
+                "reports": latest_reports
+            },
+            "last_updated": now.isoformat()
         }
 
     async def get_real_time_terminal(self, sector: str, county: str) -> Dict[str, Any]:
         now = datetime.utcnow()
-
-        stmt_1h = select(func.count(MarketSearch.id)).where(
-            MarketSearch.sector == sector,
-            MarketSearch.county == county,
-            MarketSearch.created_at >= now - timedelta(hours=1)
-        )
+        stmt_1h = select(func.count(MarketSearch.id)).where(MarketSearch.sector == sector, MarketSearch.county == county, MarketSearch.created_at >= now - timedelta(hours=1))
         last_1h = self.db.exec(stmt_1h).one()
-
-        stmt_24h = select(func.count(MarketSearch.id)).where(
-            MarketSearch.sector == sector,
-            MarketSearch.county == county,
-            MarketSearch.created_at >= now - timedelta(days=1)
-        )
+        stmt_24h = select(func.count(MarketSearch.id)).where(MarketSearch.sector == sector, MarketSearch.county == county, MarketSearch.created_at >= now - timedelta(days=1))
         last_24h = self.db.exec(stmt_24h).one()
-
-        stmt_7d = select(func.count(MarketSearch.id)).where(
-            MarketSearch.sector == sector,
-            MarketSearch.county == county,
-            MarketSearch.created_at >= now - timedelta(days=7)
-        )
+        stmt_7d = select(func.count(MarketSearch.id)).where(MarketSearch.sector == sector, MarketSearch.county == county, MarketSearch.created_at >= now - timedelta(days=7))
         last_7d = self.db.exec(stmt_7d).one()
-
         avg_per_hour = (last_24h or 0) / 24 if last_24h else 0
         trend = "UP" if (last_1h or 0) > avg_per_hour else "DOWN"
-
         return {
             "sector": sector,
             "county": county,
