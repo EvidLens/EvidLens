@@ -16,29 +16,57 @@ class ReportFormat(str, Enum):
     pdf = "pdf"
     excel = "excel"
 
+class ReportType(str, Enum):
+    MARKET_FEASIBILITY = "MARKET_FEASIBILITY"
+    CONSUMER_ANALYSIS = "CONSUMER_ANALYSIS"
+    INVESTOR_PITCH = "INVESTOR_PITCH"
+    KRA_TAX = "KRA_TAX"
+    BUSINESS_PLAN = "BUSINESS_PLAN"
+
+class ReportFormat(str, Enum):
+    PDF = "pdf"
+    EXCEL = "excel"
+
 class ReportStatus(str, Enum):
-    pending = "pending"
-    completed = "completed"
-    failed = "failed"
+    GENERATING = "GENERATING"
+    READY = "READY"
+    FAILED = "FAILED"
+    EXPIRED = "EXPIRED"
 
-# --- ALL YOUR EXISTING MODELS ---
-class Plan(SQLModel, table=True):
-    __tablename__ = "plan"
+class Report(SQLModel, table=True):
+    __tablename__ = "report"
     __table_args__ = {"extend_existing": True}
-    id: Optional[int] = Field(default=None, primary_key=True)
-    code: str = Field(index=True, unique=True)
-    name: str
-    monthly_price: int
-    annual_price: int
-    lanes: int
-    modules: int
-    users: int
-    competitors: int
-    leads_per_quarter: int
-    support_sla: str
-    description: str
-    features: str
 
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+
+    title: str
+    report_type: ReportType
+    format: ReportFormat
+    status: ReportStatus = Field(default=ReportStatus.GENERATING)
+
+    # Query context
+    query: str
+    sector: str
+    country: str = "Kenya"
+    county: Optional[str] = Field(default=None, index=True)
+    sub_county: Optional[str] = Field(default=None, index=True)
+    ward: Optional[str] = Field(default=None, index=True)
+    town: Optional[str] = Field(default=None, index=True)
+
+    # File
+    file_path: Optional[str] = None
+    file_size_kb: Optional[int] = None
+    download_count: int = Field(default=0)
+
+    # Meta
+    is_branded: bool = Field(default=False)
+    expires_at: Optional[datetime] = None
+    error_message: Optional[str] = None
+    data: dict = Field(default={}, sa_column=Column(JSON))
+
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), sa_column_kwargs={"server_default": func.now()})
+    
 class AddOn(SQLModel, table=True):
     __tablename__ = "addon"
     __table_args__ = {"extend_existing": True}
