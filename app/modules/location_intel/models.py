@@ -143,3 +143,27 @@ class LocationComparisonResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class LocationDemand(SQLModel, table=True):
+    __tablename__ = "location_demand"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    county: str = Field(max_length=100, index=True)
+    sub_county: Optional[str] = Field(default=None, max_length=100)
+    ward: Optional[str] = Field(default=None, max_length=100)
+    product_category: str = Field(max_length=100, index=True)
+    demand_score: float = Field(default=0.0)
+    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
+
+class PropertyListing(SQLModel, table=True):
+    __tablename__ = "property_listings"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: Optional[int] = Field(default=None, foreign_key="businesses.id")
+    title: str = Field(max_length=255)
+    description: Optional[str] = Field(default=None)
+    county: str = Field(max_length=100, index=True)
+    sub_county: Optional[str] = Field(default=None, max_length=100)
+    price_kes: float = Field(default=0.0)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
