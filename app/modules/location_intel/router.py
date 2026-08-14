@@ -1,19 +1,27 @@
-from fastapi import APIRouter, Depends, Header, Request, WebSocket, BackgroundTasks, Query
+from fastapi import APIRouter, Depends, Request, BackgroundTasks, Query
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
 from sqlmodel import Session, select
 from pydantic import BaseModel
-from typing import List, Optional
-from .service import get_location_comparison, generate_heatmap, fetch_osm_businesses, calculate_price_arbitrage, seed_geo_data
+from typing import Optional
+
+from.service import get_location_comparison, generate_heatmap, fetch_osm_businesses, calculate_price_arbitrage, seed_geo_data
 from app.modules.location_intel.models import KENYA_COUNTIES, LocationGeo
 from app.core.db import get_session as get_db
 from app.core.guards import require_module
 
 router = APIRouter(prefix="/location", tags=["Location Intel"])
+templates = Jinja2Templates(directory="app/templates")
 
 class ComparisonRequest(BaseModel):
     sector: str
     location_a: str
     location_b: str
     location_type: str
+
+@router.get("/counties", response_class=HTMLResponse)
+async def counties_page(request: Request):
+    return templates.TemplateResponse("location_counties.html", {"request": request})
 
 @router.get("/geo/counties")
 def list_counties():
@@ -53,3 +61,18 @@ def seed_geo(request: Request, background_tasks: BackgroundTasks):
 def compare_locations(request: Request, req: ComparisonRequest):
     result = get_location_comparison(req.sector, req.location_a, req.location_b, req.location_type)
     return result
+
+@router.get("/api/heatmap")
+@require_module(module_number=4)
+def get_heatmap(sector: str = Query(...), metric: str = "business_density", db: Session = Depends(get_db)):
+    return generate_heatmap(sector, metric, db)
+
+@router.get("/api/osm")
+@require_module(module_number=4)
+def get_osm_businesses(county: str = Query(...), category: str = "retail", db: Session = Depends(get_db)):
+    return fetch_osm_businesses(county, category, db)
+
+@router.get("/api/arbitrage")
+@require_module(module_number=4)
+def get_arbitrage(product: str = Query(...), db: Session = Depends(get_db)):
+    return calculate_price_arbitrage(product, db)
