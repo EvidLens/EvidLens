@@ -6,6 +6,7 @@ from app.core.models import KenyaLensBusiness, MarketMetric, NewsArticle, Social
 from app.core.db import get_session
 from app.core.service import CoreService
 from app.modules.auth.dependencies import get_current_user
+from app.core.models import Report, ReportType, ReportFormat, ReportStatus
 
 UTC = timezone.utc
 router = APIRouter()
