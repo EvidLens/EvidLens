@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select, desc
 from pydantic import BaseModel
 from typing import Optional
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import httpx
 
 from.service import generate_market_report_pdf, generate_market_report_excel
@@ -13,8 +14,10 @@ from app.modules.payments.service import get_subscription
 from app.core.db import get_session as get_db
 from app.core.guards import require_module
 
-router = APIRouter(prefix="/report-builder", tags=["Report Builder"])
+router = APIRouter(prefix="/reports", tags=["Report Builder"])
+templates = Jinja2Templates(directory="app/templates")
 GROQ_KEY = os.getenv("GROQ_API_KEY")
+UTC = timezone.utc
 
 class GenerateReportRequest(BaseModel):
     query: str
@@ -27,15 +30,17 @@ class GenerateReportRequest(BaseModel):
     report_type: ReportType = ReportType.MARKET_FEASIBILITY
     format: ReportFormat = ReportFormat.PDF
 
+@router.get("/", response_class=HTMLResponse)
+async def reports_page(request: Request):
+    return templates.TemplateResponse("reports.html", {"request": request})
+
+@router.get("/funding", response_class=HTMLResponse)
+async def funding_page(request: Request):
+    return templates.TemplateResponse("reports_funding.html", {"request": request})
+
 @router.post("/generate")
 @require_module(module_number=5)
-def generate_report(
-    request: Request,
-    req: GenerateReportRequest,
-    user_id: int,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
-):
+def generate_report(request: Request, req: GenerateReportRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     user_id = request.state.user.id
     sub = get_subscription(db, user_id)
 
@@ -68,11 +73,7 @@ def generate_report(
         sub.reports_left -= 1
         db.commit()
 
-    return {
-        "report_id": report.id,
-        "status": "generating",
-        "message": "Report is being generated. Check /reports/list for download"
-    }
+    return {"report_id": report.id, "status": "generating", "message": "Report is being generated. Check /reports/list for download"}
 
 async def process_report_generation(db: Session, report_id: int, req: GenerateReportRequest):
     stmt = select(Report).where(Report.id==report_id)
@@ -90,20 +91,14 @@ async def process_report_generation(db: Session, report_id: int, req: GenerateRe
                 insight = ai_res.json()["choices"][0]["message"]["content"]
 
         if req.format == ReportFormat.PDF:
-            filepath = generate_market_report_pdf(
-                db, req.query, req.sector, req.country, req.county,
-                req.sub_county, req.ward, req.town
-            )
+            filepath = generate_market_report_pdf(db, req.query, req.sector, req.country, req.county, req.sub_county, req.ward, req.town)
         else:
-            filepath = generate_market_report_excel(
-                db, req.sector, req.country, req.county,
-                req.sub_county, req.ward, req.town, req.query
-            )
+            filepath = generate_market_report_excel(db, req.sector, req.country, req.county, req.sub_county, req.ward, req.town, req.query)
 
         report.file_path = filepath
         report.file_size_kb = os.path.getsize(filepath) // 1024
         report.status = ReportStatus.READY
-        report.expires_at = datetime.now() + timedelta(days=30 if report.is_branded else 7)
+        report.expires_at = datetime.now(UTC) + timedelta(days=30 if report.is_branded else 7)
         db.commit()
     except Exception as e:
         report.status = ReportStatus.FAILED
@@ -118,7 +113,7 @@ def download_report(request: Request, report_id: int, db: Session = Depends(get_
     report = db.exec(stmt).first()
     if not report: raise HTTPException(status_code=404, detail="Report not found")
     if report.status!= ReportStatus.READY: raise HTTPException(status_code=400, detail="Report not ready yet")
-    if report.expires_at and report.expires_at < datetime.now():
+    if report.expires_at and report.expires_at < datetime.now(UTC):
         report.status = ReportStatus.EXPIRED
         db.commit()
         raise HTTPException(status_code=410, detail="Report expired")
@@ -135,11 +130,17 @@ def list_reports(request: Request, db: Session = Depends(get_db)):
     user_id = request.state.user.id
     stmt = select(Report).where(Report.user_id==user_id).order_by(desc(Report.created_at)).limit(50)
     reports = db.exec(stmt).all()
+    
     return {
         "reports": [
             {
-                "id": r.id, "title": r.title, "type": r.report_type, "format": r.format,
-                "status": r.status, "created_at": r.created_at, "downloads": r.download_count,
+                "id": r.id, 
+                "title": r.title, 
+                "type": r.report_type, 
+                "format": r.format,
+                "status": r.status, 
+                "created_at": r.created_at, 
+                "downloads": r.download_count,
                 "location": r.town or r.ward or r.sub_county or r.county or r.country,
                 "is_branded": r.is_branded
             } for r in reports
