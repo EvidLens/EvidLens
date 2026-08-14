@@ -114,3 +114,17 @@ class MarketMetric(SQLModel, table=True):
     source: Optional[str] = Field(default=None)
     extra_data: dict = Field(default={}, sa_column=Column("metadata", JSON))
     created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
+
+class Report(SQLModel, table=True):
+    __tablename__ = "reports"
+    __table_args__ = {'extend_existing': True}
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[int] = Field(default=None, index=True)
+    title: str = Field(index=True)
+    sector: Optional[str] = Field(default=None, index=True)
+    county: Optional[str] = Field(default=None, index=True)
+    file_url: str # s3 / cloudinary link
+    file_type: str = Field(default="pdf") # pdf, xlsx, csv
+    report_data: dict = Field(default={}, sa_column=Column("report_data", JSON))
+    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
