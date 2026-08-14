@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Request, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sqlmodel import Session
 from typing import Optional, List
@@ -16,6 +17,7 @@ from app.core.db import get_session
 __all__ = ["router", "ask_lens_chat", "ChatRequest"]
 
 router = APIRouter(prefix="/ai", tags=["Ask Lens"])
+templates = Jinja2Templates(directory="app/templates")
 GROQ_KEY = os.getenv("GROQ_API_KEY")
 ai_service = AIInsightsService()
 
@@ -69,6 +71,10 @@ async def call_tool(name: str, args: dict, user_id: int, session: Session):
         return {"status": "Export ready", "format": args["format"], "download_url": "/api/reports/download"}
     return {"error": "Tool not found"}
 
+@router.get("/", response_class=HTMLResponse)
+async def ai_page(request: Request):
+    return templates.TemplateResponse("ai_insights.html", {"request": request})
+
 @router.post("/chat")
 @require_module(module_number=3)
 async def ask_lens_chat(request: Request, req: ChatRequest, session: Session = Depends(get_session)):
@@ -120,8 +126,12 @@ async def ask_lens(request: Request, req: InsightRequest, session: Session = Dep
         consume_credits(session, user_id, "api_credits", 1)
         return export_result(result, req.export_format)
     return {
-        "answer": result["answer"], "chart_data": result.get("chart"), "table": result.get("table"),
-        "map": result.get("map"), "sources": result.get("sources", []), "export_url": f"/ai/export?format={req.export_format}"
+        "answer": result["answer"],
+        "chart_data": result.get("chart"),
+        "table": result.get("table"),
+        "map": result.get("map"),
+        "sources": result.get("sources", []),
+        "export_url": f"/ai/export?format={req.export_format}"
     }
 
 @router.post("/viability")
@@ -161,7 +171,11 @@ async def export_leads(request: Request, req: InsightRequest, session: Session =
 
 @router.get("/help")
 def ask_lens_help(query: str):
-    help_map = {"pricing": "EV-SME 20k, EV-GROWTH 50k, EV-PRO 100k, EV-ENT 200k", "setup": "Go to Dashboard > Pick Sector > Pick County > Ask Lens", "features": "19 Modules, 9 Lanes, Kenya-First Data"}
+    help_map = {
+        "pricing": "EV-SME 20k, EV-GROWTH 50k, EV-PRO 100k, EV-ENT 200k",
+        "setup": "Go to Dashboard > Pick Sector > Pick County > Ask Lens",
+        "features": "19 Modules, 9 Lanes, Kenya-First Data"
+    }
     return {"answer": help_map.get(query.lower(), "Contact support@evidlens.co.ke")}
 
 def export_result(data, format):
