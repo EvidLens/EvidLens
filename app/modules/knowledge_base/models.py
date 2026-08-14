@@ -1,4 +1,8 @@
 from app.core.models import SectorReport, KnowledgeChunk
+from datetime import datetime
+from typing import Optional
+from sqlmodel import SQLModel, Field
+from sqlalchemy.sql import func
 
 KENYA_SECTORS = [
     "Banks",
@@ -77,3 +81,13 @@ KENYA_SECTORS = [
     "Waste Management & Recycling",
     "Environmental & Climate Services"
 ]
+
+class KnowledgeDocument(SQLModel, table=True):
+    __tablename__ = "knowledge_documents"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    title: str = Field(max_length=255, index=True)
+    category: Optional[str] = Field(default=None, max_length=100, index=True)
+    content: str
+    source: Optional[str] = Field(default=None, max_length=255)
+    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
