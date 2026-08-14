@@ -13,19 +13,19 @@ async def competitive_page(request: Request):
     return templates.TemplateResponse("competitive.html", {"request": request})
 
 @router.get("/api/company")
-async def company_db(sector: str, company_name: str = None, db: Session = Depends(get_session)):
+async def company_db(sector: str, county: str = None, company_name: str = None, db: Session = Depends(get_session)):
     service = CompetitiveEngineService(db)
-    return await service.company_deal_database(sector, company_name)
+    return await service.company_deal_database(sector, county, company_name)
 
 @router.get("/api/funding")
-async def funding(sector: str, investor: str = None, date_range: str = "90d", db: Session = Depends(get_session)):
+async def funding(sector: str, county: str = None, investor: str = None, date_range: str = "90d", db: Session = Depends(get_session)):
     service = CompetitiveEngineService(db)
-    return await service.funding_tracker(sector, investor, date_range)
+    return await service.funding_tracker(sector, county, investor, date_range)
 
 @router.get("/api/traffic")
-async def traffic(competitor1: str, competitor2: str, date_range: str = "30d", db: Session = Depends(get_session)):
+async def traffic(competitor1: str, competitor2: str, db: Session = Depends(get_session)):
     service = CompetitiveEngineService(db)
-    return await service.digital_traffic_analyzer(competitor1, competitor2, date_range)
+    return await service.digital_traffic_analyzer(competitor1, competitor2)
 
 @router.get("/api/monitor")
 async def monitor(competitor: str, signal_type: str, db: Session = Depends(get_session)):
