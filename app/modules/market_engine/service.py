@@ -1,7 +1,7 @@
 from typing import Dict, Any, List, Optional
 from sqlmodel import Session, select, func, desc
 from datetime import datetime, timedelta
-from app.modules.market_engine.models import MarketMetric, MarketSearch, Competitor
+from app.modules.market_engine.models import MarketMetric, MarketSearch, Competitor, Report
 import httpx
 import os
 
@@ -116,6 +116,7 @@ class MarketEngineService:
         total_searches = self.db.exec(select(func.count(MarketSearch.id))).one()
         total_metrics = self.db.exec(select(func.count(MarketMetric.id))).one()
         total_companies = self.db.exec(select(func.count(Competitor.id))).one()
+        total_reports = self.db.exec(select(func.count(Report.id))).one() # <-- REAL COUNT NOW
 
         sectors_covered = self.db.exec(select(func.count(func.distinct(MarketSearch.sector)))).one()
 
@@ -133,7 +134,7 @@ class MarketEngineService:
             "total_metrics": total_metrics or 0,
             "total_companies": total_companies or 0,
             "sectors_covered": sectors_covered or 0,
-            "reports_exported": 0,
+            "reports_exported": total_reports or 0, # <-- NO MORE HARDCODE
             "top_sector": top_sector[0] if top_sector else "N/A",
             "top_county": top_county[0] if top_county else "N/A",
             "trending_queries": [{"query": q, "count": c} for q, c in trending]
