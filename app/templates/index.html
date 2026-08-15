@@ -22,7 +22,7 @@
 
       <div id="profileDropdown" class="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl hidden text-[#0A1F44] z-50">
         <div class="p-4 border-b border-gray-100">
-          <p class="font-bold">{{ current_user.full_name }}</p>
+          <p class="font-bold">{{ current_user.full_name if current_user else 'Guest' }}</p>
           <p class="text-xs text-gray-500">{{ current_user.email }}</p>
           <span class="text-xs px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 mt-1 inline-block">
             {{ current_user.plan }}
