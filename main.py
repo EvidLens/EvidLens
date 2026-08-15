@@ -3,6 +3,7 @@ import traceback
 from typing import Optional
 from datetime import datetime, timezone
 from dotenv import load_dotenv
+from sqlmodel import func
 
 from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,6 +16,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.schedulers import SchedulerNotRunningError
 
+from app.core.models import MarketMetric, Company, Report
 from app.modules.api import data, meta
 from app.core.config import settings
 from app.core.db import init_db, engine
@@ -142,20 +144,17 @@ def root(request: Request, current_user: Optional[AuthUser] = Depends(get_curren
         "login": "/login"
     }
 
-    from app.core.models import Price, Demand, Company, Report
-    from sqlmodel import func
+insights_count = db.exec(select(func.count()).select_from(Report)).one() or 0
+reports_count = db.exec(select(func.count()).select_from(Report)).one() or 0
 
-    insights_count = db.exec(select(func.count()).select_from(Report)).one() or 0
-    reports_count = db.exec(select(func.count()).select_from(Report).where(Report.status == "completed")).one() or 0
-
-    modules = [
-        {"name": "Market Engine", "route": "/market", "icon": "📊", "count": db.exec(select(func.count()).select_from(Price)).one() or 0},
-        {"name": "Competitive Intel", "route": "/competitive", "icon": "🎯", "count": db.exec(select(func.count()).select_from(Company)).one() or 0},
-        {"name": "Location IQ", "route": "/location", "icon": "📍", "count": db.exec(select(func.count()).select_from(Company)).one() or 0},
-        {"name": "Consumer Voice", "route": "/voice", "icon": "🗣️", "count": db.exec(select(func.count()).select_from(Demand)).one() or 0},
-        {"name": "Knowledge Base", "route": "/kb", "icon": "📚", "count": 0},
-        {"name": "AI Insights", "route": "/ai", "icon": "🤖", "count": insights_count},
-    ]
+modules = [
+    {"name": "Market Engine", "route": "/market", "icon": "📊", "count": db.exec(select(func.count()).select_from(PriceData)).one() or 0},
+    {"name": "Competitive Intel", "route": "/competitive", "icon": "🎯", "count": db.exec(select(func.count()).select_from(Company)).one() or 0},
+    {"name": "Location IQ", "route": "/location", "icon": "📍", "count": db.exec(select(func.count()).select_from(Company)).one() or 0},
+    {"name": "Consumer Voice", "route": "/voice", "icon": "🗣️", "count": db.exec(select(func.count()).select_from(MarketMetric)).one() or 0},
+    {"name": "Knowledge Base", "route": "/kb", "icon": "📚", "count": 0},
+    {"name": "AI Insights", "route": "/ai", "icon": "🤖", "count": insights_count},
+]
 
     data = {
         "last_updated": datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),
