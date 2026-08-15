@@ -43,8 +43,6 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 def init_db():
-    # Import all models here so SQLModel creates the tables
-    # Everything is now consolidated in app.core.models to avoid "Table already defined" errors
     from app.core.models import (
         Plan, Module, AddOn, ALCService, UserSubscription, GeoFilter, User, Workspace, 
         Subscription, MarketMetric, MarketSearch, SocialMention, Report, SectorReport, 
@@ -63,19 +61,19 @@ def init_db():
     from app.modules.business_os.models import Business, TeamMember, Product, Invoice, Employee, AuditLog
     from app.modules.knowledge_base.models import KnowledgeDocument
     
-    # 1. Create tables if they don't exist
     SQLModel.metadata.create_all(bind=engine)
     
-    # 2. Auto-migrate: Add missing columns to existing tables
     with engine.connect() as conn:
         inspector = inspect(conn)
         
-        # Fix for news_articles.category
         if 'news_articles' in inspector.get_table_names():
             columns = [col['name'] for col in inspector.get_columns('news_articles')]
             if 'category' not in columns:
                 conn.execute(text("ALTER TABLE news_articles ADD COLUMN category VARCHAR"))
                 conn.commit()
-                print("DB MIGRATION: Added 'category' column to news_articles")
-    
-    print("DB tables created/verified successfully")
+        
+        if 'price_data' in inspector.get_table_names():
+            columns = [col['name'] for col in inspector.get_columns('price_data')]
+            if 'tenant_id' not in columns:
+                conn.execute(text("ALTER TABLE price_data ADD COLUMN tenant_id INTEGER"))
+                conn.commit()
