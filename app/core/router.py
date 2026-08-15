@@ -3,7 +3,7 @@ from sqlmodel import Session, select, func, or_, desc
 from datetime import datetime, timezone
 from typing import Optional
 
-from app.core.models import KenyaLensBusiness, MarketMetric, NewsArticle, SocialMention, Sector, UserSubscription, KnowledgeChunk, ExportOpportunity
+from app.core.models import KenyaLensBusiness, MarketMetric, NewsArticle, SocialMention, UserSubscription, KnowledgeChunk, ExportOpportunity
 from app.modules.report_builder.models import Report
 from app.core.db import get_session
 from app.core.service import CoreService
@@ -45,7 +45,14 @@ async def dashboard_api(db: Session = Depends(get_session), user = Depends(get_c
     county_count = db.exec(select(func.count(func.distinct(MarketMetric.county)))).one() if metric_count > 0 else 0
     sector_metric_count = db.exec(select(func.count(func.distinct(MarketMetric.sector)))).one() if metric_count > 0 else 0
     policy_count = db.exec(select(func.count(NewsArticle.id)).where(NewsArticle.category == "Policy")).one()
-    funding_count = db.exec(select(func.count(KenyaLensBusiness.id)).where(or_(KenyaLensBusiness.sector.ilike("%Financial%"), KenyaLensBusiness.sector.ilike("%Banking%"), KenyaLensBusiness.sector.ilike("%Insurance%"), KenyaLensBusiness.sector.ilike("%SACCO%"), KenyaLensBusiness.sector.ilike("%Microfinance%"), KenyaLensBusiness.sector.ilike("%FinTech%")))).one() if business_count > 0 else 0
+    funding_count = db.exec(select(func.count(KenyaLensBusiness.id)).where(or_(
+        KenyaLensBusiness.sector.ilike("%Financial%"),
+        KenyaLensBusiness.sector.ilike("%Banking%"),
+        KenyaLensBusiness.sector.ilike("%Insurance%"),
+        KenyaLensBusiness.sector.ilike("%SACCO%"),
+        KenyaLensBusiness.sector.ilike("%Microfinance%"),
+        KenyaLensBusiness.sector.ilike("%FinTech%")
+    ))).one() if business_count > 0 else 0
 
     all_modules = [
         {"id": 1, "name": "Competitive Engine", "icon": "🎯", "count": business_count, "route": "/competitive", "required_module": "Competitive Engine"},
@@ -57,11 +64,16 @@ async def dashboard_api(db: Session = Depends(get_session), user = Depends(get_c
         {"id": 7, "name": "Policy Watch", "icon": "📜", "count": policy_count, "route": "/kb/policy", "required_module": "Regulatory Engine"},
         {"id": 8, "name": "Funding Radar", "icon": "🏦", "count": funding_count, "route": "/reports/funding", "required_module": "Competitive Engine"},
         {"id": 9, "name": "Export Navigator", "icon": "🚢", "count": export_count, "route": "/market/export", "required_module": "Market Engine"},
+        {"id": 10, "name": "Knowledge Base", "icon": "📚", "count": knowledge_count, "route": "/kb", "required_module": "AI Insights"},
         {"id": 11, "name": "Report Builder", "icon": "📑", "count": report_count, "route": "/reports", "required_module": "Report Builder"},
         {"id": 12, "name": "AI Insights", "icon": "🧠", "count": knowledge_count, "route": "/ai", "required_module": "AI Insights"}
     ]
 
-    modules = [{"id": m["id"], "name": m["name"], "icon": m["icon"], "count": m["count"], "route": m["route"], "is_active": m["required_module"] in active_module_names, "is_locked": m["required_module"] not in active_module_names} for m in all_modules]
+    modules = [{
+        "id": m["id"], "name": m["name"], "icon": m["icon"], "count": m["count"], "route": m["route"],
+        "is_active": m["required_module"] in active_module_names, "is_locked": m["required_module"] not in active_module_names
+    } for m in all_modules]
+
     stats = {"insights_generated": metric_count, "sectors_covered": sector_metric_count, "reports_exported": report_count, "active_products": metric_count, "businesses": business_count}
 
     trending = []
@@ -70,4 +82,4 @@ async def dashboard_api(db: Session = Depends(get_session), user = Depends(get_c
         for d in top_demands:
             trending.append({"category": d.sector, "headline": f"{d.product} demand up in {d.county}", "score": float(d.demand_score), "product": d.product, "county": d.county, "updated": datetime.now(UTC).isoformat()})
 
-    return {"stats": stats, "trending": trending, "modules": modules, "active_plan_modules": active_module_names, "last_updated": datetime.now(UTC).isoformat()}
+    return {"stats": stats, "trending": trending, "modules": modules, "active_plan_modules": active_module_names}
