@@ -7,25 +7,21 @@
 </head>
 <body class="bg-[#F5F7FA]">
 
-<!-- HEADER -->
 <header class="text-white px-6 py-4 sticky top-0 shadow-md z-40" style="background:#0A1F44">
   <div class="max-w-7xl mx-auto flex items-center justify-between">
     <a href="/" class="font-bold text-2xl"><span>Evid</span><span style="color:#14B8A6">Lens</span></a>
-
-    <!-- PROFILE DROPDOWN -->
     <div class="relative" id="profileMenu">
       <button id="profileBtn" class="flex items-center gap-2">
         <div class="w-9 h-9 rounded-full bg-gradient-to-r from-[#14B8A6] to-[#0A1F44] flex items-center justify-center text-white font-bold">
           {{ current_user.full_name[:1] if current_user else 'G' }}
         </div>
       </button>
-
       <div id="profileDropdown" class="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl hidden text-[#0A1F44] z-50">
         <div class="p-4 border-b border-gray-100">
           <p class="font-bold">{{ current_user.full_name if current_user else 'Guest' }}</p>
-          <p class="text-xs text-gray-500">{{ current_user.email }}</p>
+          <p class="text-xs text-gray-500">{{ current_user.email if current_user else '' }}</p>
           <span class="text-xs px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 mt-1 inline-block">
-            {{ current_user.plan }}
+            {{ current_user.plan if current_user else 'Free' }}
           </span>
         </div>
         <div class="p-2 max-h-96 overflow-y-auto">
@@ -34,7 +30,7 @@
           <a href="/history" class="block px-3 py-2 hover:bg-gray-50 rounded-lg text-sm">Activity & History</a>
           <a href="/stats" class="block px-3 py-2 hover:bg-gray-50 rounded-lg text-sm">Usage & Stats</a>
           <a href="/wallet" class="block px-3 py-2 hover:bg-gray-50 rounded-lg text-sm">
-            Wallet / Credits: {{ current_user.credits }}
+            Wallet / Credits: {{ current_user.credits if current_user else 0 }}
           </a>
           <a href="/security" class="block px-3 py-2 hover:bg-gray-50 rounded-lg text-sm">Security & 2FA</a>
         </div>
@@ -46,14 +42,11 @@
   </div>
 </header>
 
-<!-- YOUR DASHBOARD CONTENT GOES HERE -->
 <div class="max-w-7xl mx-auto p-6">
-  <h1 class="text-3xl font-bold text-[#0A1F44]">Welcome back, {{ current_user.full_name.split(' ')[0] }}</h1>
-  <!-- Paste your analysis form and dashboard cards here from main.py -->
+  <h1 class="text-3xl font-bold text-[#0A1F44]">Welcome{{ ', ' + current_user.full_name.split(' ')[0] if current_user else '' }}</h1>
 </div>
 
 <script>
-// dropdown toggle
 document.getElementById('profileBtn').onclick = () => {
   document.getElementById('profileDropdown').classList.toggle('hidden')
 }
