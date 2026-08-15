@@ -102,7 +102,8 @@ async def ask_lens_chat(request: Request, req: ChatRequest, session: Session = D
         )
 
     if res.status_code!= 200:
-        return {"reply": "Lens error. Try again.", "error": res.text}
+        # FIX: Always return 'response' key
+        return {"response": "Lens error. Try again.", "error": res.text, "sources": []}
 
     data = res.json()
     msg = data["choices"][0]["message"]
@@ -112,9 +113,11 @@ async def ask_lens_chat(request: Request, req: ChatRequest, session: Session = D
         tool_name = tool_call["function"]["name"]
         tool_args = json.loads(tool_call["function"]["arguments"])
         tool_result = await call_tool(tool_name, tool_args, user_id, session)
-        return {"reply": f"Done. {tool_name}", "result": tool_result, "credits_used": 1}
+        # FIX: Return 'response' not 'reply'
+        return {"response": f"Done. {tool_name}", "result": tool_result, "credits_used": 1, "sources": ["EvidLens Tools"]}
 
-    return {"reply": msg["content"], "credits_used": 1, "sources": ["EvidLens 9 Lanes", "Groq AI"]}
+    # FIX: Return 'response' not 'reply'
+    return {"response": msg["content"], "credits_used": 1, "sources": ["EvidLens 9 Lanes", "Groq AI"]}
 
 @router.post("/ask")
 @require_module(module_number=3)
