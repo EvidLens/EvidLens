@@ -16,7 +16,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.schedulers import SchedulerNotRunningError
 
-from app.core.models import MarketMetric, Company, Report, PriceData
+from app.core.models import MarketMetric, Company, Report, PriceData, NewsArticle, SocialMention, KnowledgeChunk, ExportOpportunity
 from app.modules.api import data, meta
 from app.core.config import settings
 from app.core.db import init_db, engine
@@ -144,23 +144,36 @@ def root(request: Request, current_user: Optional[AuthUser] = Depends(get_curren
         "login": "/login"
     }
 
-    insights_count = db.exec(select(func.count()).select_from(Report)).one() or 0
-    reports_count = db.exec(select(func.count()).select_from(Report)).one() or 0
+    business_count = db.exec(select(func.count()).select_from(Company)).one() or 0
+    metric_count = db.exec(select(func.count()).select_from(MarketMetric)).one() or 0
+    news_count = db.exec(select(func.count()).select_from(NewsArticle)).one() or 0
+    social_count = db.exec(select(func.count()).select_from(SocialMention)).one() or 0
+    report_count = db.exec(select(func.count()).select_from(Report)).one() or 0
+    knowledge_count = db.exec(select(func.count()).select_from(KnowledgeChunk)).one() or 0
+    export_count = db.exec(select(func.count()).select_from(ExportOpportunity)).one() or 0
+    county_count = db.exec(select(func.count(func.distinct(MarketMetric.county)))).one() or 0
+    policy_count = db.exec(select(func.count()).select_from(NewsArticle).where(NewsArticle.category == "Policy")).one() or 0
 
     modules = [
-        {"name": "Market Engine", "route": "/market", "icon": "📊", "count": db.exec(select(func.count()).select_from(PriceData)).one() or 0},
-        {"name": "Competitive Intel", "route": "/competitive", "icon": "🎯", "count": db.exec(select(func.count()).select_from(Company)).one() or 0},
-        {"name": "Location IQ", "route": "/location", "icon": "📍", "count": db.exec(select(func.count()).select_from(Company)).one() or 0},
-        {"name": "Consumer Voice", "route": "/voice", "icon": "🗣️", "count": db.exec(select(func.count()).select_from(MarketMetric)).one() or 0},
-        {"name": "Knowledge Base", "route": "/kb", "icon": "📚", "count": 0},
-        {"name": "AI Insights", "route": "/ai", "icon": "🤖", "count": insights_count},
+        {"name": "Competitive Engine", "route": "/competitive", "icon": "🎯", "count": business_count},
+        {"name": "Price Oracle", "route": "/market/prices", "icon": "💰", "count": metric_count},
+        {"name": "Demand Radar", "route": "/market/demand", "icon": "📈", "count": metric_count},
+        {"name": "County Mapper", "route": "/location/counties", "icon": "🗺️", "count": county_count},
+        {"name": "Consumer Pulse", "route": "/voice", "icon": "👥", "count": social_count},
+        {"name": "Risk Sentinel", "route": "/market/risk", "icon": "⚠️", "count": news_count},
+        {"name": "Policy Watch", "route": "/kb/policy", "icon": "📜", "count": policy_count},
+        {"name": "Funding Radar", "route": "/reports/funding", "icon": "🏦", "count": business_count},
+        {"name": "Export Navigator", "route": "/market/export", "icon": "🚢", "count": export_count},
+        {"name": "Knowledge Base", "route": "/kb", "icon": "📚", "count": knowledge_count},
+        {"name": "Report Builder", "route": "/reports", "icon": "📑", "count": report_count},
+        {"name": "AI Insights", "route": "/ai", "icon": "🧠", "count": knowledge_count},
     ]
 
     data = {
         "last_updated": datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),
         "stats": {
-            "insights_generated": insights_count,
-            "reports_exported": reports_count
+            "insights_generated": metric_count,
+            "reports_exported": report_count
         },
         "modules": modules
     }
