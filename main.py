@@ -120,7 +120,7 @@ app.include_router(chatbot_router)
 app.include_router(billing.router)
 
 @app.get("/", response_class=HTMLResponse)
-def root(request: Request, current_user: Optional[AuthUser] = Depends(get_current_user_optional)):
+def root(request: Request, current_user: Optional[AuthUser] = Depends(get_current_user_optional), db: Session = Depends(get_db)):
     API = {
         "prices": "/api/data/prices",
         "demand": "/api/data/demand",
@@ -139,20 +139,28 @@ def root(request: Request, current_user: Optional[AuthUser] = Depends(get_curren
         "login": "/login"
     }
 
+    from app.core.models import Price, Demand, Company, Report
+    from sqlmodel import func
+
+    insights_count = db.exec(select(func.count()).select_from(Report)).one() or 0
+    reports_count = db.exec(select(func.count()).select_from(Report).where(Report.status == "completed")).one() or 0
+
+    modules = [
+        {"name": "Market Engine", "route": "/market", "icon": "📊", "count": db.exec(select(func.count()).select_from(Price)).one() or 0},
+        {"name": "Competitive Intel", "route": "/competitive", "icon": "🎯", "count": db.exec(select(func.count()).select_from(Company)).one() or 0},
+        {"name": "Location IQ", "route": "/location", "icon": "📍", "count": db.exec(select(func.count()).select_from(Company)).one() or 0},
+        {"name": "Consumer Voice", "route": "/voice", "icon": "🗣️", "count": db.exec(select(func.count()).select_from(Demand)).one() or 0},
+        {"name": "Knowledge Base", "route": "/kb", "icon": "📚", "count": 0},
+        {"name": "AI Insights", "route": "/ai", "icon": "🤖", "count": insights_count},
+    ]
+
     data = {
         "last_updated": datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),
         "stats": {
-            "insights_generated": 1247,
-            "reports_exported": 389
+            "insights_generated": insights_count,
+            "reports_exported": reports_count
         },
-        "modules": [
-            {"name": "Market Engine", "route": "/market", "icon": "📊", "count": 12450},
-            {"name": "Competitive Intel", "route": "/competitive", "icon": "🎯", "count": 890},
-            {"name": "Location IQ", "route": "/location", "icon": "📍", "count": 290},
-            {"name": "Consumer Voice", "route": "/voice", "icon": "🗣️", "count": 15400},
-            {"name": "Knowledge Base", "route": "/kb", "icon": "📚", "count": 450},
-            {"name": "AI Insights", "route": "/ai", "icon": "🤖", "count": 1247},
-        ]
+        "modules": modules
     }
 
     return templates.TemplateResponse("dashboard.html", {
