@@ -234,7 +234,7 @@ class NewsArticle(SQLModel, table=True):
     title: Optional[str] = None
     summary: Optional[str] = None
     source: Optional[str] = None
-    category: Optional[str] = None
+    category: Optional[str] = Field(default=None, index=True)
     url: Optional[str] = None
     county: Optional[str] = None
     published_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
