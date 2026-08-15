@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 
-from sqlmodel import SQLModel, Session
+from sqlmodel import SQLModel, Session, select
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
@@ -18,9 +18,11 @@ from app.core.config import settings
 from app.core.db import init_db, engine
 from app.core.scheduler import start_scheduler, shutdown_scheduler
 from app.core.models import User
+from app.modules.auth.models import AuthUser
+from app.modules.database import get_session as get_db
 
 from app.modules.auth.router import router as auth_router
-from app.modules.auth.dependencies import get_current_user_optional
+from app.modules.auth.dependencies import get_current_user
 from app.core.router import router as core_router
 from app.modules.competitive_engine.router import router as competitive_router
 from app.modules.market_engine.router import router as market_router
@@ -44,6 +46,15 @@ scheduler = AsyncIOScheduler(timezone=getattr(settings, "SCHEDULER_TIMEZONE", "A
 app = FastAPI(title="EvidLens API", version="2.5.13", docs_url="/docs", redoc_url="/redoc")
 
 UTC = timezone.utc
+
+async def get_current_user_optional(request: Request, db: Session = Depends(get_db)):
+    user_id = request.cookies.get("user_id")
+    if not user_id:
+        return None
+    user = db.exec(select(AuthUser).where(AuthUser.id == int(user_id))).first()
+    if not user or not user.is_active:
+        return None
+    return user
 
 def safe_job(job_func, job_name):
     try:
@@ -101,7 +112,7 @@ app.include_router(chatbot_router)
 app.include_router(billing.router)
 
 @app.get("/", response_class=HTMLResponse)
-def root(request: Request, current_user: Optional[User] = Depends(get_current_user_optional)):
+def root(request: Request, current_user: Optional[AuthUser] = Depends(get_current_user_optional)):
     return templates.TemplateResponse("index.html", {
         "request": request,
         "now": datetime.now(UTC),
