@@ -5,9 +5,9 @@ from sqlmodel import Session, select, desc
 from pydantic import BaseModel
 from typing import List, Optional
 from.service import aggregate_sentiment, fetch_reddit_data
-from app.core.models import ConsumerFeedback, SentimentSummary
+from app.core.models import ConsumerFeedback, SentimentSummary, User
 from app.core.db import get_session as get_db
-from app.core.guards import require_module, consume_credits
+from app.core.guards import require_module, consume_credits, get_current_user
 
 router = APIRouter(prefix="/voice", tags=["Consumer Voice"])
 templates = Jinja2Templates(directory="app/templates")
@@ -30,8 +30,14 @@ class SentimentResponse(BaseModel):
     top_complaints: List[str]
 
 @router.get("/", response_class=HTMLResponse)
-async def voice_page(request: Request):
-    return templates.TemplateResponse("voice.html", {"request": request})
+async def voice_page(
+    request: Request,
+    current_user: User = Depends(get_current_user)
+):
+    return templates.TemplateResponse(
+        "voice.html",
+        {"request": request, "current_user": current_user}
+    )
 
 @router.post("/analyze", response_model=SentimentResponse)
 @require_module(module_number=2)
