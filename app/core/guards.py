@@ -1,6 +1,36 @@
-from fastapi import Request, HTTPException
+from fastapi import Request, HTTPException, Depends
+from fastapi.security import OAuth2PasswordBearer
+from jose import jwt, JWTError
 from sqlmodel import Session, select
-from app.core.models import Module, UserSubscription
+from app.core.models import Module, UserSubscription, User
+from app.core.db import get_session
+import os
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret")
+ALGORITHM = "HS256"
+
+def get_current_user(request: Request, db: Session = Depends(get_session)) -> User:
+    token = request.cookies.get("access_token")
+    if not token:
+        auth = request.headers.get("Authorization")
+        if auth and auth.startswith("Bearer "):
+            token = auth.replace("Bearer ", "")
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: int = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=401, detail="User not found")
+    request.state.user = user
+    request.state.db = db
+    return user
 
 def require_module(module_number: int):
     def decorator(func):
@@ -8,12 +38,11 @@ def require_module(module_number: int):
             session: Session = request.state.db
             user_id = request.state.user.id
             sub = session.exec(select(UserSubscription).where(UserSubscription.user_id == user_id)).first()
-            if not sub: 
+            if not sub:
                 raise HTTPException(status_code=401, detail="No subscription")
             module = session.exec(select(Module).where(Module.module_number == module_number)).first()
             if not module:
                 raise HTTPException(status_code=500, detail=f"Module {module_number} not found in DB")
-            
             rank = {"EV-FREE":0,"EV-STARTER":1,"EV-SME":2,"EV-GROWTH":3,"EV-PRO":4,"EV-ENT":5}
             if rank.get(sub.plan_code,0) < rank.get(module.min_plan,0):
                 raise HTTPException(status_code=403, detail=f"Upgrade to {module.min_plan} to access this module")
@@ -25,13 +54,11 @@ def consume_credits(session: Session, user_id: int, credit_type: str, amount: in
     sub = session.exec(select(UserSubscription).where(UserSubscription.user_id == user_id)).first()
     if not sub:
         raise HTTPException(status_code=401, detail="No subscription")
-    
     credits = getattr(sub, credit_type, None)
     if credits is None:
         raise HTTPException(status_code=500, detail=f"Credit type {credit_type} not found")
-    if credits < amount: 
+    if credits < amount:
         raise HTTPException(status_code=402, detail="Not enough credits. Please buy more.")
-    
     setattr(sub, credit_type, credits - amount)
     session.add(sub)
     session.commit()
