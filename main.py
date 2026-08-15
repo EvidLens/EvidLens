@@ -19,8 +19,8 @@ from app.core.db import init_db, engine
 from app.core.scheduler import start_scheduler, shutdown_scheduler
 from app.core.models import User
 
-# Routers
-from app.core.auth import router as auth_router, get_current_user_optional
+from app.modules.auth.router import router as auth_router
+from app.modules.auth.dependencies import get_current_user_optional
 from app.core.router import router as core_router
 from app.modules.competitive_engine.router import router as competitive_router
 from app.modules.market_engine.router import router as market_router
@@ -38,7 +38,6 @@ from app.modules.storage.router import router as storage_router
 from app.modules.chatbot.router import router as chatbot_router
 from app.core import billing
 
-# Load env
 load_dotenv()
 
 scheduler = AsyncIOScheduler(timezone=getattr(settings, "SCHEDULER_TIMEZONE", "Africa/Nairobi"))
@@ -60,10 +59,7 @@ def on_startup():
     init_db()
     SQLModel.metadata.create_all(engine)
     print("DB tables checked/created")
-
-    # Import jobs here to avoid circular imports
     from app.modules.cron.jobs import scrape_kpin_prices, fetch_real_news, fetch_real_tweets
-
     scheduler.add_job(lambda: safe_job(scrape_kpin_prices, "KPIN"), CronTrigger(hour=getattr(settings, "KPIN_SCRAPE_HOUR", 3), minute=0), id="kpin_scrape", replace_existing=True)
     scheduler.add_job(lambda: safe_job(fetch_real_news, "NEWS"), CronTrigger(hour=getattr(settings, "NEWS_SCRAPE_HOUR", 4), minute=0), id="news_scrape", replace_existing=True)
     scheduler.add_job(lambda: safe_job(fetch_real_tweets, "TWEETS"), CronTrigger(hour=getattr(settings, "TWEETS_SCRAPE_HOUR", 5), minute=0), id="tweets_scrape", replace_existing=True)
@@ -86,7 +82,6 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates", auto_reload=True)
 
-# INCLUDE ROUTERS - NO DOUBLE PREFIX
 app.include_router(competitive_router)
 app.include_router(market_router)
 app.include_router(location_router)
