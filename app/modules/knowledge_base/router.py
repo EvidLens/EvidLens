@@ -5,9 +5,9 @@ from sqlmodel import Session, select, desc
 from pydantic import BaseModel
 from typing import List, Optional
 from.service import get_sector_report, search_knowledge, ingest_sector_data, generate_report_with_groq
-from app.core.models import SectorReport, KnowledgeChunk, DataSource
+from app.core.models import SectorReport, KnowledgeChunk, DataSource, User
 from app.core.db import get_session as get_db
-from app.core.guards import require_module
+from app.core.guards import require_module, get_current_user
 
 router = APIRouter(prefix="/kb", tags=["Knowledge Base"])
 templates = Jinja2Templates(directory="app/templates")
@@ -60,8 +60,11 @@ class SearchRequest(BaseModel):
     top_k: int = 5
 
 @router.get("/policy", response_class=HTMLResponse)
-async def policy_page(request: Request):
-    return templates.TemplateResponse("kb_policy.html", {"request": request})
+async def policy_page(
+    request: Request,
+    current_user: User = Depends(get_current_user)
+):
+    return templates.TemplateResponse("kb_policy.html", {"request": request, "current_user": current_user})
 
 @router.get("/sectors")
 def list_sectors():
