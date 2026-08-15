@@ -20,7 +20,7 @@ from app.core.scheduler import start_scheduler, shutdown_scheduler
 from app.core.models import User
 
 # Routers
-from app.core.auth import router as auth_router, get_current_user_optional # FIXED
+from app.core.auth import router as auth_router, get_current_user_optional
 from app.core.router import router as core_router
 from app.modules.competitive_engine.router import router as competitive_router
 from app.modules.market_engine.router import router as market_router
