@@ -1,5 +1,6 @@
 from sqlmodel import SQLModel, Session, create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy import inspect, text
 from typing import Generator
 from .config import settings
 import redis
@@ -62,5 +63,19 @@ def init_db():
     from app.modules.business_os.models import Business, TeamMember, Product, Invoice, Employee, AuditLog
     from app.modules.knowledge_base.models import KnowledgeDocument
     
+    # 1. Create tables if they don't exist
     SQLModel.metadata.create_all(bind=engine)
-    print("DB tables created successfully")
+    
+    # 2. Auto-migrate: Add missing columns to existing tables
+    with engine.connect() as conn:
+        inspector = inspect(conn)
+        
+        # Fix for news_articles.category
+        if 'news_articles' in inspector.get_table_names():
+            columns = [col['name'] for col in inspector.get_columns('news_articles')]
+            if 'category' not in columns:
+                conn.execute(text("ALTER TABLE news_articles ADD COLUMN category VARCHAR"))
+                conn.commit()
+                print("DB MIGRATION: Added 'category' column to news_articles")
+    
+    print("DB tables created/verified successfully")
