@@ -13,6 +13,7 @@ from fastapi.responses import HTMLResponse
 from sqlmodel import SQLModel, Session, select
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.schedulers import SchedulerNotRunningError
 
 from app.core.config import settings
 from app.core.db import init_db, engine
@@ -79,8 +80,15 @@ def on_startup():
 
 @app.on_event("shutdown")
 def shutdown_event():
-    scheduler.shutdown()
-    shutdown_scheduler()
+    try:
+        if scheduler.running:
+            scheduler.shutdown()
+    except SchedulerNotRunningError:
+        pass
+    try:
+        shutdown_scheduler()
+    except SchedulerNotRunningError:
+        pass
     print("Scheduler shut down")
 
 app.add_middleware(
