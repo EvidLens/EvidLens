@@ -121,9 +121,44 @@ app.include_router(billing.router)
 
 @app.get("/", response_class=HTMLResponse)
 def root(request: Request, current_user: Optional[AuthUser] = Depends(get_current_user_optional)):
-    return templates.TemplateResponse("index.html", {
+    API = {
+        "prices": "/api/data/prices",
+        "demand": "/api/data/demand",
+        "companies": "/api/data/companies",
+        "county_stats": "/api/data/county-stats",
+        "sectors": "/api/data/sectors",
+        "opportunities": "/api/data/opportunities",
+        "analyze": "/api/analyze",
+        "chat": "/api/chat",
+        "download": "/api/download",
+        "export": "/api/export",
+        "get_sectors": "/api/meta/sectors",
+        "get_counties": "/api/meta/counties",
+        "get_subcounties": "/api/meta/subcounties",
+        "logout": "/auth/logout",
+        "login": "/login"
+    }
+
+    data = {
+        "last_updated": datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),
+        "stats": {
+            "insights_generated": 1247,
+            "reports_exported": 389
+        },
+        "modules": [
+            {"name": "Market Engine", "route": "/market", "icon": "📊", "count": 12450},
+            {"name": "Competitive Intel", "route": "/competitive", "icon": "🎯", "count": 890},
+            {"name": "Location IQ", "route": "/location", "icon": "📍", "count": 290},
+            {"name": "Consumer Voice", "route": "/voice", "icon": "🗣️", "count": 15400},
+            {"name": "Knowledge Base", "route": "/kb", "icon": "📚", "count": 450},
+            {"name": "AI Insights", "route": "/ai", "icon": "🤖", "count": 1247},
+        ]
+    }
+
+    return templates.TemplateResponse("dashboard.html", {
         "request": request,
-        "now": datetime.now(UTC),
+        "API": API,
+        "data": data,
         "current_user": current_user
     })
 
