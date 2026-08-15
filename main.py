@@ -15,6 +15,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.schedulers import SchedulerNotRunningError
 
+from app.modules.api import data, meta
 from app.core.config import settings
 from app.core.db import init_db, engine
 from app.core.scheduler import start_scheduler, shutdown_scheduler
@@ -118,6 +119,8 @@ app.include_router(core_router)
 app.include_router(storage_router)
 app.include_router(chatbot_router)
 app.include_router(billing.router)
+app.include_router(data.router)
+app.include_router(meta.router)
 
 @app.get("/", response_class=HTMLResponse)
 def root(request: Request, current_user: Optional[AuthUser] = Depends(get_current_user_optional), db: Session = Depends(get_db)):
