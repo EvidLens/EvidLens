@@ -1,4 +1,4 @@
-from sqlmodel import SQLModel, Field, Column, JSON
+from sqlmodel import SQLModel, Field, Column, JSON, Relationship
 from typing import Optional, List, Dict
 from datetime import datetime, timezone, UTC
 from pydantic import BaseModel, field_validator
@@ -496,16 +496,16 @@ class SubscriptionTier(str, Enum):
     BUSINESS = "business"
     GROWTH = "growth"
     ENTERPRISE = "enterprise"
-    
+
 class Payment(SQLModel, table=True):
-    __tablename__ = "payment"
-    __table_args__ = {"extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id")
-    amount: float
-    status: PaymentStatus
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
+    amount_kes: float
+    plan_code: str
+    status: str
+    mpesa_code: Optional[str] = None
+    created_at: Optional[str] = None
+    
 class SocialMention(SQLModel, table=True):
     __tablename__ = "social_mentions"
     __table_args__ = {"extend_existing": True}
