@@ -47,7 +47,7 @@ from app.core import billing
 load_dotenv()
 
 scheduler = AsyncIOScheduler(timezone=getattr(settings, "SCHEDULER_TIMEZONE", "Africa/Nairobi"))
-app = FastAPI(title="EvidLens API", version="2.5.13", docs_url="/docs", redoc_url="/redoc")
+app = FastAPI(title="EvidLens API", version="2.5.14", docs_url="/docs", redoc_url="/redoc")
 
 UTC = timezone.utc
 
@@ -72,7 +72,6 @@ def safe_job(job_func, job_name):
 @app.on_event("startup")
 def on_startup():
     init_db()
-    SQLModel.metadata.create_all(engine)
     print("DB tables checked/created")
     from app.modules.cron.jobs import scrape_kpin_prices, fetch_real_news, fetch_real_tweets
     scheduler.add_job(lambda: safe_job(scrape_kpin_prices, "KPIN"), CronTrigger(hour=getattr(settings, "KPIN_SCRAPE_HOUR", 3), minute=0), id="kpin_scrape", replace_existing=True)
