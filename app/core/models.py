@@ -58,30 +58,13 @@ class Plan(SQLModel, table=True):
     leads_qtr: int = 0
     lens_tier: str = "Basic"
 
-class User(SQLModel, table=True):
-    __tablename__ = "user"
+class Sector(SQLModel, table=True):
+    __tablename__ = "sector"
     __table_args__ = {"extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
-    email: str = Field(index=True, unique=True)
-    hashed_password: str
+    sector_number: int = Field(index=True, unique=True)
     name: str
-    phone: Optional[str] = None
-    county: Optional[str] = None
-    sector: Optional[str] = None
-    current_workspace_id: Optional[int] = Field(default=None, foreign_key="workspace.id")
-    reset_token: Optional[str] = None
-    reset_token_expires: Optional[datetime] = None
-    consent_at: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
-class Workspace(SQLModel, table=True):
-    __tablename__ = "workspace"
-    __table_args__ = {"extend_existing": True}
-    id: Optional[int] = Field(default=None, primary_key=True)
-    name: str
-    owner_id: int = Field(foreign_key="user.id")
-    credits: int = Field(default=0)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    parent_category: str
 
 class Funder(SQLModel, table=True):
     __tablename__ = "funder"
@@ -98,14 +81,6 @@ class Funder(SQLModel, table=True):
     requirements: str
     apply_link: str
 
-class Sector(SQLModel, table=True):
-    __tablename__ = "sector"
-    __table_args__ = {"extend_existing": True}
-    id: Optional[int] = Field(default=None, primary_key=True)
-    sector_number: int = Field(index=True, unique=True)
-    name: str
-    parent_category: str
-
 class KenyaLensBusiness(SQLModel, table=True):
     __tablename__ = "kenyalens_business"
     __table_args__ = {"extend_existing": True}
@@ -116,6 +91,42 @@ class KenyaLensBusiness(SQLModel, table=True):
     address: Optional[str] = None
     lat: float = 0
     lng: float = 0
+
+class Workspace(SQLModel, table=True):
+    __tablename__ = "workspace"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    owner_id: int = Field(foreign_key="user.id")
+    credits: int = Field(default=0)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+class User(SQLModel, table=True):
+    __tablename__ = "user"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    email: str = Field(index=True, unique=True)
+    hashed_password: str
+    name: str
+    phone: Optional[str] = None
+    county: Optional[str] = None
+    sector: Optional[str] = None
+    current_workspace_id: Optional[int] = Field(default=None, foreign_key="workspace.id")
+    reset_token: Optional[str] = None
+    reset_token_expires: Optional[datetime] = None
+    consent_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+class Payment(SQLModel, table=True):
+    __tablename__ = "payment"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id")
+    amount_kes: float
+    plan_code: str
+    status: str
+    mpesa_code: Optional[str] = None
+    created_at: Optional[str] = None
 
 class Report(SQLModel, table=True):
     __tablename__ = "report"
@@ -464,17 +475,6 @@ class KenyaLensSubscription(SQLModel, table=True):
     api_credits: int = Field(default=10)
     features_json: str = Field(default="[]")
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
-class Payment(SQLModel, table=True):
-    __tablename__ = "payment"
-    __table_args__ = {"extend_existing": True}
-    id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="user.id")
-    amount_kes: float
-    plan_code: str
-    status: str
-    mpesa_code: Optional[str] = None
-    created_at: Optional[str] = None
 
 class SocialMention(SQLModel, table=True):
     __tablename__ = "social_mentions"
