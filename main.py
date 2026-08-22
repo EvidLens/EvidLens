@@ -55,10 +55,13 @@ async def get_current_user_optional(request: Request, db: Session = Depends(get_
     user_id = request.cookies.get("user_id")
     if not user_id:
         return None
-    user = db.exec(select(AuthUser).where(AuthUser.id == int(user_id))).first()
-    if not user or not user.is_active:
+    try:
+        user = db.exec(select(AuthUser).where(AuthUser.id == int(user_id))).first()
+        if not user or not user.is_active:
+            return None
+        return user
+    except Exception:
         return None
-    return user
 
 def safe_job(job_func, job_name):
     try:
@@ -71,14 +74,21 @@ def safe_job(job_func, job_name):
 
 @app.on_event("startup")
 def on_startup():
-    init_db()
-    print("DB tables checked/created")
+    try:
+        init_db()
+        print("DB tables checked/created - SUCCESS")
+    except Exception as e:
+        print(f"DB init error: {e}")
+        traceback.print_exc()
     from app.modules.cron.jobs import scrape_kpin_prices, fetch_real_news, fetch_real_tweets
-    scheduler.add_job(lambda: safe_job(scrape_kpin_prices, "KPIN"), CronTrigger(hour=getattr(settings, "KPIN_SCRAPE_HOUR", 3), minute=0), id="kpin_scrape", replace_existing=True)
-    scheduler.add_job(lambda: safe_job(fetch_real_news, "NEWS"), CronTrigger(hour=getattr(settings, "NEWS_SCRAPE_HOUR", 4), minute=0), id="news_scrape", replace_existing=True)
-    scheduler.add_job(lambda: safe_job(fetch_real_tweets, "TWEETS"), CronTrigger(hour=getattr(settings, "TWEETS_SCRAPE_HOUR", 5), minute=0), id="tweets_scrape", replace_existing=True)
-    scheduler.start()
-    print(f"Scheduler started. Timezone: {getattr(settings, 'SCHEDULER_TIMEZONE', 'Africa/Nairobi')}")
+    try:
+        scheduler.add_job(lambda: safe_job(scrape_kpin_prices, "KPIN"), CronTrigger(hour=getattr(settings, "KPIN_SCRAPE_HOUR", 3), minute=0), id="kpin_scrape", replace_existing=True)
+        scheduler.add_job(lambda: safe_job(fetch_real_news, "NEWS"), CronTrigger(hour=getattr(settings, "NEWS_SCRAPE_HOUR", 4), minute=0), id="news_scrape", replace_existing=True)
+        scheduler.add_job(lambda: safe_job(fetch_real_tweets, "TWEETS"), CronTrigger(hour=getattr(settings, "TWEETS_SCRAPE_HOUR", 5), minute=0), id="tweets_scrape", replace_existing=True)
+        scheduler.start()
+        print(f"Scheduler started. Timezone: {getattr(settings, 'SCHEDULER_TIMEZONE', 'Africa/Nairobi')}")
+    except Exception as e:
+        print(f"Scheduler start skipped: {e}")
 
 @app.on_event("shutdown")
 def shutdown_event():
@@ -143,15 +153,21 @@ def root(request: Request, current_user: Optional[AuthUser] = Depends(get_curren
         "login": "/login"
     }
 
-    business_count = db.exec(select(func.count()).select_from(Company)).one() or 0
-    metric_count = db.exec(select(func.count()).select_from(MarketMetric)).one() or 0
-    news_count = db.exec(select(func.count()).select_from(NewsArticle)).one() or 0
-    social_count = db.exec(select(func.count()).select_from(SocialMention)).one() or 0
-    report_count = db.exec(select(func.count()).select_from(Report)).one() or 0
-    knowledge_count = db.exec(select(func.count()).select_from(KnowledgeChunk)).one() or 0
-    export_count = db.exec(select(func.count()).select_from(ExportOpportunity)).one() or 0
-    county_count = db.exec(select(func.count(func.distinct(MarketMetric.county)))).one() or 0
-    policy_count = db.exec(select(func.count()).select_from(NewsArticle).where(NewsArticle.category == "Policy")).one() or 0
+    def safe_count(stmt):
+        try:
+            return db.exec(stmt).one() or 0
+        except Exception:
+            return 0
+
+    business_count = safe_count(select(func.count()).select_from(Company))
+    metric_count = safe_count(select(func.count()).select_from(MarketMetric))
+    news_count = safe_count(select(func.count()).select_from(NewsArticle))
+    social_count = safe_count(select(func.count()).select_from(SocialMention))
+    report_count = safe_count(select(func.count()).select_from(Report))
+    knowledge_count = safe_count(select(func.count()).select_from(KnowledgeChunk))
+    export_count = safe_count(select(func.count()).select_from(ExportOpportunity))
+    county_count = safe_count(select(func.count(func.distinct(MarketMetric.county))))
+    policy_count = safe_count(select(func.count()).select_from(NewsArticle).where(NewsArticle.category == "Policy"))
 
     modules = [
         {"name": "Competitive Engine", "route": "/competitive", "icon": "🎯", "count": business_count},
