@@ -51,6 +51,22 @@ app = FastAPI(title="EvidLens API", version="2.5.14", docs_url="/docs", redoc_ur
 
 UTC = timezone.utc
 
+# FIXED: Correct CORS - wildcard with credentials crashes FastAPI and causes Not authenticated
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://app.evidlens.co.ke",
+        "https://evidlens.co.ke",
+        "https://www.evidlens.co.ke",
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:8000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 async def get_current_user_optional(request: Request, db: Session = Depends(get_db)):
     user_id = request.cookies.get("user_id")
     if not user_id:
@@ -80,8 +96,8 @@ def on_startup():
     except Exception as e:
         print(f"DB init error: {e}")
         traceback.print_exc()
-    from app.modules.cron.jobs import scrape_kpin_prices, fetch_real_news, fetch_real_tweets
     try:
+        from app.modules.cron.jobs import scrape_kpin_prices, fetch_real_news, fetch_real_tweets
         scheduler.add_job(lambda: safe_job(scrape_kpin_prices, "KPIN"), CronTrigger(hour=getattr(settings, "KPIN_SCRAPE_HOUR", 3), minute=0), id="kpin_scrape", replace_existing=True)
         scheduler.add_job(lambda: safe_job(fetch_real_news, "NEWS"), CronTrigger(hour=getattr(settings, "NEWS_SCRAPE_HOUR", 4), minute=0), id="news_scrape", replace_existing=True)
         scheduler.add_job(lambda: safe_job(fetch_real_tweets, "TWEETS"), CronTrigger(hour=getattr(settings, "TWEETS_SCRAPE_HOUR", 5), minute=0), id="tweets_scrape", replace_existing=True)
@@ -103,13 +119,6 @@ def shutdown_event():
         pass
     print("Scheduler shut down")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"]
-)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates", auto_reload=True)
 
@@ -155,8 +164,14 @@ def root(request: Request, current_user: Optional[AuthUser] = Depends(get_curren
 
     def safe_count(stmt):
         try:
-            return db.exec(stmt).one() or 0
-        except Exception:
+            result = db.exec(stmt).first()
+            if result is None:
+                return 0
+            if isinstance(result, (list, tuple)):
+                return result[0] or 0
+            return result or 0
+        except Exception as e:
+            print(f"Count failed: {e}")
             return 0
 
     business_count = safe_count(select(func.count()).select_from(Company))
@@ -184,7 +199,7 @@ def root(request: Request, current_user: Optional[AuthUser] = Depends(get_curren
         {"name": "AI Insights", "route": "/ai", "icon": "🧠", "count": knowledge_count},
     ]
 
-    data = {
+    data_payload = {
         "last_updated": datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),
         "stats": {
             "insights_generated": metric_count,
@@ -196,13 +211,13 @@ def root(request: Request, current_user: Optional[AuthUser] = Depends(get_curren
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "API": API,
-        "data": data,
+        "data": data_payload,
         "current_user": current_user
     })
 
-def get_session():
-    with Session(engine) as session:
-        yield session
+@app.get("/health")
+def health():
+    return {"status": "ok", "version": "2.5.14"}
 
 if __name__ == "__main__":
     import uvicorn
