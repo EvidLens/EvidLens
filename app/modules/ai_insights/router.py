@@ -104,7 +104,7 @@ async def process_chat(req: ChatRequest, request: Request, session: Session):
             res = await client.post(
                 "https://api.groq.com/openai/v1/chat/completions",
                 headers={"Authorization": f"Bearer {GROQ_KEY}"},
-                json={"model": "llama-3.1-8b-instant", "messages": messages, "tools": TOOLS, "tool_choice": "auto", "max_tokens": 900, "temperature": 0.3}
+                json={"model": "llama-3.3-70b-versatile", "messages": messages, "tools": TOOLS, "tool_choice": "auto", "max_tokens": 900, "temperature": 0.3}
             )
             if res.status_code!= 200:
                 err = res.text[:500]
@@ -129,7 +129,7 @@ async def process_chat(req: ChatRequest, request: Request, session: Session):
                 res2 = await client.post(
                     "https://api.groq.com/openai/v1/chat/completions",
                     headers={"Authorization": f"Bearer {GROQ_KEY}"},
-                    json={"model": "llama-3.1-8b-instant", "messages": messages, "max_tokens": 900, "temperature": 0.3}
+                    json={"model": "llama-3.3-70b-versatile", "messages": messages, "max_tokens": 900, "temperature": 0.3}
                 )
                 if res2.status_code == 200:
                     final_content = res2.json()["choices"][0]["message"]["content"]
