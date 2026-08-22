@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 
-from sqlmodel import SQLModel, Session, select
+from sqlmodel import Session, select
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.schedulers import SchedulerNotRunningError
@@ -21,7 +21,6 @@ from app.modules.api import data, meta
 from app.core.config import settings
 from app.core.db import init_db, engine
 from app.core.scheduler import start_scheduler, shutdown_scheduler
-from app.core.models import User
 from app.modules.auth.models import AuthUser
 from app.modules.database import get_session as get_db
 
@@ -48,10 +47,8 @@ load_dotenv()
 
 scheduler = AsyncIOScheduler(timezone=getattr(settings, "SCHEDULER_TIMEZONE", "Africa/Nairobi"))
 app = FastAPI(title="EvidLens API", version="2.5.14", docs_url="/docs", redoc_url="/redoc")
-
 UTC = timezone.utc
 
-# FIXED: Correct CORS - wildcard with credentials crashes FastAPI and causes Not authenticated
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -161,7 +158,6 @@ def root(request: Request, current_user: Optional[AuthUser] = Depends(get_curren
         "logout": "/auth/logout",
         "login": "/login"
     }
-
     def safe_count(stmt):
         try:
             result = db.exec(stmt).first()
@@ -182,7 +178,7 @@ def root(request: Request, current_user: Optional[AuthUser] = Depends(get_curren
     knowledge_count = safe_count(select(func.count()).select_from(KnowledgeChunk))
     export_count = safe_count(select(func.count()).select_from(ExportOpportunity))
     county_count = safe_count(select(func.count(func.distinct(MarketMetric.county))))
-    policy_count = safe_count(select(func.count()).select_from(NewsArticle).where(NewsArticle.category == "Policy"))
+    policy_count = safe_count(select(func.count()).select_from(KnowledgeChunk).where(KnowledgeChunk.category == "policy"))
 
     modules = [
         {"name": "Competitive Engine", "route": "/competitive", "icon": "🎯", "count": business_count},
@@ -198,22 +194,12 @@ def root(request: Request, current_user: Optional[AuthUser] = Depends(get_curren
         {"name": "Report Builder", "route": "/reports", "icon": "📑", "count": report_count},
         {"name": "AI Insights", "route": "/ai", "icon": "🧠", "count": knowledge_count},
     ]
-
     data_payload = {
         "last_updated": datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),
-        "stats": {
-            "insights_generated": metric_count,
-            "reports_exported": report_count
-        },
+        "stats": {"insights_generated": metric_count, "reports_exported": report_count},
         "modules": modules
     }
-
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request,
-        "API": API,
-        "data": data_payload,
-        "current_user": current_user
-    })
+    return templates.TemplateResponse("dashboard.html", {"request": request, "API": API, "data": data_payload, "current_user": current_user})
 
 @app.get("/health")
 def health():
