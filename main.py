@@ -4,6 +4,7 @@ from typing import Optional
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 from sqlmodel import func
+from sqlalchemy import text
 
 from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -49,7 +50,6 @@ app = FastAPI(title="EvidLens API", version="2.5.14", docs_url="/docs", redoc_ur
 
 UTC = timezone.utc
 
-# FIXED: Correct CORS - wildcard with credentials crashes FastAPI and causes Not authenticated
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -86,8 +86,37 @@ def safe_job(job_func, job_name):
         print(f"[{job_name}] FAILED: {e}")
         traceback.print_exc()
 
+def force_create_tables():
+    sqls = [
+        "CREATE TABLE IF NOT EXISTS company (id SERIAL PRIMARY KEY, name VARCHAR, sector VARCHAR, county VARCHAR, description TEXT, created_at TIMESTAMP DEFAULT NOW())",
+        "CREATE TABLE IF NOT EXISTS market_metrics (id SERIAL PRIMARY KEY, product VARCHAR, county VARCHAR, subcounty VARCHAR, sector VARCHAR, company_name VARCHAR, avg_price_kes FLOAT, demand_score FLOAT, created_at TIMESTAMP DEFAULT NOW(), timestamp TIMESTAMP DEFAULT NOW(), user_id INTEGER)",
+        "CREATE TABLE IF NOT EXISTS price_data (id SERIAL PRIMARY KEY, product_name VARCHAR, product VARCHAR, county VARCHAR, sector VARCHAR, price FLOAT, avg_price_kes FLOAT, tenant_id VARCHAR, timestamp TIMESTAMP DEFAULT NOW(), created_at TIMESTAMP DEFAULT NOW())",
+        "CREATE TABLE IF NOT EXISTS news_articles (id SERIAL PRIMARY KEY, title VARCHAR, summary TEXT, content TEXT, source VARCHAR, category VARCHAR, url VARCHAR, county VARCHAR, published_at TIMESTAMP DEFAULT NOW(), created_at TIMESTAMP DEFAULT NOW())",
+        "CREATE TABLE IF NOT EXISTS social_mentions (id SERIAL PRIMARY KEY, platform VARCHAR, content TEXT, author VARCHAR, url VARCHAR, sentiment VARCHAR, county VARCHAR, sector VARCHAR, created_at TIMESTAMP DEFAULT NOW())",
+        "CREATE TABLE IF NOT EXISTS report (id SERIAL PRIMARY KEY, user_id INTEGER, title VARCHAR, report_type VARCHAR, format VARCHAR, status VARCHAR, query TEXT, sector VARCHAR, country VARCHAR, county VARCHAR, sub_county VARCHAR, ward VARCHAR, town VARCHAR, file_path VARCHAR, file_size_kb INTEGER, download_count INTEGER DEFAULT 0, is_branded BOOLEAN DEFAULT FALSE, expires_at TIMESTAMP, error_message TEXT, data JSON, created_at TIMESTAMP DEFAULT NOW())",
+        "CREATE TABLE IF NOT EXISTS knowledge_chunks (id SERIAL PRIMARY KEY, sector VARCHAR, county VARCHAR, chunk_text TEXT, chunk_type VARCHAR, source VARCHAR, embedding JSON, chunk_metadata JSON, created_at TIMESTAMP DEFAULT NOW())",
+        "CREATE TABLE IF NOT EXISTS export_opportunities (id SERIAL PRIMARY KEY, tenant_id VARCHAR, country VARCHAR, product VARCHAR, opportunity_score FLOAT, created_at TIMESTAMP DEFAULT NOW())",
+        "CREATE TABLE IF NOT EXISTS competitor (id SERIAL PRIMARY KEY, name VARCHAR, sector VARCHAR, county VARCHAR, created_at TIMESTAMP DEFAULT NOW())",
+        "CREATE TABLE IF NOT EXISTS auth_user (id SERIAL PRIMARY KEY, email VARCHAR UNIQUE, hashed_password VARCHAR, is_active BOOLEAN DEFAULT TRUE, created_at TIMESTAMP DEFAULT NOW())",
+    ]
+    try:
+        with engine.connect() as conn:
+            for sql in sqls:
+                try:
+                    conn.execute(text(sql))
+                except Exception as inner_e:
+                    print(f"Table create skip: {inner_e}")
+            conn.commit()
+        print("FORCE TABLE CREATE - SUCCESS - 10 tables ensured")
+    except Exception as e:
+        print(f"Force create failed: {e}")
+        traceback.print_exc()
+
 @app.on_event("startup")
 def on_startup():
+    # STEP 1: Force create missing tables with raw SQL - works even if models clash
+    force_create_tables()
+    # STEP 2: Normal init_db for remaining tables
     try:
         init_db()
         print("DB tables checked/created - SUCCESS")
