@@ -33,22 +33,23 @@ from app.modules.location_intel.router import router as location_router
 from app.modules.consumer_voice.router import router as voice_router
 from app.modules.knowledge_base.router import router as kb_router
 from app.modules.report_builder.router import router as reports_router
-from app.modules.ai_insights.router import router as ai_insights_router
+from app.modules.ai_insights.router import router as ai_insights_router, router_api as ai_api_router
 from app.modules.business_os.router import router as business_os_router
 from app.modules.rag.router import router as rag_router
 from app.modules.payments.router import router as payments_router
 from app.modules.api.routes import router as api_router
 from app.modules.cron.router import router as cron_router
 from app.modules.storage.router import router as storage_router
-from app.modules.chatbot.router import router as chatbot_router
 from app.core import billing
 
 load_dotenv()
 
 scheduler = AsyncIOScheduler(timezone=getattr(settings, "SCHEDULER_TIMEZONE", "Africa/Nairobi"))
 app = FastAPI(title="EvidLens API", version="2.5.14", docs_url="/docs", redoc_url="/redoc")
+
 UTC = timezone.utc
 
+# FIXED: Correct CORS - wildcard with credentials crashes FastAPI and causes Not authenticated
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -126,7 +127,7 @@ app.include_router(voice_router)
 app.include_router(kb_router)
 app.include_router(reports_router)
 app.include_router(ai_insights_router)
-app.include_router(ai_insights_router.router_api)
+app.include_router(ai_api_router)
 app.include_router(business_os_router)
 app.include_router(auth_router)
 app.include_router(rag_router)
@@ -135,7 +136,6 @@ app.include_router(api_router)
 app.include_router(cron_router)
 app.include_router(core_router)
 app.include_router(storage_router)
-# app.include_router(chatbot_router)
 app.include_router(billing.router)
 app.include_router(data.router)
 app.include_router(meta.router)
@@ -159,6 +159,7 @@ def root(request: Request, current_user: Optional[AuthUser] = Depends(get_curren
         "logout": "/auth/logout",
         "login": "/login"
     }
+
     def safe_count(stmt):
         try:
             result = db.exec(stmt).first()
@@ -168,6 +169,10 @@ def root(request: Request, current_user: Optional[AuthUser] = Depends(get_curren
                 return result[0] or 0
             return result or 0
         except Exception as e:
+            try:
+                db.rollback()
+            except:
+                pass
             print(f"Count failed: {e}")
             return 0
 
@@ -179,7 +184,7 @@ def root(request: Request, current_user: Optional[AuthUser] = Depends(get_curren
     knowledge_count = safe_count(select(func.count()).select_from(KnowledgeChunk))
     export_count = safe_count(select(func.count()).select_from(ExportOpportunity))
     county_count = safe_count(select(func.count(func.distinct(MarketMetric.county))))
-    policy_count = safe_count(select(func.count()).select_from(KnowledgeChunk).where(KnowledgeChunk.category == "policy"))
+    policy_count = knowledge_count
 
     modules = [
         {"name": "Competitive Engine", "route": "/competitive", "icon": "🎯", "count": business_count},
@@ -195,12 +200,22 @@ def root(request: Request, current_user: Optional[AuthUser] = Depends(get_curren
         {"name": "Report Builder", "route": "/reports", "icon": "📑", "count": report_count},
         {"name": "AI Insights", "route": "/ai", "icon": "🧠", "count": knowledge_count},
     ]
+
     data_payload = {
         "last_updated": datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),
-        "stats": {"insights_generated": metric_count, "reports_exported": report_count},
+        "stats": {
+            "insights_generated": metric_count,
+            "reports_exported": report_count
+        },
         "modules": modules
     }
-    return templates.TemplateResponse("dashboard.html", {"request": request, "API": API, "data": data_payload, "current_user": current_user})
+
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request,
+        "API": API,
+        "data": data_payload,
+        "current_user": current_user
+    })
 
 @app.get("/health")
 def health():
