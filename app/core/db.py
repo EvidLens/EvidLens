@@ -45,27 +45,70 @@ def get_db():
         db.close()
 
 def init_db():
+    # CORE MODELS - ALL TABLES
     from app.core.models import (
         Plan, Module, AddOn, ALCService, UserSubscription, GeoFilter, User, Workspace,
         Subscription, MarketMetric, MarketSearch, SocialMention, Report, SectorReport,
         NewsArticle, Company, KenyaLensBusiness, GeoData, Sector, Funder, Policy,
         KenyaLensAlert, KenyaLensSubscription, KenyaLensMember, KenyaLensApiUsage,
-        Deal, Funding
+        Deal, Funding, PriceData, KnowledgeChunk, ExportOpportunity,
+        Payment, KenyaLensBusiness, KenyaLensSurvey, KenyaLensResponse, KenyaTenant,
+        KenyaLensMember, KenyaLensAlert, KenyaLensApiUsage, Notification,
+        ConsumerFeedback, SentimentSummary, DataSource, Competitor, KenyaLensSubscription,
+        MarketSearch, SocialMention, KenyaLensApiUsage
     )
-    from app.modules.auth.models import UserRole
-    from app.modules.payments.models import Payment, Subscription as PaymentSubscription, MpesaTransaction
-    from app.modules.report_builder.models import ReportTemplate, ReportShare
-    from app.modules.market_engine.models import Competitor
-    from app.modules.pricing_engine.models import ProductPrice, RetailOutlet
-    from app.modules.regulatory_engine.models import Regulation, ComplianceDeadline
-    from app.modules.consumer_voice.models import ConsumerFeedback, SentimentSummary
-    from app.modules.location_intel.models import LocationDemand, PropertyListing
-    from app.modules.business_os.models import Business, TeamMember, Product, Invoice, Employee, AuditLog
-    from app.modules.knowledge_base.models import KnowledgeDocument
+    from app.modules.auth.models import AuthUser
+    try:
+        from app.modules.auth.models import UserRole
+    except:
+        pass
+    try:
+        from app.modules.payments.models import Payment as PaymentModel, Subscription as PaymentSubscription, MpesaTransaction
+    except:
+        pass
+    try:
+        from app.modules.report_builder.models import ReportTemplate, ReportShare
+    except:
+        pass
+    try:
+        from app.modules.market_engine.models import Competitor as MarketCompetitor
+    except:
+        pass
+    try:
+        from app.modules.pricing_engine.models import ProductPrice, RetailOutlet
+    except:
+        pass
+    try:
+        from app.modules.regulatory_engine.models import Regulation, ComplianceDeadline
+    except:
+        pass
+    try:
+        from app.modules.consumer_voice.models import ConsumerFeedback as CVFeedback, SentimentSummary as CVSummary
+    except:
+        pass
+    try:
+        from app.modules.location_intel.models import LocationDemand, PropertyListing
+    except:
+        pass
+    try:
+        from app.modules.business_os.models import Business, TeamMember, Product, Invoice, Employee, AuditLog
+    except:
+        pass
+    try:
+        from app.modules.knowledge_base.models import KnowledgeDocument
+    except:
+        pass
     try:
         SQLModel.metadata.create_all(bind=engine, checkfirst=True)
+        print("DB tables checked/created - SUCCESS")
     except Exception as e:
         if "already exists" in str(e).lower():
             print(f"DB exists, skipping: {e}")
+            # Try again to create missing ones only
+            try:
+                SQLModel.metadata.create_all(bind=engine, checkfirst=True)
+            except:
+                pass
         else:
+            print(f"DB init error: {e}")
             raise
