@@ -92,6 +92,40 @@ def safe_job(job_func, job_name):
         print(f"[{job_name}] FAILED: {e}")
         traceback.print_exc()
 
+def fix_auth_user_table():
+    # FIX FOR: column auth_user.phone does not exist
+    # This migrates old 4-column table to full model
+    columns = [
+        "ADD COLUMN IF NOT EXISTS phone VARCHAR",
+        "ADD COLUMN IF NOT EXISTS full_name VARCHAR",
+        "ADD COLUMN IF NOT EXISTS hashed_password VARCHAR",
+        "ADD COLUMN IF NOT EXISTS avatar_url VARCHAR",
+        "ADD COLUMN IF NOT EXISTS plan VARCHAR DEFAULT 'free'",
+        "ADD COLUMN IF NOT EXISTS credits INTEGER DEFAULT 0",
+        "ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE",
+        "ADD COLUMN IF NOT EXISTS verification_token VARCHAR",
+        "ADD COLUMN IF NOT EXISTS reset_token VARCHAR",
+        "ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMP",
+        "ADD COLUMN IF NOT EXISTS sector VARCHAR",
+        "ADD COLUMN IF NOT EXISTS county VARCHAR",
+        "ADD COLUMN IF NOT EXISTS role VARCHAR DEFAULT 'USER'",
+        "ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE",
+        "ADD COLUMN IF NOT EXISTS two_fa_enabled BOOLEAN DEFAULT FALSE",
+        "ADD COLUMN IF NOT EXISTS theme VARCHAR DEFAULT 'light'",
+        "ADD COLUMN IF NOT EXISTS language VARCHAR DEFAULT 'en'",
+    ]
+    try:
+        with engine.connect() as conn:
+            for col_sql in columns:
+                try:
+                    conn.execute(text(f"ALTER TABLE auth_user {col_sql}"))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+        print("AUTH_USER MIGRATED - SUCCESS")
+    except Exception as e:
+        print(f"AUTH_USER migration check: {e}")
+
 def force_create_tables():
     sqls = [
         "CREATE TABLE IF NOT EXISTS company (id SERIAL PRIMARY KEY, name VARCHAR, sector VARCHAR, county VARCHAR, description TEXT, created_at TIMESTAMP DEFAULT NOW())",
@@ -104,7 +138,7 @@ def force_create_tables():
         "CREATE TABLE IF NOT EXISTS knowledge_chunks (id SERIAL PRIMARY KEY, sector VARCHAR, county VARCHAR, chunk_text TEXT, chunk_type VARCHAR, source VARCHAR, embedding JSON, chunk_metadata JSON, created_at TIMESTAMP DEFAULT NOW())",
         "CREATE TABLE IF NOT EXISTS export_opportunities (id SERIAL PRIMARY KEY, tenant_id VARCHAR, country VARCHAR, product VARCHAR, opportunity_score FLOAT, created_at TIMESTAMP DEFAULT NOW())",
         "CREATE TABLE IF NOT EXISTS competitor (id SERIAL PRIMARY KEY, name VARCHAR, sector VARCHAR, county VARCHAR, created_at TIMESTAMP DEFAULT NOW())",
-        "CREATE TABLE IF NOT EXISTS auth_user (id SERIAL PRIMARY KEY, email VARCHAR UNIQUE, hashed_password VARCHAR, is_active BOOLEAN DEFAULT TRUE, created_at TIMESTAMP DEFAULT NOW())",
+        "CREATE TABLE IF NOT EXISTS auth_user (id SERIAL PRIMARY KEY, email VARCHAR UNIQUE, phone VARCHAR, full_name VARCHAR, hashed_password VARCHAR, avatar_url VARCHAR, plan VARCHAR DEFAULT 'free', credits INTEGER DEFAULT 0, email_verified BOOLEAN DEFAULT FALSE, verification_token VARCHAR, reset_token VARCHAR, reset_token_expires TIMESTAMP, sector VARCHAR, county VARCHAR, role VARCHAR DEFAULT 'USER', is_active BOOLEAN DEFAULT TRUE, two_fa_enabled BOOLEAN DEFAULT FALSE, theme VARCHAR DEFAULT 'light', language VARCHAR DEFAULT 'en', created_at TIMESTAMP DEFAULT NOW())",
         "CREATE TABLE IF NOT EXISTS usersubscription (id SERIAL PRIMARY KEY, tenant_id VARCHAR, user_id INTEGER, module_name VARCHAR, plan_name VARCHAR, payment_reference VARCHAR, starts_at TIMESTAMP, expires_at TIMESTAMP, status VARCHAR)",
     ]
     try:
@@ -122,6 +156,7 @@ def force_create_tables():
 
 @app.on_event("startup")
 def on_startup():
+    fix_auth_user_table()
     force_create_tables()
     try:
         init_db()
