@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select, delete
+from sqlmodel import Session, select
+from sqlmodel import delete as sql_delete
 from pydantic import BaseModel
 from datetime import datetime, timedelta, timezone
 from typing import List
@@ -18,24 +19,50 @@ PLAN_MODULES = {
 }
 
 PLAN_DAYS = {"Trial": 7, "Pro": 30, "Enterprise": 30}
+PLAN_PRICE = {"Trial": 0, "Pro": 5000, "Enterprise": 20000}
 
 class SubscribeRequest(BaseModel):
     plan_name: str
-    payment_reference: str
+    payment_reference: str = "mpesa_manual"
+
+@router.get("/plans")
+def get_plans():
+    return {
+        "plans": [
+            {"name": name, "price_kes": PLAN_PRICE[name], "days": PLAN_DAYS[name], "modules": mods}
+            for name, mods in PLAN_MODULES.items()
+        ]
+    }
+
+@router.get("/my-subscription")
+def my_subscription(db: Session = Depends(get_session), user = Depends(get_current_user)):
+    stmt = select(UserSubscription).where(UserSubscription.user_id == user.id, UserSubscription.status == "active")
+    subs = db.exec(stmt).all()
+    if not subs:
+        return {"plan": "Trial", "modules": PLAN_MODULES["Trial"], "expired": True}
+    plan_name = subs[0].plan_name
+    return {
+        "plan": plan_name,
+        "modules": [s.module_name for s in subs],
+        "expires_at": subs[0].expires_at,
+        "all_modules": PLAN_MODULES
+    }
 
 @router.post("/subscribe")
-async def subscribe(
+def subscribe(
     req: SubscribeRequest,
     db: Session = Depends(get_session),
     user = Depends(get_current_user)
 ):
     if req.plan_name not in PLAN_MODULES:
-        raise HTTPException(status_code=400, detail="Invalid plan")
+        raise HTTPException(status_code=400, detail=f"Invalid plan. Choose {list(PLAN_MODULES.keys())}")
 
-    tenant_id = user.tenant_id
+    tenant_id = getattr(user, 'tenant_id', user.id)
     expires_at = datetime.now(UTC) + timedelta(days=PLAN_DAYS[req.plan_name])
 
-    db.exec(delete(UserSubscription).where(UserSubscription.tenant_id == tenant_id))
+    # Remove old active subs for this tenant/user
+    db.exec(sql_delete(UserSubscription).where(UserSubscription.user_id == user.id))
+    db.commit()
 
     modules_to_add: List[UserSubscription] = []
     for module_name in PLAN_MODULES[req.plan_name]:
