@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from sqlmodel import Session
 from pydantic import BaseModel, EmailStr
-from.service import *
-from.models import AuthUser
-from.dependencies import get_current_user, require_active_subscription, require_admin
+from .service import *
+from .models import AuthUser
+from .dependencies import get_current_user, require_active_subscription, require_admin
 from app.core.db import get_session as get_db
 import secrets
 
@@ -52,7 +52,7 @@ def verify_email(token: str, db: Session = Depends(get_db)):
     user = verify_user(db, token)
     if not user:
         raise HTTPException(status_code=400, detail="Invalid token")
-    return RedirectResponse(url="/login?verified=1")
+    return RedirectResponse(url="/auth/login?verified=1")
 
 @router.post("/login")
 def login(req: LoginRequest, db: Session = Depends(get_db)):
@@ -60,7 +60,7 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
     if "error" in result:
         raise HTTPException(status_code=401, detail=result["error"])
     response = JSONResponse(content=result)
-    response.set_cookie(key="user_id", value=str(result["user_id"]), httponly=True, samesite="lax")
+    response.set_cookie(key="user_id", value=str(result["user_id"]), httponly=True, samesite="lax", max_age=86400*7)
     return response
 
 @router.post("/forgot-password")
@@ -91,6 +91,12 @@ def logout():
 
 @router.get("/logout")
 def logout_get():
-    response = RedirectResponse(url="/login")
+    response = RedirectResponse(url="/auth/login")
     response.delete_cookie("user_id")
     return response
+
+@router.get("/login")
+def login_page(request: Request):
+    from fastapi.templating import Jinja2Templates
+    templates = Jinja2Templates(directory="app/templates")
+    return templates.TemplateResponse("login.html", {"request": request})
