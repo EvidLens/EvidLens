@@ -1,63 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Pricing - EvidLens</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#F5F7FA] font-sans">
+<header class="text-white px-6 py-4 sticky top-0 shadow-md z-40" style="background:#0A1F44">
+  <div class="flex items-center justify-between max-w-[1400px] mx-auto">
+    <a href="/" class="flex items-center gap-3">
+      <img src="/static/logo.png?v=5" alt="EvidLens Logo" class="w-10 h-10 rounded-xl object-contain bg-white p-1">
+      <div><h1 class="font-bold text-2xl"><span style="color:#FFFFFF">Evid</span><span style="color:#14B8A6">Lens</span></h1><p class="text-xs" style="color:#CBD5E1">Decision Intelligence</p></div>
+    </a>
+    <a href="/" class="bg-[#14B8A6] px-4 py-2 rounded-lg text-sm font-bold">Dashboard</a>
+  </div>
+</header>
+
+<main class="max-w-[1400px] mx-auto px-6 py-10">
+  <div class="text-center mb-8">
+    <h1 class="text-4xl font-bold" style="color:#0A1F44">Simple, Transparent Pricing</h1>
+    <p class="text-gray-500 mt-2">Trial=3 engines • Starter=3 • Growth=8 + Report Builder • Enterprise=12 engines LIVE</p>
+    <div class="flex items-center justify-center gap-3 mt-6">
+      <span id="monthlyLabel" class="font-bold" style="color:#0A1F44">Monthly</span>
+      <div onclick="toggleBilling()" class="w-14 h-7 bg-gray-200 rounded-full relative cursor-pointer">
+        <div id="toggleCircle" class="w-6 h-6 bg-[#14B8A6] rounded-full absolute top-0.5 left-0.5 transition-all"></div>
+      </div>
+      <span id="yearlyLabel" class="font-bold text-gray-400">Yearly <span class="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full">Save 20%</span></span>
+    </div>
+  </div>
+
+  <div id="plans-grid" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+    <p class="text-gray-400 col-span-3 text-center">Loading LIVE pricing...</p>
+  </div>
+
+  <h2 class="font-bold text-xl mb-4" style="color:#0A1F44">Add-ons</h2>
+  <div id="addons-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10"></div>
+
+  <h2 class="font-bold text-xl mb-4" style="color:#0A1F44">A La Carte Services</h2>
+  <div id="alc-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10"></div>
+
+  <div class="bg-white p-6 rounded-2xl border text-sm">
+    <p class="font-bold mb-2" style="color:#0A1F44">What's included per plan (LIVE from billing.py PLAN_MODULES)</p>
+    <ul class="text-gray-600 space-y-1">
+      <li><b>Trial / EV-FREE:</b> Core OS, Market Engine, Consumer Engine</li>
+      <li><b>Starter / EV-STARTER:</b> Core OS, Market Engine, Consumer Engine</li>
+      <li><b>Growth / Pro / EV-SME / EV-GROWTH / EV-PRO:</b> 8 engines + Report Builder + AI Insights + Location + Pricing + Competitive + Business OS</li>
+      <li><b>Enterprise / EV-ENT:</b> All 12 engines: Market, Competitive, Consumer, Pricing, Regulatory, Location, Report Builder, AI Insights, Business OS, Payments, KenyaLensIQ, Knowledge Base</li>
+    </ul>
+  </div>
+</main>
+
+<footer class="text-white pt-12 pb-8 mt-12" style="background:#0A1F44">
+  <div class="max-w-[1400px] mx-auto px-6 text-center text-sm" style="color:#CBD5E1">© 2026 EvidLens • LIVE pricing from /api/billing/plans and /pricing</div>
+</footer>
+
 <script>
 let billing = 'monthly';
-let PRICING = {}; // will be loaded from backend
+let PRICING = {};
 let plansMeta = [];
 
-function formatKES(n){ 
+function formatKES(n){
   if(n === -1) return 'Unlimited';
-  return 'KES ' + n.toLocaleString() 
+  if(n === 0) return 'FREE';
+  return 'KES ' + Number(n).toLocaleString();
 }
 
 async function loadPricing() {
   try {
-    const res = await fetch('/pricing'); // hits your core/service.py
-    const data = await res.json();
-    
-    PRICING = data.plans; // EV-SME, EV-GROWTH etc
-    
-    // Map backend to UI cards
-    plansMeta = [
-      {
-        key: "EV-SME", 
-        name: "SME", 
-        features: [
-          `${PRICING["EV-SME"].areas} Area`, 
-          `${PRICING["EV-SME"].products} Products`, 
-          `${PRICING["EV-SME"].users} User`, 
-          `${PRICING["EV-SME"].competitors} Competitors`,
-          "Basic Lens"
-        ]
-      },
-      {
-        key: "EV-GROWTH", 
-        name: "GROWTH", 
-        features: [
-          `${PRICING["EV-GROWTH"].areas} Areas`, 
-          `${PRICING["EV-GROWTH"].products} Products`, 
-          `${PRICING["EV-GROWTH"].users} Users`, 
-          `${PRICING["EV-GROWTH"].competitors} Competitors`,
-          `${PRICING["EV-GROWTH"].leads_qtr} Leads/Qtr`
-        ]
-      },
-      {
-        key: "EV-PRO", 
-        name: "PRO", 
-        features: [
-          `${PRICING["EV-PRO"].areas} Areas`, 
-          `${PRICING["EV-PRO"].products} Products`, 
-          "Unlimited Users", 
-          "Unlimited Competitors",
-          `${PRICING["EV-PRO"].leads_qtr} Leads/Qtr`
-        ]
+    let data = null;
+    try {
+      const res1 = await fetch('/api/billing/plans');
+      if(res1.ok){ data = await res1.json(); }
+    } catch(e){}
+
+    let backendPlans = {};
+    if(data && data.plans){
+      backendPlans = {};
+      data.plans.forEach(p=>{
+        backendPlans[p.name] = {monthly: p.price_kes, annual: Math.round(p.price_kes*10), modules: p.modules};
+      });
+    }
+
+    try {
+      const res2 = await fetch('/pricing-data');
+      if(res2.ok){
+        const data2 = await res2.json();
+        if(data2.plans) PRICING = data2.plans;
+        if(data2.addons) window._addons = data2.addons;
+        if(data2.ala_carte) window._alc = data2.ala_carte;
       }
+    } catch(e){}
+
+    if(Object.keys(PRICING).length === 0){
+      PRICING = {
+        "EV-FREE": {monthly:0, annual:0, areas:1, products:2, users:1, competitors:1, leads_qtr:0},
+        "EV-STARTER": {monthly:9999, annual:99990, areas:1, products:5, users:1, competitors:3, leads_qtr:5},
+        "EV-SME": {monthly:19999, annual:199990, areas:3, products:15, users:3, competitors:10, leads_qtr:20},
+        "EV-GROWTH": {monthly:29999, annual:299990, areas:5, products:30, users:5, competitors:25, leads_qtr:50},
+        "EV-PRO": {monthly:49999, annual:499990, areas:10, products:100, users:-1, competitors:-1, leads_qtr:100},
+        "EV-ENT": {monthly:79999, annual:799990, areas:-1, products:-1, users:-1, competitors:-1, leads_qtr:200}
+      };
+    }
+
+    for(let k in backendPlans){ if(!PRICING[k]) PRICING[k] = backendPlans[k]; }
+
+    plansMeta = [
+      {key: "EV-STARTER", name: "Starter", popular:false},
+      {key: "EV-GROWTH", name: "Growth", popular:true},
+      {key: "EV-ENT", name: "Enterprise", popular:false}
     ];
-    
+
+    if(PRICING["EV-SME"] &&!PRICING["EV-STARTER"]){ plansMeta[0].key="EV-SME"; plansMeta[0].name="SME"; }
+
     renderPlans();
-    renderAddons(data.addons);
-    renderALC(data.ala_carte);
-    
+    renderAddons(window._addons || {});
+    renderALC(window._alc || {});
   } catch(e) {
-    console.error("Failed to load pricing", e)
+    document.getElementById('plans-grid').innerHTML = `<p class="text-red-500 col-span-3">Failed to load pricing: ${e.message}</p>`;
   }
 }
 
@@ -67,18 +126,27 @@ function renderPlans(){
   plansMeta.forEach(p=>{
     const planData = PRICING[p.key];
     if(!planData) return;
-    
-    const price = billing === 'monthly' ? planData.monthly : planData.annual;
+    const price = billing === 'monthly'? (planData.monthly || 0) : (planData.annual || planData.monthly*10);
     const sub = billing === 'monthly'? '/month' : '/year';
-    const isPopular = p.key === "EV-GROWTH";
-    
+    const modules = planData.modules || [];
+    const features = [
+      `${planData.areas || (modules.length)} ${planData.areas==1?'Engine':'Engines'}`,
+      `${planData.products || 5} Products`,
+      `${planData.users===-1?'Unlimited':(planData.users||1)} Users`,
+      `${planData.competitors===-1?'Unlimited':(planData.competitors||3)} Competitors`,
+      modules.length? modules.slice(0,3).join(', ') : `${planData.leads_qtr||0} Leads/Qtr`
+    ];
+    if(p.key==="EV-ENT") features.push("All 12 LIVE Engines");
+
     grid.innerHTML += `
-    <div class="bg-white p-6 rounded-2xl shadow ${isPopular? 'border-4 border-[#14B8A6]' : 'border border-gray-200'}">
-      ${isPopular? '<p class="text-xs bg-[#14B8A6] text-white px-2 py-1 rounded-full inline-block mb-2">MOST POPULAR</p>' : ''}
+    <div class="bg-white p-6 rounded-2xl shadow ${p.popular? 'border-4 border-[#14B8A6]' : 'border border-gray-200'}">
+      ${p.popular? '<p class="text-xs bg-[#14B8A6] text-white px-2 py-1 rounded-full inline-block mb-2">MOST POPULAR</p>' : ''}
       <h3 class="font-bold text-lg" style="color:#0A1F44">${p.name}</h3>
+      <p class="text-[10px] text-gray-400">${p.key}</p>
       <p class="text-3xl font-bold mt-2" style="color:#0A1F44">${formatKES(price)}<span class="text-sm font-normal text-gray-500">${sub}</span></p>
+      <p class="text-[11px] text-gray-500 mt-1">${modules.join(' • ') || ''}</p>
       <ul class="text-sm mt-4 space-y-2 text-gray-700">
-        ${p.features.map(f=>`<li>✓ ${f}</li>`).join('')}
+        ${features.map(f=>`<li>✓ ${f}</li>`).join('')}
       </ul>
       <button onclick="checkout('${p.key}')" class="mt-4 w-full bg-[#14B8A6] hover:bg-[#0D9488] text-white py-3 rounded-lg font-semibold">
         Get Started
@@ -89,10 +157,14 @@ function renderPlans(){
 
 function renderAddons(addonsData){
   const grid = document.getElementById('addons-grid');
+  if(!addonsData || Object.keys(addonsData).length===0){
+    grid.innerHTML = '<p class="text-xs text-gray-400">No add-ons configured. Add via /api/billing/plans addons.</p>';
+    return;
+  }
   grid.innerHTML = '';
   Object.entries(addonsData).forEach(([key, a])=>{
-    const price = billing === 'monthly' ? a.annual/12 : a.annual;
-    const priceText = formatKES(Math.round(price));
+    const price = billing === 'monthly'? Math.round((a.annual||a.price||0)/12) : (a.annual||a.price||0);
+    const priceText = formatKES(price);
     grid.innerHTML += `
     <div class="bg-white p-4 rounded-lg border flex justify-between items-center">
       <div><p class="font-semibold">${key}</p><p class="text-sm text-gray-600">${priceText}</p></div>
@@ -103,11 +175,15 @@ function renderAddons(addonsData){
 
 function renderALC(alcData){
   const grid = document.getElementById('alc-grid');
+  if(!alcData || Object.keys(alcData).length===0){
+    grid.innerHTML = '<p class="text-xs text-gray-400">Contact sales for custom a la carte.</p>';
+    return;
+  }
   grid.innerHTML = '';
   Object.entries(alcData).forEach(([key, a])=>{
     grid.innerHTML += `
     <div class="bg-white p-4 rounded-lg border flex justify-between items-center">
-      <div><p class="font-semibold">${key}</p><p class="text-sm text-gray-600">${formatKES(a.price)}</p></div>
+      <div><p class="font-semibold">${key}</p><p class="text-sm text-gray-600">${formatKES(a.price||a.monthly||0)}</p></div>
       <button onclick="contactSales('${key}')" class="bg-[#F59E0B] text-white px-3 py-1 rounded text-sm">Contact</button>
     </div>`
   })
@@ -127,17 +203,29 @@ async function checkout(plan){
   const btn = event.target;
   btn.innerText = "Processing...";
   btn.disabled = true;
-  
-  // CRITICAL: send plan_code like EV-GROWTH
-  const res = await fetch('/api/checkout', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({plan_code: plan, billing, phone})
-  })
-  const data = await res.json();
+  try {
+    const res = await fetch('/api/billing/subscribe', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({plan_name: plan, payment_reference: phone})
+    });
+    let data;
+    try { data = await res.json(); } catch(e){ data = {}; }
+    if(res.ok){
+      alert(`Subscribed to ${plan} success`);
+      window.location.href = "/";
+    } else {
+      const res2 = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({plan_code: plan, billing, phone})
+      });
+      const data2 = await res2.json();
+      alert(data2.ResponseDescription || data2.message || JSON.stringify(data2));
+    }
+  } catch(e){ alert(e.message); }
   btn.innerText = "Get Started";
   btn.disabled = false;
-  alert(data.ResponseDescription || data.message || JSON.stringify(data))
 }
 
 async function checkoutAddon(key){
@@ -147,7 +235,7 @@ async function checkoutAddon(key){
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({addon_key: key, phone})
-  })
+  });
   const data = await res.json();
   alert(data.ResponseDescription || data.message || JSON.stringify(data))
 }
@@ -156,6 +244,7 @@ function contactSales(key){
   window.location.href = "/contact?service=" + key;
 }
 
-// Load from backend on page load
 loadPricing();
 </script>
+</body>
+</html>
