@@ -20,6 +20,9 @@ templates = Jinja2Templates(directory="app/templates")
 GROQ_KEY = os.getenv("GROQ_API_KEY")
 UTC = timezone.utc
 
+ADMIN_USER_IDS = [1]
+ADMIN_EMAILS = ["noreply@evidlens.co.ke", "evid@example.com", "admin@evidlens.co.ke"]
+
 class GenerateReportRequest(BaseModel):
     query: Optional[str] = None
     title: Optional[str] = None
@@ -85,8 +88,17 @@ def get_user_plan(db: Session, user_id: int) -> str:
         pass
     return "Trial"
 
-def check_plan_access(plan_name: str, required_module: str = "Report Builder") -> bool:
-    """Check PLAN_MODULES from billing.py"""
+def check_plan_access(plan_name: str, required_module: str = "Report Builder", user_id: int = None, db: Session = None) -> bool:
+    if user_id in ADMIN_USER_IDS:
+        return True
+    if db is not None and user_id is not None:
+        try:
+            from app.core.models import User
+            u = db.exec(select(User).where(User.id == user_id)).first()
+            if u and getattr(u, 'email', None) in ADMIN_EMAILS:
+                return True
+        except:
+            pass
     allowed = billing.PLAN_MODULES.get(plan_name, billing.PLAN_MODULES["Trial"])
     return required_module in allowed
 
@@ -96,7 +108,7 @@ def generate_report(request: Request, req: GenerateReportRequest, background_tas
     user_id = user_id.id if user_id else 1
 
     plan_name = get_user_plan(db, user_id)
-    if not check_plan_access(plan_name, "Report Builder"):
+    if not check_plan_access(plan_name, "Report Builder", user_id, db):
         raise HTTPException(status_code=402, detail=f"Report Builder locked. Your plan {plan_name} does not include Report Builder. Upgrade to Pro KES 5000 - https://app.evidlens.co.ke/api/billing/plans")
 
     q = req.get_query()
