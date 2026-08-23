@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 import httpx
 
 from app.modules.auth.dependencies import get_current_user
-from app.modules.report_builder.service import generate_market_report_pdf_file, generate_market_report_excel
+from .service import generate_market_report_pdf_file, generate_market_report_excel
 from app.modules.report_builder.models import Report, ReportType, ReportFormat, ReportStatus
 from app.core.db import get_session as get_db
 from app.core.models import UserSubscription
