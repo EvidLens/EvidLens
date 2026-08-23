@@ -9,7 +9,7 @@
         <div id="lens-messages" class="flex-1 p-4 overflow-y-auto text-sm space-y-3"></div>
         <div id="lens-typing" class="hidden px-4 text-xs text-gray-500">Lens is thinking...</div>
         <form id="lens-form" class="p-3 border-t flex gap-2">
-            <input id="lens-input" type="text" placeholder="Ask about counties, competitors..." class="flex-1 border rounded-lg px-3 py-2 text-sm outline-none focus:border-[#14B8A6]">
+            <input id="lens-input" type="text" placeholder="" class="flex-1 border rounded-lg px-3 py-2 text-sm outline-none focus:border-[#14B8A6]">
             <button class="bg-[#14B8A6] text-white px-4 rounded-lg font-bold">Send</button>
         </form>
     </div>
@@ -25,21 +25,35 @@ toggle.onclick = () => chat.classList.toggle('hidden');
 
 function addMessage(text, sender) {
     const bubble = sender === 'user'? 'bg-[#14B8A6] text-white ml-auto' : 'bg-gray-100 text-[#0A1F44] mr-auto';
-    messages.innerHTML += `<div class="flex"><div class="${bubble} p-3 rounded-2xl max-w-[80%]">${text}</div></div>`;
+    const safeText = (text || 'How can I help with Kenya markets?').replace(/\n/g,'<br>');
+    messages.innerHTML += `<div class="flex"><div class="${bubble} p-3 rounded-2xl max-w-[80%] whitespace-pre-wrap">${safeText}</div></div>`;
     messages.scrollTop = messages.scrollHeight;
 }
 
 form.onsubmit = async (e) => {
     e.preventDefault();
-    const msg = document.getElementById('lens-input').value;
+    const input = document.getElementById('lens-input');
+    const msg = input.value.trim();
     if(!msg) return;
     addMessage(msg, 'user');
-    document.getElementById('lens-input').value = '';
+    input.value = '';
     typing.classList.remove('hidden');
-
-    const res = await fetch('/api/lens/chat', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({message: msg})});
-    const data = await res.json();
-    typing.classList.add('hidden');
-    addMessage(data.reply, 'ai');
+    try {
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token') || '';
+        const headers = {'Content-Type': 'application/json'};
+        if(token) headers['Authorization'] = `Bearer ${token}`;
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({message: msg, history: [], context: {}})
+        });
+        const data = await res.json();
+        typing.classList.add('hidden');
+        const reply = data.reply || data.response || data.answer || data.message || JSON.stringify(data);
+        addMessage(reply, 'ai');
+    } catch(err) {
+        typing.classList.add('hidden');
+        addMessage('Lens offline - retry. ' + err.message, 'ai');
+    }
 }
 </script>
