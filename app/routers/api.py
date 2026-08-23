@@ -233,3 +233,10 @@ async def lens_chat(payload: dict, db: Session = Depends(get_db)):
     if isinstance(result, dict):
         return result
     return {"reply": result}
+
+@router.post("/api/analyze")
+async def analyze_compat(payload: dict, db: Session = Depends(get_db)):
+    # legacy frontend
+    msg = payload.get("query") or payload.get("message") or "hi"
+    service = LensEngineService(db)
+    return {"reply": await service.chat(msg)}
