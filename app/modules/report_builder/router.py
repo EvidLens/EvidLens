@@ -21,16 +21,47 @@ GROQ_KEY = os.getenv("GROQ_API_KEY")
 UTC = timezone.utc
 
 class GenerateReportRequest(BaseModel):
-    query: str
-    sector: str
+    query: Optional[str] = None
+    title: Optional[str] = None
+    sector: Optional[str] = None
     country: str = "Kenya"
     county: Optional[str] = None
     sub_county: Optional[str] = None
     ward: Optional[str] = None
     town: Optional[str] = None
     budget: Optional[str] = None
-    report_type: ReportType = ReportType.MARKET_FEASIBILITY
-    format: ReportFormat = ReportFormat.PDF
+    report_type: Optional[str] = "MARKET_FEASIBILITY"
+    format: Optional[str] = "PDF"
+
+    def get_query(self):
+        return self.query or self.title or "general market analysis"
+
+    def get_sector(self):
+        return self.sector or "Agriculture"
+
+    def get_report_type(self):
+        try:
+            if isinstance(self.report_type, str):
+                upper = self.report_type.upper()
+                if "MARKET" in upper: return ReportType.MARKET_FEASIBILITY
+                if "CONSUMER" in upper: return ReportType.CONSUMER_ANALYSIS
+                if "INVESTOR" in upper: return ReportType.INVESTOR_PITCH
+                if "KRA" in upper: return ReportType.KRA_TAX
+                if "BUSINESS" in upper or "BANK" in upper: return ReportType.BUSINESS_PLAN
+                return ReportType.MARKET_FEASIBILITY
+            return self.report_type
+        except:
+            return ReportType.MARKET_FEASIBILITY
+
+    def get_format(self):
+        try:
+            if isinstance(self.format, str):
+                if "PDF" in self.format.upper(): return ReportFormat.PDF
+                if "EXCEL" in self.format.upper() or "XLSX" in self.format.upper(): return ReportFormat.EXCEL
+                return ReportFormat.PDF
+            return self.format
+        except:
+            return ReportFormat.PDF
 
 @router.get("/", response_class=HTMLResponse)
 async def reports_page(request: Request):
@@ -62,21 +93,25 @@ def check_plan_access(plan_name: str, required_module: str = "Report Builder") -
 @router.post("/generate")
 def generate_report(request: Request, req: GenerateReportRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     user_id = getattr(request.state, 'user', None)
-    user_id = user_id.id if user_id else 1 # fallback for cookie auth
+    user_id = user_id.id if user_id else 1
 
-    # PLAN CHECK - aligned to billing.py
     plan_name = get_user_plan(db, user_id)
     if not check_plan_access(plan_name, "Report Builder"):
         raise HTTPException(status_code=402, detail=f"Report Builder locked. Your plan {plan_name} does not include Report Builder. Upgrade to Pro KES 5000 - https://app.evidlens.co.ke/api/billing/plans")
 
+    q = req.get_query()
+    sec = req.get_sector()
+    rtype = req.get_report_type()
+    fmt = req.get_format()
+
     location_str = req.town or req.ward or req.sub_county or req.county or req.country
     report = Report(
         user_id=user_id,
-        title=f"{req.report_type.value} - {req.query} @ {location_str}",
-        report_type=req.report_type,
-        format=req.format,
-        query=req.query,
-        sector=req.sector,
+        title=f"{rtype.value} - {q} @ {location_str}",
+        report_type=rtype,
+        format=fmt,
+        query=q,
+        sector=sec,
         country=req.country,
         county=req.county,
         sub_county=req.sub_county,
@@ -89,10 +124,9 @@ def generate_report(request: Request, req: GenerateReportRequest, background_tas
     db.commit()
     db.refresh(report)
 
-    # Background task now uses FILE PATH version - 12 modules LIVE
     background_tasks.add_task(process_report_generation, report.id, req, plan_name)
 
-    return {"report_id": report.id, "status": "generating", "plan": plan_name, "message": f"Report {report.id} generating with 12 engines LIVE for {req.query} @ {location_str}. Poll /reports/list or /reports/download/{report.id}"}
+    return {"report_id": report.id, "status": "generating", "plan": plan_name, "message": f"Report {report.id} generating with 12 engines LIVE for {q} @ {location_str}. Poll /reports/list or /reports/download/{report.id}"}
 
 def process_report_generation(report_id: int, req: GenerateReportRequest, plan_name: str = "Pro"):
     """Sync background - generates file path for all 12 modules + Quick Analysis"""
@@ -104,20 +138,17 @@ def process_report_generation(report_id: int, req: GenerateReportRequest, plan_n
         if not report:
             return
         try:
-            # GROQ insight optional
             insight = ""
             if GROQ_KEY:
                 try:
                     import asyncio
-                    # keep simple, skip groq in bg to avoid async issues
                 except:
                     pass
 
-            if req.format == ReportFormat.PDF:
-                # FINAL: file path - 12 modules + quick analysis + budget
+            if req.get_format() == ReportFormat.PDF:
                 filepath = generate_market_report_pdf_file(
-                    q=req.query,
-                    sector=req.sector,
+                    q=req.get_query(),
+                    sector=req.get_sector(),
                     country=req.country,
                     county=req.county,
                     sub_county=req.sub_county,
@@ -127,11 +158,10 @@ def process_report_generation(report_id: int, req: GenerateReportRequest, plan_n
                     plan_name=plan_name
                 )
             else:
-                filepath = generate_market_report_excel(db, req.sector, req.country, req.county, req.sub_county, req.ward, req.town, req.query)
-                # excel returns b"" currently, make placeholder path
+                filepath = generate_market_report_excel(db, req.get_sector(), req.country, req.county, req.sub_county, req.ward, req.town, req.get_query())
                 if isinstance(filepath, bytes):
                     os.makedirs("app/static/reports", exist_ok=True)
-                    filepath = f"app/static/reports/EvidLens_{req.query}_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"
+                    filepath = f"app/static/reports/EvidLens_{req.get_query()}_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"
                     with open(filepath, "wb") as f:
                         f.write(b"")
 
