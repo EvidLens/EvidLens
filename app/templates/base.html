@@ -8,13 +8,49 @@
     <link rel="stylesheet" href="/static/css/style.css?v=2.0.0">
 </head>
 <body class="bg-gray-50">
-    <header class="bg-[#0A1F44] text-white h-16 flex items-center px-6 shadow-md">
-        <img src="/static/logo.png?v=2.0.0" alt="EvidLens Logo" class="h-10 mr-3">
-        <span class="font-bold text-xl">EvidLens</span>
+    <header class="bg-[#0A1F44] text-white h-16 flex items-center px-6 shadow-md justify-between">
+        <div class="flex items-center">
+            <img src="/static/logo.png?v=2.0.0" alt="EvidLens Logo" class="h-10 mr-3">
+            <span class="font-bold text-xl">EvidLens</span>
+        </div>
+        <div class="flex items-center gap-4 text-sm">
+            <span id="plan-badge" class="bg-[#14B8A6] px-3 py-1 rounded-full font-bold">Trial</span>
+            <a href="/docs" class="underline">API Docs</a>
+            <a href="/auth/logout" class="underline">Logout</a>
+        </div>
     </header>
     <main class="p-6 max-w-7xl mx-auto">{% block content %}{% endblock %}</main>
 
     <div id="chatbot-container"></div>
     <script src="/static/js/app.js?v=2.0.0"></script>
+    <script>
+    // PLAN LOCKING - CONNECTS BILLING TO 12 CARDS + DOWNLOAD
+    const token = localStorage.getItem('token') || '';
+    async function loadPlan(){
+      try{
+        const headers = token? {Authorization: `Bearer ${token}`} : {};
+        const r = await fetch('/api/billing/my-subscription',{headers});
+        const d = await r.json();
+        const badge = document.getElementById('plan-badge');
+        if(badge) badge.innerText = d.plan || 'Trial';
+        window.allowedModules = d.modules || [];
+        window.userPlan = d.plan || 'Trial';
+        // Lock cards
+        document.querySelectorAll('[data-module-key]').forEach(el=>{
+          const key = el.getAttribute('data-module-key');
+          if(window.allowedModules.length > 0 &&!window.allowedModules.includes(key)){
+            el.classList.add('opacity-60','relative','cursor-not-allowed');
+            if(!el.querySelector('.lock-tag')){
+              const tag = document.createElement('div');
+              tag.className = 'lock-tag absolute top-2 right-2 bg-red-600 text-white text-[10px] px-2 py-1 rounded font-bold';
+              tag.innerText = '🔒 Upgrade to Pro KES 5k';
+              el.appendChild(tag);
+            }
+          }
+        });
+      }catch(e){ console.log('plan load fail',e)}
+    }
+    loadPlan();
+    </script>
 </body>
 </html>
