@@ -25,6 +25,7 @@ from app.core.scheduler import start_scheduler, shutdown_scheduler
 from app.modules.auth.models import AuthUser
 from app.modules.database import get_session as get_db
 
+from app.modules.analysis.router import router as analysis_router
 from app.modules.auth.router import router as auth_router
 from app.modules.auth.dependencies import get_current_user
 from app.core.router import router as core_router
@@ -168,6 +169,7 @@ app.include_router(storage_router)
 app.include_router(billing.router)
 app.include_router(data.router)
 app.include_router(meta.router)
+app.include_router(analysis_router)
 
 @app.get("/", response_class=HTMLResponse)
 def root(request: Request, current_user: Optional[AuthUser] = Depends(get_current_user_optional), db: Session = Depends(get_db)):
