@@ -45,6 +45,9 @@ const tableConfig = {
   'sectors': {name: 'Top Sectors', endpoint: API.sectors, headers: {sector:"Sector", count:"Search Count"}},
   'opportunities': {name: 'High Opportunity Zones', endpoint: API.opportunities, headers: {county:"County", product_name:"Product", destination_country:"Export To", market_size_kes:"Market Size", demand_score:"Opportunity Score"}}
 }
+const KENYA_COUNTIES_FALLBACK = ["Baringo","Bomet","Bungoma","Busia","Elgeyo-Marakwet","Embu","Garissa","Homa Bay","Isiolo","Kajiado","Kakamega","Kericho","Kiambu","Kilifi","Kirinyaga","Kisii","Kisumu","Kitui","Kwale","Laikipia","Lamu","Machakos","Makueni","Mandera","Marsabit","Meru","Migori","Mombasa","Murang'a","Nairobi","Nakuru","Nandi","Narok","Nyamira","Nyandarua","Nyeri","Samburu","Siaya","Taita-Taveta","Tana River","Tharaka-Nithi","Trans Nzoia","Turkana","Uasin Gishu","Vihiga","Wajir","West Pokot"];
+const KENYA_SECTORS_FALLBACK = ["Banks","Microfinance Institutions","Insurance & HMOs","Fintechs & Mobile Money","Capital Markets & Investment Banks","SACCOs","Retail - Supermarkets & Chains","Retail - Wholesale & Distributors","FMCG - Food & Beverage","FMCG - Personal Care & Household","Manufacturing - Food Processing","Manufacturing - Textiles & Apparel","Manufacturing - Construction Materials","Manufacturing - Automotive & Assembly","Manufacturing - Pharmaceuticals","Manufacturing - Chemicals & Plastics","Agribusiness - Crops & Farming","Agribusiness - Livestock & Dairy","Agribusiness - Horticulture & Flowers","Agribusiness - Fisheries & Aquaculture","Agribusiness - Agro-processing","Telcos & ISPs","Media & Broadcasting","Advertising & Marketing Agencies","PR & Communications","Real Estate - Developers","Real Estate - Agents & Brokers","Real Estate - Property Management","Construction & Infrastructure","Architecture & Engineering","Healthcare - Hospitals & Clinics","Healthcare - Pharmacies","Healthcare - Medical Devices & Pharma","Education - Universities & Colleges","Education - Primary & Secondary Schools","Education - EdTech & Training","Logistics & Transport","E-Commerce & Marketplaces","Hospitality - Hotels & Resorts","Hospitality - Restaurants & QSR","Tourism & Tour Operators","Aviation & Airlines","Maritime & Shipping","Energy - Electricity Generation","Energy - Oil & Gas","Energy - Renewable & Solar","Energy - Utilities & Water","Mining & Minerals","Government - National Ministries","Government - County Governments","Government - State Corporations","Government - Regulatory Authorities","Public Safety & Security","Defense","NGOs","INGOs & UN Agencies","Donors & Development Partners","Foundations & Philanthropy","Investors - PE & VC","Investors - Angel & Family Offices","Professional Services - Law","Professional Services - Consulting","Professional Services - Accounting & Audit","Professional Services - HR & Recruitment","ICT & Software Companies","Data Centers & Cloud Services","Digital Marketing & Creative","Automotive - Dealerships","Automotive - Parts & Aftermarket","Automotive - Ride-hailing & Boda","Gaming & Sports","Entertainment & Events","Beauty & Wellness","Waste Management & Recycling","Environmental & Climate Services"];
+const KENYA_SUBCOUNTIES_FALLBACK = {"Mombasa":["Changamwe","Jomvu","Kisauni","Nyali","Likoni","Mvita"],"Nairobi":["Westlands","Dagoretti North","Dagoretti South","Lang'ata","Kibra","Roysambu","Kasarani","Ruaraka","Embakasi North","Embakasi South","Embakasi East","Embakasi West","Embakasi Central","Makadara","Kamukunji","Starehe","Mathare"],"Nyeri":["Nyeri Town","Tetu","Kieni","Mathira","Othaya","Mukurweini"]};
 </script>
 
 <header class="text-white px-6 py-4 sticky top-0 shadow-md z-40" style="background:#0A1F44">
@@ -342,26 +345,89 @@ async function loadActiveTable(){
   renderActivePagination(data.total, state.page);
 }
 
-// ===== DROPDOWNS - REAL LIVE =====
+// ===== DROPDOWNS - ALIGNED TO KENYA_COUNTIES + KENYA_SECTORS MODELS =====
 async function loadDropdowns(){
   try {
-    const [s, c] = await Promise.all([fetch(API.get_sectors), fetch(API.get_counties)]);
-    const sectorsData = await s.json();
-    const countiesData = await c.json();
-    let sectors = sectorsData.sectors || sectorsData.data || sectorsData || [];
-    let counties = countiesData.counties || countiesData.data || countiesData || [];
+    let sectors = [];
+    let counties = [];
+    try {
+      const [s, c] = await Promise.all([fetch(API.get_sectors), fetch(API.get_counties)]);
+      if(s.ok){
+        const sectorsData = await s.json();
+        let raw = sectorsData.sectors || sectorsData.data || sectorsData || [];
+        if(raw.length > 10) sectors = raw;
+      }
+      if(c.ok){
+        const countiesData = await c.json();
+        let raw = countiesData.counties || countiesData.data || countiesData || [];
+        if(raw.length > 10) counties = raw;
+      }
+    } catch(e){ console.log('API fetch fail, trying fallback', e); }
+
+    if(!counties.length){
+      try{
+        const r = await fetch('/api/data/counties');
+        if(r.ok){
+          const d = await r.json();
+          let raw = Array.isArray(d)? d : (d.counties || d.data || []);
+          if(raw.length > 10) counties = raw;
+        }
+      }catch(e){}
+    }
+    if(!sectors.length){
+      try{
+        const r = await fetch('/api/data/sectors');
+        if(r.ok){
+          const d = await r.json();
+          let raw = Array.isArray(d)? d : (d.sectors || d.data || []);
+          if(raw.length > 10) sectors = raw;
+        }
+      }catch(e){}
+    }
+
+    if(!counties.length) counties = KENYA_COUNTIES_FALLBACK;
+    if(!sectors.length) sectors = KENYA_SECTORS_FALLBACK;
+
     sectors = sectors.map(x => typeof x === 'string'? x : (x.name || x.sector || x.title || '')).filter(Boolean);
     counties = counties.map(x => typeof x === 'string'? x : (x.name || x.county || '')).filter(Boolean);
+
     document.getElementById('sectorSelect').innerHTML = '<option value="">Select Sector</option>' + sectors.map(x=>`<option value="${x}">${x}</option>`).join('');
     document.getElementById('countySelect').innerHTML = '<option value="">Select County</option>' + counties.map(x=>`<option value="${x}">${x}</option>`).join('');
+
     document.getElementById('countySelect').onchange = async (e) => {
+      const county = e.target.value;
+      const subSel = document.getElementById('subcountySelect');
+      let loaded = false;
       try {
-        const res = await fetch(`${API.get_subcounties}?county=${e.target.value}`);
-        const subsData = await res.json();
-        let subs = subsData.subcounties || subsData.data || subsData || [];
-        subs = subs.map(x => typeof x === 'string'? x : (x.name || x.subcounty || '')).filter(Boolean);
-        document.getElementById('subcountySelect').innerHTML = '<option value="">All Subcounties</option>' + subs.map(x=>`<option>${x}</option>`).join('');
+        const res = await fetch(`${API.get_subcounties}?county=${encodeURIComponent(county)}`);
+        if(res.ok){
+          const subsData = await res.json();
+          let subs = subsData.subcounties || subsData.data || subsData || [];
+          subs = subs.map(x => typeof x === 'string'? x : (x.name || x.subcounty || '')).filter(Boolean);
+          if(subs.length){
+            subSel.innerHTML = '<option value="">All Subcounties</option>' + subs.map(x=>`<option value="${x}">${x}</option>`).join('');
+            loaded = true;
+          }
+        }
       } catch(err){ console.error(err); }
+      if(!loaded){
+        try{
+          const r2 = await fetch(`/api/data/subcounties?county=${encodeURIComponent(county)}`);
+          if(r2.ok){
+            const subsData = await r2.json();
+            let subs = Array.isArray(subsData)? subsData : (subsData.subcounties || subsData.data || []);
+            subs = subs.map(x => typeof x === 'string'? x : (x.name || x.subcounty || '')).filter(Boolean);
+            if(subs.length){
+              subSel.innerHTML = '<option value="">All Subcounties</option>' + subs.map(x=>`<option value="${x}">${x}</option>`).join('');
+              loaded = true;
+            }
+          }
+        }catch(e){}
+      }
+      if(!loaded){
+        let subs = KENYA_SUBCOUNTIES_FALLBACK[county] || [];
+        subSel.innerHTML = '<option value="">All Subcounties</option>' + subs.map(x=>`<option value="${x}">${x}</option>`).join('');
+      }
     }
   } catch(e){ console.error("Dropdown load failed", e); }
 }
