@@ -1,6 +1,6 @@
 from sqlmodel import Session, select
 from passlib.context import CryptContext
-from.models import AuthUser, UserRole
+from .models import AuthUser, UserRole
 from app.core.db import get_session as get_db
 import requests, os
 from datetime import datetime, timedelta
