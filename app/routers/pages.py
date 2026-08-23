@@ -7,7 +7,7 @@ import secrets
 import os
 
 from app.core.db import get_session, get_db
-from app.core.models import User, MarketMetric, KenyaLensBusiness, NewsArticle, SocialMention, Company, ExportOpportunity, KenyaLensSurvey, KenyaLensResponse, KenyaTenant, KenyaLensMember
+from app.core.models import User, MarketMetric, NewsArticle, SocialMention, Company, ExportOpportunity
 from app.modules.auth.dependencies import get_current_user
 from app.core.service import _core
 from main import dashboard_api, send_email, get_password_hash, LensEngineService
@@ -19,16 +19,22 @@ PRICING = _core.PRICING
 ADDONS = _core.ADDONS
 ALC = _core.ALC
 
+API_DICT = {"logout": "/auth/logout","login": "/login","prices": "/api/prices","demand": "/api/demand","companies": "/api/companies","county_stats": "/api/county-stats","sectors": "/api/top-sectors","opportunities": "/api/opportunities","get_sectors": "/api/data/sectors","get_counties": "/api/data/counties","get_subcounties": "/api/data/subcounties","analyze": "/api/analyze-detailed","chat": "/lens/chat","download": "/download-report","export": "/api/export"}
+
 @router.get("/", response_class=HTMLResponse)
 async def root(request: Request, session: Session = Depends(get_session)):
     data = dashboard_api(session)
-    return templates.TemplateResponse("dashboard.html", {"request": request, "data": data, "API": os.getenv("API_BASE_URL"), "current_user": None})
+    return templates.TemplateResponse("dashboard.html", {"request": request, "data": data, "API": API_DICT, "current_user": None})
 
 @router.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     data = dashboard_api(session)
-    API = {"logout": "/auth/logout","login": "/login","prices": "/api/prices","demand": "/api/demand","companies": "/api/companies","county_stats": "/api/county-stats","sectors": "/api/top-sectors","opportunities": "/api/opportunities","get_sectors": "/api/sectors","get_counties": "/api/counties","get_subcounties": "/api/subcounties","analyze": "/api/analyze-detailed","chat": "/lens/chat","download": "/download-report","export": "/api/export","money_embed": "/kenyalensiq/embed/money"}
+    API = {"logout": "/auth/logout","login": "/login","prices": "/api/prices","demand": "/api/demand","companies": "/api/companies","county_stats": "/api/county-stats","sectors": "/api/top-sectors","opportunities": "/api/opportunities","get_sectors": "/api/data/sectors","get_counties": "/api/data/counties","get_subcounties": "/api/data/subcounties","analyze": "/api/analyze-detailed","chat": "/lens/chat","download": "/download-report","export": "/api/export"}
     return templates.TemplateResponse("dashboard.html", {"request": request, "current_user": current_user, "data": data, "API": API})
+
+@router.get("/api/billing/my-subscription")
+async def my_subscription(user: User = Depends(get_current_user)):
+    return {"plan": getattr(user, 'plan', 'Trial'), "modules": ["market-intel","location-intel","price-intel","demand-intel","competitor-intel","opportunity-intel","trade-intel","risk-intel","finance-intel","marketing-intel","supply-intel","export-intel"]}
 
 @router.get("/market/risk", response_class=HTMLResponse)
 def risk_sentinel_page(request: Request, session: Session = Depends(get_session)):
@@ -80,7 +86,7 @@ def demand_page(request: Request, session: Session = Depends(get_session)):
 
 @router.get("/reports/funding", response_class=HTMLResponse)
 def funding_page(request: Request, session: Session = Depends(get_session)):
-    funders = session.exec(select(KenyaLensBusiness).where(or_(KenyaLensBusiness.sector.ilike("%Financial%"),KenyaLensBusiness.sector.ilike("%Banking%"),KenyaLensBusiness.sector.ilike("%Insurance%"),KenyaLensBusiness.sector.ilike("%SACCO%"))).limit(50)).all()
+    funders = session.exec(select(Company).where(or_(Company.sector.ilike("%Financial%"),Company.sector.ilike("%Banking%"),Company.sector.ilike("%Insurance%"),Company.sector.ilike("%SACCO%"))).limit(50)).all()
     return templates.TemplateResponse("funding.html", {"request": request, "funders": funders})
 
 @router.get("/help", response_class=HTMLResponse)
@@ -180,19 +186,3 @@ def reset_password(token: str = Form(...), password: str = Form(...), session: S
     session.add(user)
     session.commit()
     return RedirectResponse("/login?success=Password reset", status_code=303)
-
-@router.get("/kenyalensiq")
-def kenyalsiq_dashboard(session: Session = Depends(get_session)):
-    business_count = session.exec(select(func.count(KenyaLensBusiness.id))).one()
-    survey_count = session.exec(select(func.count(KenyaLensSurvey.id))).one()
-    response_count = session.exec(select(func.count(KenyaLensResponse.id))).one()
-    tenant_count = session.exec(select(func.count(KenyaTenant.id))).one()
-    user_count = session.exec(select(func.count(KenyaLensMember.id))).one()
-    return {"title": "KenyaLensIQ", "modules": [{"id": 1, "name": "Businesses", "icon": "🏢", "count": business_count, "route": "/businesses"}, {"id": 2, "name": "Surveys", "icon": "📋", "count": survey_count, "route": "/surveys"}, {"id": 3, "name": "Responses", "icon": "📝", "count": response_count, "route": "/responses"}, {"id": 4, "name": "Tenants", "icon": "🏛️", "count": tenant_count, "route": "/tenants"}, {"id": 5, "name": "Users", "icon": "👥", "count": user_count, "route": "/users"}]}
-
-@router.get("/kenyalensiq/embed/money")
-def money_module_embed(query: str = "", session: Session = Depends(get_session)):
-    funding_count = session.exec(select(func.count(KenyaLensBusiness.id)).where(or_(KenyaLensBusiness.sector.ilike("%Financial%"),KenyaLensBusiness.sector.ilike("%Banking%"),KenyaLensBusiness.sector.ilike("%Insurance%"),KenyaLensBusiness.sector.ilike("%SACCO%"),KenyaLensBusiness.sector.ilike("%Microfinance%"),KenyaLensBusiness.sector.ilike("%FinTech%")))).one()
-    sector_breakdown = session.exec(select(KenyaLensBusiness.sector, func.count(KenyaLensBusiness.id).label("count")).where(or_(KenyaLensBusiness.sector.ilike("%Financial%"),KenyaLensBusiness.sector.ilike("%Banking%"),KenyaLensBusiness.sector.ilike("%Insurance%"),KenyaLensBusiness.sector.ilike("%SACCO%"),KenyaLensBusiness.sector.ilike("%Microfinance%"),KenyaLensBusiness.sector.ilike("%FinTech%"))).group_by(KenyaLensBusiness.sector)).all()
-    if query: sector_breakdown = [r for r in sector_breakdown if query.lower() in r.sector.lower()]
-    return {"module": "Money Module - Sector Breakdown", "total_funding_businesses": funding_count, "query": query, "data": [dict(r._mapping) for r in sector_breakdown]}
