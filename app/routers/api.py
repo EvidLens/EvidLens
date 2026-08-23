@@ -4,6 +4,7 @@ from sqlmodel import Session, select, func, desc, or_
 import io, csv, os, requests
 from datetime import datetime, timedelta
 
+from app.modules.lens_engine.service import LensEngineService
 from app.core.db import get_session as get_db
 from app.core.models import MarketMetric, Company, NewsArticle, SocialMention, ExportOpportunity
 from app.modules.auth.models import AuthUser
@@ -220,3 +221,15 @@ def run_scraper():
         return {"status": "scraper ran. DB updated with real prices"}
     except Exception as e:
         return {"status": "scraper failed", "error": str(e)}
+
+@router.post("/api/lens/chat")
+async def lens_chat(payload: dict, db: Session = Depends(get_db)):
+    msg = payload.get("message", "hi")
+    sector = payload.get("sector")
+    county = payload.get("county")
+    service = LensEngineService(db)
+    result = await service.chat(msg, payload.get("email","anon@evidlens.co.ke"))
+    # result is {"reply": "..."} already, but handle both cases
+    if isinstance(result, dict):
+        return result
+    return {"reply": result}
