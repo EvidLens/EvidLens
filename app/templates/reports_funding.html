@@ -3,7 +3,7 @@
 <div class="max-w-7xl mx-auto p-6">
   <div class="mb-6">
     <h1 class="text-3xl font-bold text-[#0A1F44]">💸 Funding Radar</h1>
-    <p class="text-gray-500">Banks, SACCOs, Grants, and Investors actively funding {{ current_user.sector }} in Kenya</p>
+    <p class="text-gray-500">Banks, SACCOs, Grants, and Investors actively funding {{ current_user.sector if current_user is defined and current_user and current_user.sector else 'your sector' }} in Kenya</p>
   </div>
 
   <!-- Filters -->
@@ -37,7 +37,7 @@
           <span class="bg-teal-100 text-teal-700 text-xs font-bold px-2 py-1 rounded">{{f.type}}</span>
         </div>
         <div class="text-right">
-          <div class="text-yellow-500">{"★" * f.rating}{"☆" * (5-f.rating)}</div>
+          <div class="text-yellow-500">{{ "★" * f.rating }}{{ "☆" * (5-f.rating) }}</div>
           <p class="text-xs text-gray-500">Trust Score</p>
         </div>
       </div>
