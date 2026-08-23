@@ -31,6 +31,7 @@ from app.modules.billing.router import router as billing_page_router
 from app.modules.analysis.router import router as analysis_router
 from app.modules.auth.router import router as auth_router
 from app.modules.auth.dependencies import get_current_user
+from app.modules.auth.middleware import AuthMiddleware
 from app.core.router import router as core_router
 from app.modules.competitive_engine.router import router as competitive_router
 from app.modules.market_engine.router import router as market_router
@@ -68,6 +69,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(AuthMiddleware)
 
 async def get_current_user_optional(request: Request, db: Session = Depends(get_db)):
     user_id = request.cookies.get("user_id")
