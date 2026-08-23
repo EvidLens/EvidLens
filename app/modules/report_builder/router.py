@@ -36,8 +36,12 @@ async def reports_page(request: Request):
     return templates.TemplateResponse("reports.html", {"request": request})
 
 @router.get("/funding", response_class=HTMLResponse)
-async def funding_page(request: Request):
-    return templates.TemplateResponse("reports_funding.html", {"request": request})
+async def funding_page(request: Request, db: Session = Depends(get_session), current_user = Depends(get_current_user)):
+    return templates.TemplateResponse("reports_funding.html", {
+        "request": request,
+        "current_user": current_user,
+        "user": current_user
+    })
 
 def get_user_plan(db: Session, user_id: int) -> str:
     try:
