@@ -6,7 +6,7 @@
       <h1 class="text-3xl font-bold text-[#0A1F44]">📊 My Reports</h1>
       <p class="text-gray-500">Generate, download and share your intelligence reports</p>
     </div>
-    <button onclick="generateReport()" class="bg-[#0A1F44] text-white px-6 py-2 rounded-lg font-bold hover:opacity-90">
+    <button onclick="openGenerateModal()" class="bg-[#0A1F44] text-white px-6 py-2 rounded-lg font-bold hover:opacity-90">
       + Generate New Report
     </button>
   </div>
@@ -43,25 +43,43 @@
   </div>
 </div>
 
+<!-- Generate Modal -->
+<div id="genModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+ <div class="bg-white p-6 rounded-xl w-full max-w-md">
+  <h3 class="font-bold text-lg mb-4">Generate Market Report</h3>
+  <input id="mQuery" placeholder="What to analyze? e.g. maize prices Kirinyaga" class="w-full border p-2 rounded mb-3"/>
+  <input id="mSector" placeholder="Sector e.g. Agriculture" value="Agriculture" class="w-full border p-2 rounded mb-3"/>
+  <input id="mCounty" placeholder="County e.g. Kirinyaga" value="Kirinyaga" class="w-full border p-2 rounded mb-3"/>
+  <div class="flex gap-2 justify-end">
+   <button onclick="closeGen()" class="px-4 py-2">Cancel</button>
+   <button onclick="submitGenerate()" class="bg-[#0A1F44] text-white px-6 py-2 rounded font-bold">Generate</button>
+  </div>
+ </div>
+</div>
+
 <script>
+function openGenerateModal(){ document.getElementById('genModal').classList.remove('hidden'); }
+function closeGen(){ document.getElementById('genModal').classList.add('hidden'); }
+
 async function loadReports(){
   try{
     const res = await fetch('/reports/list');
     const data = await res.json();
+    const list = data.reports || data;
     const tbody = document.getElementById('reportsTable');
-    document.getElementById('totalReports').innerText = data.length || 0;
-    document.getElementById('monthReports').innerText = data.length || 0;
-    if(!data.length){
+    document.getElementById('totalReports').innerText = list.length || 0;
+    document.getElementById('monthReports').innerText = list.length || 0;
+    if(!list.length){
       tbody.innerHTML = '<tr><td colspan="4" class="p-8 text-center text-gray-500">No reports yet. Click Generate New Report.</td></tr>';
       return;
     }
-    tbody.innerHTML = data.map(r => `
+    tbody.innerHTML = list.map(r => `
       <tr class="border-t hover:bg-gray-50">
-        <td class="p-4 font-bold text-[#0A1F44]">${r.title || r.report_type || 'Report'}</td>
-        <td class="p-4"><span class="bg-teal-100 text-teal-700 px-2 py-1 rounded text-xs">${r.report_type || 'General'}</span></td>
-        <td class="p-4 text-gray-500">${new Date(r.created_at).toLocaleDateString()}</td>
+        <td class="p-4 font-bold text-[#0A1F44]">${r.title || r.type || 'Report'}</td>
+        <td class="p-4"><span class="bg-teal-100 text-teal-700 px-2 py-1 rounded text-xs">${r.type || r.report_type || 'General'}</span> <span class="text-xs text-gray-500">${r.status || ''}</span></td>
+        <td class="p-4 text-gray-500">${r.created_at ? new Date(r.created_at).toLocaleDateString() : ''}</td>
         <td class="p-4 text-right flex justify-end gap-2">
-          <a href="/reports/download/${r.id}" class="bg-[#0A1F44] text-white px-3 py-1 rounded text-xs">Download PDF</a>
+          ${r.status==='READY' ? `<a href="/reports/download/${r.id}" class="bg-[#0A1F44] text-white px-3 py-1 rounded text-xs">Download PDF</a>` : `<span class="text-xs text-yellow-600">${r.status}</span>`}
           <button onclick="deleteReport(${r.id})" class="bg-red-50 text-red-600 px-3 py-1 rounded text-xs">Delete</button>
         </td>
       </tr>
@@ -70,15 +88,25 @@ async function loadReports(){
     document.getElementById('reportsTable').innerHTML = '<tr><td colspan="4" class="p-8 text-center text-red-500">Failed to load: '+e+'</td></tr>';
   }
 }
-async function generateReport(){
-  const title = prompt('Report title?', 'Market Intelligence Report - '+new Date().toLocaleDateString());
-  if(!title) return;
+async function submitGenerate(){
+  const query = document.getElementById('mQuery').value || 'maize market analysis';
+  const sector = document.getElementById('mSector').value || 'Agriculture';
+  const county = document.getElementById('mCounty').value || 'Kirinyaga';
+  closeGen();
   const res = await fetch('/reports/generate', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({title: title, report_type: 'market'})
+    body: JSON.stringify({
+      query: query,
+      sector: sector,
+      county: county,
+      country: "Kenya",
+      report_type: "MARKET_FEASIBILITY",
+      format: "PDF"
+    })
   });
-  if(res.ok){ alert('Report generated!'); loadReports(); } else { alert('Failed: '+(await res.text())); }
+  const txt = await res.text();
+  if(res.ok){ alert('Generating! Check list in 30s'); loadReports(); } else { alert('Failed: '+txt); }
 }
 async function deleteReport(id){
   if(!confirm('Delete report?')) return;
@@ -86,5 +114,6 @@ async function deleteReport(id){
   loadReports();
 }
 loadReports();
+setInterval(loadReports, 10000);
 </script>
 {% endblock %}
