@@ -100,3 +100,9 @@ def login_page(request: Request):
     from fastapi.templating import Jinja2Templates
     templates = Jinja2Templates(directory="app/templates")
     return templates.TemplateResponse("login.html", {"request": request})
+
+# Compatibility for old frontend that posts to /do-login and /do-signup
+@router.post("/../do-login", include_in_schema=False)
+@router.post("/../../do-login", include_in_schema=False)
+def compat_login_alias(req: LoginRequest, db: Session = Depends(get_db)):
+    return login(req, db)
