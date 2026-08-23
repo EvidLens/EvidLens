@@ -62,11 +62,11 @@ Rules: Use KES, counties, sub-counties, wards. Cite KNBS, CBK, KRA, MarketPrice,
 """
 
 TOOLS = [
-    {"type": "function", "function": {"name": "data_qa", "description": "Answer questions using 9 Lanes data DETAILED", "parameters": {"type": "object", "properties": {"query": {"type": "string"}, "sector": {"type": "string"}, "county": {"type": "string"}}, "required": ["query"]}},
-    {"type": "function", "function": {"name": "generate_report", "description": "Build detailed board deck, PDF, PPT", "parameters": {"type": "object", "properties": {"type": {"type": "string"}, "sector": {"type": "string"}, "county": {"type": "string"}}, "required": ["type"]}},
-    {"type": "function", "function": {"name": "create_alert", "description": "Set alert", "parameters": {"type": "object", "properties": {"alert_type": {"type": "string"}, "keywords": {"type": "array", "items": {"type": "string"}}, "channel": {"type": "string"}}, "required": ["alert_type", "keywords"]}},
-    {"type": "function", "function": {"name": "export_data", "description": "Export to Excel, PDF DETAILED", "parameters": {"type": "object", "properties": {"format": {"type": "string"}}, "required": ["format"]}},
-    {"type": "function", "function": {"name": "viability_check", "description": "Detailed Go, No-Go, Needs Research with financials", "parameters": {"type": "object", "properties": {"business": {"type": "string"}, "county": {"type": "string"}, "budget": {"type": "string"}}, "required": ["business", "county"]}}
+    {"type": "function", "function": {"name": "data_qa", "description": "Answer questions using 9 Lanes data DETAILED", "parameters": {"type": "object", "properties": {"query": {"type": "string"}, "sector": {"type": "string"}, "county": {"type": "string"}}, "required": ["query"]}}},
+    {"type": "function", "function": {"name": "generate_report", "description": "Build detailed board deck, PDF, PPT", "parameters": {"type": "object", "properties": {"type": {"type": "string"}, "sector": {"type": "string"}, "county": {"type": "string"}}, "required": ["type"]}}},
+    {"type": "function", "function": {"name": "create_alert", "description": "Set alert", "parameters": {"type": "object", "properties": {"alert_type": {"type": "string"}, "keywords": {"type": "array", "items": {"type": "string"}}, "channel": {"type": "string"}}, "required": ["alert_type", "keywords"]}}},
+    {"type": "function", "function": {"name": "export_data", "description": "Export to Excel, PDF DETAILED", "parameters": {"type": "object", "properties": {"format": {"type": "string"}}, "required": ["format"]}}},
+    {"type": "function", "function": {"name": "viability_check", "description": "Detailed Go, No-Go, Needs Research with financials", "parameters": {"type": "object", "properties": {"business": {"type": "string"}, "county": {"type": "string"}, "budget": {"type": "string"}}, "required": ["business", "county"]}}}
 ]
 
 async def call_tool(name: str, args: dict, user_id: int, session: Session):
