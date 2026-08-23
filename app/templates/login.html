@@ -12,29 +12,61 @@
     <p class="text-gray-500">Decision Intelligence for Kenya</p>
   </div>
 
-  {% if error %}
-    <div class="bg-red-50 text-red-700 p-3 rounded-lg mb-4 text-sm">{{ error }}</div>
-  {% endif %}
-  {% if success %}
-    <div class="bg-green-50 text-green-700 p-3 rounded-lg mb-4 text-sm">{{ success }}</div>
-  {% endif %}
+  <div id="msg" class="hidden p-3 rounded-lg mb-4 text-sm"></div>
   
-  <form method="POST" action="/do-login" class="space-y-4">
+  <form id="loginForm" class="space-y-4">
     <div>
       <label class="block text-sm font-semibold text-[#0A1F44] mb-2">Email</label>
-      <input type="email" name="email" required class="w-full p-3 border rounded-lg focus:border-[#14B8A6] outline-none">
+      <input type="email" id="email" required class="w-full p-3 border rounded-lg focus:border-[#14B8A6] outline-none">
     </div>
     <div>
       <div class="flex justify-between">
         <label class="block text-sm font-semibold text-[#0A1F44] mb-2">Password</label>
         <a href="/forgot-password" class="text-sm text-[#14B8A6]">Forgot?</a>
       </div>
-      <input type="password" name="password" required class="w-full p-3 border rounded-lg focus:border-[#14B8A6] outline-none">
+      <input type="password" id="password" required class="w-full p-3 border rounded-lg focus:border-[#14B8A6] outline-none">
     </div>
-    <button class="w-full bg-[#14B8A6] text-white p-3 rounded-lg font-bold hover:bg-[#0e9a8c] transition">Login</button>
+    <button id="btn" class="w-full bg-[#14B8A6] text-white p-3 rounded-lg font-bold hover:bg-[#0e9a8c] transition">Login</button>
   </form>
   
   <p class="text-center text-sm mt-6">Don't have an account? <a href="/signup" class="text-[#14B8A6] font-bold">Sign up</a></p>
 </div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const next = params.get('next') || '/';
+document.getElementById('loginForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const btn = document.getElementById('btn');
+  const msg = document.getElementById('msg');
+  btn.textContent = 'Logging in...';
+  btn.disabled = true;
+  try{
+    const res = await fetch('/auth/login', {
+      method:'POST',
+      credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        email: document.getElementById('email').value,
+        password: document.getElementById('password').value
+      })
+    });
+    const data = await res.json();
+    if(!res.ok){
+      msg.className = 'bg-red-50 text-red-700 p-3 rounded-lg mb-4 text-sm';
+      msg.textContent = data.detail || 'Invalid credentials';
+      msg.classList.remove('hidden');
+    }else{
+      window.location.href = next;
+    }
+  }catch(err){
+    msg.className = 'bg-red-50 text-red-700 p-3 rounded-lg mb-4 text-sm';
+    msg.textContent = 'Network error';
+    msg.classList.remove('hidden');
+  }
+  btn.textContent = 'Login';
+  btn.disabled = false;
+});
+</script>
 </body>
 </html>
