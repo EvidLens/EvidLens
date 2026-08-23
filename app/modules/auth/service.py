@@ -1,15 +1,13 @@
 from sqlmodel import Session, select
-from passlib.context import CryptContext
-from .models import AuthUser, UserRole
-from app.core.db import get_session as get_db
+import bcrypt
+from.models import AuthUser, UserRole
 import requests, os
 from datetime import datetime, timedelta
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 FROM_EMAIL = os.getenv("FROM_EMAIL", "noreply@evidlens.co.ke")
 FROM_NAME = os.getenv("FROM_NAME", "EvidLens")
-APP_URL = os.getenv("APP_URL", "http://localhost:8000")
+APP_URL = os.getenv("APP_URL", "https://app.evidlens.co.ke")
 
 def send_email(to: str, subject: str, html: str):
     if not RESEND_API_KEY:
@@ -18,15 +16,16 @@ def send_email(to: str, subject: str, html: str):
     requests.post("https://api.resend.com/emails", headers={"Authorization": f"Bearer {RESEND_API_KEY}"}, json={"from": f"{FROM_NAME} <{FROM_EMAIL}>", "to": [to], "subject": subject, "html": html})
 
 def hash_password(password: str):
-    if len(password.encode('utf-8')) > 72:
-        password = password[:72]
-    return pwd_context.hash(password)
+    pw = password.encode('utf-8')[:72]
+    return bcrypt.hashpw(pw, bcrypt.gensalt()).decode()
 
 def verify_password(plain_password: str, hashed_password: str):
-    if len(plain_password.encode('utf-8')) > 72:
-        plain_password = plain_password[:72]
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        return bcrypt.checkpw(plain_password.encode('utf-8')[:72], hashed_password.encode('utf-8'))
+    except:
+        return False
 
+#... keep rest of your functions as is (get_user_by_email, create_user, etc)
 def get_user_by_email(db: Session, email: str):
     return db.exec(select(AuthUser).where(AuthUser.email == email)).first()
 
