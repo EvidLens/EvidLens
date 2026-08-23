@@ -6,7 +6,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
 body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif}
-.card{background:white; border-radius:16px; padding:20px; box-shadow:0 1px 4px rgba(16,24,40,0.06); transition:transform 0.2s}
+.card{background:white; border-radius:16px; padding:20px; box-shadow:0 1px 4px rgba(16,24,40,0.06); transition:transform 0.2s; position:relative}
 .card:hover{transform:translateY(-2px)}
 .teal-card{border-top:4px solid #14B8A6}
 .lane-icon{background:linear-gradient(135deg, #0A1F44 0%, #14B8A6 100%)}
@@ -54,6 +54,7 @@ const tableConfig = {
       <div><h1 class="font-bold text-2xl"><span style="color:#FFFFFF">Evid</span><span style="color:#14B8A6">Lens</span></h1><p class="text-xs" style="color:#CBD5E1">Decision Intelligence</p></div>
     </div>
     <div class="flex items-center gap-4">
+      <span id="plan-badge" class="bg-[#14B8A6] px-3 py-1 rounded-full text-[10px] font-bold">Trial</span>
       <p class="text-xs" id="lastUpdated">Last updated: {{ data.last_updated }}</p>
       <div class="relative" id="profileMenu">
         <button id="profileBtn" class="flex items-center gap-2">
@@ -105,16 +106,19 @@ const tableConfig = {
 
     <div class="mb-8">
       <h2 class="font-bold text-xl mb-4 flex items-center gap-2" style="color:#0A1F44">Trending Now</h2>
-      <div id="trending-container" class="grid grid-cols-2 md:grid-cols-3 gap-4"></div>
+      <div id="trending-container" class="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <p class="text-gray-400 text-sm col-span-3">Loading trending LIVE...</p>
+      </div>
     </div>
 
     <div class="mb-8"><h2 class="font-bold text-xl mb-4" style="color:#0A1F44">WAVE 2 Intelligence Modules</h2><div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4">
       {% for module in data.modules %}
-      <a href="{{ module.route }}" class="card cursor-pointer block">
+      <a href="{{ module.route }}" data-module-key="{{ module.key }}" class="card cursor-pointer block">
         <div class="lane-icon w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold mb-3 text-2xl">{{ module.icon }}</div>
         <p class="font-semibold text-base" style="color:#0A1F44">{{ module.name }}</p>
         <p class="text-sm text-gray-500">{{ module.count }} Records</p>
-        <p class="text-xs font-bold mt-2" style="color:#F59E0B">LIVE</p>
+        <p class="text-[10px] font-bold mt-1" style="color:#F59E0B">{{ module.key }}</p>
+        <p class="text-xs font-bold mt-1" style="color:#F59E0B">LIVE</p>
       </a>
       {% endfor %}
     </div></div>
@@ -130,16 +134,21 @@ const tableConfig = {
           </div>
           <div class="flex gap-3">
             <select name="subcounty" id="subcountySelect" class="w-1/2 p-3 border rounded-lg text-sm"><option value="">All Subcounties</option></select>
-            <input name="budget_kes" type="number" placeholder="Budget KES e.g 500000" class="w-1/2 p-3 border rounded-lg text-sm">
+            <input name="budget_kes" id="budget_kes" type="number" placeholder="Budget KES e.g 500000" class="w-1/2 p-3 border rounded-lg text-sm">
           </div>
+          <input name="ward" id="wardInput" placeholder="Ward (optional)" class="w-full p-3 border rounded-lg text-sm">
+          <input name="town" id="townInput" placeholder="Town (optional)" class="w-full p-3 border rounded-lg text-sm">
           <button id="analyze-btn" class="bg-[#F59E0B] text-white w-full p-3 rounded-lg font-bold hover:opacity-90">Analyze Market</button>
         </form>
-        <div id="result" class="mt-4 text-sm"></div>
+        <div id="result" class="mt-4 text-sm hidden bg-gray-50 p-3 rounded"></div>
       </div>
       <div class="card">
-        <h2 class="font-bold text-xl mb-3" style="color:#0A1F44">Download Full Report</h2>
-        <p class="text-sm text-gray-600 mb-3">Get PDF report with competitors, pricing, and AI insights</p>
-        <button onclick="downloadPDF()" class="bg-[#14B8A6] text-white w-full p-3 rounded-lg font-bold hover:opacity-90">Download PDF</button>
+        <h2 class="font-bold text-xl mb-2" style="color:#0A1F44">Download Full Report</h2>
+        <p class="text-xs text-gray-600 mb-2">12 engines + Quick Analysis → 1 PDF</p>
+        <div id="report-preview" class="text-xs bg-gray-50 p-3 rounded mb-3 border">No analysis yet. Run Quick Analysis above — then PDF includes all 12 modules LIVE.</div>
+        <button id="download-pdf-btn" class="bg-[#14B8A6] text-white w-full p-3 rounded-lg font-bold hover:opacity-90">Download PDF (12 Sections)</button>
+        <div id="download-status" class="text-[11px] mt-2 text-gray-500"></div>
+        <a href="/reports/list" class="text-[11px] underline mt-1 inline-block">View My Reports →</a>
       </div>
     </div>
 
@@ -165,48 +174,56 @@ const tableConfig = {
   </div>
 </main>
 
-<form id="pdfForm" method="POST" action="{{ API.download }}" style="display:none"><input type="hidden" name="q" id="pdf_q"><input type="hidden" name="sector" id="pdf_sector"><input type="hidden" name="county" id="pdf_county"></form>
-
-<footer class="footer text-white pt-12 pb-8 mt-12"><div class="max-w-[1400px] mx-auto px-6"><div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8"><div><h3 class="font-bold mb-3" style="color:#14B8A6">Legal</h3><ul class="space-y-2 text-sm"><li><a href="/privacy" class="footer-link">Privacy Policy</a></li><li><a href="/terms" class="footer-link">Terms</a></li></ul></div><div><h3 class="font-bold mb-3" style="color:#14B8A6">Support</h3><ul class="space-y-2 text-sm"><li><a href="/contact" class="footer-link">Contact Us</a></li></ul></div><div><h3 class="font-bold mb-3" style="color:#14B8A6">Product</h3><ul class="space-y-2 text-sm"><li><a href="/pricing" class="footer-link">Pricing</a></li></ul></div><div><h3 class="font-bold mb-3" style="color:#14B8A6">Company</h3><ul class="space-y-2 text-sm"><li><a href="/about" class="footer-link">About</a></li></ul></div></div><div class="border-t border-gray-700 pt-6 text-center text-sm" style="color:#CBD5E1">© 2026 EvidLens. Decision Intelligence for Kenya.</div></div></footer>
+<footer class="footer text-white pt-12 pb-8 mt-12"><div class="max-w-[1400px] mx-auto px-6"><div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8"><div><h3 class="font-bold mb-3" style="color:#14B8A6">Legal</h3><ul class="space-y-2 text-sm"><li><a href="/privacy" class="footer-link">Privacy Policy</a></li><li><a href="/terms" class="footer-link">Terms</a></li></ul></div><div><h3 class="font-bold mb-3" style="color:#14B8A6">Support</h3><ul class="space-y-2 text-sm"><li><a href="/contact" class="footer-link">Contact Us</a></li></ul></div><div><h3 class="font-bold mb-3" style="color:#14B8A6">Product</h3><ul class="space-y-2 text-sm"><li><a href="/pricing" class="footer-link">Pricing</a></li></ul></div><div><h3 class="font-bold mb-3" style="color:#14B8A6">Company</h3><ul class="space-y-2 text-sm"><li><a href="/about" class="footer-link">About</a></li></ul></div></div><div class="border-t border-gray-700 pt-6 text-center text-sm" style="color:#CBD5E1">© 2026 EvidLens. Decision Intelligence for Kenya. • Trial=3 • Pro=8 + Report Builder • Enterprise=10</div></div></footer>
 
 <div id="chatWidget"><div id="chatBox"><div id="chatHeader">🤖 Lens AI Assistant</div><div id="chatMessages"><div class="msg bot">Hi! I'm Lens. Ask me anything about Kenya markets.</div></div><div id="chatInputBox"><input id="chatInput" placeholder="Ask Lens anything..."><button id="chatSend">Send</button></div></div><button id="chatBtn">💬</button></div>
 
 <script>
+// ===== TRENDING NOW - REAL WORKING CONNECTED =====
 async function loadTrending(){
-  const res = await fetch('/analysis/trending')
-  const data = await res.json()
-  const container = document.getElementById('trending-container')
-  container.innerHTML = ''
-  if(data.trending.length === 0){
-    container.innerHTML = `<p class="text-gray-500 col-span-3 text-center">No trending data yet. Run your first analysis above 👆</p>`
-    return
-  }
-  data.trending.forEach(item => {
-    const trendColor = item.trend === 'up'? 'text-green-600' : item.trend === 'down'? 'text-red-600' : 'text-gray-600'
-    const trendIcon = item.trend === 'up'? '▲' : item.trend === 'down'? '▼' : '—'
-    container.innerHTML += `
-      <div onclick="analyzeProduct('${item.product}', '${item.county}')"
-           class="p-4 bg-white border-teal-200 rounded-xl shadow-sm hover:shadow-md cursor-pointer transition">
-        <div class="flex justify-between items-start">
-          <div>
-            <p class="font-bold text-[#0A1F44]">${item.product}</p>
-            <p class="text-sm text-gray-500">${item.county} County • ${item.sector}</p>
+  const container = document.getElementById('trending-container');
+  try{
+    const res = await fetch('/analysis/trending');
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    container.innerHTML = '';
+    if(!data.trending || data.trending.length === 0){
+      container.innerHTML = `<p class="text-gray-500 col-span-3 text-center">No trending data yet. Run your first analysis above 👆 or seed DB.</p>`;
+      return;
+    }
+    data.trending.forEach(item => {
+      const trendColor = item.trend === 'up'? 'text-green-600' : item.trend === 'down'? 'text-red-600' : 'text-gray-600';
+      const trendIcon = item.trend === 'up'? '▲' : item.trend === 'down'? '▼' : '—';
+      container.innerHTML += `
+        <div onclick="analyzeProduct('${item.product}', '${item.county}')"
+             class="p-4 bg-white border border-teal-200 rounded-xl shadow-sm hover:shadow-md cursor-pointer transition">
+          <div class="flex justify-between items-start">
+            <div>
+              <p class="font-bold text-[#0A1F44]">${item.product}</p>
+              <p class="text-sm text-gray-500">${item.county} County • ${item.sector}</p>
+            </div>
+            <span class="text-xs bg-teal-100 text-[#14B8A6] px-2 py-1 rounded">Demand: ${item.demand_score}/10</span>
           </div>
-          <span class="text-xs bg-teal-100 text-[#14B8A6] px-2 py-1 rounded">Demand: ${item.demand_score}/10</span>
+          <div class="mt-3 flex justify-between items-center">
+            <p class="font-bold">KES ${Number(item.current_price_kes).toLocaleString()}</p>
+            <p class="${trendColor} font-semibold">${trendIcon} ${Math.abs(item.price_change_percent)}%</p>
+          </div>
         </div>
-        <div class="mt-3 flex justify-between items-center">
-          <p class="font-bold">KES ${item.current_price_kes.toLocaleString()}</p>
-          <p class="${trendColor} font-semibold">${trendIcon} ${Math.abs(item.price_change_percent)}%</p>
-        </div>
-      </div>
-    `
-  })
+      `;
+    });
+  }catch(e){
+    console.error('Trending error', e);
+    container.innerHTML = `<p class="text-red-400 col-span-3 text-center">Trending endpoint /analysis/trending not wired. Add router from last message. Error: ${e.message}</p>`;
+  }
 }
 function analyzeProduct(product, county){
-  document.querySelector('#product').value = product
-  document.querySelector('#countySelect').value = county
-  document.querySelector('#analyze-btn').click()
+  document.querySelector('#product').value = product;
+  document.querySelector('#countySelect').value = county;
+  document.getElementById('product').scrollIntoView({behavior:'smooth'});
+  setTimeout(()=>{document.querySelector('#analyze-btn').click();},300);
 }
+
+// ===== SEARCH - REAL WORKING CONNECTED =====
 let searchTimeout;
 document.getElementById('search-input').addEventListener('input', (e) => {
   clearTimeout(searchTimeout);
@@ -216,15 +233,17 @@ document.getElementById('search-input').addEventListener('input', (e) => {
     return;
   }
   searchTimeout = setTimeout(async () => {
-    const res = await fetch(`/analysis/search?q=${q}`)
-    const data = await res.json()
-    renderSearchResults(data.results)
-  }, 300)
-})
+    try{
+      const res = await fetch(`/analysis/search?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      renderSearchResults(data.results);
+    }catch(err){ console.error(err); }
+  }, 300);
+});
 function renderSearchResults(results){
-  const container = document.getElementById('search-results')
-  if(results.length === 0){
-    container.innerHTML = `<p class="p-4 text-gray-500">No results found</p>`
+  const container = document.getElementById('search-results');
+  if(!results || results.length === 0){
+    container.innerHTML = `<p class="p-4 text-gray-500">No results found</p>`;
   } else {
     container.innerHTML = results.map(r => `
       <div onclick="openInsight(${r.id})" class="p-3 hover:bg-teal-50 cursor-pointer border-b">
@@ -235,38 +254,59 @@ function renderSearchResults(results){
           <span class="text-xs bg-gray-100 px-2 py-0.5 rounded">KES ${r.current_price_kes}</span>
         </div>
       </div>
-    `).join('')
+    `).join('');
   }
-  container.classList.remove('hidden')
+  container.classList.remove('hidden');
 }
-function openInsight(id){
-  window.location.href = `/analysis/${id}`
-}
+function openInsight(id){ window.location.href = `/analysis/${id}`; }
 document.addEventListener('click', (e) => {
   if(!e.target.closest('#search-input') &&!e.target.closest('#search-results')){
-    document.getElementById('search-results').classList.add('hidden')
+    document.getElementById('search-results').classList.add('hidden');
   }
-})
-loadTrending()
+});
+
+// ===== PLAN LOCKING - ALIGNED TO PLAN_MODULES =====
+async function loadPlan(){
+  try{
+    const r = await fetch('/api/billing/my-subscription');
+    const d = await r.json();
+    document.getElementById('plan-badge').innerText = d.plan || 'Trial';
+    window.allowed = d.modules || [];
+    document.querySelectorAll('[data-module-key]').forEach(el=>{
+      const key = el.getAttribute('data-module-key');
+      if(window.allowed.length>0 &&!window.allowed.includes(key)){
+        el.classList.add('opacity-60');
+        if(!el.querySelector('.lock-tag')){
+          const tag=document.createElement('div');
+          tag.className='lock-tag absolute top-2 right-2 bg-red-600 text-white text-[9px] px-2 py-1 rounded font-bold';
+          tag.innerText='🔒 Upgrade';
+          el.appendChild(tag);
+        }
+      }
+    });
+  }catch(e){ console.log('plan load fail', e); }
+}
+
+// ===== PROFILE + LOGOUT =====
 document.getElementById('profileBtn').onclick = (e) => {e.stopPropagation(); document.getElementById('profileDropdown').classList.toggle('hidden');}
 document.addEventListener('click', (e) => {if(!document.getElementById('profileMenu').contains(e.target)){document.getElementById('profileDropdown').classList.add('hidden');}})
 async function logout(){await fetch(API.logout, {method:'POST'}); window.location = API.login;}
-let lastAnalysis = null;
-let chatHistory = [];
+
+// ===== TABLES =====
 let activeTable = 'prices';
 let state = {page:1, sort_by: 'id', order:'desc', search:''}
 document.getElementById('tableSelector').onchange = (e) => { activeTable = e.target.value; state.page = 1; loadActiveTable(); }
 document.getElementById('globalSearch').onkeyup = (e) => { state.search = e.target.value; state.page = 1; loadActiveTable(); }
 function renderActiveTable(headers, rows){
     const table = document.getElementById('active-table');
-    let thead = `<thead><tr>`
+    let thead = `<thead><tr>`;
     Object.keys(headers).forEach(key => {
-      thead += `<th onclick="sortActive('${key}')">${headers[key]} <span class="sort-icon">${state.sort_by==key? (state.order=='asc'?'▲':'▼') : ''}</span></th>`
-    })
-    thead += `</tr></thead>`
-    let tbody = `<tbody>`
-    rows.forEach(r => tbody += `<tr>${r.map(cell=>`<td>${cell}</td>`).join('')}</tr>`)
-    tbody += `</tbody>`
+      thead += `<th onclick="sortActive('${key}')">${headers[key]} <span class="sort-icon">${state.sort_by==key? (state.order=='asc'?'▲':'▼') : ''}</span></th>`;
+    });
+    thead += `</tr></thead>`;
+    let tbody = `<tbody>`;
+    rows.forEach(r => tbody += `<tr>${r.map(cell=>`<td>${cell}</td>`).join('')}</tr>`);
+    tbody += `</tbody>`;
     table.innerHTML = thead + tbody;
 }
 function renderActivePagination(total, page){
@@ -278,7 +318,7 @@ function renderActivePagination(total, page){
         <button onclick="changeActivePage(${page-1})" ${page==1?'disabled':''} class="px-3 py-1 border rounded text-sm ${page==1?'opacity-50':''}">Prev</button>
         <button onclick="changeActivePage(${page+1})" ${page==pages?'disabled':''} class="px-3 py-1 border rounded text-sm ${page==pages?'opacity-50':''}">Next</button>
       </div>
-    `
+    `;
 }
 function changeActivePage(page){ if(page < 1) return; state.page = page; loadActiveTable(); }
 function sortActive(key){
@@ -302,31 +342,19 @@ async function loadActiveTable(){
   renderActivePagination(data.total, state.page);
 }
 
-// === FIXED DROPDOWNS - REAL DATA ===
+// ===== DROPDOWNS - REAL LIVE =====
 async function loadDropdowns(){
   try {
     const [s, c] = await Promise.all([fetch(API.get_sectors), fetch(API.get_counties)]);
     const sectorsData = await s.json();
     const countiesData = await c.json();
-
-    console.log("Raw sectors:", sectorsData);
-    console.log("Raw counties:", countiesData);
-
     let sectors = sectorsData.sectors || sectorsData.data || sectorsData || [];
     let counties = countiesData.counties || countiesData.data || countiesData || [];
-
     sectors = sectors.map(x => typeof x === 'string'? x : (x.name || x.sector || x.title || '')).filter(Boolean);
     counties = counties.map(x => typeof x === 'string'? x : (x.name || x.county || '')).filter(Boolean);
-
-    console.log("Fixed sectors:", sectors.length, "counties:", counties.length);
-
-    const sectorEl = document.getElementById('sectorSelect');
-    const countyEl = document.getElementById('countySelect');
-
-    sectorEl.innerHTML = '<option value="">Select Sector</option>' + sectors.map(x=>`<option value="${x}">${x}</option>`).join('');
-    countyEl.innerHTML = '<option value="">Select County</option>' + counties.map(x=>`<option value="${x}">${x}</option>`).join('');
-
-    countyEl.onchange = async (e) => {
+    document.getElementById('sectorSelect').innerHTML = '<option value="">Select Sector</option>' + sectors.map(x=>`<option value="${x}">${x}</option>`).join('');
+    document.getElementById('countySelect').innerHTML = '<option value="">Select County</option>' + counties.map(x=>`<option value="${x}">${x}</option>`).join('');
+    document.getElementById('countySelect').onchange = async (e) => {
       try {
         const res = await fetch(`${API.get_subcounties}?county=${e.target.value}`);
         const subsData = await res.json();
@@ -335,28 +363,57 @@ async function loadDropdowns(){
         document.getElementById('subcountySelect').innerHTML = '<option value="">All Subcounties</option>' + subs.map(x=>`<option>${x}</option>`).join('');
       } catch(err){ console.error(err); }
     }
-  } catch(e){
-    console.error("Dropdown load failed", e);
-  }
+  } catch(e){ console.error("Dropdown load failed", e); }
 }
 
-loadDropdowns();
-loadActiveTable();
-
+// ===== QUICK ANALYSIS + DOWNLOAD PDF - 12 ENGINES CONNECTED =====
+let lastAnalysis = null;
+let currentAnalysis = {product:"",sector:"",county:"",subcounty:"",ward:"",town:"",budget:""};
 document.getElementById('searchForm').onsubmit = async (e) => {
   e.preventDefault();
   const form = new FormData(e.target);
   lastAnalysis = Object.fromEntries(form);
-  document.getElementById('result').innerHTML = '<p class="text-gray-500">Analyzing...</p>';
-  const res = await fetch(API.analyze, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(lastAnalysis)});
-  const data = await res.json();
-  document.getElementById('result').innerHTML = `<pre class="whitespace-pre-wrap bg-gray-50 p-3 rounded">${data.summary}</pre>`;
-}
-function downloadPDF(){ if(!lastAnalysis){ alert('Please run an analysis first'); return; } document.getElementById('pdf_q').value = lastAnalysis.product; document.getElementById('pdf_sector').value = lastAnalysis.sector; document.getElementById('pdf_county').value = lastAnalysis.county; document.getElementById('pdfForm').submit(); }
+  currentAnalysis = {product: form.get('product'), sector: form.get('sector'), county: form.get('county'), subcounty: form.get('subcounty')||'', ward: form.get('ward')||'', town: form.get('town')||'', budget: form.get('budget_kes')||''};
+  const resultDiv = document.getElementById('result');
+  resultDiv.classList.remove('hidden');
+  resultDiv.innerHTML = '<p class="text-gray-500">Analyzing LIVE...</p>';
+  try{
+    const res = await fetch(API.analyze, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(lastAnalysis)});
+    const data = await res.json();
+    resultDiv.innerHTML = `<pre class="whitespace-pre-wrap bg-white p-2 rounded border text-xs">${data.summary || JSON.stringify(data).slice(0,800)}</pre>`;
+    document.getElementById('report-preview').innerHTML = `Ready: <b>${currentAnalysis.product}</b> | ${currentAnalysis.sector} @ ${currentAnalysis.county} | KES ${currentAnalysis.budget}<br>Click Download PDF → 12 sections LIVE`;
+  }catch(err){ resultDiv.innerText='Error: '+err.message; }
+};
+
+document.getElementById('download-pdf-btn').onclick = async () => {
+  if(!currentAnalysis.product){ alert('First run Quick Business Analysis (product + sector + county)'); return; }
+  const status = document.getElementById('download-status');
+  status.innerText = 'Generating PDF with 12 engines...';
+  try{
+    const payload = {query: currentAnalysis.product, sector: currentAnalysis.sector, country:"Kenya", county: currentAnalysis.county, sub_county: currentAnalysis.subcounty, ward: currentAnalysis.ward, town: currentAnalysis.town, budget: currentAnalysis.budget, report_type:"MARKET_FEASIBILITY", format:"PDF"};
+    const res = await fetch('/reports/generate', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+    const data = await res.json();
+    if(data.report_id){
+      status.innerHTML = `Generating ID ${data.report_id} (${data.plan||''})... auto download in 2s`;
+      setTimeout(()=>{ window.location.href = `/reports/download/${data.report_id}`; status.innerText='Download started'; }, 2000);
+    } else {
+      status.innerText = data.detail || JSON.stringify(data);
+    }
+  }catch(e){ status.innerText = 'Failed: '+e.message; }
+};
+
+// ===== CHAT =====
+let chatHistory = [];
 const chatBtn = document.getElementById('chatBtn'); const chatBox = document.getElementById('chatBox'); const chatInput = document.getElementById('chatInput'); const chatSend = document.getElementById('chatSend'); const chatMessages = document.getElementById('chatMessages');
 chatBtn.onclick = () => { chatBox.style.display = chatBox.style.display === 'flex'? 'none' : 'flex'; };
 async function sendChat(){ const msg = chatInput.value.trim(); if(!msg) return; chatMessages.innerHTML += '<div class="msg user">' + msg + '</div>'; chatHistory.push({role: "user", content: msg}); chatInput.value = ''; chatMessages.innerHTML += '<div class="msg bot" id="typing">Lens is thinking...</div>'; chatMessages.scrollTop = chatMessages.scrollHeight; try{ const res = await fetch(API.chat, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message: msg, history: chatHistory, context: lastAnalysis})}); const data = await res.json(); document.getElementById('typing').remove(); chatHistory.push({role: "assistant", content: data.reply}); chatMessages.innerHTML += '<div class="msg bot">' + data.reply + '</div>'; }catch(e){ document.getElementById('typing').innerText = 'Error: Could not reach AI'; } chatMessages.scrollTop = chatMessages.scrollHeight; }
 chatSend.onclick = sendChat; chatInput.onkeypress = (e) => { if(e.key === 'Enter') sendChat(); }
+
+// ===== INIT =====
+loadTrending();
+loadDropdowns();
+loadActiveTable();
+loadPlan();
 </script>
 </body>
 </html>
