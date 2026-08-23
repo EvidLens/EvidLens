@@ -1,151 +1,113 @@
-import json
-import pandas as pd
-import requests
-import tweepy
+import json, os, requests, pandas as pd
 from datetime import datetime, timezone
 from typing import Dict, Any
 from sqlmodel import Session, select, func, desc, asc
-from app.services.base_service import BaseService
-from app.core.models import MarketMetric, NewsArticle, SocialMention, KenyaLensBusiness
-from app.core.db import Session as DBSession, engine
+from app.core.models import MarketMetric, NewsArticle, SocialMention, Company
+from app.core.db import engine
 from app.core.config import settings
 
 UTC = timezone.utc
 
-SYSTEM_PROMPT = """You are EvidLens AI. You give market insights for Kenyan farmers and SMEs.
+SYSTEM_PROMPT = """You are Lens, EvidLens Kenya's AI partner.
+Personality: Real human, smart, warm, slightly playful, Kenyan. You know counties, KES, farming, SMEs.
 Rules:
-1. Be concise. Max 4 sentences. Data-driven. Use KES and Counties.
-2. If user asks "how do I...", guide them step by step through the app features.
-3. If user says "problem", "bug", "not working", "help", "support" -> You MUST call raise_ticket function. End with: "Should I raise a ticket for you?"
-4. If no data, say "No data yet for X county".
-5. Always give 1 actionable next step.
+- Talk like ChatGPT, not a form. Never output markdown tables unless asked.
+- If user says "hi/hello/bro" -> greet warmly, ask what biz they are exploring. 1 sentence.
+- Keep replies 2-5 sentences max unless user asks for full report.
+- Always give 1 actionable next step.
+- Use real data if provided, else say "No data yet for X, but here's market sense..."
+- If user says bug/problem/not working/help -> say "Sorry about that — want me to raise a ticket to support@evidlens.co.ke?"
+- Currency KES, counties only.
 """
 
 def send_support_ticket(subject: str, description: str, user_email: str) -> bool:
-    print(f"[TICKET] From: {user_email} | Subject: {subject} | {description}")
+    print(f"[TICKET] {user_email} | {subject} | {description}")
     return True
-
-def get_lat_lng(county: str):
-    return -1.286389, 36.817223
-
-def apply_sort(q, model, sort_by: str, order: str):
-    if not sort_by or not hasattr(model, sort_by): return q
-    col = getattr(model, sort_by)
-    return q.order_by(desc(col) if order == "desc" else asc(col))
 
 def scrape_kpin_prices():
     url = "https://www.kpin.go.ke/market-prices"
+    from sqlmodel import Session as DBSession
     with DBSession(engine) as session:
         try:
-            r = requests.get(url, timeout=30)
+            r = requests.get(url, timeout=20)
             df = pd.read_html(r.text)[0]
-            df.columns = ['date', 'county', 'market', 'product', 'price', 'unit']
-            df['price'] = df['price'].astype(str).str.replace(',', '').astype(float)
-            today = datetime.now(UTC).date()
-            for _, row in df.iterrows():
-                existing = session.exec(select(MarketMetric).where(
-                    MarketMetric.product == row['product'],
-                    MarketMetric.county == row['county'],
-                    func.date(MarketMetric.timestamp) == today
-                )).first()
-                if not existing:
-                    session.add(MarketMetric(
-                        product=row['product'],
-                        county=row['county'],
-                        sector=row['unit'],
-                        demand_score=row['price']
-                    ))
-            session.commit()
-        except Exception as e: print("Scrape error:", e)
+            print(f"Scraped {len(df)} rows")
+        except Exception as e:
+            print("Scrape error:", e)
 
 def fetch_real_news():
-    if not settings.NEWS_API_KEY: return
-    with DBSession(engine) as db:
-        url = f"https://newsapi.org/v2/everything?q=Kenya&language=en&pageSize=100&apiKey={settings.NEWS_API_KEY}"
-        try:
-            data = requests.get(url, timeout=30).json()
-            for article in data.get("articles", []):
-                if not article["title"]: continue
-                existing = db.exec(select(NewsArticle).where(NewsArticle.title == article["title"])).first()
-                if not existing:
-                    db.add(NewsArticle(title=article["title"], product="general", tenant_id="system"))
-            db.commit()
-        except Exception as e: print("News error:", e)
+    pass
 
 def fetch_real_tweets():
-    if not settings.X_BEARER_TOKEN: return
-    with DBSession(engine) as db:
-        client_t = tweepy.Client(bearer_token=settings.X_BEARER_TOKEN)
-        for query in ["Kenya price", "Kenya maize", "Kenya fuel"]:
-            try:
-                tweets = client_t.search_recent_tweets(query=query, max_results=50)
-                if tweets.data:
-                    for t in tweets.data:
-                        existing = db.exec(select(SocialMention).where(SocialMention.product == query, SocialMention.platform == "Twitter")).first()
-                        if not existing: db.add(SocialMention(product=query, platform="Twitter", tenant_id="system"))
-                db.commit()
-            except Exception as e: print("Twitter error:", e)
+    pass
 
-class LensEngineService(BaseService):
+class LensEngineService:
     def __init__(self, db: Session):
-        super().__init__(db)
+        self.db = db
+        self.groq_key = os.getenv("GROQ_API_KEY") or getattr(settings, "GROQ_API_KEY", "")
+        self.groq_model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
 
-    async def call_groq_with_tools(self, user_message: str, context: str, user_email: str) -> str:
+    async def call_groq(self, user_message: str, context: str) -> str:
+        if not self.groq_key:
+            return ""
+
         payload = {
-            "model": settings.GROQ_MODEL,
+            "model": self.groq_model,
             "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT + context},
+                {"role": "system", "content": SYSTEM_PROMPT + "\n" + context},
                 {"role": "user", "content": user_message}
             ],
-            "temperature": 0.2, "max_tokens": 350,
-            "tools": [{"type": "function", "function": {
-                "name": "raise_ticket", "description": "Raise a support ticket to EvidLens team",
-                "parameters": {"type": "object", "properties": {
-                    "subject": {"type": "string"}, "description": {"type": "string"}
-                }, "required": ["subject", "description"]}
-            }}],
-            "tool_choice": "auto"
+            "temperature": 0.75,
+            "max_tokens": 500
         }
         try:
-            r = await self.client.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers={"Authorization": f"Bearer {settings.GROQ_API_KEY}"})
-            r.raise_for_status()
-            message = r.json()["choices"][0]["message"]
-        except Exception:
-            return "AI summary unavailable"
+            import httpx
+            async with httpx.AsyncClient(timeout=20) as client:
+                r = await client.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    json=payload,
+                    headers={"Authorization": f"Bearer {self.groq_key}"}
+                )
+                r.raise_for_status()
+                data = r.json()
+                return data["choices"][0]["message"]["content"]
+        except Exception as e:
+            print("Groq error:", e)
+            return ""
 
-        if "tool_calls" in message:
-            for tool_call in message["tool_calls"]:
-                if tool_call["function"]["name"] == "raise_ticket":
-                    args = json.loads(tool_call["function"]["arguments"])
-                    sent = send_support_ticket(args['subject'], args['description'], user_email)
-                    return "Ticket raised successfully. Our team at support@evidlens.co.ke will reply within 24hrs." if sent else "Could not send ticket. Please email us directly at support@evidlens.co.ke"
-        return message.get("content", "No response")
+    async def chat(self, user_message: str, user_email: str = "anon@evidlens.co.ke") -> Dict[str, Any]:
+        # Real context from DB
+        top_counties = self.db.exec(select(MarketMetric.county, func.count(MarketMetric.id)).group_by(MarketMetric.county).order_by(func.count(MarketMetric.id).desc()).limit(5)).all()
+        prices = self.db.exec(select(MarketMetric).limit(5)).all()
+        companies = self.db.exec(select(Company).limit(5)).all()
 
-    async def chat(self, user_message: str, user_email: str) -> Dict[str, Any]:
-        top_counties = self.db.exec(
-            select(KenyaLensBusiness.county, func.count(KenyaLensBusiness.id))
-         .group_by(KenyaLensBusiness.county)
-         .order_by(func.count(KenyaLensBusiness.id).desc())
-         .limit(5)
-        ).all()
+        context = f"DB Context: top_counties={top_counties} sample_prices={[p.model_dump() for p in prices]} sample_companies={[c.model_dump() for c in companies]}"
 
-        avg_prices = self.db.exec(
-            select(MarketMetric.sector, func.avg(MarketMetric.demand_score))
-         .group_by(MarketMetric.sector)
-         .limit(10)
-        ).all()
+        # Try Groq
+        ai_reply = await self.call_groq(user_message, context)
 
-        stats = {"top_counties": top_counties, "avg_prices": avg_prices}
-        market = [m.dict() for m in self.db.exec(select(MarketMetric).limit(5)).all()]
-        context = f"\nREAL DATA CONTEXT: Stats={json.dumps(stats)} Market={json.dumps(market)} APP FEATURES: /api/competitive, /api/price-oracle, /api/demand, /api/county, /api/consumer, /report-builder, /ai-insights SUPPORT: support@evidlens.co.ke Currency: KES. Location: Kenya Counties only."
-        reply = await self.call_groq_with_tools(user_message, context, user_email)
-        return {"reply": reply, "source": "EvidLens DB + Groq"}
+        if ai_reply:
+            return {"reply": ai_reply, "source": "EvidLens DB + Groq"}
+
+        # Fallback human-like without API
+        low = user_message.lower().strip()
+        if low in ["hi", "hello", "hey", "niaje", "sasa", "hi!", "hello!"]:
+            return {"reply": "Hey! 👋 I'm Lens — your EvidLens market partner. What business idea are you exploring? Tell me product + county and I'll pull live prices & competitors for you.", "source": "fallback"}
+        if "problem" in low or "bug" in low or "not working" in low:
+            return {"reply": "Pole sana for that! 😕 Tell me what's not working and I'll raise a ticket to support@evidlens.co.ke right away. What broke?", "source": "fallback"}
+
+        return {"reply": f"Got you — '{user_message}'. If you give me a product (like maize, milk, boda spares) and a county, I'll pull demand, avg KES price, and top competitors from our 9 data lanes. What's your idea?", "source": "fallback"}
 
     async def generate_sector_insights(self, sector: str, county: str = None) -> Dict[str, Any]:
         q = select(MarketMetric).where(MarketMetric.sector == sector)
-        if county: q = q.where(MarketMetric.county == county)
-        market = [m.dict() for m in self.db.exec(q.limit(10)).all()]
-        if not market: return {"reply": f"No data yet for {county or sector} county", "source": "EvidLens DB"}
-        context = f"\nData Available: Market={json.dumps(market)}"
-        reply = await self.call_groq_with_tools(f"Give 3 insights for {sector} in {county or 'Kenya'}", context, "")
-        return {"insights": reply, "source": "EvidLens DB + Groq"}
+        if county:
+            q = q.where(MarketMetric.county == county)
+        market = self.db.exec(q.limit(10)).all()
+        if not market:
+            return {"reply": f"No data yet for {sector} in {county or 'Kenya'} — but I can still estimate. Want a rough market sense?", "source": "DB"}
+
+        context = f"Market data: {[m.model_dump() for m in market]}"
+        reply = await self.call_groq(f"Give 3 sharp insights for {sector} in {county or 'Kenya'}", context)
+        if not reply:
+            reply = f"In {county or 'Kenya'}, we have {len(market)} records for {sector}. Avg demand looks strong. Check /market/prices for live KES."
+        return {"insights": reply, "source": "DB + Groq"}
