@@ -17,7 +17,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.schedulers import SchedulerNotRunningError
 
-from app.core.models import MarketMetric, Company, Report, PriceData, NewsArticle, SocialMention, KnowledgeChunk, ExportOpportunity
+from app.core.models import MarketMetric, Company, Report, PriceData, NewsArticle, SocialMention, KnowledgeChunk, ExportOpportunity, Competitor
 from app.modules.api import data, meta
 from app.core.config import settings
 from app.core.db import init_db, engine
@@ -94,10 +94,12 @@ def force_create_tables():
         "CREATE TABLE IF NOT EXISTS news_articles (id SERIAL PRIMARY KEY, title VARCHAR, summary TEXT, content TEXT, source VARCHAR, category VARCHAR, url VARCHAR, county VARCHAR, published_at TIMESTAMP DEFAULT NOW(), created_at TIMESTAMP DEFAULT NOW())",
         "CREATE TABLE IF NOT EXISTS social_mentions (id SERIAL PRIMARY KEY, platform VARCHAR, content TEXT, author VARCHAR, url VARCHAR, sentiment VARCHAR, county VARCHAR, sector VARCHAR, created_at TIMESTAMP DEFAULT NOW())",
         "CREATE TABLE IF NOT EXISTS report (id SERIAL PRIMARY KEY, user_id INTEGER, title VARCHAR, report_type VARCHAR, format VARCHAR, status VARCHAR, query TEXT, sector VARCHAR, country VARCHAR, county VARCHAR, sub_county VARCHAR, ward VARCHAR, town VARCHAR, file_path VARCHAR, file_size_kb INTEGER, download_count INTEGER DEFAULT 0, is_branded BOOLEAN DEFAULT FALSE, expires_at TIMESTAMP, error_message TEXT, data JSON, created_at TIMESTAMP DEFAULT NOW())",
+        "CREATE TABLE IF NOT EXISTS reports (id SERIAL PRIMARY KEY, user_id INTEGER, title VARCHAR, report_type VARCHAR, format VARCHAR, status VARCHAR, query TEXT, sector VARCHAR, country VARCHAR, county VARCHAR, sub_county VARCHAR, ward VARCHAR, town VARCHAR, file_path VARCHAR, file_size_kb INTEGER, download_count INTEGER DEFAULT 0, is_branded BOOLEAN DEFAULT FALSE, kra_compliant BOOLEAN DEFAULT TRUE, report_metadata JSON, payment_id INTEGER, is_auto_weekly BOOLEAN DEFAULT FALSE, expires_at TIMESTAMP, error_message TEXT, created_at TIMESTAMP DEFAULT NOW())",
         "CREATE TABLE IF NOT EXISTS knowledge_chunks (id SERIAL PRIMARY KEY, sector VARCHAR, county VARCHAR, chunk_text TEXT, chunk_type VARCHAR, source VARCHAR, embedding JSON, chunk_metadata JSON, created_at TIMESTAMP DEFAULT NOW())",
         "CREATE TABLE IF NOT EXISTS export_opportunities (id SERIAL PRIMARY KEY, tenant_id VARCHAR, country VARCHAR, product VARCHAR, opportunity_score FLOAT, created_at TIMESTAMP DEFAULT NOW())",
         "CREATE TABLE IF NOT EXISTS competitor (id SERIAL PRIMARY KEY, name VARCHAR, sector VARCHAR, county VARCHAR, created_at TIMESTAMP DEFAULT NOW())",
         "CREATE TABLE IF NOT EXISTS auth_user (id SERIAL PRIMARY KEY, email VARCHAR UNIQUE, hashed_password VARCHAR, is_active BOOLEAN DEFAULT TRUE, created_at TIMESTAMP DEFAULT NOW())",
+        "CREATE TABLE IF NOT EXISTS usersubscription (id SERIAL PRIMARY KEY, tenant_id VARCHAR, user_id INTEGER, module_name VARCHAR, plan_name VARCHAR, payment_reference VARCHAR, starts_at TIMESTAMP, expires_at TIMESTAMP, status VARCHAR)",
     ]
     try:
         with engine.connect() as conn:
@@ -107,16 +109,14 @@ def force_create_tables():
                 except Exception as inner_e:
                     print(f"Table create skip: {inner_e}")
             conn.commit()
-        print("FORCE TABLE CREATE - SUCCESS - 10 tables ensured")
+        print("FORCE TABLE CREATE - SUCCESS - 12 tables ensured")
     except Exception as e:
         print(f"Force create failed: {e}")
         traceback.print_exc()
 
 @app.on_event("startup")
 def on_startup():
-    # STEP 1: Force create missing tables with raw SQL - works even if models clash
     force_create_tables()
-    # STEP 2: Normal init_db for remaining tables
     try:
         init_db()
         print("DB tables checked/created - SUCCESS")
@@ -207,6 +207,8 @@ def root(request: Request, current_user: Optional[AuthUser] = Depends(get_curren
 
     business_count = safe_count(select(func.count()).select_from(Company))
     metric_count = safe_count(select(func.count()).select_from(MarketMetric))
+    price_count = safe_count(select(func.count()).select_from(PriceData))
+    competitor_count = safe_count(select(func.count()).select_from(Competitor))
     news_count = safe_count(select(func.count()).select_from(NewsArticle))
     social_count = safe_count(select(func.count()).select_from(SocialMention))
     report_count = safe_count(select(func.count()).select_from(Report))
@@ -216,18 +218,18 @@ def root(request: Request, current_user: Optional[AuthUser] = Depends(get_curren
     policy_count = knowledge_count
 
     modules = [
-        {"name": "Competitive Engine", "route": "/competitive", "icon": "🎯", "count": business_count},
-        {"name": "Price Oracle", "route": "/market/prices", "icon": "💰", "count": metric_count},
-        {"name": "Demand Radar", "route": "/market/demand", "icon": "📈", "count": metric_count},
-        {"name": "County Mapper", "route": "/location/counties", "icon": "🗺️", "count": county_count},
-        {"name": "Consumer Pulse", "route": "/voice", "icon": "👥", "count": social_count},
-        {"name": "Risk Sentinel", "route": "/market/risk", "icon": "⚠️", "count": news_count},
-        {"name": "Policy Watch", "route": "/kb/policy", "icon": "📜", "count": policy_count},
-        {"name": "Funding Radar", "route": "/reports/funding", "icon": "🏦", "count": business_count},
-        {"name": "Export Navigator", "route": "/market/export", "icon": "🚢", "count": export_count},
-        {"name": "Knowledge Base", "route": "/kb", "icon": "📚", "count": knowledge_count},
-        {"name": "Report Builder", "route": "/reports", "icon": "📑", "count": report_count},
-        {"name": "AI Insights", "route": "/ai", "icon": "🧠", "count": knowledge_count},
+        {"key": "Competitive Engine", "name": "Competitive Engine", "route": "/competitive", "icon": "🎯", "count": competitor_count, "live": competitor_count},
+        {"key": "Pricing Engine", "name": "Price Oracle", "route": "/market/prices", "icon": "💰", "count": price_count, "live": price_count},
+        {"key": "Market Engine", "name": "Demand Radar", "route": "/market/demand", "icon": "📈", "count": metric_count, "live": metric_count},
+        {"key": "Location Engine", "name": "County Mapper", "route": "/location/counties", "icon": "🗺️", "count": county_count, "live": county_count},
+        {"key": "Consumer Engine", "name": "Consumer Pulse", "route": "/voice", "icon": "👥", "count": social_count, "live": social_count},
+        {"key": "Core OS", "name": "Risk Sentinel", "route": "/market/risk", "icon": "⚠️", "count": news_count, "live": news_count},
+        {"key": "Regulatory Engine", "name": "Policy Watch", "route": "/kb/policy", "icon": "📜", "count": policy_count, "live": policy_count},
+        {"key": "Core OS", "name": "Funding Radar", "route": "/reports/funding", "icon": "🏦", "count": business_count, "live": business_count},
+        {"key": "Business OS", "name": "Export Navigator", "route": "/market/export", "icon": "🚢", "count": export_count, "live": export_count},
+        {"key": "Core OS", "name": "Knowledge Base", "route": "/kb", "icon": "📚", "count": knowledge_count, "live": knowledge_count},
+        {"key": "Report Builder", "name": "Report Builder", "route": "/reports", "icon": "📑", "count": report_count, "live": report_count},
+        {"key": "AI Insights", "name": "AI Insights", "route": "/ai", "icon": "🧠", "count": knowledge_count, "live": knowledge_count},
     ]
 
     data_payload = {
