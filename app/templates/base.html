@@ -6,6 +6,20 @@
     <title>EvidLens - Kenya's Decision Intelligence</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/static/css/style.css?v=2.0.0">
+    <script>
+    // FORCE LOGIN - RUNS BEFORE PAGE LOAD
+    (function(){
+      const publicPaths = ['/auth/login','/auth/register','/pricing','/health','/docs','/redoc','/openapi.json'];
+      const path = window.location.pathname;
+      const isPublic = publicPaths.some(p => path.startsWith(p)) || path === '/';
+      if (isPublic) return;
+      const token = localStorage.getItem('token');
+      const hasCookie = document.cookie.includes('user_id') || document.cookie.includes('access_token') || document.cookie.includes('token');
+      if (!token &&!hasCookie) {
+        window.location.href = '/auth/login?next=' + encodeURIComponent(window.location.pathname);
+      }
+    })();
+    </script>
 </head>
 <body class="bg-gray-50">
     <header class="bg-[#0A1F44] text-white h-16 flex items-center px-6 shadow-md justify-between">
@@ -30,12 +44,15 @@
       try{
         const headers = token? {Authorization: `Bearer ${token}`} : {};
         const r = await fetch('/api/billing/my-subscription',{headers});
+        if(r.status === 401){
+          window.location.href = '/auth/login';
+          return;
+        }
         const d = await r.json();
         const badge = document.getElementById('plan-badge');
         if(badge) badge.innerText = d.plan || 'Trial';
         window.allowedModules = d.modules || [];
         window.userPlan = d.plan || 'Trial';
-        // Lock cards
         document.querySelectorAll('[data-module-key]').forEach(el=>{
           const key = el.getAttribute('data-module-key');
           if(window.allowedModules.length > 0 &&!window.allowedModules.includes(key)){
