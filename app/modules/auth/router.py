@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from sqlmodel import Session
 from pydantic import BaseModel, EmailStr
-from .service import *
-from .models import AuthUser
-from .dependencies import get_current_user, require_active_subscription, require_admin
+from.service import *
+from.models import AuthUser
+from.dependencies import get_current_user, require_active_subscription, require_admin
 from app.core.db import get_session as get_db
 import secrets
 
@@ -52,7 +52,7 @@ def verify_email(token: str, db: Session = Depends(get_db)):
     user = verify_user(db, token)
     if not user:
         raise HTTPException(status_code=400, detail="Invalid token")
-    return RedirectResponse(url="/login")
+    return RedirectResponse(url="/login?verified=1")
 
 @router.post("/login")
 def login(req: LoginRequest, db: Session = Depends(get_db)):
@@ -60,7 +60,7 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
     if "error" in result:
         raise HTTPException(status_code=401, detail=result["error"])
     response = JSONResponse(content=result)
-    response.set_cookie(key="user_id", value=str(result["user_id"]), httponly=True)
+    response.set_cookie(key="user_id", value=str(result["user_id"]), httponly=True, samesite="lax")
     return response
 
 @router.post("/forgot-password")
@@ -83,16 +83,14 @@ def update_profile_route(req: ProfileUpdateRequest, user: AuthUser = Depends(get
 def me(user: AuthUser = Depends(get_current_user)):
     return user
 
-@router.get("/dashboard")
-def dashboard(user: AuthUser = Depends(require_active_subscription)):
-    return {"data": "paid content"}
-
-@router.get("/admin")
-def admin_panel(user: AuthUser = Depends(require_admin)):
-    return {"data": "admin only"}
-
 @router.post("/logout")
 def logout():
     response = JSONResponse(content={"message": "Logged out"})
+    response.delete_cookie("user_id")
+    return response
+
+@router.get("/logout")
+def logout_get():
+    response = RedirectResponse(url="/login")
     response.delete_cookie("user_id")
     return response
