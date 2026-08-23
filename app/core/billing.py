@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api/billing", tags=["billing"])
 PLAN_MODULES = {
     "Trial": ["Core OS", "Market Engine", "Consumer Engine"],
     "Pro": ["Core OS", "Market Engine", "Pricing Engine", "Competitive Engine", "Location Engine", "Consumer Engine", "Report Builder", "AI Insights"],
-    "Enterprise": ["Core OS", "Market Engine", "Pricing Engine", "Competitive Engine", "Location Engine", "Consumer Engine", "Regulatory Engine", "Report Builder", "AI Insights", "Business OS", "KenyaLensIQ"]
+    "Enterprise": ["Core OS", "Market Engine", "Pricing Engine", "Competitive Engine", "Location Engine", "Consumer Engine", "Regulatory Engine", "Report Builder", "AI Insights", "Business OS"]
 }
 
 PLAN_DAYS = {"Trial": 7, "Pro": 30, "Enterprise": 30}
