@@ -187,6 +187,8 @@ def root(request: Request, current_user: Optional[AuthUser] = Depends(get_curren
         "get_sectors": "/api/meta/sectors",
         "get_counties": "/api/meta/counties",
         "get_subcounties": "/api/meta/subcounties",
+        "trending": "/analysis/trending",
+        "search": "/analysis/search",
         "logout": "/auth/logout",
         "login": "/login"
     }
@@ -249,6 +251,10 @@ def root(request: Request, current_user: Optional[AuthUser] = Depends(get_curren
         "data": data_payload,
         "current_user": current_user
     })
+
+@app.get("/pricing", response_class=HTMLResponse)
+def pricing_page(request: Request):
+    return templates.TemplateResponse("pricing.html", {"request": request})
 
 @app.get("/health")
 def health():
