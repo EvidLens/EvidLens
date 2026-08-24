@@ -93,8 +93,6 @@ def safe_job(job_func, job_name):
         traceback.print_exc()
 
 def fix_auth_user_table():
-    # FIX FOR: column auth_user.phone does not exist
-    # This migrates old 4-column table to full model
     columns = [
         "ADD COLUMN IF NOT EXISTS phone VARCHAR",
         "ADD COLUMN IF NOT EXISTS full_name VARCHAR",
@@ -213,6 +211,44 @@ app.include_router(billing.router)
 app.include_router(data.router)
 app.include_router(meta.router)
 app.include_router(analysis_router)
+
+# === ADDED ROUTES - LEGAL + AUTH PAGES - DO NOT REMOVE ===
+@app.get("/privacy", response_class=HTMLResponse)
+def privacy_page(request: Request):
+    return templates.TemplateResponse("privacy.html", {"request": request})
+
+@app.get("/terms", response_class=HTMLResponse)
+def terms_page(request: Request):
+    return templates.TemplateResponse("terms.html", {"request": request})
+
+@app.get("/dpa", response_class=HTMLResponse)
+def dpa_page(request: Request):
+    return templates.TemplateResponse("dpa.html", {"request": request})
+
+@app.get("/signup", response_class=HTMLResponse)
+def signup_page(request: Request):
+    return templates.TemplateResponse("signup.html", {"request": request})
+
+@app.get("/register", response_class=HTMLResponse)
+def register_page(request: Request):
+    return templates.TemplateResponse("signup.html", {"request": request})
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
+@app.get("/signin", response_class=HTMLResponse)
+def signin_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
+@app.get("/forgot-password", response_class=HTMLResponse)
+def forgot_password_page(request: Request):
+    return templates.TemplateResponse("forgot.html", {"request": request})
+
+@app.get("/forgot", response_class=HTMLResponse)
+def forgot_alias_page(request: Request):
+    return templates.TemplateResponse("forgot.html", {"request": request})
+# === END ADDED ROUTES ===
 
 @app.get("/", response_class=HTMLResponse)
 def root(request: Request, current_user: Optional[AuthUser] = Depends(get_current_user_optional), db: Session = Depends(get_db)):
