@@ -32,7 +32,6 @@
           <label for="full_name" class="text-[12px] font-semibold text-slate-700">Full Name</label>
           <input id="full_name" name="full_name" placeholder="John Doe" required autocomplete="name" class="mt-1 w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-[#14B8A6] outline-none text-[14px]">
         </div>
-
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label for="phone" class="text-[12px] font-semibold text-slate-700">Phone</label>
@@ -43,28 +42,29 @@
             <input id="email" name="email" type="email" placeholder="you@gmail.com" required autocomplete="email" class="mt-1 w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-[#14B8A6] outline-none text-[14px]">
           </div>
         </div>
-
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label for="sector" class="text-[12px] font-semibold text-slate-700">Sector</label>
             <select id="sector" name="sector" required class="mt-1 w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-[#14B8A6] outline-none text-[14px] bg-white">
-              <option value="">Loading...</option>
+              <option value="">Select Sector</option>
+              <option>Government</option><option>NGO</option><option>Enterprise</option><option>Agriculture</option><option>Research</option><option>Development</option>
+              <option disabled>──────────</option>
+              <option>Banks</option><option>Microfinance Institutions</option><option>Insurance & HMOs</option><option>Fintechs & Mobile Money</option><option>Capital Markets & Investment Banks</option><option>SACCOs</option><option>Retail - Supermarkets & Chains</option><option>Retail - Wholesale & Distributors</option><option>FMCG - Food & Beverage</option><option>FMCG - Personal Care & Household</option><option>Manufacturing - Food Processing</option><option>Manufacturing - Textiles & Apparel</option><option>Manufacturing - Construction Materials</option><option>Manufacturing - Automotive & Assembly</option><option>Manufacturing - Pharmaceuticals</option><option>Manufacturing - Chemicals & Plastics</option><option>Agribusiness - Crops & Farming</option><option>Agribusiness - Livestock & Dairy</option><option>Agribusiness - Horticulture & Flowers</option><option>Agribusiness - Fisheries & Aquaculture</option><option>Agribusiness - Agro-processing</option><option>Telcos & ISPs</option><option>Media & Broadcasting</option><option>Advertising & Marketing Agencies</option><option>PR & Communications</option><option>Real Estate - Developers</option><option>Real Estate - Agents & Brokers</option><option>Real Estate - Property Management</option><option>Construction & Infrastructure</option><option>Architecture & Engineering</option><option>Healthcare - Hospitals & Clinics</option><option>Healthcare - Pharmacies</option><option>Healthcare - Medical Devices & Pharma</option><option>Education - Universities & Colleges</option><option>Education - Primary & Secondary Schools</option><option>Education - EdTech & Training</option><option>Logistics & Transport</option><option>E-Commerce & Marketplaces</option><option>Hospitality - Hotels & Resorts</option><option>Hospitality - Restaurants & QSR</option><option>Tourism & Tour Operators</option><option>Aviation & Airlines</option><option>Maritime & Shipping</option><option>Energy - Electricity Generation</option><option>Energy - Oil & Gas</option><option>Energy - Renewable & Solar</option><option>Energy - Utilities & Water</option><option>Mining & Minerals</option><option>Government - National Ministries</option><option>Government - County Governments</option><option>Government - State Corporations</option><option>Government - Regulatory Authorities</option><option>Public Safety & Security</option><option>Defense</option><option>NGOs</option><option>INGOs & UN Agencies</option><option>Donors & Development Partners</option><option>Foundations & Philanthropy</option><option>Investors - PE & VC</option><option>Investors - Angel & Family Offices</option><option>Professional Services - Law</option><option>Professional Services - Consulting</option><option>Professional Services - Accounting & Audit</option><option>Professional Services - HR & Recruitment</option><option>ICT & Software Companies</option><option>Data Centers & Cloud Services</option><option>Digital Marketing & Creative</option><option>Automotive - Dealerships</option><option>Automotive - Parts & Aftermarket</option><option>Automotive - Ride-hailing & Boda</option><option>Gaming & Sports</option><option>Entertainment & Events</option><option>Beauty & Wellness</option><option>Waste Management & Recycling</option><option>Environmental & Climate Services</option>
             </select>
           </div>
           <div>
             <label for="county" class="text-[12px] font-semibold text-slate-700">County</label>
             <select id="county" name="county" required class="mt-1 w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-[#14B8A6] outline-none text-[14px] bg-white">
-              <option value="">Loading...</option>
+              <option value="">Select County</option>
+              <option>Baringo</option><option>Bomet</option><option>Bungoma</option><option>Busia</option><option>Elgeyo-Marakwet</option><option>Embu</option><option>Garissa</option><option>Homa Bay</option><option>Isiolo</option><option>Kajiado</option><option>Kakamega</option><option>Kericho</option><option>Kiambu</option><option>Kilifi</option><option>Kirinyaga</option><option>Kisii</option><option>Kisumu</option><option>Kitui</option><option>Kwale</option><option>Laikipia</option><option>Lamu</option><option>Machakos</option><option>Makueni</option><option>Mandera</option><option>Marsabit</option><option>Meru</option><option>Migori</option><option>Mombasa</option><option>Murang'a</option><option>Nairobi</option><option>Nakuru</option><option>Nandi</option><option>Narok</option><option>Nyamira</option><option>Nyandarua</option><option>Nyeri</option><option>Samburu</option><option>Siaya</option><option>Taita-Taveta</option><option>Tana River</option><option>Tharaka-Nithi</option><option>Trans Nzoia</option><option>Turkana</option><option>Uasin Gishu</option><option>Vihiga</option><option>Wajir</option><option>West Pokot</option><option>Other</option>
             </select>
           </div>
         </div>
-
         <div>
           <label for="password" class="text-[12px] font-semibold text-slate-700">Password</label>
           <input id="password" name="password" type="password" required minlength="8" placeholder="8+ chars, uppercase, number" autocomplete="new-password" class="mt-1 w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-[#14B8A6] outline-none text-[14px]">
           <p class="mt-1.5 text-[11px] text-slate-400">Must have 8+ characters, 1 uppercase, 1 number</p>
         </div>
-
         <label class="flex gap-2 text-[11px] text-slate-500 leading-tight"><input type="checkbox" required class="mt-0.5"> I agree to <a href="/terms" class="text-[#0d9488] font-semibold">Terms</a>, <a href="/privacy" class="text-[#0d9488] font-semibold">Privacy</a> & <a href="/dpa" class="text-[#0d9488] font-semibold">DPA</a></label>
         <button id="btn" type="submit" class="w-full bg-[#14B8A6] hover:bg-[#0d9488] text-white font-semibold py-3 rounded-xl shadow flex items-center justify-center gap-2 disabled:opacity-60"><span id="btnText">Request Access</span><span id="loader" class="hidden w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span></button>
       </form>
@@ -75,33 +75,6 @@
 </div>
 
 <script>
-// Load sectors & counties dynamically - NO HARDCODE
-async function loadMeta() {
-  try {
-    // Fallback data if API not ready yet
-    const fallbackCounties = ["Baringo","Bomet","Bungoma","Busia","Elgeyo Marakwet","Embu","Garissa","Homa Bay","Isiolo","Kajiado","Kakamega","Kericho","Kiambu","Kilifi","Kirinyaga","Kisii","Kisumu","Kitui","Kwale","Laikipia","Lamu","Machakos","Makueni","Mandera","Marsabit","Meru","Migori","Mombasa","Murang'a","Nairobi","Nakuru","Nandi","Narok","Nyamira","Nyandarua","Nyeri","Samburu","Siaya","Taita Taveta","Tana River","Tharaka Nithi","Trans Nzoia","Turkana","Uasin Gishu","Vihiga","Wajir","West Pokot"];
-    const fallbackSectors = ["Government","NGO","Enterprise","Agriculture","Research","Development","Health","Education","Finance","Technology","Energy","Private Sector"];
-
-    let sectors = fallbackSectors;
-    let counties = fallbackCounties;
-
-    try {
-      const res = await Promise.allSettled([
-        fetch('/api/meta/sectors').then(r => r.ok? r.json() : Promise.reject()),
-        fetch('/api/meta/counties').then(r => r.ok? r.json() : Promise.reject())
-      ]);
-      if (res[0].status === 'fulfilled') sectors = res[0].value;
-      if (res[1].status === 'fulfilled') counties = res[1].value;
-    } catch(e) {}
-
-    document.getElementById('sector').innerHTML = '<option value="">Select Sector</option>' + sectors.map(s => `<option value="${s}">${s}</option>`).join('');
-    document.getElementById('county').innerHTML = '<option value="">Select County</option>' + counties.map(c => `<option value="${c}">${c}</option>`).join('') + '<option value="Other">Other</option>';
-  } catch(e) {
-    console.error("Meta load failed", e);
-  }
-}
-loadMeta();
-
 const f=document.getElementById('f'),err=document.getElementById('err'),ok=document.getElementById('ok'),btn=document.getElementById('btn'),btnText=document.getElementById('btnText'),loader=document.getElementById('loader');
 f.onsubmit=async e=>{
   e.preventDefault();
