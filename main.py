@@ -25,7 +25,7 @@ from app.core.scheduler import start_scheduler, shutdown_scheduler
 from app.modules.auth.models import AuthUser
 from app.modules.database import get_session as get_db
 
-from app.routes import auth_oauth
+# REMOVED: from app.routes import auth_oauth - DOES NOT EXIST
 from app.core.redis_client import redis_client
 from app.routers.pages import router as pages_router
 from app.modules.data_layer.router import router as data_router
@@ -55,7 +55,6 @@ scheduler = AsyncIOScheduler(timezone=getattr(settings, "SCHEDULER_TIMEZONE", "A
 app = FastAPI(title="EvidLens API", version="2.5.14", docs_url="/docs", redoc_url="/redoc")
 UTC = timezone.utc
 
-# 1. CORS FIRST
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -70,7 +69,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# 2. AUTH SECOND
 app.add_middleware(AuthMiddleware)
 
 async def get_current_user_optional(request: Request, db: Session = Depends(get_db)):
@@ -95,7 +93,6 @@ def safe_job(job_func, job_name):
         traceback.print_exc()
 
 def fix_auth_user_table():
-    # SAFE MIGRATION - only ADD missing columns, never override passwords
     columns = [
         "ADD COLUMN IF NOT EXISTS phone VARCHAR",
         "ADD COLUMN IF NOT EXISTS full_name VARCHAR",
@@ -125,7 +122,6 @@ def fix_auth_user_table():
                     conn.commit()
                 except Exception:
                     conn.rollback()
-            # CRITICAL: Remove fake noreply user if exists - this was causing Invalid credentials
             try:
                 conn.execute(text("DELETE FROM auth_user WHERE email = 'noreply@evidlens.co.ke'"))
                 conn.commit()
@@ -136,7 +132,6 @@ def fix_auth_user_table():
         print(f"AUTH_USER migration: {e}")
 
 def force_create_tables():
-    # Only create NON-AUTH tables - auth_user is handled by SQLModel
     sqls = [
         "CREATE TABLE IF NOT EXISTS company (id SERIAL PRIMARY KEY, name VARCHAR, sector VARCHAR, county VARCHAR, description TEXT, created_at TIMESTAMP DEFAULT NOW())",
         "CREATE TABLE IF NOT EXISTS market_metrics (id SERIAL PRIMARY KEY, product VARCHAR, county VARCHAR, subcounty VARCHAR, sector VARCHAR, company_name VARCHAR, avg_price_kes FLOAT, demand_score FLOAT, created_at TIMESTAMP DEFAULT NOW(), timestamp TIMESTAMP DEFAULT NOW(), user_id INTEGER)",
@@ -196,7 +191,7 @@ def shutdown_event():
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates", auto_reload=True)
 
-app.include_router(auth_oauth.router)
+# REMOVED auth_oauth.router - was causing ModuleNotFoundError
 app.include_router(pages_router)
 app.include_router(data_router)
 app.include_router(billing_page_router)
