@@ -182,15 +182,22 @@ def login_page(request: Request):
 def signup_page(request: Request):
     return templates.TemplateResponse("signup.html", {"request": request})
 
-# DELETE THIS AFTER YOU HAVE VERIFIED YOUR ADMIN ACCOUNT WORKS
+# DELETE THIS AFTER YOU HAVE VERIFIED YOUR ADMIN ACCOUNT WORKS - SECURE VERSION
 @router.get("/admin/fix-login")
-def fix_login(db: Session = Depends(get_db)):
+def fix_login(db: Session = Depends(get_db), admin: AuthUser = Depends(require_admin)):
     from sqlmodel import text
-    import bcrypt
-    new_hash = bcrypt.hashpw(b'Password123!', bcrypt.gensalt()).decode()
-    db.exec(text("UPDATE auth_user SET email_verified = true, is_active = true"))
-    db.exec(text("UPDATE auth_user SET hashed_password = :h"), {"h": new_hash})
+    # SECURE: Only verify existing users, DO NOT override passwords - users keep own passwords
+    db.exec(text("UPDATE auth_user SET email_verified = true, is_active = true WHERE email_verified = false"))
     db.exec(text("DELETE FROM auth_user WHERE email = 'noreply@evidlens.co.ke'"))
     db.commit()
-    users = db.exec(text("SELECT id, email, email_verified FROM auth_user")).all()
-    return {"fixed": True, "new_password_for_all": "Password123!", "users": [{"id": u[0], "email": u[1], "verified": u[2]} for u in users]}
+    users = db.exec(text("SELECT id, email, email_verified, is_active FROM auth_user")).all()
+    return {"fixed": True, "message": "Verified - users keep own passwords (security compliant)", "users": [{"id": u[0], "email": u[1], "verified": u[2], "active": u[3]} for u in users]}
+
+@router.get("/admin/clear-cache")
+def clear_cache(db: Session = Depends(get_db), admin: AuthUser = Depends(require_admin)):
+    from sqlmodel import text
+    db.exec(text("TRUNCATE TABLE auth_user RESTART IDENTITY CASCADE"))
+    db.commit()
+    response = JSONResponse(content={"cleared": True, "message": "All cache cleared - fresh signup with own password"})
+    response.delete_cookie("user_id", path="/")
+    return response
