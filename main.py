@@ -25,6 +25,8 @@ from app.core.scheduler import start_scheduler, shutdown_scheduler
 from app.modules.auth.models import AuthUser
 from app.modules.database import get_session as get_db
 
+from app.routes import auth_oauth
+from app.core.redis_client import redis_client
 from app.routers.pages import router as pages_router
 from app.modules.data_layer.router import router as data_router
 from app.modules.billing.router import router as billing_page_router
@@ -194,6 +196,7 @@ def shutdown_event():
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates", auto_reload=True)
 
+app.include_router(auth_oauth.router)
 app.include_router(pages_router)
 app.include_router(data_router)
 app.include_router(billing_page_router)
