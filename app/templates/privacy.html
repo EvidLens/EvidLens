@@ -1,64 +1,65 @@
-{% extends "base.html" %}
-{% block content %}
-<div class="max-w-4xl mx-auto p-6 bg-white rounded-2xl shadow-sm">
-  <h1 class="text-3xl font-bold text-[#0A1F44] mb-2">Privacy Policy</h1>
-  <p class="text-sm text-gray-500 mb-6"><strong>Last Updated: April 26, 2026</strong> | Effective Date: May 1, 2026</p>
-  
-  <p class="mb-4">EvidLens Ltd. “EvidLens”, “we”, “our” is committed to protecting your privacy in accordance with the <b>Kenya Data Protection Act, 2019</b> and GDPR principles. We are registered with the Office of the Data Protection Commissioner, Kenya.</p>
-
-  <h2 class="text-xl font-bold text-[#0A1F44] mt-6 mb-2">1. Data Controller</h2>
-  <p>EvidLens Ltd, Kimathi House, 2nd Floor, Nyeri, 10100, Kenya. <br>
-  Data Protection Officer: dpo@evidlens.co.ke</p>
-
-  <h2 class="text-xl font-bold text-[#0A1F44] mt-6 mb-2">2. Data We Collect</h2>
-  <table class="w-full text-sm border my-3">
-    <tr class="bg-gray-50"><th class="p-2 text-left border">Category</th><th class="p-2 text-left border">Examples</th><th class="p-2 text-left border">Why</th></tr>
-    <tr><td class="p-2 border"><b>Account Data</b></td><td class="p-2 border">Name, Email, Phone, County, Business Sector</td><td class="p-2 border">To create your account + personalize insights</td></tr>
-    <tr><td class="p-2 border"><b>Usage Data</b></td><td class="p-2 border">IP, Device, Pages, Searches, AI Prompts, Reports Downloaded</td><td class="p-2 border">To improve AI + prevent fraud</td></tr>
-    <tr><td class="p-2 border"><b>Payment Data</b></td><td class="p-2 border">M-Pesa Transaction ID, Amount, Date</td><td class="p-2 border">To process subscriptions. We do NOT store M-Pesa PIN</td></tr>
-    <tr><td class="p-2 border"><b>Public Data</b></td><td class="p-2 border">News, Tweets, Market data - Anonymized</td><td class="p-2 border">To generate Demand Radar</td></tr>
-  </table>
-
-  <h2 class="text-xl font-bold text-[#0A1F44] mt-6 mb-2">3. Legal Basis - DPA 2019 Sec 25</h2>
-  <p>Consent, Contract, Legal Obligation for KRA/Tax, Legitimate Interest for product improvement.</p>
-
-  <h2 class="text-xl font-bold text-[#0A1F44] mt-6 mb-2">4. How We Use Your Data</h2>
-  <ol class="list-decimal ml-6 space-y-1">
-    <li>Provide the 9-Lane Decision Intelligence Platform</li>
-    <li>Process M-Pesa payments via Safaricom Daraja API</li>
-    <li>Generate personalized AI insights using Groq LLM</li>
-    <li>Send invoices, alerts, and product updates via Resend</li>
-    <li>Comply with Kenyan law and prevent fraud</li>
-  </ol>
-  <p class="mt-2 text-red-600 font-semibold">We do NOT sell your personal data.</p>
-
-  <h2 class="text-xl font-bold text-[#0A1F44] mt-6 mb-2">5. Data Storage & Security</h2>
-  <p>Stored on encrypted Render Postgres in South Africa. Backups: AES-256. 2FA required for staff. <br>
-  <b>Retention:</b> Subscription + Tax data: 7 years. Free tier activity: 90 days after last login.</p>
-
-  <h2 class="text-xl font-bold text-[#0A1F44] mt-6 mb-2">6. Your Rights Under DPA 2019</h2>
-  <p>Access, Correction, Deletion, Object, Data Portability, Withdraw Consent. <br>
-  Email <a href="mailto:dpo@evidlens.co.ke" class="text-[#14B8A6] font-bold">dpo@evidlens.co.ke</a>. Response within 21 days.</p>
-
-  <div class="bg-teal-50 border border-teal-200 p-4 rounded-lg mt-6">
-    <h3 class="font-bold">Download Your Data</h3>
-    <p class="text-sm">Request a full export of all your data and reports.</p>
-    <button onclick="requestExport()" class="mt-2 bg-[#14B8A6] text-white px-4 py-2 rounded-lg text-sm font-bold">Request Data Export</button>
-    <p id="exportMsg" class="text-sm mt-2"></p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy - EvidLens</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>body{font-family:Inter,sans-serif}</style>
+</head>
+<body class="bg-[#f8fafc]">
+<div class="bg-[#0B1220] text-white p-6">
+  <div class="max-w-4xl mx-auto flex justify-between items-center">
+    <a href="/" class="flex items-center gap-2"><div class="w-8 h-8 bg-[#14B8A6] rounded-lg flex items-center justify-center font-bold">E</div><span class="font-bold">EvidLens</span></a>
+    <a href="/auth/login" class="text-[13px] bg-white/10 px-4 py-2 rounded-lg">Back to Login</a>
   </div>
-
-  <h2 class="text-xl font-bold text-[#0A1F44] mt-6 mb-2">7. Third Party Processors</h2>
-  <p>Safaricom PLC - Payments. Groq Inc - AI. NewsAPI, X Corp - Data. All have Data Processing Agreements with us.</p>
-
-  <h2 class="text-xl font-bold text-[#0A1F44] mt-6 mb-2">8. Changes</h2>
-  <p>We will email you 30 days before any material changes.</p>
 </div>
+<div class="max-w-4xl mx-auto p-6 lg:p-10">
+  <div class="bg-white rounded-[20px] shadow-sm border border-slate-200 p-8 lg:p-10">
+    <h1 class="text-[32px] font-extrabold tracking-tight">Privacy Policy</h1>
+    <p class="text-[13px] text-slate-500 mt-2"><b>Last Updated: April 26, 2026</b> | Effective: May 1, 2026 | KDPA Compliant</p>
 
+    <p class="mt-6 text-[14px] leading-relaxed">EvidLens Ltd. (“EvidLens”, “we”) is committed to protecting your privacy per <b>Kenya Data Protection Act, 2019</b> and GDPR principles. Registered with ODPC Kenya.</p>
+
+    <h2 class="text-[18px] font-bold mt-8">1. Data Controller</h2>
+    <p class="text-[14px] mt-2">EvidLens Ltd, Kimathi House, 2nd Floor, Nyeri, 10100. DPO: <a href="mailto:dpo@evidlens.co.ke" class="text-[#0d9488] font-semibold">dpo@evidlens.co.ke</a></p>
+
+    <h2 class="text-[18px] font-bold mt-8">2. Data We Collect</h2>
+    <div class="mt-3 border rounded-xl overflow-hidden text-[13px]">
+      <div class="grid grid-cols-3 bg-slate-50 p-3 font-semibold"><span>Category</span><span>Examples</span><span>Purpose</span></div>
+      <div class="grid grid-cols-3 p-3 border-t"><span class="font-semibold">Account</span><span>Name, Email, Phone, County, Sector</span><span>Create account</span></div>
+      <div class="grid grid-cols-3 p-3 border-t bg-slate-50/50"><span class="font-semibold">Usage</span><span>IP, Device, Searches, Prompts</span><span>Improve AI, fraud prevention</span></div>
+      <div class="grid grid-cols-3 p-3 border-t"><span class="font-semibold">Payment</span><span>M-Pesa ID, Amount</span><span>Subscriptions. No PIN stored</span></div>
+      <div class="grid grid-cols-3 p-3 border-t bg-slate-50/50"><span class="font-semibold">Public</span><span>News, Tweets, Market data</span><span>Demand Radar</span></div>
+    </div>
+
+    <h2 class="text-[18px] font-bold mt-8">3. Legal Basis - DPA Sec 25</h2>
+    <p class="text-[14px] mt-2">Consent, Contract, Legal Obligation (KRA), Legitimate Interest.</p>
+
+    <h2 class="text-[18px] font-bold mt-8">4. How We Use</h2>
+    <ol class="list-decimal ml-5 mt-2 text-[14px] space-y-1"><li>Provide 9-Lane Decision Intelligence Platform</li><li>Process M-Pesa via Daraja API</li><li>Generate AI insights via Groq</li><li>Send invoices/alerts via Resend</li><li>Comply with law</li></ol>
+    <p class="mt-3 text-[13px] font-bold text-red-600">We do NOT sell your personal data.</p>
+
+    <h2 class="text-[18px] font-bold mt-8">5. Storage & Security</h2>
+    <p class="text-[14px] mt-2">Encrypted Render Postgres (South Africa). AES-256, 2FA for staff. Retention: Tax 7 years, Free tier 90 days.</p>
+
+    <h2 class="text-[18px] font-bold mt-8">6. Your Rights Under DPA 2019</h2>
+    <p class="text-[14px] mt-2">Access, Correction, Deletion, Object, Portability, Withdraw Consent. Email <a href="mailto:dpo@evidlens.co.ke" class="text-[#0d9488] font-semibold">dpo@evidlens.co.ke</a> - response 21 days.</p>
+
+    <div class="mt-8 p-5 bg-teal-50 border border-teal-200 rounded-xl">
+      <h3 class="font-bold text-[14px]">Download Your Data</h3><p class="text-[13px] text-slate-600">Request full export of all data and reports.</p>
+      <button onclick="requestExport()" class="mt-3 bg-[#14B8A6] text-white px-4 py-2 rounded-lg text-[13px] font-bold">Request Export</button>
+      <p id="exportMsg" class="text-[13px] mt-2"></p>
+    </div>
+
+    <h2 class="text-[18px] font-bold mt-8">7. Processors</h2>
+    <p class="text-[14px] mt-2">Safaricom PLC, Groq Inc, NewsAPI, X Corp - all under DPA.</p>
+
+    <p class="mt-10 text-[11px] text-slate-400">© 2026 EvidLens Ltd • <a href="/terms" class="underline">Terms</a> • <a href="/dpa" class="underline">DPA</a> • <a href="/auth/login" class="text-[#0d9488]">Back to login</a></p>
+  </div>
+</div>
 <script>
-async function requestExport(){
-  const res = await fetch('/account/export-data', {method: 'POST'});
-  const data = await res.json();
-  document.getElementById('exportMsg').innerText = data.message;
-}
+async function requestExport(){try{const r=await fetch('/account/export-data',{method:'POST'});const d=await r.json();document.getElementById('exportMsg').innerText=d.message||'Request received. Check email.';}catch{document.getElementById('exportMsg').innerText='Login required to export';}}
 </script>
-{% endblock %}
+</body>
+</html>
