@@ -293,6 +293,21 @@ def pricing_page(request: Request):
 def health():
     return {"status": "ok", "version": "2.5.14"}
 
+@app.get("/create-owner-now")
+def create_owner_now():
+    from sqlalchemy import text
+    from passlib.context import CryptContext
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    hashed = pwd_context.hash("Owner@123456")
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("DELETE FROM users WHERE email='noreply@evidlens.co.ke'"))
+            conn.execute(text(f"INSERT INTO users (id, email, hashed_password, full_name, role, is_active, created_at) VALUES (gen_random_uuid(), 'noreply@evidlens.co.ke', '{hashed}', 'Owner', 'admin', true, NOW())"))
+            conn.commit()
+        return {"status": "SUCCESS", "email": "noreply@evidlens.co.ke", "password": "Owner@123456"}
+    except Exception as e:
+        return {"status": "FAILED", "error": str(e)}
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
