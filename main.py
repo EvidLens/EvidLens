@@ -49,12 +49,11 @@ from app.modules.storage.router import router as storage_router
 from app.core import billing
 
 load_dotenv()
-
 scheduler = AsyncIOScheduler(timezone=getattr(settings, "SCHEDULER_TIMEZONE", "Africa/Nairobi"))
 app = FastAPI(title="EvidLens API", version="2.5.14", docs_url="/docs", redoc_url="/redoc")
-
 UTC = timezone.utc
 
+# 1. CORS FIRST
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -69,6 +68,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# 2. AUTH SECOND
 app.add_middleware(AuthMiddleware)
 
 async def get_current_user_optional(request: Request, db: Session = Depends(get_db)):
@@ -77,7 +77,7 @@ async def get_current_user_optional(request: Request, db: Session = Depends(get_
         return None
     try:
         user = db.exec(select(AuthUser).where(AuthUser.id == int(user_id))).first()
-        if not user or not user.is_active:
+        if not user or not user.is_active or not user.email_verified:
             return None
         return user
     except Exception:
@@ -93,6 +93,7 @@ def safe_job(job_func, job_name):
         traceback.print_exc()
 
 def fix_auth_user_table():
+    # SAFE MIGRATION - only ADD missing columns, never override passwords
     columns = [
         "ADD COLUMN IF NOT EXISTS phone VARCHAR",
         "ADD COLUMN IF NOT EXISTS full_name VARCHAR",
@@ -111,6 +112,8 @@ def fix_auth_user_table():
         "ADD COLUMN IF NOT EXISTS two_fa_enabled BOOLEAN DEFAULT FALSE",
         "ADD COLUMN IF NOT EXISTS theme VARCHAR DEFAULT 'light'",
         "ADD COLUMN IF NOT EXISTS language VARCHAR DEFAULT 'en'",
+        "ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()",
+        "ADD COLUMN IF NOT EXISTS last_login TIMESTAMP",
     ]
     try:
         with engine.connect() as conn:
@@ -120,11 +123,18 @@ def fix_auth_user_table():
                     conn.commit()
                 except Exception:
                     conn.rollback()
-        print("AUTH_USER MIGRATED - SUCCESS")
+            # CRITICAL: Remove fake noreply user if exists - this was causing Invalid credentials
+            try:
+                conn.execute(text("DELETE FROM auth_user WHERE email = 'noreply@evidlens.co.ke'"))
+                conn.commit()
+            except:
+                conn.rollback()
+        print("AUTH_USER MIGRATED - SECURE")
     except Exception as e:
-        print(f"AUTH_USER migration check: {e}")
+        print(f"AUTH_USER migration: {e}")
 
 def force_create_tables():
+    # Only create NON-AUTH tables - auth_user is handled by SQLModel
     sqls = [
         "CREATE TABLE IF NOT EXISTS company (id SERIAL PRIMARY KEY, name VARCHAR, sector VARCHAR, county VARCHAR, description TEXT, created_at TIMESTAMP DEFAULT NOW())",
         "CREATE TABLE IF NOT EXISTS market_metrics (id SERIAL PRIMARY KEY, product VARCHAR, county VARCHAR, subcounty VARCHAR, sector VARCHAR, company_name VARCHAR, avg_price_kes FLOAT, demand_score FLOAT, created_at TIMESTAMP DEFAULT NOW(), timestamp TIMESTAMP DEFAULT NOW(), user_id INTEGER)",
@@ -136,7 +146,6 @@ def force_create_tables():
         "CREATE TABLE IF NOT EXISTS knowledge_chunks (id SERIAL PRIMARY KEY, sector VARCHAR, county VARCHAR, chunk_text TEXT, chunk_type VARCHAR, source VARCHAR, embedding JSON, chunk_metadata JSON, created_at TIMESTAMP DEFAULT NOW())",
         "CREATE TABLE IF NOT EXISTS export_opportunities (id SERIAL PRIMARY KEY, tenant_id VARCHAR, country VARCHAR, product VARCHAR, opportunity_score FLOAT, created_at TIMESTAMP DEFAULT NOW())",
         "CREATE TABLE IF NOT EXISTS competitor (id SERIAL PRIMARY KEY, name VARCHAR, sector VARCHAR, county VARCHAR, created_at TIMESTAMP DEFAULT NOW())",
-        "CREATE TABLE IF NOT EXISTS auth_user (id SERIAL PRIMARY KEY, email VARCHAR UNIQUE, phone VARCHAR, full_name VARCHAR, hashed_password VARCHAR, avatar_url VARCHAR, plan VARCHAR DEFAULT 'free', credits INTEGER DEFAULT 0, email_verified BOOLEAN DEFAULT FALSE, verification_token VARCHAR, reset_token VARCHAR, reset_token_expires TIMESTAMP, sector VARCHAR, county VARCHAR, role VARCHAR DEFAULT 'USER', is_active BOOLEAN DEFAULT TRUE, two_fa_enabled BOOLEAN DEFAULT FALSE, theme VARCHAR DEFAULT 'light', language VARCHAR DEFAULT 'en', created_at TIMESTAMP DEFAULT NOW())",
         "CREATE TABLE IF NOT EXISTS usersubscription (id SERIAL PRIMARY KEY, tenant_id VARCHAR, user_id INTEGER, module_name VARCHAR, plan_name VARCHAR, payment_reference VARCHAR, starts_at TIMESTAMP, expires_at TIMESTAMP, status VARCHAR)",
     ]
     try:
@@ -145,12 +154,11 @@ def force_create_tables():
                 try:
                     conn.execute(text(sql))
                 except Exception as inner_e:
-                    print(f"Table create skip: {inner_e}")
+                    print(f"Table skip: {inner_e}")
             conn.commit()
-        print("FORCE TABLE CREATE - SUCCESS - 12 tables ensured")
+        print("TABLES ENSURED - 11 tables")
     except Exception as e:
         print(f"Force create failed: {e}")
-        traceback.print_exc()
 
 @app.on_event("startup")
 def on_startup():
@@ -158,19 +166,18 @@ def on_startup():
     force_create_tables()
     try:
         init_db()
-        print("DB tables checked/created - SUCCESS")
+        print("DB INIT OK")
     except Exception as e:
-        print(f"DB init error: {e}")
-        traceback.print_exc()
+        print(f"DB init: {e}")
     try:
         from app.modules.cron.jobs import scrape_kpin_prices, fetch_real_news, fetch_real_tweets
         scheduler.add_job(lambda: safe_job(scrape_kpin_prices, "KPIN"), CronTrigger(hour=getattr(settings, "KPIN_SCRAPE_HOUR", 3), minute=0), id="kpin_scrape", replace_existing=True)
         scheduler.add_job(lambda: safe_job(fetch_real_news, "NEWS"), CronTrigger(hour=getattr(settings, "NEWS_SCRAPE_HOUR", 4), minute=0), id="news_scrape", replace_existing=True)
         scheduler.add_job(lambda: safe_job(fetch_real_tweets, "TWEETS"), CronTrigger(hour=getattr(settings, "TWEETS_SCRAPE_HOUR", 5), minute=0), id="tweets_scrape", replace_existing=True)
         scheduler.start()
-        print(f"Scheduler started. Timezone: {getattr(settings, 'SCHEDULER_TIMEZONE', 'Africa/Nairobi')}")
+        print(f"Scheduler ON - {getattr(settings, 'SCHEDULER_TIMEZONE', 'Africa/Nairobi')}")
     except Exception as e:
-        print(f"Scheduler start skipped: {e}")
+        print(f"Scheduler skip: {e}")
 
 @app.on_event("shutdown")
 def shutdown_event():
@@ -181,9 +188,8 @@ def shutdown_event():
         pass
     try:
         shutdown_scheduler()
-    except SchedulerNotRunningError:
+    except:
         pass
-    print("Scheduler shut down")
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates", auto_reload=True)
@@ -212,82 +218,47 @@ app.include_router(data.router)
 app.include_router(meta.router)
 app.include_router(analysis_router)
 
-# === ADDED ROUTES - LEGAL + AUTH PAGES - DO NOT REMOVE ===
 @app.get("/privacy", response_class=HTMLResponse)
 def privacy_page(request: Request):
     return templates.TemplateResponse("privacy.html", {"request": request})
-
 @app.get("/terms", response_class=HTMLResponse)
 def terms_page(request: Request):
     return templates.TemplateResponse("terms.html", {"request": request})
-
 @app.get("/dpa", response_class=HTMLResponse)
 def dpa_page(request: Request):
     return templates.TemplateResponse("dpa.html", {"request": request})
-
 @app.get("/signup", response_class=HTMLResponse)
 def signup_page(request: Request):
     return templates.TemplateResponse("signup.html", {"request": request})
-
 @app.get("/register", response_class=HTMLResponse)
 def register_page(request: Request):
     return templates.TemplateResponse("signup.html", {"request": request})
-
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
-
 @app.get("/signin", response_class=HTMLResponse)
 def signin_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
-
 @app.get("/forgot-password", response_class=HTMLResponse)
 def forgot_password_page(request: Request):
     return templates.TemplateResponse("forgot.html", {"request": request})
-
 @app.get("/forgot", response_class=HTMLResponse)
 def forgot_alias_page(request: Request):
     return templates.TemplateResponse("forgot.html", {"request": request})
-# === END ADDED ROUTES ===
 
 @app.get("/", response_class=HTMLResponse)
 def root(request: Request, current_user: Optional[AuthUser] = Depends(get_current_user_optional), db: Session = Depends(get_db)):
-    API = {
-        "prices": "/api/data/prices",
-        "demand": "/api/data/demand",
-        "companies": "/api/data/companies",
-        "county_stats": "/api/data/county-stats",
-        "sectors": "/api/data/sectors",
-        "opportunities": "/api/data/opportunities",
-        "analyze": "/api/analyze",
-        "chat": "/api/chat",
-        "download": "/api/download",
-        "export": "/api/export",
-        "get_sectors": "/api/meta/sectors",
-        "get_counties": "/api/meta/counties",
-        "get_subcounties": "/api/meta/subcounties",
-        "trending": "/analysis/trending",
-        "search": "/analysis/search",
-        "logout": "/auth/logout",
-        "login": "/login"
-    }
-
+    API = {"prices": "/api/data/prices","demand": "/api/data/demand","companies": "/api/data/companies","county_stats": "/api/data/county-stats","sectors": "/api/data/sectors","opportunities": "/api/data/opportunities","analyze": "/api/analyze","chat": "/api/chat","download": "/api/download","export": "/api/export","get_sectors": "/api/meta/sectors","get_counties": "/api/meta/counties","get_subcounties": "/api/meta/subcounties","trending": "/analysis/trending","search": "/analysis/search","logout": "/auth/logout","login": "/login"}
     def safe_count(stmt):
         try:
             result = db.exec(stmt).first()
-            if result is None:
-                return 0
-            if isinstance(result, (list, tuple)):
-                return result[0] or 0
+            if result is None: return 0
+            if isinstance(result, (list, tuple)): return result[0] or 0
             return result or 0
         except Exception as e:
-            try:
-                db.rollback()
-            except:
-                pass
-            print(f"Count failed: {e}")
+            try: db.rollback()
+            except: pass
             return 0
-
     business_count = safe_count(select(func.count()).select_from(Company))
     metric_count = safe_count(select(func.count()).select_from(MarketMetric))
     price_count = safe_count(select(func.count()).select_from(PriceData))
@@ -299,7 +270,6 @@ def root(request: Request, current_user: Optional[AuthUser] = Depends(get_curren
     export_count = safe_count(select(func.count()).select_from(ExportOpportunity))
     county_count = safe_count(select(func.count(func.distinct(MarketMetric.county))))
     policy_count = knowledge_count
-
     modules = [
         {"key": "Competitive Engine", "name": "Competitive Engine", "route": "/competitive", "icon": "🎯", "count": competitor_count, "live": competitor_count},
         {"key": "Pricing Engine", "name": "Price Oracle", "route": "/market/prices", "icon": "💰", "count": price_count, "live": price_count},
@@ -314,22 +284,8 @@ def root(request: Request, current_user: Optional[AuthUser] = Depends(get_curren
         {"key": "Report Builder", "name": "Report Builder", "route": "/reports", "icon": "📑", "count": report_count, "live": report_count},
         {"key": "AI Insights", "name": "AI Insights", "route": "/ai", "icon": "🧠", "count": knowledge_count, "live": knowledge_count},
     ]
-
-    data_payload = {
-        "last_updated": datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),
-        "stats": {
-            "insights_generated": metric_count,
-            "reports_exported": report_count
-        },
-        "modules": modules
-    }
-
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request,
-        "API": API,
-        "data": data_payload,
-        "current_user": current_user
-    })
+    data_payload = {"last_updated": datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),"stats": {"insights_generated": metric_count,"reports_exported": report_count},"modules": modules}
+    return templates.TemplateResponse("dashboard.html", {"request": request,"API": API,"data": data_payload,"current_user": current_user})
 
 @app.get("/pricing", response_class=HTMLResponse)
 def pricing_page(request: Request):
