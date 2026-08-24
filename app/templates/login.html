@@ -1,72 +1,110 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<title>Login - EvidLens</title>
+<title>Login - EvidLens | Decision Intelligence for Kenya</title>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>body{font-family:Inter,sans-serif}*:focus-visible{outline:2px solid #14B8A6;outline-offset:2px}</style>
 </head>
-<body class="bg-[#F5F7FA] flex items-center justify-center min-h-screen">
-<div class="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md">
-  <div class="text-center mb-6">
-    <a href="/" class="font-bold text-3xl"><span style="color:#0A1F44">Evid</span><span style="color:#14B8A6">Lens</span></a>
-    <p class="text-gray-500">Decision Intelligence for Kenya</p>
+<body class="bg-[#f8fafc]">
+<div class="min-h-screen flex">
+  <!-- LEFT -->
+  <div class="hidden lg:flex lg:w-[58%] bg-[#0B1220] text-white p-12 flex-col justify-between relative overflow-hidden">
+    <div class="absolute -top-40 -left-40 w-[600px] h-[600px] bg-[#14b8a6]/20 rounded-full blur-[100px]"></div>
+    <div class="relative z-10">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 bg-[#14B8A6] rounded-xl flex items-center justify-center font-extrabold text-xl">E</div>
+        <span class="text-[22px] font-bold">Evid<span class="text-[#14B8A6]">Lens</span></span>
+        <span class="ml-3 px-2.5 py-0.5 text-[10px] bg-white/10 border border-white/20 rounded-full">ENTERPRISE</span>
+      </div>
+      <div class="mt-24 max-w-[520px]">
+        <h1 class="text-[44px] font-extrabold leading-[1.05]">Make evidence-based decisions <span class="text-[#2dd4bf]">10x faster</span></h1>
+        <ul class="mt-8 space-y-3 text-sm text-slate-300">
+          <li class="flex gap-3"><span class="text-[#2dd4bf]">✓</span> 47 County market, price & policy intelligence</li>
+          <li class="flex gap-3"><span class="text-[#2dd4bf]">✓</span> KDPA Compliant • SOC2 Ready • SSL Secured</li>
+          <li class="flex gap-3"><span class="text-[#2dd4bf]">✓</span> Trusted by Government, NGOs & Enterprises</li>
+        </ul>
+        <div class="mt-10 p-4 bg-white/5 border border-white/10 rounded-xl text-sm italic">"Cut our assessment from 3 weeks to 2 days" — County Planning, Nyeri</div>
+      </div>
+    </div>
+    <div class="relative z-10 flex justify-between text-[11px] text-slate-400"><span>© 2026 EvidLens Ltd</span><div class="flex gap-4"><a href="/privacy" class="hover:text-white">Privacy</a><a href="/terms" class="hover:text-white">Terms</a><a href="/dpa" class="hover:text-white">DPA</a></div></div>
   </div>
 
-  <div id="msg" class="hidden p-3 rounded-lg mb-4 text-sm"></div>
-  
-  <form id="loginForm" class="space-y-4">
-    <div>
-      <label class="block text-sm font-semibold text-[#0A1F44] mb-2">Email</label>
-      <input type="email" id="email" required class="w-full p-3 border rounded-lg focus:border-[#14B8A6] outline-none">
-    </div>
-    <div>
-      <div class="flex justify-between">
-        <label class="block text-sm font-semibold text-[#0A1F44] mb-2">Password</label>
-        <a href="/forgot-password" class="text-sm text-[#14B8A6]">Forgot?</a>
+  <!-- RIGHT -->
+  <div class="flex-1 flex items-center justify-center p-5 lg:p-10">
+    <div class="w-full max-w-[420px]">
+      <div class="bg-white rounded-[20px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] border border-slate-200/60 p-7 sm:p-8">
+        <div class="lg:hidden flex items-center gap-2 mb-4"><div class="w-9 h-9 bg-[#14B8A6] rounded-lg flex items-center justify-center font-bold text-white">E</div><span class="font-bold">EvidLens</span></div>
+        <h2 class="text-[24px] font-bold text-slate-900">Welcome back</h2>
+        <p class="text-[13px] text-slate-500 mt-1">Sign in to your workspace</p>
+
+        <div id="msg" class="hidden mt-5 p-3.5 bg-red-50 border border-red-200 text-red-700 text-[13px] rounded-xl"></div>
+        <div id="successBox" class="hidden mt-5 p-3.5 bg-green-50 border border-green-200 text-green-700 text-[13px] rounded-xl"></div>
+        <div id="rateBox" class="hidden mt-5 p-3.5 bg-amber-50 border border-amber-200 text-amber-800 text-[13px] rounded-xl">Too many attempts. Try again in 5 minutes.</div>
+
+        <form id="loginForm" class="mt-6 space-y-4" novalidate>
+          <div>
+            <label for="email" class="text-[13px] font-semibold text-slate-700">Work Email</label>
+            <div class="mt-1.5 relative">
+              <span class="absolute left-3.5 top-[13px] text-slate-400">✉️</span>
+              <input id="email" type="email" required autofocus autocomplete="email" placeholder="you@company.co.ke" class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#14B8A6]/20 focus:border-[#14B8A6] outline-none text-[14px]">
+            </div>
+            <p id="emailErr" class="hidden mt-1 text-[11px] text-red-600">Enter a valid email</p>
+          </div>
+
+          <div>
+            <div class="flex justify-between"><label for="password" class="text-[13px] font-semibold text-slate-700">Password</label><a href="/forgot-password" class="text-[12px] font-semibold text-[#0d9488]">Forgot?</a></div>
+            <div class="mt-1.5 relative">
+              <span class="absolute left-3.5 top-[13px] text-slate-400">🔒</span>
+              <input id="password" type="password" required autocomplete="current-password" placeholder="••••••••" class="w-full pl-10 pr-11 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#14B8A6]/20 focus:border-[#14B8A6] outline-none text-[14px]">
+              <button type="button" id="toggleEye" class="absolute right-3 top-[10px] w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100">👁️</button>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between py-1">
+            <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="w-4 h-4 rounded border-slate-300 text-[#14B8A6]"> <span class="text-[13px] text-slate-600 font-medium">Remember me</span></label>
+            <span class="text-[11px] text-slate-500 flex items-center gap-1"><span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>SSL Secured</span>
+          </div>
+
+          <button id="btn" type="submit" class="w-full bg-[#14B8A6] hover:bg-[#0d9488] active:bg-[#0f766e] text-white font-semibold py-3 rounded-xl shadow-[0_4px_14px_rgba(20,184,166,0.35)] flex items-center justify-center gap-2 disabled:opacity-60 transition">
+            <span id="btnText">Sign in to EvidLens</span>
+            <span id="btnLoader" class="hidden w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+          </button>
+
+          <div class="relative my-5"><div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-200"></div></div><div class="relative flex justify-center"><span class="bg-white px-3 text-[11px] font-semibold tracking-widest text-slate-400">OR</span></div></div>
+          <div class="grid grid-cols-2 gap-3"><button type="button" class="border py-2.5 rounded-xl text-[13px] font-semibold hover:bg-slate-50">Google</button><button type="button" class="border py-2.5 rounded-xl text-[13px] font-semibold hover:bg-slate-50">Microsoft</button></div>
+        </form>
+
+        <p class="mt-6 text-center text-[13px] text-slate-600">Don't have access? <a href="/signup" class="font-semibold text-[#0d9488]">Request access</a></p>
+        <div class="mt-6 pt-6 border-t text-center text-[10px] text-slate-400"><p>Having trouble? <a href="mailto:support@evidlens.co.ke" class="text-[#0d9488]">support@evidlens.co.ke</a></p><p class="mt-1">© 2026 EvidLens • <a href="/privacy" class="underline">Privacy</a> • <a href="/terms" class="underline">Terms</a> • <a href="/dpa" class="underline">DPA</a> • v2.5.14</p></div>
       </div>
-      <input type="password" id="password" required class="w-full p-3 border rounded-lg focus:border-[#14B8A6] outline-none">
+      <p class="mt-3 text-center text-[11px] text-slate-400">Protected by Cloudflare • KDPA Compliant</p>
     </div>
-    <button id="btn" class="w-full bg-[#14B8A6] text-white p-3 rounded-lg font-bold hover:bg-[#0e9a8c] transition">Login</button>
-  </form>
-  
-  <p class="text-center text-sm mt-6">Don't have an account? <a href="/signup" class="text-[#14B8A6] font-bold">Sign up</a></p>
+  </div>
 </div>
 
 <script>
-const params = new URLSearchParams(window.location.search);
-const next = params.get('next') || '/';
-document.getElementById('loginForm').addEventListener('submit', async (e)=>{
+const params=new URLSearchParams(window.location.search);
+const next=params.get('next')||'/';
+const email=document.getElementById('email'),password=document.getElementById('password'),form=document.getElementById('loginForm'),msg=document.getElementById('msg'),emailErr=document.getElementById('emailErr'),btn=document.getElementById('btn'),btnText=document.getElementById('btnText'),btnLoader=document.getElementById('btnLoader'),successBox=document.getElementById('successBox');let attempts=0;
+document.getElementById('toggleEye').onclick=e=>{password.type=password.type==='password'?'text':'password';e.target.textContent=password.type==='password'?'👁️':'🙈'};
+form.addEventListener('submit',async e=>{
   e.preventDefault();
-  const btn = document.getElementById('btn');
-  const msg = document.getElementById('msg');
-  btn.textContent = 'Logging in...';
-  btn.disabled = true;
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)){emailErr.classList.remove('hidden');return;}else emailErr.classList.add('hidden');
+  if(attempts>=5){document.getElementById('rateBox').classList.remove('hidden');return;}
+  btn.disabled=true;btnText.textContent='Signing in...';btnLoader.classList.remove('hidden');msg.classList.add('hidden');
   try{
-    const res = await fetch('/auth/login', {
-      method:'POST',
-      credentials:'include',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({
-        email: document.getElementById('email').value,
-        password: document.getElementById('password').value
-      })
-    });
-    const data = await res.json();
-    if(!res.ok){
-      msg.className = 'bg-red-50 text-red-700 p-3 rounded-lg mb-4 text-sm';
-      msg.textContent = data.detail || 'Invalid credentials';
-      msg.classList.remove('hidden');
-    }else{
-      window.location.href = next;
-    }
-  }catch(err){
-    msg.className = 'bg-red-50 text-red-700 p-3 rounded-lg mb-4 text-sm';
-    msg.textContent = 'Network error';
-    msg.classList.remove('hidden');
-  }
-  btn.textContent = 'Login';
-  btn.disabled = false;
+    const res=await fetch('/auth/login',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email.value.trim(),password:password.value})});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.detail||'Invalid credentials');
+    window.location.href=next;
+  }catch(err){attempts++;msg.textContent=err.message;msg.classList.remove('hidden');if(attempts>=3)msg.textContent+=' ('+attempts+'/5)';}
+  finally{btn.disabled=false;btnText.textContent='Sign in to EvidLens';btnLoader.classList.add('hidden');}
 });
+if(params.get('verified')){successBox.textContent='Email verified! You can login now.';successBox.classList.remove('hidden');}
+if(params.get('expired')){msg.textContent='Session expired. Please login again.';msg.classList.remove('hidden');}
 </script>
 </body>
 </html>
