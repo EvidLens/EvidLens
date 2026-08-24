@@ -11,18 +11,25 @@ class UserRole(str, enum.Enum):
 
 class AuthUser(SQLModel, table=True):
     __tablename__ = "auth_user"
+
     id: Optional[int] = Field(default=None, primary_key=True)
-    email: str = Field(unique=True, index=True)
+    email: str = Field(unique=True, index=True, nullable=False)
     phone: Optional[str] = Field(default=None, unique=True, index=True)
-    full_name: str
-    hashed_password: str
+    full_name: str = Field(nullable=False)
+    hashed_password: str = Field(nullable=False)
     avatar_url: Optional[str] = Field(default=None)
+
+    # Billing
     plan: str = Field(default="BASIC")
     credits: int = Field(default=0)
-    email_verified: bool = Field(default=False)
-    verification_token: Optional[str] = Field(default=None, unique=True)
-    reset_token: Optional[str] = Field(default=None, unique=True)
+
+    # Verification - user keeps own password, only email verification
+    email_verified: bool = Field(default=False, index=True)
+    verification_token: Optional[str] = Field(default=None, unique=True, index=True)
+    reset_token: Optional[str] = Field(default=None, unique=True, index=True)
     reset_token_expires: Optional[datetime] = Field(default=None)
+
+    # Profile
     sector: Optional[str] = Field(default=None)
     county: Optional[str] = Field(default=None)
     role: UserRole = Field(default=UserRole.USER)
@@ -30,4 +37,7 @@ class AuthUser(SQLModel, table=True):
     two_fa_enabled: bool = Field(default=False)
     theme: str = Field(default="light")
     language: str = Field(default="en")
+
+    # KDPA Compliance
     created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
+    last_login: Optional[datetime] = Field(default=None)
