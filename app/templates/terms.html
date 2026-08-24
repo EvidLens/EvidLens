@@ -1,35 +1,55 @@
-{% extends "base.html" %}
-{% block content %}
-<h1>Terms of Service</h1>
-<p><strong>Last Updated: April 26, 2026</strong></p>
-<p>By accessing EvidLens, you agree to these Terms. EvidLens is operated by EvidLens Ltd, registered in Kenya.</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terms of Service - EvidLens</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>body{font-family:Inter,sans-serif}</style>
+</head>
+<body class="bg-[#f8fafc]">
+<div class="bg-[#0B1220] text-white p-6">
+  <div class="max-w-4xl mx-auto flex justify-between items-center">
+    <a href="/" class="flex items-center gap-2"><div class="w-8 h-8 bg-[#14B8A6] rounded-lg flex items-center justify-center font-bold">E</div><span class="font-bold">EvidLens</span></a>
+    <a href="/auth/login" class="text-[13px] bg-white/10 px-4 py-2 rounded-lg">Back to Login</a>
+  </div>
+</div>
+<div class="max-w-4xl mx-auto p-6 lg:p-10">
+  <div class="bg-white rounded-[20px] border border-slate-200 p-8 lg:p-10">
+    <h1 class="text-[32px] font-extrabold">Terms of Service</h1>
+    <p class="text-[13px] text-slate-500 mt-2"><b>Last Updated: April 26, 2026</b> • Governing Law: Kenya</p>
 
-<h2>1. Accounts and Subscriptions</h2>
-<p><b>Plans:</b> BASIC KES 500/mo, PROFESSIONAL KES 1500/mo, ENTERPRISE KES 5000/mo. Annual billing gives 2 months free.</p>
-<p><b>Billing:</b> All payments are via M-Pesa Paybill. Your subscription auto-renews. You can cancel anytime and access continues until period end.</p>
-<p><b>Free Tier:</b> 3 AI queries per calendar day. No payment method required.</p>
+    <p class="mt-6 text-[14px] leading-relaxed">By accessing EvidLens, you agree to these Terms. Operated by EvidLens Ltd, Kenya.</p>
 
-<h2>2. M-Pesa Payments</h2>
-<p>By paying via M-Pesa you authorize Safaricom to debit your M-Pesa wallet. Failed payments will result in downgrade to Free after 3 days grace. Refunds are only issued for duplicate charges within 7 days. No refunds for reports already generated or data downloaded.</p>
+    <h2 class="font-bold mt-8 text-[16px]">1. Accounts & Subscriptions</h2>
+    <p class="text-[14px] mt-2">BASIC KES 500/mo, PROFESSIONAL KES 1500/mo, ENTERPRISE KES 5000/mo. Annual = 2 months free. Auto-renew, cancel anytime. Free tier: 3 AI queries/day.</p>
 
-<h2>3. Acceptable Use</h2>
-<p>You agree not to: Scrape data via bots, Resell reports without license, Share login credentials beyond seat limit, or Use AI for illegal purposes. Violation = immediate suspension.</p>
+    <h2 class="font-bold mt-6 text-[16px]">2. M-Pesa Payments</h2>
+    <p class="text-[14px] mt-2">All payments via M-Pesa Paybill. Authorize Safaricom debit. Failed = downgrade to Free after 3 days grace. Refunds only for duplicates within 7 days. No refunds for generated reports.</p>
 
-<h2>4. Intellectual Property</h2>
-<p>All dashboard designs, AI prompts, and aggregated insights are property of EvidLens Ltd. You own the reports you export. You grant us license to use anonymized queries to improve AI.</p>
+    <h2 class="font-bold mt-6 text-[16px]">3. Acceptable Use</h2>
+    <p class="text-[14px] mt-2">No scraping, reselling without license, sharing logins beyond seat limit, or illegal AI use. Violation = immediate suspension.</p>
 
-<h2>5. Data and Accuracy Disclaimer</h2>
-<p>Market prices, news, and AI insights are compiled from third parties and are provided "AS IS". EvidLens does not guarantee accuracy. We are not liable for business losses from decisions made using the platform. Always verify with primary sources before trading.</p>
+    <h2 class="font-bold mt-6 text-[16px]">4. IP</h2>
+    <p class="text-[14px] mt-2">Dashboard, prompts, aggregated insights © EvidLens Ltd. You own exported reports. You grant license to use anonymized queries to improve AI.</p>
 
-<h2>6. Limitation of Liability</h2>
-<p>To the maximum extent permitted by Kenyan law, EvidLens liability is limited to the amount you paid in the last 3 months. We are not liable for indirect damages.</p>
+    <h2 class="font-bold mt-6 text-[16px]">5. Disclaimer</h2>
+    <p class="text-[14px] mt-2">Prices, news, AI insights from third parties, AS IS. No guarantee of accuracy. Not liable for business losses. Verify with primary sources.</p>
 
-<h2>7. Termination</h2>
-<p>We may terminate accounts for fraud, chargebacks, or abuse. You may delete your account from Settings. Upon deletion we remove PII within 30 days except for legal records.</p>
+    <h2 class="font-bold mt-6 text-[16px]">6. Liability</h2>
+    <p class="text-[14px] mt-2">Limited to amount paid in last 3 months per Kenyan law. No indirect damages.</p>
 
-<h2>8. Governing Law</h2>
-<p>These Terms are governed by the Laws of Kenya. Disputes will be resolved in Nyeri Courts.</p>
+    <h2 class="font-bold mt-6 text-[16px]">7. Termination</h2>
+    <p class="text-[14px] mt-2">We may terminate for fraud/chargebacks/abuse. Delete from Settings. PII removed within 30 days except legal records.</p>
 
-<h2>9. Contact</h2>
-<p>Legal: legal@evidlens.co.ke</p>
-{% endblock %}
+    <h2 class="font-bold mt-6 text-[16px]">8. Governing Law</h2>
+    <p class="text-[14px] mt-2">Laws of Kenya. Disputes in Nyeri Courts.</p>
+
+    <h2 class="font-bold mt-6 text-[16px]">9. Contact</h2>
+    <p class="text-[14px] mt-2">Legal: info@evidlens.co.ke • Support: support@evidlens.co.ke</p>
+
+    <p class="mt-10 text-[11px] text-slate-400">© 2026 EvidLens Ltd • <a href="/privacy" class="underline">Privacy</a> • <a href="/dpa" class="underline">DPA</a></p>
+  </div>
+</div>
+</body>
+</html>
