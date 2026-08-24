@@ -174,6 +174,10 @@ def logout_get():
     response.delete_cookie("user_id", path="/")
     return response
 
+@router.get("/oauth/{provider}")
+def oauth_placeholder(provider: str):
+    return RedirectResponse(url="/auth/login?error=oauth_not_configured")
+
 @router.get("/login")
 def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
