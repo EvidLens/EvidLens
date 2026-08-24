@@ -4,6 +4,7 @@
 <title>Login - EvidLens | Decision Intelligence for Kenya</title>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="/static/logo.png">
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>body{font-family:Inter,sans-serif}*:focus-visible{outline:2px solid #14B8A6;outline-offset:2px}</style>
@@ -15,7 +16,8 @@
     <div class="absolute -top-40 -left-40 w-[600px] h-[600px] bg-[#14b8a6]/20 rounded-full blur-[100px]"></div>
     <div class="relative z-10">
       <div class="flex items-center gap-3">
-        <div class="w-11 h-11 bg-[#14B8A6] rounded-xl flex items-center justify-center font-extrabold text-xl">E</div>
+        <img src="/static/logo.png" alt="EvidLens" class="w-11 h-11 rounded-xl bg-white p-1.5 object-contain" onerror="this.style.display='none';document.getElementById('fb1').style.display='flex'">
+        <div id="fb1" style="display:none" class="w-11 h-11 bg-[#14B8A6] rounded-xl flex items-center justify-center font-extrabold text-xl">E</div>
         <span class="text-[22px] font-bold">Evid<span class="text-[#14B8A6]">Lens</span></span>
         <span class="ml-3 px-2.5 py-0.5 text-[10px] bg-white/10 border border-white/20 rounded-full">ENTERPRISE</span>
       </div>
@@ -36,7 +38,11 @@
   <div class="flex-1 flex items-center justify-center p-5 lg:p-10">
     <div class="w-full max-w-[420px]">
       <div class="bg-white rounded-[20px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] border border-slate-200/60 p-7 sm:p-8">
-        <div class="lg:hidden flex items-center gap-2 mb-4"><div class="w-9 h-9 bg-[#14B8A6] rounded-lg flex items-center justify-center font-bold text-white">E</div><span class="font-bold">EvidLens</span></div>
+        <div class="lg:hidden flex items-center gap-2 mb-4">
+          <img src="/static/logo.png" alt="EvidLens" class="w-9 h-9 rounded-lg object-contain border p-1 bg-white" onerror="this.style.display='none';document.getElementById('fb2').style.display='flex'">
+          <div id="fb2" style="display:none" class="w-9 h-9 bg-[#14B8A6] rounded-lg flex items-center justify-center font-bold text-white">E</div>
+          <span class="font-bold">EvidLens</span>
+        </div>
         <h2 class="text-[24px] font-bold text-slate-900">Welcome back</h2>
         <p class="text-[13px] text-slate-500 mt-1">Sign in to your workspace</p>
 
