@@ -20,7 +20,9 @@ def send_email(to: str, subject: str, html: str):
             json={"from": f"{FROM_NAME} <{FROM_EMAIL}>", "to": [to], "subject": subject, "html": html},
             timeout=10
         )
-        print(f"[EMAIL] {to} -> {resp.status_code}")
+        print(f"[EMAIL] {to} -> {resp.status_code} via {FROM_EMAIL}")
+        if resp.status_code!= 200:
+            print(f"[EMAIL BODY] {resp.text}")
     except Exception as e:
         print(f"[EMAIL ERROR] {e}")
 
@@ -89,7 +91,7 @@ def login_user(db: Session, email: str, password: str):
     if not user:
         return {"error": "Invalid credentials"}
     if not user.email_verified:
-        return {"error": "Email not verified - check inbox for noreply@evidlens.co.ke"}
+        return {"error": "Email not verified - check inbox for verification email"}
     if not user.is_active:
         return {"error": "Account disabled"}
     if not verify_password(password, user.hashed_password):
@@ -99,26 +101,35 @@ def login_user(db: Session, email: str, password: str):
 def request_password_reset(db: Session, email: str):
     user = get_user_by_email(db, email)
     if not user:
+        # Don't reveal if email exists - security
         return {"message": "If email exists, reset link sent"}
     token = os.urandom(32).hex()
     user.reset_token = token
     user.reset_token_expires = datetime.utcnow() + timedelta(hours=1)
     db.add(user)
     db.commit()
+    db.refresh(user)
     reset_link = f"{APP_URL}/reset-password?token={token}"
     html = f"<div style='font-family:Inter'><h2>Reset Password</h2><p>Click to reset (30 min):</p><p><a href='{reset_link}' style='background:#14B8A6;color:white;padding:12px 24px;border-radius:10px;text-decoration:none'>Reset Password</a></p><p style='font-size:12px;color:#64748b'>{reset_link}</p></div>"
     send_email(email, "Reset your EvidLens Password", html)
     return {"message": "Reset email sent", "reset_token": token}
 
 def reset_password(db: Session, token: str, new_password: str):
-    user = db.exec(select(AuthUser).where(AuthUser.reset_token == token, AuthUser.reset_token_expires > datetime.utcnow())).first()
+    # Find user by token first, then check expiry - no hard-coded emails
+    user = db.exec(select(AuthUser).where(AuthUser.reset_token == token)).first()
     if not user:
         return {"error": "Invalid or expired token"}
+    if not user.reset_token_expires or user.reset_token_expires < datetime.utcnow():
+        return {"error": "Invalid or expired token"}
+
     user.hashed_password = hash_password(new_password)
     user.reset_token = None
     user.reset_token_expires = None
+    user.email_verified = True
+    user.is_active = True
     db.add(user)
     db.commit()
+    db.refresh(user)
     return {"message": "Password reset successfully"}
 
 def update_password(db: Session, user: AuthUser, old_password: str, new_password: str):
@@ -127,6 +138,7 @@ def update_password(db: Session, user: AuthUser, old_password: str, new_password
     user.hashed_password = hash_password(new_password)
     db.add(user)
     db.commit()
+    db.refresh(user)
     return {"message": "Password updated"}
 
 def update_profile(db: Session, user: AuthUser, full_name: str, phone: str, theme: str, language: str):
