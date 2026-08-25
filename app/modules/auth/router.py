@@ -15,7 +15,7 @@ from datetime import datetime
 router = APIRouter(prefix="/auth", tags=["Auth"])
 templates = Jinja2Templates(directory="app/templates")
 
-# --- EMAIL CONFIG - FROM YOUR SCREENSHOT ---
+# --- EMAIL CONFIG - ONLY ADMIN EMAIL ALLOWED HERE ---
 RESEND_KEY = os.getenv("RESEND_API_KEY")
 FROM_EMAIL = os.getenv("FROM_EMAIL", "noreply@evidlens.co.ke")
 FROM_NAME = os.getenv("FROM_NAME", "EvidLens")
@@ -53,7 +53,7 @@ def send_verification_email(to: str, name: str, token: str):
             "subject": "Verify your EvidLens account",
             "html": html
         })
-        print(f"[EMAIL SENT] Verification to {to}")
+        print(f"[EMAIL SENT] Verification to {to} via {FROM_EMAIL}")
     except Exception as e:
         print(f"[EMAIL FAILED] {to}: {e}")
 
@@ -72,6 +72,7 @@ def send_reset_email(to: str, token: str):
     """
     try:
         resend.Emails.send({"from": f"{FROM_NAME} <{FROM_EMAIL}>","to": [to],"subject": "Reset your EvidLens password","html": html})
+        print(f"[EMAIL SENT] Reset to {to}")
     except Exception as e:
         print(f"Reset email failed: {e}")
 
@@ -110,9 +111,8 @@ def signup(req: SignupRequest, background_tasks: BackgroundTasks, db: Session = 
         raise HTTPException(status_code=400, detail="Email already registered")
     token = secrets.token_urlsafe(32)
     user = create_user(db, req, token)
-    # Send verification email via noreply@evidlens.co.ke
     background_tasks.add_task(send_verification_email, user.email, user.full_name or "there", token)
-    return {"message": "Verification email sent from noreply@evidlens.co.ke. Check inbox.", "email": user.email}
+    return {"message": f"Verification email sent from {FROM_EMAIL}. Check inbox.", "email": user.email}
 
 @router.get("/verify")
 def verify_email(token: str, db: Session = Depends(get_db)):
@@ -131,7 +131,7 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
         key="user_id",
         value=str(result["user_id"]),
         httponly=True,
-        secure=True, # HTTPS only
+        secure=True,
         samesite="lax",
         max_age=86400*7,
         path="/"
@@ -141,18 +141,23 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
 @router.post("/forgot-password")
 def forgot(req: ForgotRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     result = request_password_reset(db, req.email)
-    # If user exists, send email
     if "reset_token" in result:
         background_tasks.add_task(send_reset_email, req.email, result["reset_token"])
-    return {"message": "If email exists, reset link sent from noreply@evidlens.co.ke"}
+    return {"message": f"If email exists, reset link sent from {FROM_EMAIL}"}
 
 @router.post("/reset-password")
 def reset(req: ResetRequest, db: Session = Depends(get_db)):
-    return reset_password(db, req.token, req.new_password)
+    result = reset_password(db, req.token, req.new_password)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
 
 @router.post("/change-password")
 def change_password(req: PasswordChangeRequest, user: AuthUser = Depends(get_current_user), db: Session = Depends(get_db)):
-    return update_password(db, user, req.old_password, req.new_password)
+    result = update_password(db, user, req.old_password, req.new_password)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
 
 @router.post("/update-profile")
 def update_profile_route(req: ProfileUpdateRequest, user: AuthUser = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -174,10 +179,6 @@ def logout_get():
     response.delete_cookie("user_id", path="/")
     return response
 
-@router.get("/oauth/{provider}")
-def oauth_placeholder(provider: str):
-    return RedirectResponse(url="/auth/login?error=oauth_not_configured")
-
 @router.get("/login")
 def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
@@ -186,22 +187,22 @@ def login_page(request: Request):
 def signup_page(request: Request):
     return templates.TemplateResponse("signup.html", {"request": request})
 
-# DELETE THIS AFTER YOU HAVE VERIFIED YOUR ADMIN ACCOUNT WORKS - SECURE VERSION
+# ADMIN FIX - SECURE VERSION - keeps user passwords, no hard-coded user emails
 @router.get("/admin/fix-login")
 def fix_login(db: Session = Depends(get_db), admin: AuthUser = Depends(require_admin)):
     from sqlmodel import text
-    # SECURE: Only verify existing users, DO NOT override passwords - users keep own passwords
     db.exec(text("UPDATE auth_user SET email_verified = true, is_active = true WHERE email_verified = false"))
-    db.exec(text("DELETE FROM auth_user WHERE email = 'noreply@evidlens.co.ke'"))
+    # Delete any account that was created with the noreply sender address (not a real user)
+    db.exec(text(f"DELETE FROM auth_user WHERE email = '{FROM_EMAIL}'"))
     db.commit()
     users = db.exec(text("SELECT id, email, email_verified, is_active FROM auth_user")).all()
-    return {"fixed": True, "message": "Verified - users keep own passwords (security compliant)", "users": [{"id": u[0], "email": u[1], "verified": u[2], "active": u[3]} for u in users]}
+    return {"fixed": True, "message": "Verified existing users - passwords preserved", "users": [{"id": u[0], "email": u[1], "verified": u[2], "active": u[3]} for u in users]}
 
 @router.get("/admin/clear-cache")
 def clear_cache(db: Session = Depends(get_db), admin: AuthUser = Depends(require_admin)):
     from sqlmodel import text
     db.exec(text("TRUNCATE TABLE auth_user RESTART IDENTITY CASCADE"))
     db.commit()
-    response = JSONResponse(content={"cleared": True, "message": "All cache cleared - fresh signup with own password"})
+    response = JSONResponse(content={"cleared": True, "message": "All users cleared - fresh signup required"})
     response.delete_cookie("user_id", path="/")
     return response
