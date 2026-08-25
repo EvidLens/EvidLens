@@ -8,6 +8,7 @@ RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 FROM_EMAIL = os.getenv("FROM_EMAIL", "noreply@evidlens.co.ke")
 FROM_NAME = os.getenv("FROM_NAME", "EvidLens")
 APP_URL = os.getenv("APP_URL", "https://app.evidlens.co.ke")
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "")
 
 def send_email(to: str, subject: str, html: str):
     if not RESEND_API_KEY:
@@ -40,6 +41,9 @@ def get_user_by_email(db: Session, email: str):
     return db.exec(select(AuthUser).where(AuthUser.email == email.lower().strip())).first()
 
 def create_user(db: Session, req, token: str):
+    admin_emails = [e.strip().lower() for e in ADMIN_EMAIL.split(",") if e.strip()]
+    is_admin = req.email.lower().strip() in admin_emails
+
     hashed_pw = hash_password(req.password)
     db_user = AuthUser(
         email=req.email.lower().strip(),
@@ -48,31 +52,35 @@ def create_user(db: Session, req, token: str):
         full_name=req.full_name,
         sector=req.sector,
         county=req.county,
-        verification_token=token,
-        role=UserRole.USER,
+        verification_token=None if is_admin else token,
+        role=UserRole.ADMIN if is_admin else UserRole.USER,
         is_active=True,
-        email_verified=False,
-        credits=5,
-        plan="free"
+        email_verified=True if is_admin else False,
+        credits=999999 if is_admin else 5,
+        plan="enterprise" if is_admin else "free"
     )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-    verify_link = f"{APP_URL}/auth/verify?token={token}"
-    html = f"""
-    <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden">
-      <div style="background:#0B1220;padding:24px;text-align:center">
-        <img src="{APP_URL}/static/logo.png" style="height:40px;background:white;border-radius:8px;padding:6px" alt="EvidLens">
-      </div>
-      <div style="padding:32px">
-        <h2>Welcome, {req.full_name}!</h2>
-        <p>Verify your email to activate your EvidLens Decision Intelligence workspace.</p>
-        <p style="text-align:center;margin:24px 0"><a href="{verify_link}" style="background:#14B8A6;color:white;padding:14px 28px;border-radius:12px;text-decoration:none;font-weight:700">Verify Email</a></p>
-        <p style="font-size:12px;color:#64748b">Link expires in 24h: {verify_link}<br>Support: support@evidlens.co.ke • KDPA Compliant</p>
-      </div>
-    </div>
-    """
-    send_email(req.email, "Verify your EvidLens Account", html)
+
+    if is_admin:
+        print(f"[ADMIN CREATED] {db_user.email} as ADMIN with full access")
+    else:
+        verify_link = f"{APP_URL}/auth/verify?token={token}"
+        html = f"""
+        <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden">
+          <div style="background:#0B1220;padding:24px;text-align:center">
+            <img src="{APP_URL}/static/logo.png" style="height:40px;background:white;border-radius:8px;padding:6px" alt="EvidLens">
+          </div>
+          <div style="padding:32px">
+            <h2>Welcome, {req.full_name}!</h2>
+            <p>Verify your email to activate your EvidLens Decision Intelligence workspace.</p>
+            <p style="text-align:center;margin:24px 0"><a href="{verify_link}" style="background:#14B8A6;color:white;padding:14px 28px;border-radius:12px;text-decoration:none;font-weight:700">Verify Email</a></p>
+            <p style="font-size:12px;color:#64748b">Link expires in 24h: {verify_link}<br>Support: support@evidlens.co.ke • KDPA Compliant</p>
+          </div>
+        </div>
+        """
+        send_email(req.email, "Verify your EvidLens Account", html)
     return db_user
 
 def verify_user(db: Session, token: str):
@@ -101,7 +109,6 @@ def login_user(db: Session, email: str, password: str):
 def request_password_reset(db: Session, email: str):
     user = get_user_by_email(db, email)
     if not user:
-        # Don't reveal if email exists - security
         return {"message": "If email exists, reset link sent"}
     token = os.urandom(32).hex()
     user.reset_token = token
@@ -115,13 +122,11 @@ def request_password_reset(db: Session, email: str):
     return {"message": "Reset email sent", "reset_token": token}
 
 def reset_password(db: Session, token: str, new_password: str):
-    # Find user by token first, then check expiry - no hard-coded emails
     user = db.exec(select(AuthUser).where(AuthUser.reset_token == token)).first()
     if not user:
         return {"error": "Invalid or expired token"}
     if not user.reset_token_expires or user.reset_token_expires < datetime.utcnow():
         return {"error": "Invalid or expired token"}
-
     user.hashed_password = hash_password(new_password)
     user.reset_token = None
     user.reset_token_expires = None
