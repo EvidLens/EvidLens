@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
+from starlette.middleware.sessions import SessionMiddleware
 
 from sqlmodel import Session, select
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -54,6 +55,13 @@ load_dotenv()
 scheduler = AsyncIOScheduler(timezone=getattr(settings, "SCHEDULER_TIMEZONE", "Africa/Nairobi"))
 app = FastAPI(title="EvidLens API", version="2.5.14", docs_url="/docs", redoc_url="/redoc")
 UTC = timezone.utc
+
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.getenv("SECRET_KEY", "evidlens-secret-key-change-2026-strong-random"),
+    same_site="lax",
+    https_only=True
+)
 
 app.add_middleware(
     CORSMiddleware,
