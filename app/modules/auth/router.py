@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from sqlmodel import Session
+from sqlmodel import Session, text
 from pydantic import BaseModel, EmailStr
 from.service import *
 from.models import AuthUser
@@ -10,12 +10,15 @@ from app.core.db import get_session as get_db
 import secrets
 import os
 import resend
+import uuid
 from datetime import datetime
+from authlib.integrations.starlette_client import OAuth
+from starlette.config import Config
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 templates = Jinja2Templates(directory="app/templates")
 
-# --- EMAIL CONFIG - ONLY ADMIN EMAIL ALLOWED HERE ---
+# --- EMAIL CONFIG ---
 RESEND_KEY = os.getenv("RESEND_API_KEY")
 FROM_EMAIL = os.getenv("FROM_EMAIL", "noreply@evidlens.co.ke")
 FROM_NAME = os.getenv("FROM_NAME", "EvidLens")
@@ -23,6 +26,17 @@ APP_URL = os.getenv("APP_URL", "https://app.evidlens.co.ke")
 
 if RESEND_KEY:
     resend.api_key = RESEND_KEY
+
+# --- GOOGLE OAUTH CONFIG ---
+config = Config('.env')
+oauth = OAuth(config)
+oauth.register(
+    name='google',
+    client_id=os.getenv("GOOGLE_CLIENT_ID"),
+    client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+    client_kwargs={'scope': 'openid email profile'}
+)
 
 def send_verification_email(to: str, name: str, token: str):
     if not RESEND_KEY:
@@ -187,20 +201,60 @@ def login_page(request: Request):
 def signup_page(request: Request):
     return templates.TemplateResponse("signup.html", {"request": request})
 
-# ADMIN FIX - SECURE VERSION - keeps user passwords, no hard-coded user emails
+# --- GOOGLE OAUTH ROUTES ---
+@router.get("/oauth/google")
+async def oauth_google(request: Request):
+    redirect_uri = f"{APP_URL}/auth/oauth/google/callback"
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
+@router.get("/oauth/google/callback")
+async def oauth_google_callback(request: Request, db: Session = Depends(get_db)):
+    try:
+        token = await oauth.google.authorize_access_token(request)
+        user_info = token.get('userinfo')
+        if not user_info:
+            user_info = await oauth.google.parse_id_token(request, token)
+
+        email = user_info['email']
+        name = user_info.get('name', email.split('@')[0])
+
+        user = get_user_by_email(db, email)
+        if not user:
+            user_id = str(uuid.uuid4())
+            db.exec(text(f"INSERT INTO auth_user (id, email, full_name, hashed_password, email_verified, is_active, sector, county, theme, language) VALUES (:id, :email, :name, '', true, true, 'general', 'Nairobi', 'light', 'en')"), {"id": user_id, "email": email, "name": name})
+            db.commit()
+            user = get_user_by_email(db, email)
+            if not user:
+                # fallback fetch
+                res = db.exec(text("SELECT * FROM auth_user WHERE email = :email"), {"email": email}).first()
+                user = res
+
+        response = RedirectResponse(url="/", status_code=302)
+        response.set_cookie(
+            key="user_id",
+            value=str(user.id if hasattr(user, 'id') else user[0]),
+            httponly=True,
+            secure=True,
+            samesite="lax",
+            max_age=86400*7,
+            path="/"
+        )
+        return response
+    except Exception as e:
+        print(f"[OAUTH ERROR] {e}")
+        return RedirectResponse(url=f"/auth/login?error=oauth_failed&detail={str(e)[:100]}", status_code=302)
+
+# ADMIN FIX
 @router.get("/admin/fix-login")
 def fix_login(db: Session = Depends(get_db), admin: AuthUser = Depends(require_admin)):
-    from sqlmodel import text
     db.exec(text("UPDATE auth_user SET email_verified = true, is_active = true WHERE email_verified = false"))
-    # Delete any account that was created with the noreply sender address (not a real user)
-    db.exec(text(f"DELETE FROM auth_user WHERE email = '{FROM_EMAIL}'"))
+    db.exec(text(f"DELETE FROM auth_user WHERE email = :email"), {"email": FROM_EMAIL})
     db.commit()
     users = db.exec(text("SELECT id, email, email_verified, is_active FROM auth_user")).all()
     return {"fixed": True, "message": "Verified existing users - passwords preserved", "users": [{"id": u[0], "email": u[1], "verified": u[2], "active": u[3]} for u in users]}
 
 @router.get("/admin/clear-cache")
 def clear_cache(db: Session = Depends(get_db), admin: AuthUser = Depends(require_admin)):
-    from sqlmodel import text
     db.exec(text("TRUNCATE TABLE auth_user RESTART IDENTITY CASCADE"))
     db.commit()
     response = JSONResponse(content={"cleared": True, "message": "All users cleared - fresh signup required"})
