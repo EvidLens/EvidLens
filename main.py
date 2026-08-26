@@ -1,7 +1,18 @@
+"""
+EvidLens API - Main Application
+Version: 2.5.14
+Author: EvidLens Engineering
+Fixes:
+    - file_type column added to reports
+    - ENUM reportformat -> VARCHAR (PDF vs pdf crash)
+    - InFailedSqlTransaction fixed
+"""
+
 import os
 import traceback
 from typing import Optional
 from datetime import datetime, timezone
+
 from dotenv import load_dotenv
 
 from fastapi import FastAPI, Request, Depends
@@ -18,7 +29,9 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.schedulers import SchedulerNotRunningError
 
-# Core models
+# ------------------------------------------------------------------
+# Core - Models & Config
+# ------------------------------------------------------------------
 from app.core.models import (
     MarketMetric,
     Company,
@@ -30,15 +43,15 @@ from app.core.models import (
     ExportOpportunity,
     Competitor,
 )
-from app.modules.api import data, meta
 from app.core.config import settings
 from app.core.db import init_db, engine
 from app.core.scheduler import start_scheduler, shutdown_scheduler
 from app.modules.auth.models import AuthUser
 from app.modules.database import get_session as get_db
-from app.core.redis_client import redis_client
 
+# ------------------------------------------------------------------
 # Routers
+# ------------------------------------------------------------------
 from app.routers.pages import router as pages_router
 from app.modules.data_layer.router import router as data_router
 from app.modules.billing.router import router as billing_page_router
@@ -59,15 +72,23 @@ from app.modules.payments.router import router as payments_router
 from app.modules.api.routes import router as api_router
 from app.modules.cron.router import router as cron_router
 from app.modules.storage.router import router as storage_router
+from app.modules.api import data, meta
 from app.core import billing
 
+# ------------------------------------------------------------------
+# Env & Constants
+# ------------------------------------------------------------------
 load_dotenv()
 
 UTC = timezone.utc
+
 scheduler = AsyncIOScheduler(
     timezone=getattr(settings, "SCHEDULER_TIMEZONE", "Africa/Nairobi")
 )
 
+# ------------------------------------------------------------------
+# FastAPI App
+# ------------------------------------------------------------------
 app = FastAPI(
     title="EvidLens API",
     version="2.5.14",
@@ -75,7 +96,9 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+# ------------------------------------------------------------------
 # Middleware
+# ------------------------------------------------------------------
 app.add_middleware(
     SessionMiddleware,
     secret_key=os.getenv(
@@ -85,6 +108,7 @@ app.add_middleware(
     same_site="lax",
     https_only=True,
 )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -99,15 +123,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 app.add_middleware(AuthMiddleware)
 
-# ──────────────────────────────
+# ==================================================================
 # Helpers
-# ──────────────────────────────
+# ==================================================================
 async def get_current_user_optional(
     request: Request,
-    db: Session = Depends(get_db)
-):
+    db: Session = Depends(get_db),
+) -> Optional[AuthUser]:
     user_id = request.cookies.get("user_id")
     if not user_id:
         return None
@@ -121,7 +146,7 @@ async def get_current_user_optional(
     except Exception:
         return None
 
-def safe_job(job_func, job_name):
+def safe_job(job_func, job_name: str):
     try:
         print(f"[{job_name}] Running...")
         job_func()
@@ -130,8 +155,11 @@ def safe_job(job_func, job_name):
         print(f"[{job_name}] FAILED: {e}")
         traceback.print_exc()
 
+# ==================================================================
+# Database Migrations (Production Safe)
+# ==================================================================
 def fix_auth_user_table():
-    columns = [
+    cols = [
         "ADD COLUMN IF NOT EXISTS phone VARCHAR",
         "ADD COLUMN IF NOT EXISTS full_name VARCHAR",
         "ADD COLUMN IF NOT EXISTS hashed_password VARCHAR",
@@ -154,26 +182,36 @@ def fix_auth_user_table():
     ]
     try:
         with engine.connect() as conn:
-            for col_sql in columns:
+            for sql in cols:
                 try:
-                    conn.execute(text(f"ALTER TABLE auth_user {col_sql}"))
+                    conn.execute(text(f"ALTER TABLE auth_user {sql}"))
                     conn.commit()
                 except Exception:
                     conn.rollback()
-
-            try:
-                conn.execute(text(
-                    "DELETE FROM auth_user WHERE email = 'noreply@evidlens.co.ke'"
-                ))
-                conn.commit()
-            except Exception:
-                conn.rollback()
-        print("AUTH_USER MIGRATED")
+        print("✓ AUTH_USER MIGRATED")
     except Exception as e:
-        print(f"AUTH_USER migration: {e}")
+        print(f"AUTH_USER error: {e}")
 
 def fix_reports_table():
-    cols = [
+    # 1. Convert ENUM -> VARCHAR (critical fix)
+    enum_sqls = [
+        "ALTER TABLE reports ALTER COLUMN format TYPE VARCHAR(20) USING format::text",
+        "ALTER TABLE reports ALTER COLUMN status TYPE VARCHAR(50) USING status::text",
+        "ALTER TABLE reports ALTER COLUMN report_type TYPE VARCHAR(100) USING report_type::text",
+    ]
+    try:
+        with engine.connect() as conn:
+            for sql in enum_sqls:
+                try:
+                    conn.execute(text(sql))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+    except Exception:
+        pass
+
+    # 2. Add missing columns
+    add_cols = [
         "ADD COLUMN IF NOT EXISTS file_type VARCHAR(20) DEFAULT 'pdf'",
         "ADD COLUMN IF NOT EXISTS file_path VARCHAR(500)",
         "ADD COLUMN IF NOT EXISTS file_size_kb INTEGER",
@@ -190,158 +228,102 @@ def fix_reports_table():
         "ADD COLUMN IF NOT EXISTS sub_county VARCHAR(100)",
         "ADD COLUMN IF NOT EXISTS ward VARCHAR(100)",
         "ADD COLUMN IF NOT EXISTS town VARCHAR(100)",
+        "ADD COLUMN IF NOT EXISTS country VARCHAR(100) DEFAULT 'Kenya'",
     ]
     try:
         with engine.connect() as conn:
-            for c in cols:
+            for col in add_cols:
                 try:
-                    conn.execute(text(f"ALTER TABLE reports {c}"))
+                    conn.execute(text(f"ALTER TABLE reports {col}"))
                     conn.commit()
                 except Exception:
                     conn.rollback()
-        print("REPORTS MIGRATED")
+        print("✓ REPORTS MIGRATED")
     except Exception as e:
-        print(f"Reports migration: {e}")
+        print(f"REPORTS error: {e}")
 
 def force_create_tables():
-    sqls = [
-        """CREATE TABLE IF NOT EXISTS company (
+    tables = [
+        """
+        CREATE TABLE IF NOT EXISTS company (
             id SERIAL PRIMARY KEY,
-            name VARCHAR,
-            sector VARCHAR,
-            county VARCHAR,
-            description TEXT,
-            created_at TIMESTAMP DEFAULT NOW()
-        )""",
-        """CREATE TABLE IF NOT EXISTS market_metrics (
-            id SERIAL PRIMARY KEY,
-            product VARCHAR,
-            county VARCHAR,
-            subcounty VARCHAR,
-            sector VARCHAR,
-            company_name VARCHAR,
-            avg_price_kes FLOAT,
-            demand_score FLOAT,
+            name VARCHAR, sector VARCHAR, county VARCHAR,
+            description TEXT, created_at TIMESTAMP DEFAULT NOW()
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS market_metrics (
+            id SERIAL PRIMARY KEY, product VARCHAR, county VARCHAR,
+            subcounty VARCHAR, sector VARCHAR, company_name VARCHAR,
+            avg_price_kes FLOAT, demand_score FLOAT,
             created_at TIMESTAMP DEFAULT NOW(),
-            timestamp TIMESTAMP DEFAULT NOW(),
-            user_id INTEGER
-        )""",
-        """CREATE TABLE IF NOT EXISTS price_data (
-            id SERIAL PRIMARY KEY,
-            product_name VARCHAR,
-            product VARCHAR,
-            county VARCHAR,
-            sector VARCHAR,
-            price FLOAT,
-            avg_price_kes FLOAT,
-            tenant_id VARCHAR,
-            timestamp TIMESTAMP DEFAULT NOW(),
-            created_at TIMESTAMP DEFAULT NOW()
-        )""",
-        """CREATE TABLE IF NOT EXISTS news_articles (
-            id SERIAL PRIMARY KEY,
-            title VARCHAR,
-            summary TEXT,
-            content TEXT,
-            source VARCHAR,
-            category VARCHAR,
-            url VARCHAR,
-            county VARCHAR,
+            timestamp TIMESTAMP DEFAULT NOW(), user_id INTEGER
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS price_data (
+            id SERIAL PRIMARY KEY, product_name VARCHAR, county VARCHAR,
+            sector VARCHAR, price FLOAT, tenant_id VARCHAR,
+            timestamp TIMESTAMP DEFAULT NOW(), created_at TIMESTAMP DEFAULT NOW()
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS news_articles (
+            id SERIAL PRIMARY KEY, title VARCHAR, summary TEXT,
+            content TEXT, source VARCHAR, category VARCHAR,
+            url VARCHAR, county VARCHAR,
             published_at TIMESTAMP DEFAULT NOW(),
             created_at TIMESTAMP DEFAULT NOW()
-        )""",
-        """CREATE TABLE IF NOT EXISTS social_mentions (
-            id SERIAL PRIMARY KEY,
-            platform VARCHAR,
-            content TEXT,
-            author VARCHAR,
-            url VARCHAR,
-            sentiment VARCHAR,
-            county VARCHAR,
-            sector VARCHAR,
-            created_at TIMESTAMP DEFAULT NOW()
-        )""",
-        """CREATE TABLE IF NOT EXISTS reports (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER,
-            title VARCHAR,
-            report_type VARCHAR,
-            format VARCHAR,
-            file_type VARCHAR(20) DEFAULT 'pdf',
-            status VARCHAR,
-            query TEXT,
-            sector VARCHAR,
-            country VARCHAR,
-            county VARCHAR,
-            sub_county VARCHAR,
-            ward VARCHAR,
-            town VARCHAR,
-            file_path VARCHAR,
-            file_size_kb INTEGER,
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS social_mentions (
+            id SERIAL PRIMARY KEY, platform VARCHAR, content TEXT,
+            author VARCHAR, url VARCHAR, sentiment VARCHAR,
+            county VARCHAR, sector VARCHAR, created_at TIMESTAMP DEFAULT NOW()
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS reports (
+            id SERIAL PRIMARY KEY, user_id INTEGER, title VARCHAR(500),
+            report_type VARCHAR(100), format VARCHAR(20),
+            file_type VARCHAR(20) DEFAULT 'pdf', status VARCHAR(50),
+            query TEXT, sector VARCHAR, country VARCHAR, county VARCHAR,
+            sub_county VARCHAR, ward VARCHAR, town VARCHAR,
+            file_path VARCHAR, file_size_kb INTEGER,
             download_count INTEGER DEFAULT 0,
             is_branded BOOLEAN DEFAULT FALSE,
             kra_compliant BOOLEAN DEFAULT TRUE,
-            report_metadata JSON,
-            payment_id INTEGER,
+            report_metadata JSON, payment_id INTEGER,
             is_auto_weekly BOOLEAN DEFAULT FALSE,
-            expires_at TIMESTAMP,
-            error_message TEXT,
-            data JSON,
+            expires_at TIMESTAMP, error_message TEXT,
+            data JSON, created_at TIMESTAMP DEFAULT NOW()
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS knowledge_chunks (
+            id SERIAL PRIMARY KEY, sector VARCHAR, county VARCHAR,
+            chunk_text TEXT, chunk_type VARCHAR, source VARCHAR,
+            embedding JSON, chunk_metadata JSON,
             created_at TIMESTAMP DEFAULT NOW()
-        )""",
-        """CREATE TABLE IF NOT EXISTS knowledge_chunks (
-            id SERIAL PRIMARY KEY,
-            sector VARCHAR,
-            county VARCHAR,
-            chunk_text TEXT,
-            chunk_type VARCHAR,
-            source VARCHAR,
-            embedding JSON,
-            chunk_metadata JSON,
-            created_at TIMESTAMP DEFAULT NOW()
-        )""",
-        """CREATE TABLE IF NOT EXISTS export_opportunities (
-            id SERIAL PRIMARY KEY,
-            tenant_id VARCHAR,
-            country VARCHAR,
-            product VARCHAR,
-            opportunity_score FLOAT,
-            created_at TIMESTAMP DEFAULT NOW()
-        )""",
-        """CREATE TABLE IF NOT EXISTS competitor (
-            id SERIAL PRIMARY KEY,
-            name VARCHAR,
-            sector VARCHAR,
-            county VARCHAR,
-            created_at TIMESTAMP DEFAULT NOW()
-        )""",
-        """CREATE TABLE IF NOT EXISTS usersubscription (
-            id SERIAL PRIMARY KEY,
-            tenant_id VARCHAR,
-            user_id INTEGER,
-            module_name VARCHAR,
-            plan_name VARCHAR,
-            payment_reference VARCHAR,
-            starts_at TIMESTAMP,
-            expires_at TIMESTAMP,
-            status VARCHAR
-        )""",
+        )
+        """,
     ]
     try:
         with engine.connect() as conn:
-            for sql in sqls:
+            for sql in tables:
                 try:
                     conn.execute(text(sql))
-                except Exception as inner_e:
-                    print(f"Table skip: {inner_e}")
+                except Exception as e:
+                    print(f"Table skip: {e}")
             conn.commit()
-        print("TABLES ENSURED")
+        print("✓ TABLES ENSURED")
     except Exception as e:
         print(f"Force create failed: {e}")
 
-# ──────────────────────────────
+# ==================================================================
 # Lifecycle
-# ──────────────────────────────
+# ==================================================================
 @app.on_event("startup")
 def on_startup():
     fix_auth_user_table()
@@ -350,7 +332,7 @@ def on_startup():
 
     try:
         init_db()
-        print("DB INIT OK")
+        print("✓ DB INIT OK")
     except Exception as e:
         print(f"DB init: {e}")
 
@@ -363,30 +345,24 @@ def on_startup():
 
         scheduler.add_job(
             lambda: safe_job(scrape_kpin_prices, "KPIN"),
-            CronTrigger(
-                hour=getattr(settings, "KPIN_SCRAPE_HOUR", 3), minute=0
-            ),
+            CronTrigger(hour=getattr(settings, "KPIN_SCRAPE_HOUR", 3), minute=0),
             id="kpin_scrape",
             replace_existing=True,
         )
         scheduler.add_job(
             lambda: safe_job(fetch_real_news, "NEWS"),
-            CronTrigger(
-                hour=getattr(settings, "NEWS_SCRAPE_HOUR", 4), minute=0
-            ),
+            CronTrigger(hour=getattr(settings, "NEWS_SCRAPE_HOUR", 4), minute=0),
             id="news_scrape",
             replace_existing=True,
         )
         scheduler.add_job(
             lambda: safe_job(fetch_real_tweets, "TWEETS"),
-            CronTrigger(
-                hour=getattr(settings, "TWEETS_SCRAPE_HOUR", 5), minute=0
-            ),
+            CronTrigger(hour=getattr(settings, "TWEETS_SCRAPE_HOUR", 5), minute=0),
             id="tweets_scrape",
             replace_existing=True,
         )
         scheduler.start()
-        print("Scheduler ON")
+        print("✓ Scheduler ON")
     except Exception as e:
         print(f"Scheduler skip: {e}")
 
@@ -402,12 +378,15 @@ def shutdown_event():
     except Exception:
         pass
 
-# ──────────────────────────────
-# Static & Routers
-# ──────────────────────────────
+# ==================================================================
+# Static & Templates
+# ==================================================================
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates", auto_reload=True)
 
+# ==================================================================
+# Register All Routers
+# ==================================================================
 app.include_router(pages_router)
 app.include_router(data_router)
 app.include_router(billing_page_router)
@@ -432,9 +411,9 @@ app.include_router(data.router)
 app.include_router(meta.router)
 app.include_router(analysis_router)
 
-# ──────────────────────────────
-# Pages
-# ──────────────────────────────
+# ==================================================================
+# Public Pages
+# ==================================================================
 @app.get("/privacy", response_class=HTMLResponse)
 def privacy_page(request: Request):
     return templates.TemplateResponse("privacy.html", {"request": request})
@@ -471,6 +450,13 @@ def forgot_password_page(request: Request):
 def forgot_alias_page(request: Request):
     return templates.TemplateResponse("forgot.html", {"request": request})
 
+@app.get("/pricing", response_class=HTMLResponse)
+def pricing_page(request: Request):
+    return templates.TemplateResponse("pricing.html", {"request": request})
+
+# ==================================================================
+# Dashboard + Health
+# ==================================================================
 @app.get("/", response_class=HTMLResponse)
 def root(
     request: Request,
@@ -524,106 +510,105 @@ def root(
     county_count = safe_count(
         select(func.count(func.distinct(MarketMetric.county)))
     )
-    policy_count = knowledge_count
 
-    modules = [
-        {
-            "key": "Competitive Engine",
-            "name": "Competitive Engine",
-            "route": "/competitive",
-            "icon": "🎯",
-            "count": competitor_count,
-            "live": competitor_count,
-        },
-        {
-            "key": "Pricing Engine",
-            "name": "Price Oracle",
-            "route": "/market/prices",
-            "icon": "💰",
-            "count": price_count,
-            "live": price_count,
-        },
-        {
-            "key": "Market Engine",
-            "name": "Demand Radar",
-            "route": "/market/demand",
-            "icon": "📈",
-            "count": metric_count,
-            "live": metric_count,
-        },
-        {
-            "key": "Location Engine",
-            "name": "County Mapper",
-            "route": "/location/counties",
-            "icon": "🗺️",
-            "count": county_count,
-            "live": county_count,
-        },
-        {
-            "key": "Consumer Engine",
-            "name": "Consumer Pulse",
-            "route": "/voice",
-            "icon": "👥",
-            "count": social_count,
-            "live": social_count,
-        },
-        {
-            "key": "Core OS",
-            "name": "Risk Sentinel",
-            "route": "/market/risk",
-            "icon": "⚠️",
-            "count": news_count,
-            "live": news_count,
-        },
-        {
-            "key": "Regulatory Engine",
-            "name": "Policy Watch",
-            "route": "/kb/policy",
-            "icon": "📜",
-            "count": policy_count,
-            "live": policy_count,
-        },
-        {
-            "key": "Core OS",
-            "name": "Funding Radar",
-            "route": "/reports/funding",
-            "icon": "🏦",
-            "count": business_count,
-            "live": business_count,
-        },
-        {
-            "key": "Business OS",
-            "name": "Export Navigator",
-            "route": "/market/export",
-            "icon": "🚢",
-            "count": export_count,
-            "live": export_count,
-        },
-        {
-            "key": "Core OS",
-            "name": "Knowledge Base",
-            "route": "/kb",
-            "icon": "📚",
-            "count": knowledge_count,
-            "live": knowledge_count,
-        },
-        {
-            "key": "Report Builder",
-            "name": "Report Builder",
-            "route": "/reports",
-            "icon": "📑",
-            "count": report_count,
-            "live": report_count,
-        },
-        {
-            "key": "AI Insights",
-            "name": "AI Insights",
-            "route": "/ai",
-            "icon": "🧠",
-            "count": knowledge_count,
-            "live": knowledge_count,
-        },
-    ]
+   modules = [
+    {
+        "key": "Competitive Engine",
+        "name": "Competitive Engine",
+        "route": "/competitive",
+        "icon": "🎯",
+        "count": competitor_count,
+        "live": competitor_count,
+    },
+    {
+        "key": "Pricing Engine",
+        "name": "Price Oracle",
+        "route": "/market/prices",
+        "icon": "💰",
+        "count": price_count,
+        "live": price_count,
+    },
+    {
+        "key": "Market Engine",
+        "name": "Demand Radar",
+        "route": "/market/demand",
+        "icon": "📈",
+        "count": metric_count,
+        "live": metric_count,
+    },
+    {
+        "key": "Location Engine",
+        "name": "County Mapper",
+        "route": "/location/counties",
+        "icon": "🗺️",
+        "count": county_count,
+        "live": county_count,
+    },
+    {
+        "key": "Consumer Engine",
+        "name": "Consumer Pulse",
+        "route": "/voice",
+        "icon": "👥",
+        "count": social_count,
+        "live": social_count,
+    },
+    {
+        "key": "Core OS",
+        "name": "Risk Sentinel",
+        "route": "/market/risk",
+        "icon": "⚠️",
+        "count": news_count,
+        "live": news_count,
+    },
+    {
+        "key": "Regulatory Engine",
+        "name": "Policy Watch",
+        "route": "/kb/policy",
+        "icon": "📜",
+        "count": policy_count,
+        "live": policy_count,
+    },
+    {
+        "key": "Core OS",
+        "name": "Funding Radar",
+        "route": "/reports/funding",
+        "icon": "🏦",
+        "count": business_count,
+        "live": business_count,
+    },
+    {
+        "key": "Business OS",
+        "name": "Export Navigator",
+        "route": "/market/export",
+        "icon": "🚢",
+        "count": export_count,
+        "live": export_count,
+    },
+    {
+        "key": "Core OS",
+        "name": "Knowledge Base",
+        "route": "/kb",
+        "icon": "📚",
+        "count": knowledge_count,
+        "live": knowledge_count,
+    },
+    {
+        "key": "Report Builder",
+        "name": "Report Builder",
+        "route": "/reports",
+        "icon": "📑",
+        "count": report_count,
+        "live": report_count,
+    },
+    {
+        "key": "AI Insights",
+        "name": "AI Insights",
+        "route": "/ai",
+        "icon": "🧠",
+        "count": knowledge_count,
+        "live": knowledge_count,
+    },
+]
 
     data_payload = {
         "last_updated": datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),
@@ -644,14 +629,13 @@ def root(
         },
     )
 
-@app.get("/pricing", response_class=HTMLResponse)
-def pricing_page(request: Request):
-    return templates.TemplateResponse("pricing.html", {"request": request})
-
 @app.get("/health")
 def health():
     return {"status": "ok", "version": "2.5.14"}
 
+# ==================================================================
+# Entry
+# ==================================================================
 if __name__ == "__main__":
     import uvicorn
 
