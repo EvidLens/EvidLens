@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select, desc
 from pydantic import BaseModel
@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 import httpx
 
 from app.modules.auth.dependencies import get_current_user
-from .service import generate_market_report_pdf_file, generate_market_report_excel
+from.service import generate_market_report_pdf_file, generate_market_report_excel
 from app.modules.report_builder.models import Report, ReportType, ReportFormat, ReportStatus
 from app.core.db import get_session as get_db
 from app.core.models import UserSubscription
@@ -83,7 +83,7 @@ def get_user_plan(db: Session, user_id: int) -> str:
         stmt = select(UserSubscription).where(UserSubscription.user_id == user_id, UserSubscription.status == "active")
         sub = db.exec(stmt).first()
         if sub:
-            return sub.plan_name
+            return getattr(sub, 'plan_code', 'Trial')
     except:
         pass
     return "Trial"
@@ -132,9 +132,14 @@ def generate_report(request: Request, req: GenerateReportRequest, background_tas
         status=ReportStatus.GENERATING,
         is_branded=plan_name!= "Trial"
     )
-    db.add(report)
-    db.commit()
-    db.refresh(report)
+    try:
+        db.add(report)
+        db.commit()
+        db.refresh(report)
+    except Exception as e:
+        db.rollback()
+        print(f"[REPORT SAVE ERROR] {e}")
+        raise HTTPException(status_code=500, detail=f"DB save failed: {str(e)}")
 
     background_tasks.add_task(process_report_generation, report.id, req, plan_name)
 
@@ -150,13 +155,6 @@ def process_report_generation(report_id: int, req: GenerateReportRequest, plan_n
         if not report:
             return
         try:
-            insight = ""
-            if GROQ_KEY:
-                try:
-                    import asyncio
-                except:
-                    pass
-
             if req.get_format() == ReportFormat.PDF:
                 filepath = generate_market_report_pdf_file(
                     q=req.get_query(),
@@ -187,7 +185,7 @@ def process_report_generation(report_id: int, req: GenerateReportRequest, plan_n
             db.commit()
         except Exception as e:
             report.status = ReportStatus.FAILED
-            report.error_message = str(e)
+            report.error_message = str(e)[:1000]
             db.commit()
             print(f"Report {report_id} failed: {e}")
             import traceback; traceback.print_exc()
