@@ -1,11 +1,9 @@
-from sqlmodel import SQLModel, Field
+from sqlmodel import SQLModel, Field, Column, JSON
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
-from sqlalchemy import Column, JSON
 
 UTC = timezone.utc
 
-# Keep your tables but as SQLModel - so they are counted
 class Company(SQLModel, table=True):
     __tablename__ = "companies"
     __table_args__ = {"extend_existing": True}
