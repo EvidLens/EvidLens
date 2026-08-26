@@ -49,20 +49,39 @@ class SubscriptionTier(str, Enum):
     GROWTH = "growth"
     ENTERPRISE = "enterprise"
 
-class Plan(SQLModel, table=True):
-    __tablename__ = "plan"
-    __table_args__ = {"extend_existing": True}
+class Report(SQLModel, table=True):
+    __tablename__ = "reports"
+    __table_args__ = (
+        Index("ix_reports_user_status", "user_id", "status"),
+        Index("ix_reports_type_country", "report_type", "country"),
+        {"extend_existing": True}
+    )
     id: Optional[int] = Field(default=None, primary_key=True)
-    code: str = Field(index=True, unique=True)
-    name: str
-    monthly_kes: int
-    annual_kes: int
-    areas: int
-    products: int
-    users: int
-    competitors: int
-    leads_qtr: int = 0
-    lens_tier: str = "Basic"
+    user_id: int = Field(foreign_key="user.id", index=True)
+    title: str
+    report_type: str = Field(default="MARKET_FEASIBILITY", max_length=100)
+    format: str = Field(default="pdf", max_length=20)
+    file_type: Optional[str] = Field(default="pdf", max_length=20)
+    status: str = Field(default="GENERATING", max_length=50)
+    query: Optional[str] = Field(default=None, max_length=500)
+    sector: Optional[str] = Field(default=None, max_length=100)
+    country: str = Field(default="Kenya", max_length=100)
+    county: Optional[str] = Field(default=None, index=True, max_length=100)
+    sub_county: Optional[str] = Field(default=None, index=True, max_length=100)
+    ward: Optional[str] = Field(default=None, index=True, max_length=100)
+    town: Optional[str] = Field(default=None, index=True, max_length=100)
+    file_path: Optional[str] = Field(default=None, max_length=500)
+    file_size_kb: Optional[int] = Field(default=None, ge=0)
+    download_count: int = Field(default=0, ge=0)
+    is_branded: bool = Field(default=False)
+    kra_compliant: bool = Field(default=True)
+    report_metadata: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    payment_id: Optional[int] = Field(default=None)
+    is_auto_weekly: bool = Field(default=False)
+    expires_at: Optional[datetime] = None
+    error_message: Optional[str] = Field(default=None, max_length=1000)
+    data: dict = Field(default={}, sa_column=Column(JSON))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), sa_column_kwargs={"server_default": func.now()})
 
 class Sector(SQLModel, table=True):
     __tablename__ = "sector"
