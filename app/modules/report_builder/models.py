@@ -2,8 +2,7 @@ from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from sqlmodel import SQLModel, Field, Relationship, Column, JSON
 from sqlalchemy.sql import func
-# Use single Report from core - NO duplicate table
-from app.core.models import Report, ReportType
+from app.core.models import Report
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
