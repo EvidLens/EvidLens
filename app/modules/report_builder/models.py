@@ -6,7 +6,6 @@ from sqlmodel import SQLModel, Field, Relationship, Column, JSON
 from sqlalchemy import Enum as SAEnum, Index
 from sqlalchemy.sql import func
 
-
 class ReportType(str, Enum):
     MARKET_FEASIBILITY = "market_feasibility"
     CONSUMER_ANALYSIS = "consumer_analysis"
@@ -24,11 +23,9 @@ class ReportType(str, Enum):
     ESG_IMPACT = "esg_impact"
     EXECUTIVE_SUMMARY = "executive_summary"
 
-
 class ReportFormat(str, Enum):
     PDF = "pdf"
     EXCEL = "excel"
-
 
 class ReportStatus(str, Enum):
     GENERATING = "generating"
@@ -36,14 +33,13 @@ class ReportStatus(str, Enum):
     FAILED = "failed"
     EXPIRED = "expired"
 
-
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
-
 
 class Report(SQLModel, table=True):
     __tablename__ = "reports"
     __table_args__ = (
+        {"extend_existing": True},
         Index("ix_reports_user_status", "user_id", "status"),
         Index("ix_reports_type_country", "report_type", "country"),
     )
@@ -96,12 +92,12 @@ class Report(SQLModel, table=True):
 
     shares: List["ReportShare"] = Relationship(
         back_populates="report",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+        sa_relationship_kwargs={"cascade": "all, delete-orphan", "foreign_keys": "[ReportShare.report_id]"},
     )
-
 
 class ReportTemplate(SQLModel, table=True):
     __tablename__ = "report_templates"
+    __table_args__ = {"extend_existing": True}
 
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(max_length=150, unique=True)
@@ -118,9 +114,9 @@ class ReportTemplate(SQLModel, table=True):
         sa_column_kwargs={"server_default": func.now()},
     )
 
-
 class ReportShare(SQLModel, table=True):
     __tablename__ = "report_shares"
+    __table_args__ = {"extend_existing": True}
 
     id: Optional[int] = Field(default=None, primary_key=True)
     report_id: int = Field(foreign_key="reports.id", index=True)
@@ -135,4 +131,7 @@ class ReportShare(SQLModel, table=True):
         sa_column_kwargs={"server_default": func.now()},
     )
 
-    report: Optional[Report] = Relationship(back_populates="shares")
+    report: Optional[Report] = Relationship(
+        back_populates="shares",
+        sa_relationship_kwargs={"foreign_keys": "[ReportShare.report_id]"}
+    )
