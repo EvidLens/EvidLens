@@ -11,7 +11,6 @@
 </head>
 <body class="bg-[#f8fafc]">
 <div class="min-h-screen flex flex-col lg:flex-row">
-  <!-- LEFT - DESKTOP ONLY -->
   <div class="hidden lg:flex lg:w-[58%] bg-[#0B1220] text-white p-12 flex-col justify-between relative overflow-hidden">
     <div class="absolute -top-40 -left-40 w-[600px] h-[600px] bg-[#14b8a6]/20 rounded-full blur-[100px]"></div>
     <div class="relative z-10">
@@ -34,7 +33,6 @@
     <div class="relative z-10 flex justify-between text-[11px] text-slate-400"><span>© 2026 EvidLens Ltd</span><div class="flex gap-4"><a href="/privacy" class="hover:text-white">Privacy</a><a href="/terms" class="hover:text-white">Terms</a><a href="/dpa" class="hover:text-white">DPA</a></div></div>
   </div>
 
-  <!-- RIGHT - MOBILE FIXED -->
   <div class="flex-1 flex items-start justify-center lg:items-center p-4 sm:p-6 lg:p-10 bg-[#f8fafc] min-h-screen">
     <div class="w-full max-w-[420px] mt-2 sm:mt-6 lg:mt-0">
       <div class="bg-white rounded-[20px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] border border-slate-200/60 p-6 sm:p-8">
@@ -50,18 +48,18 @@
         <div id="successBox" class="hidden mt-5 p-3.5 bg-green-50 border border-green-200 text-green-700 text-[13px] rounded-xl"></div>
         <div id="rateBox" class="hidden mt-5 p-3.5 bg-amber-50 border border-amber-200 text-amber-800 text-[13px] rounded-xl">Too many attempts. Try again in 5 minutes.</div>
 
-        <form id="loginForm" class="mt-6 space-y-4" novalidate>
+        <form id="loginForm" class="mt-6 space-y-4" novalidate autocomplete="off">
           <div>
             <label for="email" class="text-[13px] font-semibold text-slate-700">Email</label>
             <div class="mt-1.5 relative">
-              <input id="email" type="email" required autofocus autocomplete="email" placeholder="Email" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#14B8A6]/20 focus:border-[#14B8A6] outline-none text-[14px]">
+              <input id="email" type="email" required autocomplete="off" value="" readonly onfocus="this.removeAttribute('readonly');" placeholder="you@company.co.ke" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#14B8A6]/20 focus:border-[#14B8A6] outline-none text-[14px]">
             </div>
             <p id="emailErr" class="hidden mt-1 text-[11px] text-red-600">Enter a valid email</p>
           </div>
           <div>
             <div class="flex justify-between"><label for="password" class="text-[13px] font-semibold text-slate-700">Password</label><a href="/forgot-password" class="text-[12px] font-semibold text-[#0d9488]">Forgot?</a></div>
             <div class="mt-1.5 relative">
-              <input id="password" type="password" required autocomplete="current-password" placeholder="••••••••" class="w-full px-4 pr-11 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#14B8A6]/20 focus:border-[#14B8A6] outline-none text-[14px]">
+              <input id="password" type="password" required autocomplete="new-password" value="" readonly onfocus="this.removeAttribute('readonly');" placeholder="••••••••" class="w-full px-4 pr-11 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#14B8A6]/20 focus:border-[#14B8A6] outline-none text-[14px]">
               <button type="button" id="toggleEye" class="absolute right-3 top-[10px] w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100">👁️</button>
             </div>
           </div>
@@ -94,6 +92,8 @@
 const params=new URLSearchParams(window.location.search);
 const next=params.get('next')||'/';
 const email=document.getElementById('email'),password=document.getElementById('password'),form=document.getElementById('loginForm'),msg=document.getElementById('msg'),emailErr=document.getElementById('emailErr'),btn=document.getElementById('btn'),btnText=document.getElementById('btnText'),btnLoader=document.getElementById('btnLoader'),successBox=document.getElementById('successBox');let attempts=0;
+// Force clear on load - kills autofill
+window.addEventListener('load', ()=>{ setTimeout(()=>{ email.value=''; password.value=''; }, 50); });
 document.getElementById('toggleEye').onclick=e=>{password.type=password.type==='password'?'text':'password';e.target.textContent=password.type==='password'?'👁️':'🙈'};
 form.addEventListener('submit',async e=>{
   e.preventDefault();
