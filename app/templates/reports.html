@@ -1,58 +1,70 @@
 {% extends "base.html" %}
+{% block title %}My Reports | EvidLens{% endblock %}
 {% block content %}
+<div class="min-h-screen bg-[#f8fafc]">
 <div class="max-w-7xl mx-auto p-6">
-  <div class="flex justify-between items-center mb-6">
+  <div class="flex justify-between items-start mb-6">
     <div>
-      <h1 class="text-3xl font-bold text-[#0A1F44]">📊 My Reports</h1>
-      <p class="text-gray-500">Generate, download and share your intelligence reports</p>
+      <h1 class="text-3xl font-black text-[#0A1F44]">📊 My Reports</h1>
+      <p class="text-gray-500 text-sm mt-1">Generate, download and share your intelligence reports • REAL DATA • PDF + CSV</p>
+      <div class="flex gap-2 mt-3">
+        <span class="bg-[#0A1F44] text-white px-3 py-1 rounded-full text-xs font-bold" id="totalBadge">0 REPORTS</span>
+        <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">LIVE GENERATION</span>
+        <a href="/reports/funding" class="bg-yellow-400 text-black px-3 py-1 rounded-full text-xs font-bold hover:bg-yellow-500">💸 Funding Radar →</a>
+      </div>
     </div>
-    <button onclick="openGenerateModal()" class="bg-[#0A1F44] text-white px-6 py-2 rounded-lg font-bold hover:opacity-90">
+    <button onclick="openGenerateModal()" class="bg-[#0A1F44] text-white px-6 py-3 rounded-xl font-black text-sm hover:bg-black shadow-lg">
       + Generate New Report
     </button>
   </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-    <div class="bg-white p-4 rounded-xl shadow-sm border">
-      <p class="text-xs text-gray-500 uppercase">Total Reports</p>
-      <p class="text-2xl font-bold" id="totalReports">0</p>
+  <div class="grid grid-cols-3 gap-4 mb-6">
+    <div class="bg-white p-5 rounded-2xl shadow-sm border">
+      <p class="text-[10px] uppercase font-bold text-gray-400">Total Reports</p>
+      <p class="text-3xl font-black mt-1" id="totalReports">0</p>
+      <p class="text-xs text-gray-500 mt-1">Across all sectors</p>
     </div>
-    <div class="bg-white p-4 rounded-xl shadow-sm border">
-      <p class="text-xs text-gray-500 uppercase">This Month</p>
-      <p class="text-2xl font-bold text-[#14B8A6]" id="monthReports">0</p>
+    <div class="bg-white p-5 rounded-2xl shadow-sm border">
+      <p class="text-[10px] uppercase font-bold text-gray-400">This Month</p>
+      <p class="text-3xl font-black mt-1 text-[#14B8A6]" id="monthReports">0</p>
+      <p class="text-xs text-green-600 mt-1">↑ Live tracking</p>
     </div>
-    <div class="bg-white p-4 rounded-xl shadow-sm border">
-      <p class="text-xs text-gray-500 uppercase">Funding Matches</p>
-      <p class="text-2xl font-bold text-yellow-600"><a href="/reports/funding" class="underline">View Radar →</a></p>
+    <div class="bg-white p-5 rounded-2xl shadow-sm border hover:shadow-md transition cursor-pointer" onclick="window.location='/reports/funding'">
+      <p class="text-[10px] uppercase font-bold text-gray-400">Funding Matches</p>
+      <p class="text-3xl font-black mt-1">→</p>
+      <p class="text-xs text-yellow-600 mt-1 font-bold underline">View Funding Radar</p>
     </div>
   </div>
 
-  <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+  <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
+    <div class="p-4 border-b flex justify-between items-center">
+      <h3 class="font-bold text-sm">Intelligence History</h3>
+      <span class="text-xs text-gray-400">Auto-refreshes every 10s</span>
+    </div>
     <table class="w-full text-sm">
-      <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
-        <tr>
-          <th class="p-4 text-left">Title</th>
-          <th class="p-4 text-left">Type</th>
-          <th class="p-4 text-left">Date</th>
-          <th class="p-4 text-right">Actions</th>
-        </tr>
+      <thead class="bg-gray-50 text-gray-400 text-[11px] uppercase font-bold">
+        <tr><th class="p-4 text-left">Title / Query</th><th class="p-4 text-left">Type</th><th class="p-4 text-left">Date</th><th class="p-4 text-right">Actions</th></tr>
       </thead>
       <tbody id="reportsTable">
-        <tr><td colspan="4" class="p-8 text-center text-gray-500">Loading reports...</td></tr>
+        <tr><td colspan="4" class="p-12 text-center text-gray-400">Loading reports...</td></tr>
       </tbody>
     </table>
   </div>
 </div>
+</div>
 
-<!-- Generate Modal -->
-<div id="genModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
- <div class="bg-white p-6 rounded-xl w-full max-w-md">
-  <h3 class="font-bold text-lg mb-4">Generate Market Report</h3>
-  <input id="mQuery" placeholder="What to analyze? e.g. maize prices Kirinyaga" class="w-full border p-2 rounded mb-3"/>
-  <input id="mSector" placeholder="Sector e.g. Agriculture" value="Agriculture" class="w-full border p-2 rounded mb-3"/>
-  <input id="mCounty" placeholder="County e.g. Kirinyaga" value="Kirinyaga" class="w-full border p-2 rounded mb-3"/>
-  <div class="flex gap-2 justify-end">
-   <button onclick="closeGen()" class="px-4 py-2">Cancel</button>
-   <button onclick="submitGenerate()" class="bg-[#0A1F44] text-white px-6 py-2 rounded font-bold">Generate</button>
+<div id="genModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+ <div class="bg-white p-7 rounded-2xl w-full max-w-md shadow-2xl">
+  <h3 class="font-black text-lg text-[#0A1F44]">Generate Market Report</h3>
+  <p class="text-xs text-gray-500 mb-4 mt-1">REAL market feasibility - Pulls live data from 47 counties</p>
+  <input id="mQuery" placeholder="What to analyze? e.g. maize prices Kirinyaga" class="w-full border rounded-xl p-3 text-sm mb-3 focus:ring-2 focus:ring-[#0A1F44] outline-none"/>
+  <div class="grid grid-cols-2 gap-3 mb-3">
+    <input id="mSector" placeholder="Sector" value="Agriculture" class="w-full border rounded-xl p-3 text-sm"/>
+    <input id="mCounty" placeholder="County" value="Kirinyaga" class="w-full border rounded-xl p-3 text-sm"/>
+  </div>
+  <div class="flex gap-2 justify-end mt-2">
+   <button onclick="closeGen()" class="px-4 py-2.5 text-sm font-bold">Cancel</button>
+   <button onclick="submitGenerate()" class="bg-[#0A1F44] text-white px-6 py-2.5 rounded-xl font-black text-sm">Generate PDF →</button>
   </div>
  </div>
 </div>
@@ -60,32 +72,32 @@
 <script>
 function openGenerateModal(){ document.getElementById('genModal').classList.remove('hidden'); }
 function closeGen(){ document.getElementById('genModal').classList.add('hidden'); }
-
 async function loadReports(){
   try{
     const res = await fetch('/reports/list');
     const data = await res.json();
-    const list = data.reports || data;
+    const list = data.reports || data || [];
     const tbody = document.getElementById('reportsTable');
     document.getElementById('totalReports').innerText = list.length || 0;
     document.getElementById('monthReports').innerText = list.length || 0;
+    document.getElementById('totalBadge').innerText = list.length + ' REPORTS';
     if(!list.length){
-      tbody.innerHTML = '<tr><td colspan="4" class="p-8 text-center text-gray-500">No reports yet. Click Generate New Report.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" class="p-12 text-center"><p class="text-3xl">📄</p><p class="font-bold mt-2">No reports yet</p><p class="text-sm text-gray-500">Click Generate New Report to create your first intelligence PDF</p></td></tr>';
       return;
     }
     tbody.innerHTML = list.map(r => `
-      <tr class="border-t hover:bg-gray-50">
-        <td class="p-4 font-bold text-[#0A1F44]">${r.title || r.type || 'Report'}</td>
-        <td class="p-4"><span class="bg-teal-100 text-teal-700 px-2 py-1 rounded text-xs">${r.type || r.report_type || 'General'}</span> <span class="text-xs text-gray-500">${r.status || ''}</span></td>
-        <td class="p-4 text-gray-500">${r.created_at ? new Date(r.created_at).toLocaleDateString() : ''}</td>
+      <tr class="border-t hover:bg-gray-50 transition">
+        <td class="p-4"><p class="font-bold text-[#0A1F44] text-[14px]">${r.title || r.query || r.type || 'Market Report'}</p><p class="text-xs text-gray-400">${r.query || ''}</p></td>
+        <td class="p-4"><span class="bg-teal-50 text-teal-700 border border-teal-200 px-2.5 py-1 rounded-full text-[11px] font-bold">${r.type || r.report_type || 'FEASIBILITY'}</span> <span class="text-[11px] ${r.status==='READY'?'text-green-600':'text-yellow-600'} font-bold ml-1">${r.status || 'PENDING'}</span></td>
+        <td class="p-4 text-gray-500 text-xs">${r.created_at? new Date(r.created_at).toLocaleString() : 'Just now'}</td>
         <td class="p-4 text-right flex justify-end gap-2">
-          ${r.status==='READY' ? `<a href="/reports/download/${r.id}" class="bg-[#0A1F44] text-white px-3 py-1 rounded text-xs">Download PDF</a>` : `<span class="text-xs text-yellow-600">${r.status}</span>`}
-          <button onclick="deleteReport(${r.id})" class="bg-red-50 text-red-600 px-3 py-1 rounded text-xs">Delete</button>
+          ${r.status==='READY'? `<a href="/reports/download/${r.id}" class="bg-[#0A1F44] text-white px-4 py-1.5 rounded-full text-xs font-bold hover:bg-black">Download PDF</a>` : `<span class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-bold animate-pulse">${r.status || 'GENERATING...'}</span>`}
+          <button onclick="deleteReport(${r.id})" class="border px-3 py-1.5 rounded-full text-xs font-bold hover:bg-red-50 hover:text-red-600">Delete</button>
         </td>
       </tr>
     `).join('');
   } catch(e){
-    document.getElementById('reportsTable').innerHTML = '<tr><td colspan="4" class="p-8 text-center text-red-500">Failed to load: '+e+'</td></tr>';
+    document.getElementById('reportsTable').innerHTML = '<tr><td colspan="4" class="p-8 text-center text-red-500 text-sm">Failed to load: '+e+' - Check /reports/list endpoint</td></tr>';
   }
 }
 async function submitGenerate(){
@@ -93,23 +105,19 @@ async function submitGenerate(){
   const sector = document.getElementById('mSector').value || 'Agriculture';
   const county = document.getElementById('mCounty').value || 'Kirinyaga';
   closeGen();
-  const res = await fetch('/reports/generate', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      query: query,
-      sector: sector,
-      county: county,
-      country: "Kenya",
-      report_type: "MARKET_FEASIBILITY",
-      format: "PDF"
-    })
-  });
-  const txt = await res.text();
-  if(res.ok){ alert('Generating! Check list in 30s'); loadReports(); } else { alert('Failed: '+txt); }
+  const btn = document.activeElement; if(btn) btn.disabled=true;
+  try{
+    const res = await fetch('/reports/generate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ query, sector, county, country: "Kenya", report_type: "MARKET_FEASIBILITY", format: "PDF" })
+    });
+    const txt = await res.text();
+    if(res.ok){ alert('✅ Generating! Will appear in list in 30s'); loadReports(); } else { alert('❌ Failed: '+txt.slice(0,300)); }
+  } catch(e){ alert('Error: '+e); } finally { if(btn) btn.disabled=false; }
 }
 async function deleteReport(id){
-  if(!confirm('Delete report?')) return;
+  if(!confirm('Delete report #'+id+'?')) return;
   await fetch('/reports/'+id, {method: 'DELETE'});
   loadReports();
 }
