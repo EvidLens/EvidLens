@@ -1,9 +1,7 @@
-from fastapi import APIRouter, Request, Depends, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, Request, Depends
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select, func, desc, or_
-from datetime import datetime, timedelta
-import secrets
 
 from app.core.db import get_session as get_db
 from app.core.models import MarketMetric, Company, NewsArticle, SocialMention, ExportOpportunity
@@ -11,7 +9,7 @@ from app.modules.auth.models import AuthUser
 from app.modules.auth.dependencies import get_current_user
 
 router = APIRouter()
-templates = Jinja2Templates(directory="app/templates", auto_reload=True)
+templates = Jinja2Templates(directory="app/templates")
 
 @router.get("/market/risk", response_class=HTMLResponse)
 def risk_sentinel_page(request: Request, db: Session = Depends(get_db)):
@@ -59,10 +57,14 @@ def demand_page(request: Request, db: Session = Depends(get_db)):
     demand = db.exec(select(MarketMetric).order_by(desc(MarketMetric.demand_score)).limit(100)).all()
     return templates.TemplateResponse("demand.html", {"request": request, "demand": demand})
 
+# FIXED - USE YOUR REAL TEMPLATE
 @router.get("/reports/funding", response_class=HTMLResponse)
-def funding_page(request: Request, db: Session = Depends(get_db)):
+@router.get("/funding", response_class=HTMLResponse)
+def funding_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user)):
     funders = db.exec(select(Company).where(or_(Company.sector.ilike("%Financial%"),Company.sector.ilike("%Banking%"),Company.sector.ilike("%Insurance%"),Company.sector.ilike("%SACCO%"))).limit(50)).all()
-    return templates.TemplateResponse("funding.html", {"request": request, "funders": funders})
+    counties = db.exec(select(func.distinct(Company.county))).all()
+    counties = [c[0] if isinstance(c,(list,tuple)) else c for c in counties if c]
+    return templates.TemplateResponse("reports_funding.html", {"request": request, "funders": funders, "companies": funders, "counties": counties, "current_user": user})
 
 @router.get("/help", response_class=HTMLResponse)
 def help_page(request: Request): return templates.TemplateResponse("help.html", {"request": request})
@@ -78,24 +80,18 @@ def login_page(request: Request): return templates.TemplateResponse("login.html"
 @router.get("/signup", response_class=HTMLResponse)
 def signup_page(request: Request): return templates.TemplateResponse("signup.html", {"request": request})
 
-@router.get("/kb/policy")
-@router.get("/policy")
-def policy_page(request: Request, db: Session = Depends(get_db)):
+# FIXED - USE YOUR REAL TEMPLATE
+@router.get("/kb/policy", response_class=HTMLResponse)
+@router.get("/policy", response_class=HTMLResponse)
+def policy_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user)):
     try:
-        # Try real policy table
-        from app.core.models import NewsArticle
-        from sqlmodel import select, desc
         policies = db.exec(select(NewsArticle).where(NewsArticle.category == "policy").order_by(desc(NewsArticle.published_at)).limit(50)).all()
     except:
-        policies = []
-    
-    # Use existing template that DOES exist
-    for tmpl in ["policy.html", "kb_policy.html", "knowledge_base.html", "dashboard.html"]:
         try:
-            return templates.TemplateResponse(tmpl, {"request": request, "policies": policies, "data": {"policies": policies}})
+            policies = db.exec(select(NewsArticle).order_by(desc(NewsArticle.published_at)).limit(50)).all()
         except:
-            continue
-    return {"policies": [p.dict() if hasattr(p, 'dict') else str(p) for p in policies]}
+            policies = []
+    return templates.TemplateResponse("kb_policy.html", {"request": request, "policies": policies, "current_user": user, "new_count": len(policies)})
 
 @router.get("/pricing", response_class=HTMLResponse)
 def pricing_page(request: Request): return templates.TemplateResponse("pricing.html", {"request": request})
