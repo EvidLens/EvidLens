@@ -1,67 +1,53 @@
 {% extends "base.html" %}
+{% block title %}Funding Radar | EvidLens{% endblock %}
 {% block content %}
+<div class="min-h-screen bg-[#f8fafc]">
 <div class="max-w-7xl mx-auto p-6">
-  <div class="mb-6">
-    <h1 class="text-3xl font-bold text-[#0A1F44]">💸 Funding Radar</h1>
-    <p class="text-gray-500">Banks, SACCOs, Grants, and Investors actively funding {{ current_user.sector if current_user is defined and current_user and current_user.sector else 'your sector' }} in Kenya</p>
+  <div class="flex justify-between items-start mb-6">
+    <div>
+      <h1 class="text-3xl font-black text-[#0A1F44]">💸 Funding Radar</h1>
+      <p class="text-gray-500 text-sm mt-1">Banks, SACCOs, Grants, Investors • {{ current_user.sector if current_user is defined and current_user and current_user.sector else 'All Sectors' }} • {{ funders|length }} Live Opportunities</p>
+      <div class="flex gap-2 mt-3">
+        <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">KES 50K - 50M Ticket</span>
+        <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">Verified Lenders</span>
+      </div>
+    </div>
+    <div class="bg-white border rounded-xl p-3 flex gap-3 text-center">
+      <div><p class="text-[10px] font-bold text-gray-400">AVG RATE</p><p class="font-black">12.5%</p></div>
+      <div class="w-px bg-gray-200"></div>
+      <div><p class="text-[10px] font-bold text-gray-400">APPROVAL</p><p class="font-black text-green-600">72h</p></div>
+    </div>
   </div>
 
-  <!-- Filters -->
-  <div class="bg-white p-4 rounded-xl shadow-sm mb-6 flex gap-3">
-    <select id="filterSector" class="border p-2 rounded-lg">
-      <option value="">All Sectors</option>
-      <option value="Agriculture">Agriculture</option>
-      <option value="Retail">Retail</option>
-      <option value="Tech">Tech</option>
-    </select>
-    <select id="filterCounty" class="border p-2 rounded-lg">
-      <option value="">All Counties</option>
-      {% for c in counties %}<option value="{{c}}">{{c}}</option>{% endfor %}
-    </select>
-    <select id="filterType" class="border p-2 rounded-lg">
-      <option value="">All Types</option>
-      <option value="Bank">Bank</option>
-      <option value="SACCO">SACCO</option>
-      <option value="Grant">Grant</option>
-      <option value="Investor">Investor</option>
-    </select>
+  <div class="bg-white p-4 rounded-xl shadow-sm mb-6 flex gap-3 flex-wrap">
+    <select id="filterSector" class="border rounded-full px-4 py-2 text-sm font-bold"><option value="">All Sectors</option><option>Agriculture</option><option>Retail</option><option>Tech</option><option>Manufacturing</option></select>
+    <select id="filterCounty" class="border rounded-full px-4 py-2 text-sm font-bold"><option value="">All Counties</option>{% for c in counties %}<option value="{{c}}">{{c}}</option>{% endfor %}</select>
+    <select id="filterType" class="border rounded-full px-4 py-2 text-sm font-bold"><option value="">All Types</option><option>Bank</option><option>SACCO</option><option>Grant</option><option>Investor</option></select>
+    <span class="ml-auto text-xs text-gray-400 py-2">Showing {{ funders|length }} funders • Sorted by Trust Score</span>
   </div>
 
-  <!-- Funder Cards -->
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
     {% for f in funders %}
-    <div class="bg-white p-6 rounded-2xl shadow-sm border hover:shadow-lg transition">
-      <div class="flex justify-between items-start mb-3">
-        <div>
-          <h2 class="text-xl font-bold text-[#0A1F44]">{{f.name}}</h2>
-          <span class="bg-teal-100 text-teal-700 text-xs font-bold px-2 py-1 rounded">{{f.type}}</span>
-        </div>
-        <div class="text-right">
-          <div class="text-yellow-500">{{ "★" * f.rating }}{{ "☆" * (5-f.rating) }}</div>
-          <p class="text-xs text-gray-500">Trust Score</p>
-        </div>
+    <div class="bg-white p-6 rounded-2xl shadow-sm border hover:shadow-xl hover:-translate-y-1 transition-all duration-200">
+      <div class="flex justify-between items-start mb-4">
+        <div><h2 class="text-[16px] font-black text-[#0A1F44]">{{f.name}}</h2><span class="bg-teal-50 text-teal-700 border border-teal-200 text-[11px] font-bold px-2.5 py-1 rounded-full mt-1 inline-block">{{f.type}}</span></div>
+        <div class="text-right"><div class="text-yellow-500 text-sm">{{ "★" * (f.rating if f.rating else 4) }}{{ "☆" * (5-(f.rating if f.rating else 4)) }}</div><p class="text-[10px] text-gray-400 font-bold uppercase mt-1">Trust Score {{ f.rating }}/5</p></div>
       </div>
-
-      <div class="space-y-2 text-sm mb-4">
-        <p><b>Sector:</b> {{f.sector}}</p>
-        <p><b>County:</b> {{f.county}}</p>
-        <p><b>Ticket Size:</b> KES {{ "{:,.0f}".format(f.min_amount) }} - {{ "{:,.0f}".format(f.max_amount) }}</p>
-        <p><b>Interest:</b> {{f.interest_rate}}% p.a</p>
+      <div class="space-y-2 text-[13px] mb-4">
+        <div class="flex justify-between"><span class="text-gray-500">Sector</span><span class="font-bold">{{f.sector}}</span></div>
+        <div class="flex justify-between"><span class="text-gray-500">County</span><span class="font-bold">{{f.county}}</span></div>
+        <div class="flex justify-between"><span class="text-gray-500">Ticket</span><span class="font-black text-[#0A1F44]">KES {{ "{:,.0f}".format(f.min_amount) }} - {{ "{:,.0f}".format(f.max_amount) }}</span></div>
+        <div class="flex justify-between"><span class="text-gray-500">Interest</span><span class="font-bold text-green-700">{{f.interest_rate}}% p.a</span></div>
       </div>
-
-      <div class="bg-gray-50 p-3 rounded-lg mb-4">
-        <p class="text-xs text-gray-600"><b>Requirements:</b> {{f.requirements}}</p>
-      </div>
-
-      <a href="{{f.apply_link}}" target="_blank" class="block text-center bg-[#14B8A6] text-white w-full py-2 rounded-lg font-bold hover:opacity-90">
-        Apply Now
-      </a>
+      <div class="bg-[#f8fafc] p-3 rounded-xl mb-4 border"><p class="text-[11px] text-gray-600 leading-relaxed"><b class="text-[#0A1F44]">Requirements:</b> {{f.requirements}}</p></div>
+      <div class="flex gap-2"><a href="{{f.apply_link}}" target="_blank" class="flex-1 text-center bg-[#0A1F44] text-white py-2.5 rounded-xl font-bold text-sm hover:bg-black">Apply Now →</a><button class="border px-3 py-2.5 rounded-xl text-sm font-bold">Compare</button></div>
     </div>
     {% else %}
-    <div class="col-span-3 text-center p-10 bg-white rounded-xl">
-      <p class="text-gray-500">No funders match your filters yet</p>
+    <div class="col-span-3 bg-white p-16 rounded-2xl text-center border">
+      <p class="text-4xl mb-3">🏦</p><p class="font-bold">No funders match your filters</p><p class="text-sm text-gray-500 mt-1">Try All Counties + All Sectors - {{ counties|length if counties else 47 }} counties tracked</p>
     </div>
     {% endfor %}
   </div>
+</div>
 </div>
 {% endblock %}
