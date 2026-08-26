@@ -146,6 +146,7 @@ class Report(SQLModel, table=True):
     title: str
     report_type: ReportType = Field(sa_column=Column(SAEnum(ReportType, name="reporttype", native_enum=False)))
     format: ReportFormat = Field(default=ReportFormat.PDF, sa_column=Column(SAEnum(ReportFormat, name="reportformat", native_enum=False)))
+    file_type: Optional[str] = Field(default="pdf", max_length=20)
     status: ReportStatus = Field(default=ReportStatus.GENERATING, sa_column=Column(SAEnum(ReportStatus, name="reportstatus", native_enum=False)))
     query: Optional[str] = Field(default=None, max_length=500)
     sector: Optional[str] = Field(default=None, max_length=100)
