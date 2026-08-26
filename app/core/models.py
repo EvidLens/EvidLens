@@ -7,7 +7,6 @@ from enum import Enum
 
 UTC = timezone.utc
 
-
 class ReportType(str, Enum):
     MARKET_FEASIBILITY = "MARKET_FEASIBILITY"
     CONSUMER_ANALYSIS = "CONSUMER_ANALYSIS"
@@ -15,11 +14,9 @@ class ReportType(str, Enum):
     KRA_TAX = "KRA_TAX"
     BUSINESS_PLAN = "BUSINESS_PLAN"
 
-
 class ReportFormat(str, Enum):
     PDF = "pdf"
     EXCEL = "excel"
-
 
 class ReportStatus(str, Enum):
     GENERATING = "GENERATING"
@@ -27,12 +24,10 @@ class ReportStatus(str, Enum):
     FAILED = "FAILED"
     EXPIRED = "EXPIRED"
 
-
 class PaymentStatus(str, Enum):
     PENDING = "pending"
     PAID = "paid"
     FAILED = "failed"
-
 
 class SubscriptionTier(str, Enum):
     FREE = "free"
@@ -42,7 +37,6 @@ class SubscriptionTier(str, Enum):
     BUSINESS = "business"
     GROWTH = "growth"
     ENTERPRISE = "enterprise"
-
 
 class Plan(SQLModel, table=True):
     __tablename__ = "plan"
@@ -60,7 +54,6 @@ class Plan(SQLModel, table=True):
     leads_qtr: int = 0
     lens_tier: str = "Basic"
 
-
 class Sector(SQLModel, table=True):
     __tablename__ = "sector"
     __table_args__ = {"extend_existing": True}
@@ -69,7 +62,6 @@ class Sector(SQLModel, table=True):
     sector_number: int = Field(index=True, unique=True)
     name: str
     parent_category: str
-
 
 class Funder(SQLModel, table=True):
     __tablename__ = "funder"
@@ -87,7 +79,6 @@ class Funder(SQLModel, table=True):
     requirements: str
     apply_link: str
 
-
 class KenyaLensBusiness(SQLModel, table=True):
     __tablename__ = "kenyalens_business"
     __table_args__ = {"extend_existing": True}
@@ -100,7 +91,6 @@ class KenyaLensBusiness(SQLModel, table=True):
     lat: float = 0
     lng: float = 0
 
-
 class Workspace(SQLModel, table=True):
     __tablename__ = "workspace"
     __table_args__ = {"extend_existing": True}
@@ -110,7 +100,6 @@ class Workspace(SQLModel, table=True):
     owner_id: int = Field(foreign_key="user.id")
     credits: int = Field(default=0)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
 
 class User(SQLModel, table=True):
     __tablename__ = "user"
@@ -129,7 +118,6 @@ class User(SQLModel, table=True):
     consent_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-
 class Payment(SQLModel, table=True):
     __tablename__ = "payment"
     __table_args__ = {"extend_existing": True}
@@ -142,9 +130,8 @@ class Payment(SQLModel, table=True):
     mpesa_code: Optional[str] = None
     created_at: Optional[str] = None
 
-
 class Report(SQLModel, table=True):
-    __tablename__ = "report"
+    __tablename__ = "reports"
     __table_args__ = {"extend_existing": True}
 
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -172,7 +159,6 @@ class Report(SQLModel, table=True):
         sa_column_kwargs={"server_default": func.now()}
     )
 
-
 class AddOn(SQLModel, table=True):
     __tablename__ = "addon"
     __table_args__ = {"extend_existing": True}
@@ -184,7 +170,6 @@ class AddOn(SQLModel, table=True):
     annual_fee: int
     best_for: str
 
-
 class ALCService(SQLModel, table=True):
     __tablename__ = "alcservice"
     __table_args__ = {"extend_existing": True}
@@ -194,7 +179,6 @@ class ALCService(SQLModel, table=True):
     name: str
     price: int
     best_for: str
-
 
 class UserSubscription(SQLModel, table=True):
     __tablename__ = "usersubscription"
@@ -213,7 +197,6 @@ class UserSubscription(SQLModel, table=True):
     default_sub_county: Optional[str] = None
     default_ward: Optional[str] = None
 
-
 class Subscription(SQLModel, table=True):
     __tablename__ = "subscription"
     __table_args__ = {"extend_existing": True}
@@ -227,7 +210,6 @@ class Subscription(SQLModel, table=True):
     expires_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-
 class GeoFilter(SQLModel, table=True):
     __tablename__ = "geofilter"
     __table_args__ = {"extend_existing": True}
@@ -238,7 +220,6 @@ class GeoFilter(SQLModel, table=True):
     sub_county: Optional[str] = Field(index=True, default=None)
     ward: Optional[str] = Field(index=True, default=None)
     sector_id: int = Field(foreign_key="sector.id")
-
 
 class Module(SQLModel, table=True):
     __tablename__ = "module"
@@ -254,7 +235,6 @@ class Module(SQLModel, table=True):
     min_plan: str = Field(index=True)
     geo_enabled: bool = True
 
-
 class GeoData(SQLModel, table=True):
     __tablename__ = "geo_data"
     __table_args__ = {"extend_existing": True}
@@ -264,7 +244,6 @@ class GeoData(SQLModel, table=True):
     type: str = Field(index=True, max_length=20)
     parent: Optional[str] = Field(default=None, index=True, max_length=100)
 
-
 class Company(SQLModel, table=True):
     __tablename__ = "company"
     __table_args__ = {"extend_existing": True}
@@ -273,7 +252,6 @@ class Company(SQLModel, table=True):
     name: str
     sector: str
     county: str
-
 
 class MarketMetric(SQLModel, table=True):
     __tablename__ = "market_metrics"
@@ -291,7 +269,6 @@ class MarketMetric(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-
 class NewsArticle(SQLModel, table=True):
     __tablename__ = "news_articles"
     __table_args__ = {"extend_existing": True}
@@ -304,7 +281,6 @@ class NewsArticle(SQLModel, table=True):
     url: Optional[str] = None
     county: Optional[str] = None
     published_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
 
 class SectorReport(SQLModel, table=True):
     __tablename__ = "sector_reports"
@@ -332,7 +308,6 @@ class SectorReport(SQLModel, table=True):
         sa_column_kwargs={"server_default": func.now(), "onupdate": func.now()}
     )
 
-
 class Deal(SQLModel, table=True):
     __tablename__ = "deals"
     __table_args__ = {"extend_existing": True}
@@ -351,7 +326,6 @@ class Deal(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     closed_at: Optional[datetime] = None
 
-
 class Policy(SQLModel, table=True):
     __tablename__ = "policy"
     __table_args__ = {"extend_existing": True}
@@ -367,7 +341,6 @@ class Policy(SQLModel, table=True):
     url: str
     published_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-
 class KenyaLensSurvey(SQLModel, table=True):
     __tablename__ = "kenyalens_survey"
     __table_args__ = {"extend_existing": True}
@@ -380,7 +353,6 @@ class KenyaLensSurvey(SQLModel, table=True):
     status: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-
 class KenyaLensResponse(SQLModel, table=True):
     __tablename__ = "kenyalens_response"
     __table_args__ = {"extend_existing": True}
@@ -392,7 +364,6 @@ class KenyaLensResponse(SQLModel, table=True):
     data: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-
 class KenyaTenant(SQLModel, table=True):
     __tablename__ = "kenya_tenants"
     __table_args__ = {"extend_existing": True}
@@ -400,7 +371,6 @@ class KenyaTenant(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
 
 class KenyaLensMember(SQLModel, table=True):
     __tablename__ = "kenyalens_member"
@@ -413,7 +383,6 @@ class KenyaLensMember(SQLModel, table=True):
     role: str = Field(default="member")
     status: str = Field(default="pending")
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
 
 class KenyaLensAlert(SQLModel, table=True):
     __tablename__ = "kenya_lens_alerts"
@@ -429,7 +398,6 @@ class KenyaLensAlert(SQLModel, table=True):
     is_read: bool = Field(default=False)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-
 class KenyaLensApiUsage(SQLModel, table=True):
     __tablename__ = "kenya_lens_api_usage"
     __table_args__ = {"extend_existing": True}
@@ -440,7 +408,6 @@ class KenyaLensApiUsage(SQLModel, table=True):
     endpoint: str
     tenant_id: Optional[str] = Field(default=None)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
 
 class Notification(SQLModel, table=True):
     __tablename__ = "notifications"
@@ -454,7 +421,6 @@ class Notification(SQLModel, table=True):
     status: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-
 class PriceData(SQLModel, table=True):
     __tablename__ = "price_data"
     __table_args__ = {"extend_existing": True}
@@ -467,7 +433,6 @@ class PriceData(SQLModel, table=True):
     price: float
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-
 class ExportOpportunity(SQLModel, table=True):
     __tablename__ = "export_opportunities"
     __table_args__ = {"extend_existing": True}
@@ -478,7 +443,6 @@ class ExportOpportunity(SQLModel, table=True):
     product: str
     opportunity_score: float
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
 
 class MarketSearch(SQLModel, table=True):
     __tablename__ = "market_searches"
@@ -492,7 +456,6 @@ class MarketSearch(SQLModel, table=True):
     product: Optional[str] = Field(default=None, index=True)
     filters: Optional[Dict] = Field(default={}, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
 
 class KnowledgeChunk(SQLModel, table=True):
     __tablename__ = "knowledge_chunks"
@@ -508,7 +471,6 @@ class KnowledgeChunk(SQLModel, table=True):
     chunk_metadata: Dict = Field(default={}, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-
 class ConsumerFeedback(SQLModel, table=True):
     __tablename__ = "consumer_feedback"
     __table_args__ = {"extend_existing": True}
@@ -521,7 +483,6 @@ class ConsumerFeedback(SQLModel, table=True):
     sector: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-
 class SentimentSummary(SQLModel, table=True):
     __tablename__ = "sentiment_summaries"
     __table_args__ = {"extend_existing": True}
@@ -533,7 +494,6 @@ class SentimentSummary(SQLModel, table=True):
     count: int
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-
 class DataSource(SQLModel, table=True):
     __tablename__ = "data_sources"
     __table_args__ = {"extend_existing": True}
@@ -542,7 +502,6 @@ class DataSource(SQLModel, table=True):
     name: str
     url: Optional[str] = None
     last_fetched: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
 
 class KenyaLensSubscription(SQLModel, table=True):
     __tablename__ = "kenyalens_subscription"
@@ -556,7 +515,6 @@ class KenyaLensSubscription(SQLModel, table=True):
     api_credits: int = Field(default=10)
     features_json: str = Field(default="[]")
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
 
 class SocialMention(SQLModel, table=True):
     __tablename__ = "social_mentions"
@@ -572,7 +530,6 @@ class SocialMention(SQLModel, table=True):
     sector: Optional[str] = Field(default=None, index=True, max_length=100)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-
 class Funding(SQLModel, table=True):
     __tablename__ = "fundings"
     __table_args__ = {"extend_existing": True}
@@ -586,7 +543,6 @@ class Funding(SQLModel, table=True):
     application_date: datetime = Field(default_factory=lambda: datetime.now(UTC))
     funding_date: Optional[datetime] = None
 
-
 class Competitor(SQLModel, table=True):
     __tablename__ = "competitor"
     __table_args__ = {"extend_existing": True}
@@ -597,7 +553,6 @@ class Competitor(SQLModel, table=True):
     county: str
     lat: float = 0
     lng: float = 0
-
 
 class DetailedAnalysisRequest(BaseModel):
     product: str
