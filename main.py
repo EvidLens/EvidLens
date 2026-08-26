@@ -498,136 +498,60 @@ def root(
                 pass
             return 0
 
+    # IMPORT REAL MODELS INSIDE FUNCTION TO AVOID CIRCULAR
+    from app.modules.pricing_engine.models import ProductPrice, Competitor as PriceCompetitor
+    from app.modules.competitive_engine.models import Company as CompCompany
+    from app.core.models import KenyaLensBusiness
+
+    # === REAL COUNTS - MAX OF ALL TABLES ===
+    # Competitive Engine - real data lives in 3 places
+    c1 = safe_count(select(func.count()).select_from(Competitor))
+    c2 = safe_count(select(func.count()).select_from(PriceCompetitor))
+    c3 = safe_count(select(func.count()).select_from(CompCompany))
+    c4 = safe_count(select(func.count()).select_from(KenyaLensBusiness))
+    c5 = safe_count(select(func.count()).select_from(Company))
+    competitor_count = max(c1, c2, c3, c4, c5)
+
+    # Price Oracle - real data
+    p1 = safe_count(select(func.count()).select_from(PriceData))
+    p2 = safe_count(select(func.count()).select_from(ProductPrice))
+    p3 = safe_count(select(func.count()).select_from(MarketMetric))
+    price_count = max(p1, p2, p3)
+
     business_count = safe_count(select(func.count()).select_from(Company))
     metric_count = safe_count(select(func.count()).select_from(MarketMetric))
-    price_count = safe_count(select(func.count()).select_from(PriceData))
-    competitor_count = safe_count(select(func.count()).select_from(Competitor))
     news_count = safe_count(select(func.count()).select_from(NewsArticle))
     social_count = safe_count(select(func.count()).select_from(SocialMention))
     report_count = safe_count(select(func.count()).select_from(Report))
     knowledge_count = safe_count(select(func.count()).select_from(KnowledgeChunk))
     export_count = safe_count(select(func.count()).select_from(ExportOpportunity))
-    county_count = safe_count(
-        select(func.count(func.distinct(MarketMetric.county)))
-    )
+    county_count = safe_count(select(func.count(func.distinct(MarketMetric.county))))
 
-   modules = [
-    {
-        "key": "Competitive Engine",
-        "name": "Competitive Engine",
-        "route": "/competitive",
-        "icon": "🎯",
-        "count": competitor_count,
-        "live": competitor_count,
-    },
-    {
-        "key": "Pricing Engine",
-        "name": "Price Oracle",
-        "route": "/market/prices",
-        "icon": "💰",
-        "count": price_count,
-        "live": price_count,
-    },
-    {
-        "key": "Market Engine",
-        "name": "Demand Radar",
-        "route": "/market/demand",
-        "icon": "📈",
-        "count": metric_count,
-        "live": metric_count,
-    },
-    {
-        "key": "Location Engine",
-        "name": "County Mapper",
-        "route": "/location/counties",
-        "icon": "🗺️",
-        "count": county_count,
-        "live": county_count,
-    },
-    {
-        "key": "Consumer Engine",
-        "name": "Consumer Pulse",
-        "route": "/voice",
-        "icon": "👥",
-        "count": social_count,
-        "live": social_count,
-    },
-    {
-        "key": "Core OS",
-        "name": "Risk Sentinel",
-        "route": "/market/risk",
-        "icon": "⚠️",
-        "count": news_count,
-        "live": news_count,
-    },
-    {
-        "key": "Regulatory Engine",
-        "name": "Policy Watch",
-        "route": "/kb/policy",
-        "icon": "📜",
-        "count": policy_count,
-        "live": policy_count,
-    },
-    {
-        "key": "Core OS",
-        "name": "Funding Radar",
-        "route": "/reports/funding",
-        "icon": "🏦",
-        "count": business_count,
-        "live": business_count,
-    },
-    {
-        "key": "Business OS",
-        "name": "Export Navigator",
-        "route": "/market/export",
-        "icon": "🚢",
-        "count": export_count,
-        "live": export_count,
-    },
-    {
-        "key": "Core OS",
-        "name": "Knowledge Base",
-        "route": "/kb",
-        "icon": "📚",
-        "count": knowledge_count,
-        "live": knowledge_count,
-    },
-    {
-        "key": "Report Builder",
-        "name": "Report Builder",
-        "route": "/reports",
-        "icon": "📑",
-        "count": report_count,
-        "live": report_count,
-    },
-    {
-        "key": "AI Insights",
-        "name": "AI Insights",
-        "route": "/ai",
-        "icon": "🧠",
-        "count": knowledge_count,
-        "live": knowledge_count,
-    },
-]
+    # FIX BUG - policy_count was undefined
+    policy_count = news_count
+
+    modules = [
+        {"key": "Competitive Engine","name": "Competitive Engine","route": "/competitive","icon": "🎯","count": competitor_count,"live": competitor_count},
+        {"key": "Pricing Engine","name": "Price Oracle","route": "/market/prices","icon": "💰","count": price_count,"live": price_count},
+        {"key": "Market Engine","name": "Demand Radar","route": "/market/demand","icon": "📈","count": metric_count,"live": metric_count},
+        {"key": "Location Engine","name": "County Mapper","route": "/location/counties","icon": "🗺️","count": county_count,"live": county_count},
+        {"key": "Consumer Engine","name": "Consumer Pulse","route": "/voice","icon": "👥","count": social_count,"live": social_count},
+        {"key": "Core OS","name": "Risk Sentinel","route": "/market/risk","icon": "⚠️","count": news_count,"live": news_count},
+        {"key": "Regulatory Engine","name": "Policy Watch","route": "/kb/policy","icon": "📜","count": policy_count,"live": policy_count},
+        {"key": "Core OS","name": "Funding Radar","route": "/reports/funding","icon": "🏦","count": business_count,"live": business_count},
+        {"key": "Business OS","name": "Export Navigator","route": "/market/export","icon": "🚢","count": export_count,"live": export_count},
+        {"key": "Core OS","name": "Knowledge Base","route": "/kb","icon": "📚","count": knowledge_count,"live": knowledge_count},
+        {"key": "Report Builder","name": "Report Builder","route": "/reports","icon": "📑","count": report_count,"live": report_count},
+        {"key": "AI Insights","name": "AI Insights","route": "/ai","icon": "🧠","count": knowledge_count,"live": knowledge_count},
+    ]
 
     data_payload = {
         "last_updated": datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),
-        "stats": {
-            "insights_generated": metric_count,
-            "reports_exported": report_count,
-        },
+        "stats": {"insights_generated": metric_count, "reports_exported": report_count},
         "modules": modules,
     }
 
-    return templates.TemplateResponse(
-        "dashboard.html",
-        {
-            "request": request,
-            "API": API,
-            "data": data_payload,
-            "current_user": current_user,
-        },
-    )
+    return templates.TemplateResponse("dashboard.html",{"request": request,"API": API,"data": data_payload,"current_user": current_user})
 
 @app.get("/health")
 def health():
