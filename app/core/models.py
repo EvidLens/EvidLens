@@ -136,7 +136,11 @@ class Payment(SQLModel, table=True):
 
 class Report(SQLModel, table=True):
     __tablename__ = "reports"
-    __table_args__ = ({"extend_existing": True}, Index("ix_reports_user_status", "user_id", "status"), Index("ix_reports_type_country", "report_type", "country"))
+    __table_args__ = (
+        Index("ix_reports_user_status", "user_id", "status"),
+        Index("ix_reports_type_country", "report_type", "country"),
+        {"extend_existing": True}
+    )
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id", index=True)
     title: str
