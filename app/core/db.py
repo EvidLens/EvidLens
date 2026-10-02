@@ -14,13 +14,25 @@ DATABASE_URL = settings.DATABASE_URL.strip()
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
+# FIX 1: Force SSL
+if "sslmode" not in DATABASE_URL:
+    DATABASE_URL += ("?sslmode=require" if "?" not in DATABASE_URL else "&sslmode=require")
+
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
-    pool_recycle=300,
-    pool_size=10,
-    max_overflow=20,
-    echo=False
+    pool_recycle=280,  # FIX 2: was 300, now 280 to recycle BEFORE Render kills
+    pool_size=5,       # FIX 3: was 10, now 5 - Render free limit is 97
+    max_overflow=5,    # FIX 4: was 20, now 5
+    echo=False,
+    connect_args={     # FIX 5: keepalives - this was missing
+        "keepalives": 1,
+        "keepalives_idle": 30,
+        "keepalives_interval": 10,
+        "keepalives_count": 5,
+        "connect_timeout": 10,
+        "sslmode": "require",
+    },
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=Session)
@@ -37,17 +49,25 @@ if getattr(settings, "REDIS_URL", None):
 
 def get_session() -> Generator[Session, None, None]:
     with Session(engine) as session:
-        yield session
+        try:
+            yield session
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
 
 def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 
 def init_db():
-    # STEP 1: Import CORE models that hold the 8 missing tables - MUST BE FIRST
     from app.core.models import (
         Plan, Module, AddOn, ALCService, UserSubscription, GeoFilter, User, Workspace,
         Subscription, MarketMetric, MarketSearch, SocialMention, Report, SectorReport,
@@ -59,9 +79,6 @@ def init_db():
     )
     from app.modules.auth.models import AuthUser, UserRole
 
-    # STEP 2: CREATE TABLES NOW - before importing conflicting modules
-    # This ensures company, market_metrics, news_articles, social_mentions, 
-    # report, knowledge_chunks, export_opportunities, price_data are created
     try:
         SQLModel.metadata.create_all(bind=engine, checkfirst=True)
         print("DB CORE TABLES CREATED - SUCCESS")
@@ -70,8 +87,6 @@ def init_db():
         print(f"Core create error: {e}")
         logger.error(f"Core create error: {e}")
 
-    # STEP 3: Now import other modules AFTER tables created - if they clash, we ignore
-    # These are for extra tables only, not for the 8 missing ones
     try:
         from app.modules.payments.models import Payment as PaymentModel, Subscription as PaymentSubscription, MpesaTransaction
         SQLModel.metadata.create_all(bind=engine, checkfirst=True)
