@@ -3,6 +3,7 @@ import bcrypt
 from.models import AuthUser, UserRole
 import requests, os
 from datetime import datetime, timedelta
+import time
 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 FROM_EMAIL = os.getenv("FROM_EMAIL", "noreply@evidlens.co.ke")
@@ -38,7 +39,19 @@ def verify_password(plain_password: str, hashed_password: str):
         return False
 
 def get_user_by_email(db: Session, email: str):
-    return db.exec(select(AuthUser).where(AuthUser.email == email.lower().strip())).first()
+    for attempt in range(2):
+        try:
+            return db.exec(select(AuthUser).where(AuthUser.email == email.lower().strip())).first()
+        except Exception as e:
+            print(f"[DB RETRY {attempt}] get_user_by_email failed: {e}")
+            try:
+                db.rollback()
+            except:
+                pass
+            if attempt == 0:
+                time.sleep(0.5)
+                continue
+            raise
 
 def create_user(db: Session, req, token: str):
     admin_emails = [e.strip().lower() for e in ADMIN_EMAIL.split(",") if e.strip()]
@@ -84,7 +97,12 @@ def create_user(db: Session, req, token: str):
     return db_user
 
 def verify_user(db: Session, token: str):
-    user = db.exec(select(AuthUser).where(AuthUser.verification_token == token)).first()
+    try:
+        user = db.exec(select(AuthUser).where(AuthUser.verification_token == token)).first()
+    except Exception as e:
+        print(f"[DB RETRY] verify_user {e}")
+        db.rollback()
+        user = db.exec(select(AuthUser).where(AuthUser.verification_token == token)).first()
     if not user:
         return None
     user.email_verified = True
@@ -95,7 +113,10 @@ def verify_user(db: Session, token: str):
     return user
 
 def login_user(db: Session, email: str, password: str):
-    user = get_user_by_email(db, email)
+    try:
+        user = get_user_by_email(db, email)
+    except Exception as e:
+        return {"error": f"Database temporarily unavailable, please retry"}
     if not user:
         return {"error": "Invalid credentials"}
     if not user.email_verified:
@@ -122,7 +143,12 @@ def request_password_reset(db: Session, email: str):
     return {"message": "Reset email sent", "reset_token": token}
 
 def reset_password(db: Session, token: str, new_password: str):
-    user = db.exec(select(AuthUser).where(AuthUser.reset_token == token)).first()
+    try:
+        user = db.exec(select(AuthUser).where(AuthUser.reset_token == token)).first()
+    except Exception as e:
+        print(f"[DB RETRY] reset_password {e}")
+        db.rollback()
+        user = db.exec(select(AuthUser).where(AuthUser.reset_token == token)).first()
     if not user:
         return {"error": "Invalid or expired token"}
     if not user.reset_token_expires or user.reset_token_expires < datetime.utcnow():
