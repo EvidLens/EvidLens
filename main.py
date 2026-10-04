@@ -546,18 +546,18 @@ def root(
     policy_count = news_count
 
     modules = [
-        {"key": "Competitive Engine","name": "Competitive Engine","route": "/competitive","icon": "🎯","count": competitor_count,"live": competitor_count},
-        {"key": "Pricing Engine","name": "Price Oracle","route": "/market/prices","icon": "💰","count": price_count,"live": price_count},
-        {"key": "Market Engine","name": "Demand Radar","route": "/market/demand","icon": "📈","count": metric_count,"live": metric_count},
-        {"key": "Location Engine","name": "County Mapper","route": "/location/counties","icon": "🗺️","count": county_count,"live": county_count},
-        {"key": "Consumer Engine","name": "Consumer Pulse","route": "/voice","icon": "👥","count": social_count,"live": social_count},
-        {"key": "Core OS","name": "Risk Sentinel","route": "/market/risk","icon": "⚠️","count": news_count,"live": news_count},
-        {"key": "Regulatory Engine","name": "Policy Watch","route": "/kb/policy","icon": "📜","count": policy_count,"live": policy_count},
-        {"key": "Core OS","name": "Funding Radar","route": "/reports/funding","icon": "🏦","count": business_count,"live": business_count},
-        {"key": "Business OS","name": "Export Navigator","route": "/market/export","icon": "🚢","count": export_count,"live": export_count},
-        {"key": "Core OS","name": "Knowledge Base","route": "/kb","icon": "📚","count": knowledge_count,"live": knowledge_count},
-        {"key": "Report Builder","name": "Report Builder","route": "/reports","icon": "📑","count": report_count,"live": report_count},
-        {"key": "AI Insights","name": "AI Insights","route": "/ai","icon": "🧠","count": knowledge_count,"live": knowledge_count},
+        {"key": "Competitive Engine","name": "Competitive Engine","route": "/competitive","icon": "🎯","count": competitor_count,: competitor_count},
+        {"key": "Pricing Engine","name": "Price Oracle","route": "/market/prices","icon": "💰","count": price_count,: price_count},
+        {"key": "Market Engine","name": "Demand Radar","route": "/market/demand","icon": "📈","count": metric_count,: metric_count},
+        {"key": "Location Engine","name": "County Mapper","route": "/location/counties","icon": "🗺️","count": county_count,: county_count},
+        {"key": "Consumer Engine","name": "Consumer Pulse","route": "/voice","icon": "👥","count": social_count,: social_count},
+        {"key": "Core OS","name": "Risk Sentinel","route": "/market/risk","icon": "⚠️","count": news_count,: news_count},
+        {"key": "Regulatory Engine","name": "Policy Watch","route": "/kb/policy","icon": "📜","count": policy_count,: policy_count},
+        {"key": "Core OS","name": "Funding Radar","route": "/reports/funding","icon": "🏦","count": business_count,: business_count},
+        {"key": "Business OS","name": "Export Navigator","route": "/market/export","icon": "🚢","count": export_count,: export_count},
+        {"key": "Core OS","name": "Knowledge Base","route": "/kb","icon": "📚","count": knowledge_count,: knowledge_count},
+        {"key": "Report Builder","name": "Report Builder","route": "/reports","icon": "📑","count": report_count,: report_count},
+        {"key": "AI Insights","name": "AI Insights","route": "/ai","icon": "🧠","count": knowledge_count,: knowledge_count},
     ]
 
     data_payload = {
