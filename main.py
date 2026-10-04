@@ -6,6 +6,8 @@ Fixes:
     - file_type column added to reports
     - ENUM reportformat -> VARCHAR (PDF vs pdf crash)
     - InFailedSqlTransaction fixed
+    - Render PG SSL closed fixed - startup order corrected
+    - pool_recycle 280 + keepalives
 """
 
 import os
@@ -144,6 +146,10 @@ async def get_current_user_optional(
             return None
         return user
     except Exception:
+        try:
+            db.rollback()
+        except:
+            pass
         return None
 
 def safe_job(job_func, job_name: str):
@@ -193,7 +199,6 @@ def fix_auth_user_table():
         print(f"AUTH_USER error: {e}")
 
 def fix_reports_table():
-    # 1. Convert ENUM -> VARCHAR (critical fix)
     enum_sqls = [
         "ALTER TABLE reports ALTER COLUMN format TYPE VARCHAR(20) USING format::text",
         "ALTER TABLE reports ALTER COLUMN status TYPE VARCHAR(50) USING status::text",
@@ -210,7 +215,6 @@ def fix_reports_table():
     except Exception:
         pass
 
-    # 2. Add missing columns
     add_cols = [
         "ADD COLUMN IF NOT EXISTS file_type VARCHAR(20) DEFAULT 'pdf'",
         "ADD COLUMN IF NOT EXISTS file_path VARCHAR(500)",
@@ -322,20 +326,36 @@ def force_create_tables():
         print(f"Force create failed: {e}")
 
 # ==================================================================
-# Lifecycle
+# Lifecycle - FIXED ORDER FOR FRESH RENDER DB
 # ==================================================================
 @app.on_event("startup")
 def on_startup():
-    fix_auth_user_table()
-    force_create_tables()
-    fix_reports_table()
-
+    # 1. CREATE all ORM tables FIRST - critical for fresh DB like dpg-davp1pid0e5s738rev9g-a
     try:
         init_db()
-        print("✓ DB INIT OK")
+        print("✓ DB INIT OK - Core tables created")
     except Exception as e:
-        print(f"DB init: {e}")
+        print(f"DB init error: {e}")
+        traceback.print_exc()
 
+    # 2. Ensure raw SQL tables exist
+    try:
+        force_create_tables()
+    except Exception as e:
+        print(f"Force create error: {e}")
+
+    # 3. THEN migrate/add columns - tables now exist
+    try:
+        fix_auth_user_table()
+    except Exception as e:
+        print(f"Auth migrate error: {e}")
+
+    try:
+        fix_reports_table()
+    except Exception as e:
+        print(f"Reports migrate error: {e}")
+
+    # 4. Scheduler last
     try:
         from app.modules.cron.jobs import (
             scrape_kpin_prices,
@@ -498,13 +518,10 @@ def root(
                 pass
             return 0
 
-    # IMPORT REAL MODELS INSIDE FUNCTION TO AVOID CIRCULAR
     from app.modules.pricing_engine.models import ProductPrice, Competitor as PriceCompetitor
     from app.modules.competitive_engine.models import Company as CompCompany
     from app.core.models import KenyaLensBusiness
 
-    # === REAL COUNTS - MAX OF ALL TABLES ===
-    # Competitive Engine - real data lives in 3 places
     c1 = safe_count(select(func.count()).select_from(Competitor))
     c2 = safe_count(select(func.count()).select_from(PriceCompetitor))
     c3 = safe_count(select(func.count()).select_from(CompCompany))
@@ -512,7 +529,6 @@ def root(
     c5 = safe_count(select(func.count()).select_from(Company))
     competitor_count = max(c1, c2, c3, c4, c5)
 
-    # Price Oracle - real data
     p1 = safe_count(select(func.count()).select_from(PriceData))
     p2 = safe_count(select(func.count()).select_from(ProductPrice))
     p3 = safe_count(select(func.count()).select_from(MarketMetric))
@@ -527,7 +543,6 @@ def root(
     export_count = safe_count(select(func.count()).select_from(ExportOpportunity))
     county_count = safe_count(select(func.count(func.distinct(MarketMetric.county))))
 
-    # FIX BUG - policy_count was undefined
     policy_count = news_count
 
     modules = [
@@ -562,6 +577,5 @@ def health():
 # ==================================================================
 if __name__ == "__main__":
     import uvicorn
-
     port = int(os.getenv("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
