@@ -74,16 +74,30 @@ def competitive(request: Request, user: AuthUser = Depends(get_current_user), db
     try:
         last = db.exec(select(MarketMetric).where(MarketMetric.user_id == user.id).order_by(desc(MarketMetric.timestamp)).limit(1)).first()
         if last:
-            companies = db.exec(select(Company).where(Company.sector == last.sector, Company.county == last.county).limit(20)).all()
+            companies = db.exec(select(Company).where(Company.sector == last.sector, Company.county == last.county)).all()
             sector, county = last.sector, last.county
         else:
-            companies, sector, county = [], None, None
+            companies = db.exec(select(Company)).all()
+            sector, county = None, None
     except Exception as e:
-        print(f"competitive query error: {e}")
+        print(f"competitive error: {e}")
         try: db.rollback()
         except: pass
-        companies, sector, county = [], None, None
-    return safe_template(request, "competitive.html", {"request": request,"current_user": user,"companies": companies,"sector": sector,"county": county}, "Competitive Engine")
+        try:
+            companies = db.exec(select(Company)).all()
+        except:
+            companies = []
+        sector, county = None, None
+
+    return templates.TemplateResponse("competitive.html", {
+        "request": request,
+        "current_user": user,
+        "companies": companies,
+        "competitors": companies,
+        "count": len(companies),
+        "sector": sector,
+        "county": county
+    })
 
 @router.get("/contact", response_class=HTMLResponse)
 def contact(request: Request):
