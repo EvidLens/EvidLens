@@ -1,9 +1,11 @@
 from sqlmodel import Session, select
 import bcrypt
 from.models import AuthUser, UserRole
-import requests, os
+import requests
+import os
 from datetime import datetime, timedelta
 import time
+from sqlalchemy.exc import OperationalError
 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 FROM_EMAIL = os.getenv("FROM_EMAIL", "noreply@evidlens.co.ke")
@@ -42,8 +44,8 @@ def get_user_by_email(db: Session, email: str):
     for attempt in range(2):
         try:
             return db.exec(select(AuthUser).where(AuthUser.email == email.lower().strip())).first()
-        except Exception as e:
-            print(f"[DB RETRY {attempt}] get_user_by_email failed: {e}")
+        except OperationalError as e:
+            print(f"[DB RETRY {attempt}] OperationalError: {e}")
             try:
                 db.rollback()
             except:
@@ -52,11 +54,12 @@ def get_user_by_email(db: Session, email: str):
                 time.sleep(0.5)
                 continue
             raise
+        except Exception:
+            raise
 
 def create_user(db: Session, req, token: str):
     admin_emails = [e.strip().lower() for e in ADMIN_EMAIL.split(",") if e.strip()]
     is_admin = req.email.lower().strip() in admin_emails
-
     hashed_pw = hash_password(req.password)
     db_user = AuthUser(
         email=req.email.lower().strip(),
@@ -75,7 +78,6 @@ def create_user(db: Session, req, token: str):
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-
     if is_admin:
         print(f"[ADMIN CREATED] {db_user.email} as ADMIN with full access")
     else:
@@ -97,12 +99,7 @@ def create_user(db: Session, req, token: str):
     return db_user
 
 def verify_user(db: Session, token: str):
-    try:
-        user = db.exec(select(AuthUser).where(AuthUser.verification_token == token)).first()
-    except Exception as e:
-        print(f"[DB RETRY] verify_user {e}")
-        db.rollback()
-        user = db.exec(select(AuthUser).where(AuthUser.verification_token == token)).first()
+    user = db.exec(select(AuthUser).where(AuthUser.verification_token == token)).first()
     if not user:
         return None
     user.email_verified = True
@@ -115,8 +112,8 @@ def verify_user(db: Session, token: str):
 def login_user(db: Session, email: str, password: str):
     try:
         user = get_user_by_email(db, email)
-    except Exception as e:
-        return {"error": f"Database temporarily unavailable, please retry"}
+    except OperationalError:
+        return {"error": "Database temporarily unavailable, please retry"}
     if not user:
         return {"error": "Invalid credentials"}
     if not user.email_verified:
@@ -143,12 +140,7 @@ def request_password_reset(db: Session, email: str):
     return {"message": "Reset email sent", "reset_token": token}
 
 def reset_password(db: Session, token: str, new_password: str):
-    try:
-        user = db.exec(select(AuthUser).where(AuthUser.reset_token == token)).first()
-    except Exception as e:
-        print(f"[DB RETRY] reset_password {e}")
-        db.rollback()
-        user = db.exec(select(AuthUser).where(AuthUser.reset_token == token)).first()
+    user = db.exec(select(AuthUser).where(AuthUser.reset_token == token)).first()
     if not user:
         return {"error": "Invalid or expired token"}
     if not user.reset_token_expires or user.reset_token_expires < datetime.utcnow():
