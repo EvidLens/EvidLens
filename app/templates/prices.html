@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="min-h-screen bg-[#F5F7FA]">
+<header class="bg-[#0A1F44] text-white px-6 py-4 sticky top-0 z-40">
+  <div class="flex items-center justify-between max-w-[1400px] mx-auto">
+    <div class="flex items-center gap-3">
+      <a href="/" class="text-white/70 hover:text-white">← Dashboard</a>
+      <h1 class="font-bold text-xl ml-4">Price Oracle • Live Market Intelligence</h1>
+    </div>
+    <div class="flex gap-2">
+      <a href="/market/prices/sync-real" class="bg-[#14B8A6] px-4 py-2 rounded-lg text-sm font-bold hover:bg-[#0D9488]">🔄 Sync KPIN + Kilimo</a>
+      <a href="/api/data/prices" class="bg-white/10 px-4 py-2 rounded-lg text-sm">API JSON</a>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-[1400px] mx-auto px-6 py-6 space-y-6">
+
+  <!-- KPIs -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div class="bg-white p-4 rounded-xl border">
+      <p class="text-xs text-gray-400">Total Price Points</p>
+      <p class="text-2xl font-bold text-[#0A1F44]">{{ prices|length if prices else 0 }}</p>
+      <p class="text-xs text-green-600 mt-1">Live from price_data + market_metrics</p>
+    </div>
+    <div class="bg-white p-4 rounded-xl border">
+      <p class="text-xs text-gray-400">Unique Products</p>
+      <p class="text-2xl font-bold text-[#0A1F44]">{{ prices|map(attribute='product_name')|unique|list|length if prices else 0 }}</p>
+      <p class="text-xs text-gray-500 mt-1">Across all counties</p>
+    </div>
+    <div class="bg-white p-4 rounded-xl border">
+      <p class="text-xs text-gray-400">Avg Price KES</p>
+      <p class="text-2xl font-bold text-[#0A1F44]">
+        {% if prices %}{{ "%.0f"|format(prices|map(attribute='price')|select|sum / prices|length) }}{% else %}0{% endif %}
+      </p>
+      <p class="text-xs text-gray-500 mt-1">National average</p>
+    </div>
+    <div class="bg-white p-4 rounded-xl border">
+      <p class="text-xs text-gray-400">Counties Covered</p>
+      <p class="text-2xl font-bold text-[#0A1F44]">{{ prices|map(attribute='county')|unique|list|length if prices else 0 }}</p>
+      <p class="text-xs text-gray-500 mt-1">47 counties tracked</p>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="bg-white p-4 rounded-xl border flex flex-wrap gap-3 items-end">
+    <div>
+      <label class="text-xs text-gray-500">Search Product</label>
+      <input id="searchProd" onkeyup="filterTable()" placeholder="e.g. Maize, Milk, Eggs" class="border rounded-lg px-3 py-2 text-sm w-64">
+    </div>
+    <div>
+      <label class="text-xs text-gray-500">County</label>
+      <select id="filterCounty" onchange="filterTable()" class="border rounded-lg px-3 py-2 text-sm">
+        <option value="">All Counties</option>
+        {% for c in prices|map(attribute='county')|unique|list|sort if c %}
+        <option value="{{ c }}">{{ c }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="text-xs text-gray-500">Sort</label>
+      <select id="sortBy" onchange="sortTable()" class="border rounded-lg px-3 py-2 text-sm">
+        <option value="price_desc">Price High → Low</option>
+        <option value="price_asc">Price Low → High</option>
+        <option value="county">County A-Z</option>
+        <option value="product">Product A-Z</option>
+        <option value="date">Latest First</option>
+      </select>
+    </div>
+    <div class="ml-auto text-xs text-gray-400" id="rowCount">{{ prices|length }} rows</div>
+  </div>
+
+  <!-- Table -->
+  <div class="bg-white rounded-xl border overflow-hidden">
+    <div class="overflow-x-auto">
+      <table id="priceTable" class="w-full text-sm">
+        <thead class="bg-[#0A1F44] text-white">
+          <tr>
+            <th class="p-3 text-left">Product</th>
+            <th class="p-3 text-left">County / Sub-County</th>
+            <th class="p-3 text-left">Sector</th>
+            <th class="p-3 text-left">Price</th>
+            <th class="p-3 text-left">Demand / Source</th>
+            <th class="p-3 text-left">Timestamp</th>
+            <th class="p-3 text-left">Action</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          {% for p in prices %}
+          <tr class="border-t hover:bg-gray-50" data-product="{{ (p.product_name or p.product or '')|lower }}" data-county="{{ (p.county or '')|lower }}">
+            <td class="p-3 font-semibold text-[#0A1F44]">{{ p.product_name or p.product or p.sector or 'Unknown' }}</td>
+            <td class="p-3">
+              <div class="font-medium">{{ p.county or 'Kenya' }}</div>
+              <div class="text-xs text-gray-400">{{ p.subcounty or p.sub_county or p.town or '' }}</div>
+            </td>
+            <td class="p-3"><span class="bg-teal-50 text-teal-700 px-2 py-1 rounded-full text-xs">{{ p.sector or 'General' }}</span></td>
+            <td class="p-3">
+              <div class="font-bold">KES {{ "%.2f"|format(p.price or p.avg_price_kes or 0) }}</div>
+              {% if p.avg_price_kes and p.price and p.avg_price_kes!= p.price %}
+              <div class="text-xs text-gray-400">Avg: KES {{ p.avg_price_kes }}</div>
+              {% endif %}
+            </td>
+            <td class="p-3">
+              {% if p.demand_score %}<span class="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded">Demand {{ p.demand_score }}</span>{% endif %}
+              <div class="text-xs text-gray-400">{{ p.tenant_id or p.source or 'KPIN' }}</div>
+            </td>
+            <td class="p-3 text-xs text-gray-500">{{ (p.timestamp or p.created_at or '')|string|truncate(19, True, '') }}</td>
+            <td class="p-3">
+              <a href="/market/demand?product={{ p.product_name or p.product }}&county={{ p.county }}" class="text-[#14B8A6] hover:underline text-xs font-bold">View Demand →</a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="p-12 text-center">
+            <div class="text-gray-400">No price_data found.</div>
+            <div class="mt-3"><a href="/market/prices/sync-real" class="bg-[#0A1F44] text-white px-6 py-2 rounded-lg text-sm">Sync Real Prices from KPIN</a></div>
+            <div class="mt-4 text-xs text-gray-400">If sync says 0, check cron jobs: /cron/status</div>
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="bg-white p-4 rounded-xl border">
+      <h3 class="font-bold text-sm mb-2">How this works (LIVE)</h3>
+      <ul class="text-xs text-gray-600 space-y-1">
+        <li>• Source: <b>price_data</b> (KPIN scrape) + <b>market_metrics</b> (your queries)</li>
+        <li>• Sync endpoint hits: <code>/api/data/prices</code> → same table</li>
+        <li>• No mock: if DB empty, table empty - click Sync</li>
+        <li>• County filter uses distinct county from DB, not hardcoded 47 list</li>
+      </ul>
+    </div>
+    <div class="bg-[#0A1F44] p-4 rounded-xl text-white">
+      <h3 class="font-bold text-sm mb-2">Export & Use</h3>
+      <div class="flex gap-2">
+        <a href="/api/data/prices?format=csv" class="bg-white text-[#0A1F44] px-3 py-2 rounded text-xs font-bold">Export CSV</a>
+        <a href="/api/data/prices" class="bg-white/20 px-3 py-2 rounded text-xs">JSON API</a>
+        <a href="/reports?source=prices" class="bg-[#14B8A6] px-3 py-2 rounded text-xs font-bold">Build Report →</a>
+      </div>
+    </div>
+  </div>
+
+</main>
+</div>
+
+<script>
+function filterTable(){
+  const q = document.getElementById('searchProd').value.toLowerCase();
+  const county = document.getElementById('filterCounty').value.toLowerCase();
+  const rows = document.querySelectorAll('#tableBody tr');
+  let visible = 0;
+  rows.forEach(r=>{
+    const prod = r.getAttribute('data-product')||'';
+    const c = r.getAttribute('data-county')||'';
+    const matchProd = prod.includes(q);
+    const matchCounty =!county || c.includes(county);
+    const show = matchProd && matchCounty;
+    r.style.display = show? '' : 'none';
+    if(show) visible++;
+  });
+  document.getElementById('rowCount').innerText = visible + ' rows';
+}
+function sortTable(){
+  const mode = document.getElementById('sortBy').value;
+  const tbody = document.getElementById('tableBody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  rows.sort((a,b)=>{
+    if(mode==='price_desc' || mode==='price_asc'){
+      const pa = parseFloat(a.cells[3]?.innerText.replace(/[^0-9.]/g,'')||0);
+      const pb = parseFloat(b.cells[3]?.innerText.replace(/[^0-9.]/g,'')||0);
+      return mode==='price_desc'? pb-pa : pa-pb;
+    }
+    if(mode==='county') return (a.getAttribute('data-county')||'').localeCompare(b.getAttribute('data-county')||'');
+    if(mode==='product') return (a.getAttribute('data-product')||'').localeCompare(b.getAttribute('data-product')||'');
+    return 0;
+  });
+  rows.forEach(r=>tbody.appendChild(r));
+}
+</script>
+{% endblock %}
