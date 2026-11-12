@@ -18,16 +18,16 @@ from starlette.config import Config
 router = APIRouter(prefix="/auth", tags=["Auth"])
 templates = Jinja2Templates(directory="app/templates")
 
-# --- EMAIL CONFIG ---
 RESEND_KEY = os.getenv("RESEND_API_KEY")
 FROM_EMAIL = os.getenv("FROM_EMAIL", "noreply@evidlens.co.ke")
 FROM_NAME = os.getenv("FROM_NAME", "EvidLens")
 APP_URL = os.getenv("APP_URL", "https://app.evidlens.co.ke")
+SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", FROM_EMAIL)
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "").lower().strip()
 
 if RESEND_KEY:
     resend.api_key = RESEND_KEY
 
-# --- GOOGLE OAUTH CONFIG ---
 config = Config('.env')
 oauth = OAuth(config)
 oauth.register(
@@ -56,7 +56,7 @@ def send_verification_email(to: str, name: str, token: str):
           <a href="{verify_url}" style="display:inline-block;background:#14B8A6;color:white;padding:14px 28px;border-radius:12px;text-decoration:none;font-weight:700;font-size:14px">Verify Email Address</a>
         </div>
         <p style="color:#64748b;font-size:13px">Or copy this link: <br><a href="{verify_url}" style="color:#0d9488;word-break:break-all">{verify_url}</a></p>
-        <p style="color:#94a3b8;font-size:12px;margin-top:24px">Link expires in 24 hours. If you didn't request this, ignore this email.<br><br>Support: support@evidlens.co.ke<br>© 2026 EvidLens Ltd • KDPA Compliant • ODPC Registered</p>
+        <p style="color:#94a3b8;font-size:12px;margin-top:24px">Link expires in 24 hours. If you didn't request this, ignore this email.<br><br>Support: {SUPPORT_EMAIL}<br>© 2026 EvidLens Ltd • KDPA Compliant • ODPC Registered</p>
       </div>
     </div>
     """
@@ -201,7 +201,6 @@ def login_page(request: Request):
 def signup_page(request: Request):
     return templates.TemplateResponse("signup.html", {"request": request})
 
-# --- GOOGLE OAUTH ROUTES ---
 @router.get("/oauth/google")
 async def oauth_google(request: Request):
     redirect_uri = f"{APP_URL}/auth/oauth/google/callback"
@@ -214,25 +213,48 @@ async def oauth_google_callback(request: Request, db: Session = Depends(get_db))
         user_info = token.get('userinfo')
         if not user_info:
             user_info = await oauth.google.parse_id_token(request, token)
-
-        email = user_info['email']
-        name = user_info.get('name', email.split('@')[0])
-
+        email = str(user_info['email']).lower().strip()
+        name = user_info.get('name') or email.split('@')[0]
+        is_admin_email = bool(ADMIN_EMAIL) and email == ADMIN_EMAIL
         user = get_user_by_email(db, email)
         if not user:
-            user_id = str(uuid.uuid4())
-            db.exec(text(f"INSERT INTO auth_user (id, email, full_name, hashed_password, email_verified, is_active, sector, county, theme, language) VALUES (:id, :email, :name, '', true, true, 'general', 'Nairobi', 'light', 'en')"), {"id": user_id, "email": email, "name": name})
+            user = AuthUser(
+                email=email,
+                full_name=name,
+                hashed_password="",
+                email_verified=True,
+                is_active=True,
+            )
+            if hasattr(user, "role"):
+                user.role = "admin" if is_admin_email else "user"
+            if hasattr(user, "is_admin"):
+                user.is_admin = is_admin_email
+            db.add(user)
             db.commit()
-            user = get_user_by_email(db, email)
-            if not user:
-                # fallback fetch
-                res = db.exec(text("SELECT * FROM auth_user WHERE email = :email"), {"email": email}).first()
-                user = res
-
+            db.refresh(user)
+        else:
+            updated = False
+            if hasattr(user, "email_verified") and not user.email_verified:
+                user.email_verified = True
+                updated = True
+            if hasattr(user, "is_active") and not user.is_active:
+                user.is_active = True
+                updated = True
+            if is_admin_email:
+                if hasattr(user, "role") and getattr(user, "role", None) != "admin":
+                    user.role = "admin"
+                    updated = True
+                if hasattr(user, "is_admin") and not getattr(user, "is_admin", False):
+                    user.is_admin = True
+                    updated = True
+            if updated:
+                db.add(user)
+                db.commit()
+                db.refresh(user)
         response = RedirectResponse(url="/", status_code=302)
         response.set_cookie(
             key="user_id",
-            value=str(user.id if hasattr(user, 'id') else user[0]),
+            value=str(user.id),
             httponly=True,
             secure=True,
             samesite="lax",
@@ -244,11 +266,10 @@ async def oauth_google_callback(request: Request, db: Session = Depends(get_db))
         print(f"[OAUTH ERROR] {e}")
         return RedirectResponse(url=f"/auth/login?error=oauth_failed&detail={str(e)[:100]}", status_code=302)
 
-# ADMIN FIX
 @router.get("/admin/fix-login")
 def fix_login(db: Session = Depends(get_db), admin: AuthUser = Depends(require_admin)):
     db.exec(text("UPDATE auth_user SET email_verified = true, is_active = true WHERE email_verified = false"))
-    db.exec(text(f"DELETE FROM auth_user WHERE email = :email"), {"email": FROM_EMAIL})
+    db.exec(text("DELETE FROM auth_user WHERE email = :email"), {"email": FROM_EMAIL})
     db.commit()
     users = db.exec(text("SELECT id, email, email_verified, is_active FROM auth_user")).all()
     return {"fixed": True, "message": "Verified existing users - passwords preserved", "users": [{"id": u[0], "email": u[1], "verified": u[2], "active": u[3]} for u in users]}
