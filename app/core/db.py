@@ -66,7 +66,6 @@ def get_db() -> Generator[Session, None, None]:
     finally:
         db.close()
 
-# REAL FIX: Import all models BEFORE create_all so metadata contains auth_user
 def _import_all_models():
     try:
         from app.core import models as core_models
@@ -116,6 +115,20 @@ def _import_all_models():
 _import_all_models()
 
 def init_db():
+    _import_all_models()
+    try:
+        from app.modules.auth.models import AuthUser
+    except Exception as e:
+        print(f"auth_user direct import error: {e}")
+        logger.error(f"auth_user direct import error: {e}")
+        raise
+    tables = list(SQLModel.metadata.tables.keys())
+    print(f"TABLES TO CREATE: {tables}")
+    logger.info(f"TABLES TO CREATE: {tables}")
+    if "auth_user" not in SQLModel.metadata.tables:
+        print("CRITICAL: auth_user NOT in metadata - aborting create_all, import failed")
+        logger.error("CRITICAL: auth_user NOT in metadata - aborting create_all, import failed")
+        raise RuntimeError("auth_user table not registered in SQLModel metadata")
     try:
         SQLModel.metadata.create_all(bind=engine, checkfirst=True)
         print("DB CORE TABLES CREATED - SUCCESS")
