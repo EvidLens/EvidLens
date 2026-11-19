@@ -107,7 +107,7 @@ class LensEngineService:
         ai_reply = await self.call_groq(user_message, context, history)
         if ai_reply:
             return {"reply": ai_reply, "source": "EvidLens DB + Groq"}
-        return {"reply": f"Got you - '{user_message}'. If you give me a product (like maize, milk, boda spares) and a county, I'll pull demand, avg KES price, and top competitors from our 9 data lanes. What's your idea?", "source": "fallback"}
+        return {"reply": f"Got you - '{user_message}'. If you give me a product and a county, I'll pull demand, avg KES price, and top competitors from our 9 data lanes. What's your idea?", "source": "fallback"}
     async def generate_sector_insights(self, sector: str, county: str = None) -> Dict[str, Any]:
         q = select(MarketMetric).where(MarketMetric.sector == sector)
         if county:
