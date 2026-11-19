@@ -217,6 +217,21 @@ async def oauth_google_callback(request: Request, db: Session = Depends(get_db))
         name = user_info.get('name') or email.split('@')[0]
         is_admin_email = bool(ADMIN_EMAIL) and email == ADMIN_EMAIL
         user = get_user_by_email(db, email)
+        admin_role = None
+        user_role = None
+        try:
+            from.models import UserRole
+            admin_role = UserRole.ADMIN
+            user_role = UserRole.USER
+        except Exception:
+            try:
+                from app.modules.auth.models import UserRole as _UR
+                admin_role = _UR.ADMIN
+                user_role = _UR.USER
+            except Exception:
+                admin_role = "ADMIN"
+                user_role = "USER"
+        target_role = admin_role if is_admin_email else user_role
         if not user:
             user = AuthUser(
                 email=email,
@@ -226,7 +241,7 @@ async def oauth_google_callback(request: Request, db: Session = Depends(get_db))
                 is_active=True,
             )
             if hasattr(user, "role"):
-                user.role = "admin" if is_admin_email else "user"
+                user.role = target_role
             if hasattr(user, "is_admin"):
                 user.is_admin = is_admin_email
             db.add(user)
@@ -241,8 +256,8 @@ async def oauth_google_callback(request: Request, db: Session = Depends(get_db))
                 user.is_active = True
                 updated = True
             if is_admin_email:
-                if hasattr(user, "role") and getattr(user, "role", None) != "admin":
-                    user.role = "admin"
+                if hasattr(user, "role") and getattr(user, "role", None) != admin_role:
+                    user.role = admin_role
                     updated = True
                 if hasattr(user, "is_admin") and not getattr(user, "is_admin", False):
                     user.is_admin = True
