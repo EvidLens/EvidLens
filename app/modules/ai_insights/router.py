@@ -8,18 +8,17 @@ import json
 import io
 import os
 import httpx
-
 from app.modules.ai_insights.service import AIInsightsService
 from app.core.guards import require_module, consume_credits
 from app.core.models import UserSubscription
 from app.core.db import get_session
 
 __all__ = ["router", "router_api", "ask_lens_chat", "ChatRequest", "process_chat"]
-
 router = APIRouter(prefix="/ai", tags=["Ask Lens"])
 router_api = APIRouter(prefix="/api", tags=["Ask Lens API"])
 templates = Jinja2Templates(directory="app/templates")
 GROQ_KEY = os.getenv("GROQ_API_KEY")
+SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", "support@evidlens.co.ke")
 ai_service = AIInsightsService()
 
 class InsightRequest(BaseModel):
@@ -47,18 +46,13 @@ class ChatRequest(BaseModel):
 
 SYSTEM_PROMPT = """You are Ask Lens, the AI Agent for EvidLens Kenya Decision Intelligence.
 You have access to 9 Lanes of Kenya data: MarketPrice, BusinessDirectory, DemandSignal, CountyStats, Sectors, Opportunities.
-
-You must give DETAILED analysis in 8 sections:
-1. EXECUTIVE SUMMARY with Go/No-Go Score /10
-2. MARKET SIZE & DEMAND - Total Market Size KES, Demand Score /10, Volume, Growth %
-3. PRICING INTELLIGENCE - Live KES table: Product | Avg Price | Market | County
-4. COMPETITOR LANDSCAPE - 5 Real Businesses with Rating, Reviews, County
-5. COUNTY DEEP DIVE - Market Size, Best Subcounty, Best Ward
-6. FINANCIAL VIABILITY - For Budget KES: Startup breakdown, Break-even months, Monthly Profit, ROI%
-7. RISKS & MITIGATION - 3 Risks
-8. ACTION PLAN - 30 Days
-
-Rules: Use KES, counties, sub-counties, wards. Cite KNBS, CBK, KRA, MarketPrice, BusinessDirectory. Never brief. Minimum 400 words. If no DB data, ESTIMATE with Kenya benchmarks but label as Estimated. Never say "Lens error" or "No data yet".
+Personality: Real human, smart, warm, slightly playful, Kenyan. Talk like ChatGPT, not a form. Keep replies 2-5 sentences unless user asks for a full report. Always give 1 actionable next step. Currency KES, counties only.
+Rules:
+If user says hi/hello/hey/niaje/sasa: greet warmly in 1 sentence, ask what business they are exploring. Do NOT give 8 sections.
+If user says vague like 'i need something' / 'help' / 'i need help': ask ONE question only: What product or business are you thinking about? Do NOT ask for product + county + budget + timeline all at once.
+If user gives a real product/business but no county or budget: DO NOT block. Assume nationwide, KES 500000, 12 months, say you assumed that, and give the answer. Ask for county/budget at the end in 1 line if needed.
+If user asks for full report / analysis / viability / business case / detailed: give DETAILED analysis in 8 sections: 1. EXECUTIVE SUMMARY with Go/No-Go Score /10 2. MARKET SIZE & DEMAND - Total Market Size KES, Demand Score /10, Volume, Growth % 3. PRICING INTELLIGENCE - Live KES table: Product | Avg Price | Market | County 4. COMPETITOR LANDSCAPE - 5 Real Businesses with Rating, Reviews, County 5. COUNTY DEEP DIVE - Market Size, Best Subcounty, Best Ward 6. FINANCIAL VIABILITY - For Budget KES: Startup breakdown, Break-even months, Monthly Profit, ROI% 7. RISKS & MITIGATION - 3 Risks 8. ACTION PLAN - 30 Days
+Use KES, counties, sub-counties, wards. Cite KNBS, CBK, KRA, MarketPrice, BusinessDirectory. Never brief when full report asked. Minimum 400 words for full report. If no DB data, ESTIMATE with Kenya benchmarks but label as Estimated.
 """
 
 TOOLS = [
@@ -91,16 +85,33 @@ def safe_consume_credits(session, user_id, credit_type="api_credits", amount=1):
     except:
         pass
 
+def is_greeting_or_vague(text: str):
+    low = text.lower().strip()
+    greetings = ["hi", "hello", "hey", "niaje", "sasa", "hi!", "hello!", "hey!", "good morning", "good afternoon", "good evening", "habari", "mambo"]
+    vague = ["i need something", "i need help", "help", "i need", "something", "i want something", "need something", "i want help", "assist me", "help me"]
+    if low in greetings:
+        return "greeting"
+    if low in vague:
+        return "vague"
+    if len(low.split()) <= 2 and low not in greetings:
+        return "vague"
+    return None
+
 async def process_chat(req: ChatRequest, request: Request, session: Session):
     user_id = getattr(request.state, 'user', None)
     user_id = user_id.id if user_id else 1
     safe_consume_credits(session, user_id, "api_credits", 1)
-
+    kind = is_greeting_or_vague(req.message)
+    if kind == "greeting":
+        ans = "Hey! I'm Lens, your EvidLens market partner. What business idea are you exploring? Tell me the product and county and I'll pull live prices and competitors for you."
+        return {"reply": ans, "response": ans, "message": ans, "answer": ans, "sources": ["EvidLens"], "verdict": None}
+    if kind == "vague":
+        ans = "Got you, I'm here. What are you thinking about starting or growing? Just tell me the product or business, even in one word, and I'll take it from there."
+        return {"reply": ans, "response": ans, "message": ans, "answer": ans, "sources": ["EvidLens"], "verdict": None}
     if not GROQ_KEY:
         result = await ai_service.generate_insights(req.message, req.context or {}, user_id)
         ans = result.get("answer", "Lens offline - no GROQ key")
         return {"reply": ans, "response": ans, "message": ans, "answer": ans, "sources": result.get("sources", []), "verdict": result.get("verdict")}
-
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     for msg in req.history[-6:]:
         messages.append({"role": msg.role, "content": msg.content})
@@ -109,24 +120,13 @@ async def process_chat(req: ChatRequest, request: Request, session: Session):
         budget_info = req.context.get('budget_kes','')
         messages.append({"role": "system", "content": f"User Context: Sector={req.context.get('sector')}, Location={geo}, Budget={budget_info} KES"})
     messages.append({"role": "user", "content": req.message})
-
-    groq_models = [
-        "meta-llama/llama-4-maverick-17b-128e-instruct",
-        "meta-llama/llama-4-scout-17b-16e-instruct",
-        "openai/gpt-oss-120b",
-        "openai/gpt-oss-20b"
-    ]
-
+    groq_models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "openai/gpt-oss-120b", "openai/gpt-oss-20b"]
     last_error = ""
     for model_name in groq_models:
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
-                res = await client.post(
-                    "https://api.groq.com/openai/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {GROQ_KEY}"},
-                    json={"model": model_name, "messages": messages, "tools": TOOLS, "tool_choice": "auto", "max_tokens": 4000, "temperature": 0.4}
-                )
-                if res.status_code!= 200:
+                res = await client.post("https://api.groq.com/openai/v1/chat/completions", headers={"Authorization": f"Bearer {GROQ_KEY}"}, json={"model": model_name, "messages": messages, "tools": TOOLS, "tool_choice": "auto", "max_tokens": 4000, "temperature": 0.7})
+                if res.status_code != 200:
                     last_error = res.text[:800]
                     print(f"{model_name} failed {res.status_code}: {last_error}")
                     continue
@@ -135,9 +135,7 @@ async def process_chat(req: ChatRequest, request: Request, session: Session):
             last_error = str(e)
             print(f"{model_name} exception {e}")
             continue
-
         msg = data["choices"][0]["message"]
-
         if msg.get("tool_calls"):
             tool_call = msg["tool_calls"][0]
             tool_name = tool_call["function"]["name"]
@@ -147,11 +145,7 @@ async def process_chat(req: ChatRequest, request: Request, session: Session):
                 messages.append(msg)
                 messages.append({"role": "tool", "tool_call_id": tool_call["id"], "content": json.dumps(tool_result)})
                 async with httpx.AsyncClient(timeout=60.0) as client:
-                    res2 = await client.post(
-                        "https://api.groq.com/openai/v1/chat/completions",
-                        headers={"Authorization": f"Bearer {GROQ_KEY}"},
-                        json={"model": model_name, "messages": messages, "max_tokens": 4000, "temperature": 0.4}
-                    )
+                    res2 = await client.post("https://api.groq.com/openai/v1/chat/completions", headers={"Authorization": f"Bearer {GROQ_KEY}"}, json={"model": model_name, "messages": messages, "max_tokens": 4000, "temperature": 0.7})
                     if res2.status_code == 200:
                         final_content = res2.json()["choices"][0]["message"]["content"]
                         return {"reply": final_content, "response": final_content, "message": final_content, "answer": final_content, "result": tool_result, "tool_used": tool_name, "sources": ["EvidLens 9 Lanes", f"Groq {model_name}"], "credits_used": 1, "verdict": tool_result.get("verdict")}
@@ -161,10 +155,8 @@ async def process_chat(req: ChatRequest, request: Request, session: Session):
             ans = tool_result.get("answer") if isinstance(tool_result, dict) else str(tool_result)
             ans = ans or f"Done. {tool_name}"
             return {"reply": ans, "response": ans, "message": ans, "answer": ans, "result": tool_result, "credits_used": 1, "sources": ["EvidLens Tools"], "verdict": tool_result.get("verdict")}
-
         content = msg.get("content") or "How can I help with Kenya markets?"
         return {"reply": content, "response": content, "message": content, "answer": content, "credits_used": 1, "sources": ["EvidLens 9 Lanes", f"Groq {model_name}"], "model": model_name}
-
     result = await ai_service.generate_insights(req.message, req.context or {}, user_id)
     return {"reply": result["answer"], "response": result["answer"], "message": result["answer"], "answer": result["answer"], "sources": result.get("sources", []), "verdict": result.get("verdict"), "fallback": True, "last_error": last_error}
 
@@ -180,6 +172,10 @@ async def ask_lens_chat(request: Request, req: ChatRequest, session: Session = D
 async def ask_lens_chat_api(request: Request, req: ChatRequest, session: Session = Depends(get_session)):
     return await process_chat(req, request, session)
 
+@router_api.post("/analyze")
+async def analyze_api(request: Request, req: ChatRequest, session: Session = Depends(get_session)):
+    return await process_chat(req, request, session)
+
 @router.get("/chat")
 async def ask_lens_chat_get(message: str = "hello", request: Request = None, session: Session = Depends(get_session)):
     return await process_chat(ChatRequest(message=message, history=[], context={}), request, session)
@@ -191,19 +187,9 @@ async def ask_lens(request: Request, req: InsightRequest, session: Session = Dep
     safe_consume_credits(session, user_id, "api_credits", 1)
     market_data = {"sector": req.sector, "county": req.county, "sub_county": req.sub_county, "ward": req.ward, "budget_kes": req.budget_kes}
     result = await ai_service.generate_insights(req.query, market_data, user_id)
-    if req.export_format!= "json":
+    if req.export_format != "json":
         return export_result(result, req.export_format)
-    return {
-        "reply": result["answer"],
-        "response": result["answer"],
-        "answer": result["answer"],
-        "chart_data": result.get("chart"),
-        "table": result.get("table"),
-        "map": result.get("map"),
-        "sources": result.get("sources", []),
-        "verdict": result.get("verdict"),
-        "export_url": f"/ai/export?format={req.export_format}"
-    }
+    return {"reply": result["answer"], "response": result["answer"], "answer": result["answer"], "chart_data": result.get("chart"), "table": result.get("table"), "map": result.get("map"), "sources": result.get("sources", []), "verdict": result.get("verdict"), "export_url": f"/ai/export?format={req.export_format}"}
 
 @router.post("/viability")
 async def viability_check(request: Request, req: InsightRequest, session: Session = Depends(get_session)):
@@ -248,12 +234,8 @@ async def export_leads(request: Request, req: InsightRequest, session: Session =
 
 @router.get("/help")
 def ask_lens_help(query: str):
-    help_map = {
-        "pricing": "EV-SME 20k, EV-GROWTH 50k, EV-PRO 100k, EV-ENT 200k",
-        "setup": "Go to Dashboard > Pick Sector > Pick County > Ask Lens",
-        "features": "19 Modules, 9 Lanes, Kenya-First Data"
-    }
-    ans = help_map.get(query.lower(), "Contact support@evidlens.co.ke")
+    help_map = {"pricing": "EV-SME 20k, EV-GROWTH 50k, EV-PRO 100k, EV-ENT 200k", "setup": "Go to Dashboard > Pick Sector > Pick County > Ask Lens", "features": "19 Modules, 9 Lanes, Kenya-First Data"}
+    ans = help_map.get(query.lower(), f"Contact {SUPPORT_EMAIL}")
     return {"reply": ans, "response": ans, "answer": ans}
 
 def export_result(data, format):
