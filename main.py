@@ -31,9 +31,6 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.schedulers import SchedulerNotRunningError
 
-# ------------------------------------------------------------------
-# Core - Models & Config
-# ------------------------------------------------------------------
 from app.core.models import (
     MarketMetric,
     Company,
@@ -51,9 +48,6 @@ from app.core.scheduler import start_scheduler, shutdown_scheduler
 from app.modules.auth.models import AuthUser
 from app.modules.database import get_session as get_db
 
-# ------------------------------------------------------------------
-# Routers
-# ------------------------------------------------------------------
 from app.routers.pages import router as pages_router
 from app.modules.data_layer.router import router as data_router
 from app.modules.billing.router import router as billing_page_router
@@ -77,20 +71,10 @@ from app.modules.storage.router import router as storage_router
 from app.modules.api import data, meta
 from app.core import billing
 
-# ------------------------------------------------------------------
-# Env & Constants
-# ------------------------------------------------------------------
 load_dotenv()
-
 UTC = timezone.utc
+scheduler = AsyncIOScheduler(timezone=getattr(settings, "SCHEDULER_TIMEZONE", "Africa/Nairobi"))
 
-scheduler = AsyncIOScheduler(
-    timezone=getattr(settings, "SCHEDULER_TIMEZONE", "Africa/Nairobi")
-)
-
-# ------------------------------------------------------------------
-# FastAPI App
-# ------------------------------------------------------------------
 app = FastAPI(
     title="EvidLens API",
     version="2.5.14",
@@ -98,19 +82,12 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# ------------------------------------------------------------------
-# Middleware
-# ------------------------------------------------------------------
 app.add_middleware(
     SessionMiddleware,
-    secret_key=os.getenv(
-        "SECRET_KEY",
-        "evidlens-secret-key-change-2026-strong-random"
-    ),
+    secret_key=os.getenv("SECRET_KEY", "evidlens-secret-key-change-2026-strong-random"),
     same_site="lax",
     https_only=True,
 )
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -125,12 +102,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 app.add_middleware(AuthMiddleware)
 
-# ==================================================================
-# Helpers
-# ==================================================================
 async def get_current_user_optional(
     request: Request,
     db: Session = Depends(get_db),
@@ -139,9 +112,7 @@ async def get_current_user_optional(
     if not user_id:
         return None
     try:
-        user = db.exec(
-            select(AuthUser).where(AuthUser.id == int(user_id))
-        ).first()
+        user = db.exec(select(AuthUser).where(AuthUser.id == int(user_id))).first()
         if not user or not user.is_active or not user.email_verified:
             return None
         return user
@@ -161,9 +132,6 @@ def safe_job(job_func, job_name: str):
         print(f"[{job_name}] FAILED: {e}")
         traceback.print_exc()
 
-# ==================================================================
-# Database Migrations (Production Safe)
-# ==================================================================
 def fix_auth_user_table():
     cols = [
         "ADD COLUMN IF NOT EXISTS phone VARCHAR",
@@ -214,7 +182,6 @@ def fix_reports_table():
                     conn.rollback()
     except Exception:
         pass
-
     add_cols = [
         "ADD COLUMN IF NOT EXISTS file_type VARCHAR(20) DEFAULT 'pdf'",
         "ADD COLUMN IF NOT EXISTS file_path VARCHAR(500)",
@@ -325,44 +292,32 @@ def force_create_tables():
     except Exception as e:
         print(f"Force create failed: {e}")
 
-# ==================================================================
-# Lifecycle - FIXED ORDER FOR FRESH RENDER DB
-# ==================================================================
 @app.on_event("startup")
 def on_startup():
-    # 1. CREATE all ORM tables FIRST - critical for fresh DB like dpg-davp1pid0e5s738rev9g-a
     try:
         init_db()
         print("✓ DB INIT OK - Core tables created")
     except Exception as e:
         print(f"DB init error: {e}")
         traceback.print_exc()
-
-    # 2. Ensure raw SQL tables exist
     try:
         force_create_tables()
     except Exception as e:
         print(f"Force create error: {e}")
-
-    # 3. THEN migrate/add columns - tables now exist
     try:
         fix_auth_user_table()
     except Exception as e:
         print(f"Auth migrate error: {e}")
-
     try:
         fix_reports_table()
     except Exception as e:
         print(f"Reports migrate error: {e}")
-
-    # 4. Scheduler last
     try:
         from app.modules.cron.jobs import (
             scrape_kpin_prices,
             fetch_real_news,
             fetch_real_tweets,
         )
-
         scheduler.add_job(
             lambda: safe_job(scrape_kpin_prices, "KPIN"),
             CronTrigger(hour=getattr(settings, "KPIN_SCRAPE_HOUR", 3), minute=0),
@@ -398,15 +353,9 @@ def shutdown_event():
     except Exception:
         pass
 
-# ==================================================================
-# Static & Templates
-# ==================================================================
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates", auto_reload=True)
 
-# ==================================================================
-# Register All Routers
-# ==================================================================
 app.include_router(pages_router)
 app.include_router(data_router)
 app.include_router(billing_page_router)
@@ -431,9 +380,6 @@ app.include_router(data.router)
 app.include_router(meta.router)
 app.include_router(analysis_router)
 
-# ==================================================================
-# Public Pages
-# ==================================================================
 @app.get("/privacy", response_class=HTMLResponse)
 def privacy_page(request: Request):
     return templates.TemplateResponse("privacy.html", {"request": request})
@@ -474,9 +420,6 @@ def forgot_alias_page(request: Request):
 def pricing_page(request: Request):
     return templates.TemplateResponse("pricing.html", {"request": request})
 
-# ==================================================================
-# Dashboard + Health
-# ==================================================================
 @app.get("/", response_class=HTMLResponse)
 def root(
     request: Request,
@@ -502,7 +445,6 @@ def root(
         "logout": "/auth/logout",
         "login": "/login",
     }
-
     def safe_count(stmt):
         try:
             result = db.exec(stmt).first()
@@ -517,23 +459,19 @@ def root(
             except Exception:
                 pass
             return 0
-
     from app.modules.pricing_engine.models import ProductPrice, Competitor as PriceCompetitor
     from app.modules.competitive_engine.models import Company as CompCompany
     from app.core.models import KenyaLensBusiness
-
     c1 = safe_count(select(func.count()).select_from(Competitor))
     c2 = safe_count(select(func.count()).select_from(PriceCompetitor))
     c3 = safe_count(select(func.count()).select_from(CompCompany))
     c4 = safe_count(select(func.count()).select_from(KenyaLensBusiness))
     c5 = safe_count(select(func.count()).select_from(Company))
     competitor_count = max(c1, c2, c3, c4, c5)
-
     p1 = safe_count(select(func.count()).select_from(PriceData))
     p2 = safe_count(select(func.count()).select_from(ProductPrice))
     p3 = safe_count(select(func.count()).select_from(MarketMetric))
     price_count = max(p1, p2, p3)
-
     business_count = safe_count(select(func.count()).select_from(Company))
     metric_count = safe_count(select(func.count()).select_from(MarketMetric))
     news_count = safe_count(select(func.count()).select_from(NewsArticle))
@@ -542,9 +480,7 @@ def root(
     knowledge_count = safe_count(select(func.count()).select_from(KnowledgeChunk))
     export_count = safe_count(select(func.count()).select_from(ExportOpportunity))
     county_count = safe_count(select(func.count(func.distinct(MarketMetric.county))))
-
     policy_count = news_count
-
     modules = [
         {"key": "Competitive Engine","name": "Competitive Engine","route": "/competitive","icon": "🎯","count": competitor_count},
         {"key": "Pricing Engine","name": "Price Oracle","route": "/market/prices","icon": "💰","count": price_count},
@@ -559,22 +495,28 @@ def root(
         {"key": "Report Builder","name": "Report Builder","route": "/reports","icon": "📑","count": report_count},
         {"key": "AI Insights","name": "AI Insights","route": "/ai","icon": "🧠","count": knowledge_count},
     ]
-
     data_payload = {
         "last_updated": datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),
         "stats": {"insights_generated": metric_count, "reports_exported": report_count},
         "modules": modules,
     }
-
     return templates.TemplateResponse("dashboard.html",{"request": request,"API": API,"data": data_payload,"current_user": current_user})
+
+@app.post("/api/run-scraper")
+def run_scraper():
+    from app.core.seed_master import seed_all
+    try:
+        result = seed_all()
+        return {"status": "ok", "result": result}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"status": "error", "error": str(e)}
 
 @app.get("/health")
 def health():
     return {"status": "ok", "version": "2.5.14"}
 
-# ==================================================================
-# Entry
-# ==================================================================
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
