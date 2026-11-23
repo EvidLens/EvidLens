@@ -44,7 +44,7 @@ def list_products(request: Request, business_id: int, session: Session = Depends
     business = get_business(session, business_id)
     if not business or business.owner_id != user_id: raise HTTPException(status_code=403, detail="Not your business")
     stmt = select(Product).where(Product.business_id == business_id)
-    return session.exec(stmt).all()
+    return list(session.exec(stmt))
 
 @router.post("/accounting/invoice")
 @require_module(module_number=8)
@@ -66,7 +66,7 @@ def list_invoices(request: Request, business_id: int, session: Session = Depends
     business = get_business(session, business_id)
     if not business or business.owner_id != user_id: raise HTTPException(status_code=403, detail="Not your business")
     stmt = select(Invoice).where(Invoice.business_id == business_id)
-    return session.exec(stmt).all()
+    return list(session.exec(stmt))
 
 @router.post("/hr/employee")
 @require_module(module_number=8)
@@ -82,4 +82,4 @@ def list_employees(request: Request, business_id: int, session: Session = Depend
     business = get_business(session, business_id)
     if not business or business.owner_id != user_id: raise HTTPException(status_code=403, detail="Not your business")
     stmt = select(Employee).where(Employee.business_id == business_id)
-    return session.exec(stmt).all()
+    return list(session.exec(stmt))
