@@ -8,7 +8,7 @@ import traceback
 from app.core.db import get_session as get_db
 from app.core.models import MarketMetric, Company, NewsArticle, SocialMention, ExportOpportunity
 from app.modules.auth.models import AuthUser
-from app.modules.auth.dependencies import get_current_user
+from app.modules.auth.dependencies import get_current_user, get_current_user_optional
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
