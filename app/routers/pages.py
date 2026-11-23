@@ -8,7 +8,7 @@ import traceback
 from app.core.db import get_session as get_db
 from app.core.models import MarketMetric, Company, NewsArticle, SocialMention, ExportOpportunity
 from app.modules.auth.models import AuthUser
-from app.modules.auth.dependencies import get_current_user, get_current_user_optional
+from app.modules.auth.dependencies import get_current_user_optional
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -57,7 +57,7 @@ def safe_template(request: Request, name: str, context: dict, fallback_title: st
     """, status_code=200)
 
 @router.get("/market/risk", response_class=HTMLResponse)
-def risk_sentinel_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user)):
+def risk_sentinel_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user_optional)):
     try:
         news = list(db.exec(select(NewsArticle).order_by(NewsArticle.published_at.desc()).limit(100)))
         data = [n.model_dump() if hasattr(n,'model_dump') else {"title": getattr(n,'title','-')} for n in news]
@@ -69,7 +69,7 @@ def risk_sentinel_page(request: Request, db: Session = Depends(get_db), user: Au
     return safe_template(request, "market_risk.html", {"request": request, "current_user": user, "risk_alerts": data, "risks": data, "risk": data}, "Risk Sentinel")
 
 @router.get("/market/export", response_class=HTMLResponse)
-def export_navigator_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user)):
+def export_navigator_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user_optional)):
     try:
         exports = list(db.exec(select(ExportOpportunity).limit(100)))
     except Exception as e:
@@ -84,7 +84,7 @@ def about(request: Request):
     return safe_template(request, "about.html", {"request": request}, "About")
 
 @router.get("/billing", response_class=HTMLResponse)
-def billing_page(request: Request, user: AuthUser = Depends(get_current_user)):
+def billing_page(request: Request, user: AuthUser = Depends(get_current_user_optional)):
     return safe_template(request, "billing.html", {"request": request, "current_user": user}, "Billing")
 
 @router.get("/changelog", response_class=HTMLResponse)
@@ -92,9 +92,9 @@ def changelog(request: Request):
     return safe_template(request, "changelog.html", {"request": request}, "Changelog")
 
 @router.get("/competitive", response_class=HTMLResponse)
-def competitive(request: Request, user: AuthUser = Depends(get_current_user), db: Session = Depends(get_db)):
+def competitive(request: Request, user: AuthUser = Depends(get_current_user_optional), db: Session = Depends(get_db)):
     try:
-        last = db.exec(select(MarketMetric).where(MarketMetric.user_id == user.id).order_by(desc(MarketMetric.timestamp)).limit(1)).first()
+        last = db.exec(select(MarketMetric).where(MarketMetric.user_id == user.id).order_by(desc(MarketMetric.timestamp)).limit(1)).first() if user else None
         if last:
             companies = list(db.exec(select(Company).where(Company.sector == last.sector, Company.county == last.county)))
             sector, county = last.sector, last.county
@@ -110,22 +110,14 @@ def competitive(request: Request, user: AuthUser = Depends(get_current_user), db
         except:
             companies = []
         sector, county = None, None
-    return safe_template(request, "competitive.html", {
-        "request": request,
-        "current_user": user,
-        "companies": companies,
-        "competitors": companies,
-        "count": len(companies),
-        "sector": sector,
-        "county": county
-    }, "Competitive")
+    return safe_template(request, "competitive.html", {"request": request, "current_user": user, "companies": companies, "competitors": companies, "count": len(companies), "sector": sector, "county": county}, "Competitive")
 
 @router.get("/contact", response_class=HTMLResponse)
 def contact(request: Request):
     return safe_template(request, "contact.html", {"request": request}, "Contact")
 
 @router.get("/location/counties", response_class=HTMLResponse)
-def counties_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user)):
+def counties_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user_optional)):
     try:
         counties_raw = list(db.exec(select(func.distinct(MarketMetric.county))))
         counties = [c[0] if isinstance(c,(list,tuple)) else c for c in counties_raw if c]
@@ -140,7 +132,7 @@ def counties_page(request: Request, db: Session = Depends(get_db), user: AuthUse
     return safe_template(request, "location_counties.html", {"request": request, "current_user": user, "counties": counties, "count_map": count_map}, "Counties")
 
 @router.get("/market/prices", response_class=HTMLResponse)
-def prices_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user)):
+def prices_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user_optional)):
     try:
         prices = list(db.exec(select(MarketMetric).order_by(MarketMetric.created_at.desc()).limit(500)))
     except Exception as e:
@@ -151,7 +143,7 @@ def prices_page(request: Request, db: Session = Depends(get_db), user: AuthUser 
     return safe_template(request, "market_prices.html", {"request": request, "current_user": user, "prices": prices}, "Price Oracle")
 
 @router.get("/market/demand", response_class=HTMLResponse)
-def demand_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user)):
+def demand_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user_optional)):
     try:
         demand = list(db.exec(select(MarketMetric).order_by(desc(MarketMetric.demand_score)).limit(500)))
     except Exception as e:
@@ -163,7 +155,7 @@ def demand_page(request: Request, db: Session = Depends(get_db), user: AuthUser 
 
 @router.get("/reports/funding", response_class=HTMLResponse)
 @router.get("/funding", response_class=HTMLResponse)
-def funding_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user)):
+def funding_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user_optional)):
     try:
         funders = list(db.exec(select(Company).where(or_(Company.sector.ilike("%Financial%"), Company.sector.ilike("%Banking%"), Company.sector.ilike("%Insurance%"), Company.sector.ilike("%SACCO%")))))
         counties_raw = list(db.exec(select(func.distinct(Company.county))))
@@ -180,9 +172,9 @@ def help_page(request: Request):
     return safe_template(request, "help.html", {"request": request}, "Help")
 
 @router.get("/history", response_class=HTMLResponse)
-def history(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user)):
+def history(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user_optional)):
     try:
-        analyses = list(db.exec(select(MarketMetric).where(MarketMetric.user_id == user.id).order_by(desc(MarketMetric.timestamp)).limit(100)))
+        analyses = list(db.exec(select(MarketMetric).where(MarketMetric.user_id == user.id).order_by(desc(MarketMetric.timestamp)).limit(100))) if user else []
     except Exception as e:
         print(f"history query error: {e}")
         try: db.rollback()
@@ -200,7 +192,7 @@ def signup_page(request: Request):
 
 @router.get("/kb/policy", response_class=HTMLResponse)
 @router.get("/policy", response_class=HTMLResponse)
-def policy_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user)):
+def policy_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user_optional)):
     try:
         try:
             policies = list(db.exec(select(NewsArticle).where(NewsArticle.category == "policy").order_by(desc(NewsArticle.published_at)).limit(100)))
@@ -222,22 +214,22 @@ def privacy(request: Request):
     return safe_template(request, "privacy.html", {"request": request}, "Privacy")
 
 @router.get("/risk", response_class=HTMLResponse)
-def risk(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user)):
+def risk(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user_optional)):
     return safe_template(request, "market_risk.html", {"request": request, "current_user": user}, "Risk")
 
 @router.get("/security", response_class=HTMLResponse)
-def security(request: Request, user: AuthUser = Depends(get_current_user)):
+def security(request: Request, user: AuthUser = Depends(get_current_user_optional)):
     return safe_template(request, "security.html", {"request": request, "current_user": user}, "Security")
 
 @router.get("/settings", response_class=HTMLResponse)
-def settings(request: Request, user: AuthUser = Depends(get_current_user)):
+def settings(request: Request, user: AuthUser = Depends(get_current_user_optional)):
     return safe_template(request, "settings.html", {"request": request, "current_user": user}, "Settings")
 
 @router.get("/stats", response_class=HTMLResponse)
-def stats(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user)):
+def stats(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user_optional)):
     try:
-        total = db.exec(select(func.count()).select_from(MarketMetric).where(MarketMetric.user_id == user.id)).first() or 0
-        top_counties = list(db.exec(select(MarketMetric.county, func.count().label("c")).where(MarketMetric.user_id == user.id).group_by(MarketMetric.county).order_by(desc("c")).limit(5)))
+        total = db.exec(select(func.count()).select_from(MarketMetric).where(MarketMetric.user_id == user.id)).first() or 0 if user else 0
+        top_counties = list(db.exec(select(MarketMetric.county, func.count().label("c")).where(MarketMetric.user_id == user.id).group_by(MarketMetric.county).order_by(desc("c")).limit(5))) if user else []
     except Exception as e:
         print(f"stats query error: {e}")
         try: db.rollback()
@@ -250,7 +242,7 @@ def terms(request: Request):
     return safe_template(request, "terms.html", {"request": request}, "Terms")
 
 @router.get("/voice", response_class=HTMLResponse)
-def voice_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user)):
+def voice_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user_optional)):
     try:
         posts = list(db.exec(select(SocialMention).order_by(SocialMention.created_at.desc()).limit(100)))
     except Exception as e:
@@ -261,11 +253,11 @@ def voice_page(request: Request, db: Session = Depends(get_db), user: AuthUser =
     return safe_template(request, "voice.html", {"request": request, "current_user": user, "posts": posts, "voices": posts, "voice": posts}, "Consumer Pulse")
 
 @router.get("/wallet", response_class=HTMLResponse)
-def wallet(request: Request, user: AuthUser = Depends(get_current_user)):
+def wallet(request: Request, user: AuthUser = Depends(get_current_user_optional)):
     return safe_template(request, "wallet.html", {"request": request, "current_user": user}, "Wallet")
 
 @router.get("/workspaces", response_class=HTMLResponse)
-def workspaces(request: Request, user: AuthUser = Depends(get_current_user)):
+def workspaces(request: Request, user: AuthUser = Depends(get_current_user_optional)):
     return safe_template(request, "workspaces.html", {"request": request, "current_user": user}, "Workspaces")
 
 @router.get("/forgot-password", response_class=HTMLResponse)
