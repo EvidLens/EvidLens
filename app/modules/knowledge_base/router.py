@@ -59,6 +59,11 @@ class SearchRequest(BaseModel):
     county: Optional[str] = None
     top_k: int = 5
 
+@router.get("", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse)
+async def kb_home(request: Request, current_user: User = Depends(get_current_user)):
+    return templates.TemplateResponse("kb_policy.html", {"request": request, "current_user": current_user, "sectors": KENYA_SECTORS})
+
 @router.get("/policy", response_class=HTMLResponse)
 async def policy_page(
     request: Request,
@@ -75,11 +80,9 @@ def list_sectors():
 def get_report(request: Request, sector: str, county: Optional[str] = Query(None), db: Session = Depends(get_db)):
     if sector not in KENYA_SECTORS:
         raise HTTPException(status_code=404, detail="Sector not found. Use /kb/sectors to list all 75")
-
     report = get_sector_report(db, sector, county)
     if not report:
         report = generate_report_with_groq(db, sector, county)
-
     return report
 
 @router.post("/search")
