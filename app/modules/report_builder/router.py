@@ -77,22 +77,17 @@ async def funding_page(request: Request, db: Session = Depends(get_db), current_
         from app.core.models import Company
         from app.modules.competitive_engine.models import Company as CompCompany
         from app.core.models import KenyaLensBusiness
-        
-        # REAL DATA
         try:
-            companies = db.exec(select(KenyaLensBusiness).limit(50)).all()
+            companies = list(db.exec(select(KenyaLensBusiness).limit(50)))
         except:
             db.rollback()
             companies = []
-        
         if not companies:
             try:
-                companies = db.exec(select(Company).limit(50)).all()
+                companies = list(db.exec(select(Company).limit(50)))
             except:
                 db.rollback()
                 companies = []
-
-        # Try templates in order - first that exists wins
         for tmpl_name in ["reports_funding.html", "funding.html", "reports/funding.html", "business_os.html", "dashboard.html"]:
             try:
                 return templates.TemplateResponse(tmpl_name, {
@@ -104,10 +99,7 @@ async def funding_page(request: Request, db: Session = Depends(get_db), current_
                 })
             except Exception:
                 continue
-
-        # Fallback JSON if no template
         return HTMLResponse(f"<h1>Funding Radar - {len(companies)} companies</h1><p>Template missing but data OK</p>")
-
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -115,7 +107,6 @@ async def funding_page(request: Request, db: Session = Depends(get_db), current_
             db.rollback()
         except:
             pass
-        # NEVER 500
         return templates.TemplateResponse("dashboard.html", {
             "request": request,
             "current_user": current_user,
@@ -150,16 +141,13 @@ def check_plan_access(plan_name: str, required_module: str = "Report Builder", u
 def generate_report(request: Request, req: GenerateReportRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     user_id = getattr(request.state, 'user', None)
     user_id = user_id.id if user_id else 1
-
     plan_name = get_user_plan(db, user_id)
     if not check_plan_access(plan_name, "Report Builder", user_id, db):
         raise HTTPException(status_code=402, detail=f"Report Builder locked. Your plan {plan_name} does not include Report Builder. Upgrade to Pro KES 5000 - https://app.evidlens.co.ke/api/billing/plans")
-
     q = req.get_query()
     sec = req.get_sector()
     rtype = req.get_report_type()
     fmt = req.get_format()
-
     location_str = req.town or req.ward or req.sub_county or req.county or req.country
     report = Report(
         user_id=user_id,
@@ -184,13 +172,10 @@ def generate_report(request: Request, req: GenerateReportRequest, background_tas
         db.rollback()
         print(f"[REPORT SAVE ERROR] {e}")
         raise HTTPException(status_code=500, detail=f"DB save failed: {str(e)}")
-
     background_tasks.add_task(process_report_generation, report.id, req, plan_name)
-
     return {"report_id": report.id, "status": "generating", "plan": plan_name, "message": f"Report {report.id} generating with 12 engines LIVE for {q} @ {location_str}. Poll /reports/list or /reports/download/{report.id}"}
 
 def process_report_generation(report_id: int, req: GenerateReportRequest, plan_name: str = "Pro"):
-    """Sync background - generates file path for all 12 modules + Quick Analysis"""
     from app.core.db import engine as bg_engine
     from sqlmodel import Session as BgSession
     with BgSession(bg_engine) as db:
@@ -218,7 +203,6 @@ def process_report_generation(report_id: int, req: GenerateReportRequest, plan_n
                     filepath = f"app/static/reports/EvidLens_{req.get_query()}_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"
                     with open(filepath, "wb") as f:
                         f.write(b"")
-
             report.file_path = filepath
             try:
                 report.file_size_kb = os.path.getsize(filepath) // 1024
@@ -246,20 +230,17 @@ def download_report(report_id: int, db: Session = Depends(get_db)):
         report.status = ReportStatus.EXPIRED
         db.commit()
         raise HTTPException(status_code=410, detail="Report expired")
-
     if not report.file_path or not os.path.exists(report.file_path):
         raise HTTPException(status_code=404, detail=f"File not found at {report.file_path}. Regenerate.")
-
     report.download_count += 1
     db.commit()
-
     media_type = "application/pdf" if str(report.format) == "ReportFormat.PDF" or report.format == ReportFormat.PDF else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     return FileResponse(report.file_path, filename=os.path.basename(report.file_path), media_type=media_type)
 
 @router.get("/list")
 def list_reports(db: Session = Depends(get_db)):
     stmt = select(Report).order_by(desc(Report.created_at)).limit(50)
-    reports = db.exec(stmt).all()
+    reports = list(db.exec(stmt))
     return {
         "reports": [
             {
