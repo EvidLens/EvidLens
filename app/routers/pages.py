@@ -13,7 +13,6 @@ from app.modules.auth.dependencies import get_current_user
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
-# MAP old names -> your real files
 TEMPLATE_ALIASES = {
     "demand.html": "market_demand.html",
     "prices.html": "market_prices.html",
@@ -24,20 +23,15 @@ TEMPLATE_ALIASES = {
 }
 
 def safe_template(request: Request, name: str, context: dict, fallback_title: str = ""):
-    # always ensure request + current_user exists for base.html
     context["request"] = request
     context.setdefault("current_user", None)
     context.setdefault("user", context.get("current_user"))
-
-    # try alias first
     try_names = [name]
     if name in TEMPLATE_ALIASES:
         try_names.append(TEMPLATE_ALIASES[name])
-    # also try market_ prefix fallback
     if not name.startswith("market_") and not name.startswith("location_"):
         try_names.append(f"market_{name}")
         try_names.append(f"location_{name}")
-
     last_err = None
     for try_name in try_names:
         try:
@@ -50,7 +44,6 @@ def safe_template(request: Request, name: str, context: dict, fallback_title: st
             traceback.print_exc()
             last_err = e
             continue
-
     print(f"TemplateNotFound: {name} tried {try_names} - {last_err}")
     title = fallback_title or name.replace('.html','').title()
     return HTMLResponse(f"""
@@ -66,7 +59,7 @@ def safe_template(request: Request, name: str, context: dict, fallback_title: st
 @router.get("/market/risk", response_class=HTMLResponse)
 def risk_sentinel_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user)):
     try:
-        news = db.exec(select(NewsArticle).order_by(NewsArticle.published_at.desc()).limit(100)).all()
+        news = list(db.exec(select(NewsArticle).order_by(NewsArticle.published_at.desc()).limit(100)))
         data = [n.model_dump() if hasattr(n,'model_dump') else {"title": getattr(n,'title','-')} for n in news]
     except Exception as e:
         print(f"risk query error: {e}")
@@ -78,7 +71,7 @@ def risk_sentinel_page(request: Request, db: Session = Depends(get_db), user: Au
 @router.get("/market/export", response_class=HTMLResponse)
 def export_navigator_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user)):
     try:
-        exports = db.exec(select(ExportOpportunity).limit(100)).all()
+        exports = list(db.exec(select(ExportOpportunity).limit(100)))
     except Exception as e:
         print(f"export query error: {e}")
         try: db.rollback()
@@ -103,21 +96,20 @@ def competitive(request: Request, user: AuthUser = Depends(get_current_user), db
     try:
         last = db.exec(select(MarketMetric).where(MarketMetric.user_id == user.id).order_by(desc(MarketMetric.timestamp)).limit(1)).first()
         if last:
-            companies = db.exec(select(Company).where(Company.sector == last.sector, Company.county == last.county)).all()
+            companies = list(db.exec(select(Company).where(Company.sector == last.sector, Company.county == last.county)))
             sector, county = last.sector, last.county
         else:
-            companies = db.exec(select(Company)).all()
+            companies = list(db.exec(select(Company)))
             sector, county = None, None
     except Exception as e:
         print(f"competitive error: {e}")
         try: db.rollback()
         except: pass
         try:
-            companies = db.exec(select(Company)).all()
+            companies = list(db.exec(select(Company)))
         except:
             companies = []
         sector, county = None, None
-
     return safe_template(request, "competitive.html", {
         "request": request,
         "current_user": user,
@@ -135,10 +127,9 @@ def contact(request: Request):
 @router.get("/location/counties", response_class=HTMLResponse)
 def counties_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user)):
     try:
-        counties_raw = db.exec(select(func.distinct(MarketMetric.county))).all()
+        counties_raw = list(db.exec(select(func.distinct(MarketMetric.county))))
         counties = [c[0] if isinstance(c,(list,tuple)) else c for c in counties_raw if c]
-        # also get company counts per county for richer UI
-        county_counts = db.exec(select(Company.county, func.count().label("cnt")).group_by(Company.county)).all()
+        county_counts = list(db.exec(select(Company.county, func.count().label("cnt")).group_by(Company.county)))
         count_map = {r[0]: r[1] for r in county_counts if r[0]}
     except Exception as e:
         print(f"counties query error: {e}")
@@ -151,7 +142,7 @@ def counties_page(request: Request, db: Session = Depends(get_db), user: AuthUse
 @router.get("/market/prices", response_class=HTMLResponse)
 def prices_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user)):
     try:
-        prices = db.exec(select(MarketMetric).order_by(MarketMetric.created_at.desc()).limit(500)).all()
+        prices = list(db.exec(select(MarketMetric).order_by(MarketMetric.created_at.desc()).limit(500)))
     except Exception as e:
         print(f"prices query error: {e}")
         try: db.rollback()
@@ -162,7 +153,7 @@ def prices_page(request: Request, db: Session = Depends(get_db), user: AuthUser 
 @router.get("/market/demand", response_class=HTMLResponse)
 def demand_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user)):
     try:
-        demand = db.exec(select(MarketMetric).order_by(desc(MarketMetric.demand_score)).limit(500)).all()
+        demand = list(db.exec(select(MarketMetric).order_by(desc(MarketMetric.demand_score)).limit(500)))
     except Exception as e:
         print(f"demand query error: {e}")
         try: db.rollback()
@@ -174,8 +165,8 @@ def demand_page(request: Request, db: Session = Depends(get_db), user: AuthUser 
 @router.get("/funding", response_class=HTMLResponse)
 def funding_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user)):
     try:
-        funders = db.exec(select(Company).where(or_(Company.sector.ilike("%Financial%"),Company.sector.ilike("%Banking%"),Company.sector.ilike("%Insurance%"),Company.sector.ilike("%SACCO%"))).all())
-        counties_raw = db.exec(select(func.distinct(Company.county))).all()
+        funders = list(db.exec(select(Company).where(or_(Company.sector.ilike("%Financial%"), Company.sector.ilike("%Banking%"), Company.sector.ilike("%Insurance%"), Company.sector.ilike("%SACCO%")))))
+        counties_raw = list(db.exec(select(func.distinct(Company.county))))
         counties = [c[0] if isinstance(c,(list,tuple)) else c for c in counties_raw if c]
     except Exception as e:
         print(f"funding query error: {e}")
@@ -191,7 +182,7 @@ def help_page(request: Request):
 @router.get("/history", response_class=HTMLResponse)
 def history(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user)):
     try:
-        analyses = db.exec(select(MarketMetric).where(MarketMetric.user_id == user.id).order_by(desc(MarketMetric.timestamp)).limit(100)).all()
+        analyses = list(db.exec(select(MarketMetric).where(MarketMetric.user_id == user.id).order_by(desc(MarketMetric.timestamp)).limit(100)))
     except Exception as e:
         print(f"history query error: {e}")
         try: db.rollback()
@@ -212,9 +203,9 @@ def signup_page(request: Request):
 def policy_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user)):
     try:
         try:
-            policies = db.exec(select(NewsArticle).where(NewsArticle.category == "policy").order_by(desc(NewsArticle.published_at)).limit(100)).all()
+            policies = list(db.exec(select(NewsArticle).where(NewsArticle.category == "policy").order_by(desc(NewsArticle.published_at)).limit(100)))
         except:
-            policies = db.exec(select(NewsArticle).order_by(desc(NewsArticle.published_at)).limit(100)).all()
+            policies = list(db.exec(select(NewsArticle).order_by(desc(NewsArticle.published_at)).limit(100)))
     except Exception as e:
         print(f"policy query error: {e}")
         try: db.rollback()
@@ -246,7 +237,7 @@ def settings(request: Request, user: AuthUser = Depends(get_current_user)):
 def stats(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user)):
     try:
         total = db.exec(select(func.count()).select_from(MarketMetric).where(MarketMetric.user_id == user.id)).first() or 0
-        top_counties = db.exec(select(MarketMetric.county, func.count().label("c")).where(MarketMetric.user_id == user.id).group_by(MarketMetric.county).order_by(desc("c")).limit(5)).all()
+        top_counties = list(db.exec(select(MarketMetric.county, func.count().label("c")).where(MarketMetric.user_id == user.id).group_by(MarketMetric.county).order_by(desc("c")).limit(5)))
     except Exception as e:
         print(f"stats query error: {e}")
         try: db.rollback()
@@ -261,7 +252,7 @@ def terms(request: Request):
 @router.get("/voice", response_class=HTMLResponse)
 def voice_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user)):
     try:
-        posts = db.exec(select(SocialMention).order_by(SocialMention.created_at.desc()).limit(100)).all()
+        posts = list(db.exec(select(SocialMention).order_by(SocialMention.created_at.desc()).limit(100)))
     except Exception as e:
         print(f"voice query error: {e}")
         try: db.rollback()
