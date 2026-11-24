@@ -3,71 +3,122 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EvidLens - Kenya's Decision Intelligence</title>
+    <title>{% block title %}EvidLens - Kenya's Decision Intelligence{% endblock %}</title>
+    <meta name="description" content="EvidLens - Kenya's Decision Intelligence. Demand Radar, Consumer Pulse, Policy Watch, Funding Radar, Knowledge Base, Report Builder.">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/static/css/style.css?v=2.0.0">
-    <script>
-    // FORCE LOGIN - RUNS BEFORE PAGE LOAD
-    (function(){
-      const publicPaths = ['/auth/login','/auth/register','/pricing','/health','/docs','/redoc','/openapi.json'];
-      const path = window.location.pathname;
-      const isPublic = publicPaths.some(p => path.startsWith(p)) || path === '/';
-      if (isPublic) return;
-      const token = localStorage.getItem('token');
-      const hasCookie = document.cookie.includes('user_id') || document.cookie.includes('access_token') || document.cookie.includes('token');
-      if (!token &&!hasCookie) {
-        window.location.href = '/auth/login?next=' + encodeURIComponent(window.location.pathname);
-      }
-    })();
-    </script>
+    <link rel="icon" href="/static/logo.png?v=2.0.0">
+    {% block head %}{% endblock %}
+    <!-- NO FORCE LOGIN - All 6 client pages are PUBLIC by design.
+         Login is only required for Generate / Download / Billing actions,
+         which are checked server-side in the router, not by JS redirect. -->
 </head>
-<body class="bg-gray-50">
-    <header class="bg-[#0A1F44] text-white h-16 flex items-center px-6 shadow-md justify-between">
-        <div class="flex items-center">
-            <img src="/static/logo.png?v=2.0.0" alt="EvidLens Logo" class="h-10 mr-3">
-            <span class="font-bold text-xl">EvidLens</span>
-        </div>
-        <div class="flex items-center gap-4 text-sm">
-            <span id="plan-badge" class="bg-[#14B8A6] px-3 py-1 rounded-full font-bold">Trial</span>
-            <a href="/docs" class="underline">API Docs</a>
-            <a href="/auth/logout" class="underline">Logout</a>
+<body class="bg-gray-50 min-h-screen flex flex-col font-sans antialiased">
+    <!-- TOP NAV -->
+    <header class="bg-[#0A1F44] text-white h-16 flex items-center px-4 md:px-6 shadow-md justify-between sticky top-0 z-50">
+        <a href="/" class="flex items-center gap-2">
+            <img src="/static/logo.png?v=2.0.0" alt="EvidLens Logo" class="h-10 w-10 object-contain bg-white rounded-full p-1">
+            <span class="font-bold text-xl tracking-tight">EvidLens</span>
+            <span class="hidden md:inline text-[11px] bg-white/10 px-2 py-1 rounded-full text-white/80">Kenya's Decision Intelligence</span>
+        </a>
+
+        <!-- Desktop Nav -->
+        <nav class="hidden lg:flex items-center gap-5 text-sm font-medium">
+            <a href="/market/demand" class="hover:text-teal-300">Demand Radar</a>
+            <a href="/voice" class="hover:text-teal-300">Consumer Pulse</a>
+            <a href="/policy" class="hover:text-teal-300">Policy Watch</a>
+            <a href="/reports/funding" class="hover:text-teal-300">Funding Radar</a>
+            <a href="/kb" class="hover:text-teal-300">Knowledge Base</a>
+            <a href="/reports" class="hover:text-teal-300">Report Builder</a>
+            <a href="/competitive" class="hover:text-teal-300">Competitive</a>
+        </nav>
+
+        <div class="flex items-center gap-3 text-sm">
+            <span id="plan-badge" class="bg-[#14B8A6] px-3 py-1 rounded-full font-bold text-xs md:text-sm">Trial</span>
+            <a href="/pricing" class="hidden md:inline bg-white text-[#0A1F44] px-3 py-1.5 rounded-full font-bold">Upgrade</a>
+            <a href="/docs" class="hidden md:inline underline opacity-80">API Docs</a>
+            <span id="auth-links" class="flex items-center gap-3">
+                <a href="/auth/login" class="underline">Login</a>
+                <a href="/auth/register" class="hidden md:inline underline">Register</a>
+            </span>
+            <button id="mobile-menu-btn" class="lg:hidden text-2xl px-2" aria-label="Menu">☰</button>
         </div>
     </header>
-    <main class="p-6 max-w-7xl mx-auto">{% block content %}{% endblock %}</main>
+
+    <!-- Mobile Nav -->
+    <div id="mobile-menu" class="hidden lg:hidden bg-[#0A1F44] text-white px-6 py-4 flex flex-col gap-3 text-sm font-medium">
+        <a href="/market/demand">📊 Demand Radar</a>
+        <a href="/voice">🎙️ Consumer Pulse</a>
+        <a href="/policy">📜 Policy Watch</a>
+        <a href="/reports/funding">💰 Funding Radar</a>
+        <a href="/kb">📚 Knowledge Base</a>
+        <a href="/reports">📝 Report Builder</a>
+        <a href="/competitive">🏆 Competitive</a>
+        <a href="/market/prices">💲 Prices</a>
+        <a href="/pricing">⭐ Pricing</a>
+    </div>
+
+    <!-- Main -->
+    <main class="p-4 md:p-6 max-w-7xl mx-auto w-full flex-1">
+        <div id="global-toast" class="hidden fixed top-20 right-4 z-[100] bg-[#0A1F44] text-white px-4 py-3 rounded-lg shadow-lg max-w-xs text-sm"></div>
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-[#0A1F44] text-white/70 text-center text-xs py-6 px-4 mt-8">
+        <p class="font-bold text-white text-sm mb-1">EvidLens — Kenya's Decision Intelligence</p>
+        <p>Demand Radar • Consumer Pulse • Policy Watch • Funding Radar • Knowledge Base • Report Builder</p>
+        <p class="mt-2"><a href="/pricing" class="underline">Pricing</a> • <a href="/privacy" class="underline">Privacy</a> • <a href="/terms" class="underline">Terms</a> • <a href="/contact" class="underline">Contact</a></p>
+        <p class="mt-2 opacity-60">© 2026 EvidLens. All rights reserved.</p>
+    </footer>
 
     <div id="chatbot-container"></div>
+
     <script src="/static/js/app.js?v=2.0.0"></script>
     <script>
-    // PLAN LOCKING - CONNECTS BILLING TO 12 CARDS + DOWNLOAD
-    const token = localStorage.getItem('token') || '';
-    async function loadPlan(){
-      try{
-        const headers = token? {Authorization: `Bearer ${token}`} : {};
-        const r = await fetch('/api/billing/my-subscription',{headers});
-        if(r.status === 401){
-          window.location.href = '/auth/login';
-          return;
+    // PLAN BADGE + LOCKING - NEVER redirect to login.
+    // If not logged in, we show Trial. Server enforces paywall on Generate/Download only.
+    (function(){
+        async function loadPlan(){
+            try{
+                const r = await EvidLens.api('/api/billing/my-subscription');
+                const badge = document.getElementById('plan-badge');
+                if(!r.ok){
+                    if(badge) badge.innerText = 'Trial';
+                    window.allowedModules = [];
+                    window.userPlan = 'Trial';
+                    return;
+                }
+                const d = await r.json().catch(()=>({}));
+                if(badge) badge.innerText = d.plan || 'Trial';
+                window.allowedModules = d.modules || [];
+                window.userPlan = d.plan || 'Trial';
+                // Auth links: if logged in, show Logout
+                if(d.plan && d.user_id){
+                    const authLinks = document.getElementById('auth-links');
+                    if(authLinks) authLinks.innerHTML = '<a href="/auth/logout" class="underline">Logout</a>';
+                }
+                document.querySelectorAll('[data-module-key]').forEach(el=>{
+                    const key = el.getAttribute('data-module-key');
+                    if(window.allowedModules.length > 0 && !window.allowedModules.includes(key)){
+                        el.classList.add('opacity-60','relative','cursor-not-allowed');
+                        if(!el.querySelector('.lock-tag')){
+                            const tag = document.createElement('div');
+                            tag.className = 'lock-tag absolute top-2 right-2 bg-red-600 text-white text-[10px] px-2 py-1 rounded font-bold z-10';
+                            tag.innerText = '🔒 Upgrade to Pro KES 5k';
+                            el.appendChild(tag);
+                        }
+                    }
+                });
+            }catch(e){ console.log('plan load fail', e); }
         }
-        const d = await r.json();
-        const badge = document.getElementById('plan-badge');
-        if(badge) badge.innerText = d.plan || 'Trial';
-        window.allowedModules = d.modules || [];
-        window.userPlan = d.plan || 'Trial';
-        document.querySelectorAll('[data-module-key]').forEach(el=>{
-          const key = el.getAttribute('data-module-key');
-          if(window.allowedModules.length > 0 &&!window.allowedModules.includes(key)){
-            el.classList.add('opacity-60','relative','cursor-not-allowed');
-            if(!el.querySelector('.lock-tag')){
-              const tag = document.createElement('div');
-              tag.className = 'lock-tag absolute top-2 right-2 bg-red-600 text-white text-[10px] px-2 py-1 rounded font-bold';
-              tag.innerText = '🔒 Upgrade to Pro KES 5k';
-              el.appendChild(tag);
-            }
-          }
-        });
-      }catch(e){ console.log('plan load fail',e)}
-    }
-    loadPlan();
+        loadPlan();
+        // Mobile menu
+        const btn = document.getElementById('mobile-menu-btn');
+        const menu = document.getElementById('mobile-menu');
+        if(btn && menu) btn.addEventListener('click', ()=> menu.classList.toggle('hidden'));
+    })();
     </script>
+    {% block scripts %}{% endblock %}
 </body>
 </html>
