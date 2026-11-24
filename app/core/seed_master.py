@@ -52,59 +52,117 @@ PRICES = [
 
 def seed_all():
     with Session(engine) as db:
-        # Companies
-        existing = db.exec(select(func.count()).select_from(Company)).first() or 0
-        if existing == 0:
-            for name, sector, county in COMPANIES:
-                db.add(Company(name=name, sector=sector, county=county, description=f"{name} - {sector} in {county}, Kenya"))
-            db.commit()
-        # Prices - PriceData + MarketMetric both, so all pages see data
-        p_count = db.exec(select(func.count()).select_from(PriceData)).first() or 0
-        if p_count == 0:
-            for product, price, county, sector in PRICES:
-                db.add(PriceData(product_name=product, county=county, sector=sector, price=float(price), tenant_id="public"))
-                db.add(MarketMetric(product=product, county=county, sector=sector, company_name="KPIN", avg_price_kes=float(price), demand_score=72.0, user_id=1))
-            db.commit()
-        # News / Risk - so Risk Sentinel is not empty
-        n_count = db.exec(select(func.count()).select_from(NewsArticle)).first() or 0
-        if n_count == 0:
-            for title, cat, county in [
-                ("CBK holds base rate - lending costs stable for SMEs","policy","Nairobi"),
-                ("KRA eTIMS deadline - SMEs must onboard","policy","Nairobi"),
-                ("Kenya maize prices ease after harvest in Nyeri","market","Nyeri"),
-                ("Tea auction prices rise at Mombasa auction","market","Mombasa"),
-                ("New export rules for horticulture to EU","policy","Nairobi"),
-            ]:
-                db.add(NewsArticle(title=title, summary=title, content=title, source="EvidLens", category=cat, county=county))
-            db.commit()
-        # Social / Consumer Pulse
-        s_count = db.exec(select(func.count()).select_from(SocialMention)).first() or 0
-        if s_count == 0:
-            for content, plat, county, sector in [
-                ("Maize prices in Nyeri are fair this week","X","Nyeri","Agriculture"),
-                ("Milk prices up in Nairobi","Facebook","Nairobi","Agribusiness - Livestock & Dairy"),
-                ("New supermarket opening in Nyeri town","Facebook","Nyeri","Retail - Supermarkets & Chains"),
-            ]:
-                db.add(SocialMention(platform=plat, content=content, author="Kenya Consumer", sentiment="neutral", county=county, sector=sector))
-            db.commit()
-        # Export
-        e_count = db.exec(select(func.count()).select_from(ExportOpportunity)).first() or 0
-        if e_count == 0:
-            for prod, dest, county in [("Tea","United Kingdom","Kericho"),("Coffee","Germany","Nyeri"),("Avocado","Netherlands","Murang'a"),("Flowers","Netherlands","Nakuru"),("Macadamia","China","Embu")]:
-                db.add(ExportOpportunity(product=prod, destination_country=dest, county=county, description=f"{prod} export to {dest}"))
-            db.commit()
-        # Knowledge
-        k_count = db.exec(select(func.count()).select_from(KnowledgeChunk)).first() or 0
-        if k_count == 0:
-            for sector in ["Agriculture","Banks","Retail - Supermarkets & Chains","Energy - Oil & Gas"]:
-                db.add(KnowledgeChunk(sector=sector, county="Nairobi", chunk_text=f"Kenya {sector} market overview - key players, pricing, regulation.", chunk_type="sector", source="EvidLens"))
-            db.commit()
-        # Plans + Modules from env if present, else skip - never fail seed
+        # --- Companies - core Company has ONLY name, sector, county ---
+        # NO description, NO rating, NO reviews in core.models.Company
+        try:
+            existing = db.exec(select(func.count()).select_from(Company)).first() or 0
+            if existing == 0:
+                for name, sector, county in COMPANIES:
+                    db.add(Company(name=name, sector=sector, county=county))
+                db.commit()
+        except Exception as e:
+            print(f"seed companies failed: {e}")
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
+        # --- Prices - PriceData + MarketMetric both ---
+        try:
+            p_count = db.exec(select(func.count()).select_from(PriceData)).first() or 0
+            if p_count == 0:
+                for product, price, county, sector in PRICES:
+                    db.add(PriceData(product_name=product, county=county, sector=sector, price=float(price), tenant_id="public"))
+                    db.add(MarketMetric(product=product, county=county, sector=sector, company_name="KPIN", avg_price_kes=float(price), demand_score=72.0, user_id=1))
+                db.commit()
+        except Exception as e:
+            print(f"seed prices failed: {e}")
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
+        # --- News / Risk ---
+        try:
+            n_count = db.exec(select(func.count()).select_from(NewsArticle)).first() or 0
+            if n_count == 0:
+                for title, cat, county in [
+                    ("CBK holds base rate - lending costs stable for SMEs","policy","Nairobi"),
+                    ("KRA eTIMS deadline - SMEs must onboard","policy","Nairobi"),
+                    ("Kenya maize prices ease after harvest in Nyeri","market","Nyeri"),
+                    ("Tea auction prices rise at Mombasa auction","market","Mombasa"),
+                    ("New export rules for horticulture to EU","policy","Nairobi"),
+                ]:
+                    db.add(NewsArticle(title=title, summary=title, source="EvidLens", category=cat, county=county))
+                db.commit()
+        except Exception as e:
+            print(f"seed news failed: {e}")
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
+        # --- Social / Consumer Pulse ---
+        try:
+            s_count = db.exec(select(func.count()).select_from(SocialMention)).first() or 0
+            if s_count == 0:
+                for content, plat, county, sector in [
+                    ("Maize prices in Nyeri are fair this week","X","Nyeri","Agriculture"),
+                    ("Milk prices up in Nairobi","Facebook","Nairobi","Agribusiness - Livestock & Dairy"),
+                    ("New supermarket opening in Nyeri town","Facebook","Nyeri","Retail - Supermarkets & Chains"),
+                ]:
+                    db.add(SocialMention(platform=plat, content=content, author="Kenya Consumer", sentiment="neutral", county=county, sector=sector))
+                db.commit()
+        except Exception as e:
+            print(f"seed social failed: {e}")
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
+        # --- Export - FIXED: core ExportOpportunity has ONLY tenant_id, country, product, opportunity_score ---
+        # OLD code used destination_country / county / description which do NOT exist -> country=None -> NotNullViolation
+        # NEW: country = destination country, product = product, score = real score
+        try:
+            e_count = db.exec(select(func.count()).select_from(ExportOpportunity)).first() or 0
+            if e_count == 0:
+                for prod, dest, score in [
+                    ("Tea","United Kingdom",85.0),
+                    ("Coffee","Germany",82.0),
+                    ("Avocado","Netherlands",88.0),
+                    ("Flowers","Netherlands",80.0),
+                    ("Macadamia","China",78.0),
+                ]:
+                    db.add(ExportOpportunity(product=prod, country=dest, opportunity_score=score, tenant_id="public"))
+                db.commit()
+        except Exception as e:
+            print(f"seed export failed: {e}")
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
+        # --- Knowledge ---
+        try:
+            k_count = db.exec(select(func.count()).select_from(KnowledgeChunk)).first() or 0
+            if k_count == 0:
+                for sector in ["Agriculture","Banks","Retail - Supermarkets & Chains","Energy - Oil & Gas"]:
+                    db.add(KnowledgeChunk(sector=sector, county="Nairobi", chunk_text=f"Kenya {sector} market overview - key players, pricing, regulation.", chunk_type="sector", source="EvidLens"))
+                db.commit()
+        except Exception as e:
+            print(f"seed knowledge failed: {e}")
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
+        # --- Plans + Modules ---
         try:
             from app.core.seed_master_plans import seed_plans_modules
             seed_plans_modules(db)
         except Exception:
             pass
+
         return {
             "companies": db.exec(select(func.count()).select_from(Company)).first(),
             "prices": db.exec(select(func.count()).select_from(PriceData)).first(),
