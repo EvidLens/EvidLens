@@ -19,7 +19,7 @@
     </select>
     <select name="county" class="border p-2 rounded-lg">
       <option value="">All Counties</option>
-      {% for c in counties %}
+      {% for c in counties or [] %}
       <option value="{{c}}" {% if county==c %}selected{% endif %}>{{c}}</option>
       {% endfor %}
     </select>
@@ -35,27 +35,29 @@
           <th class="p-3 text-left">Product</th>
           <th class="p-3 text-left">County</th>
           <th class="p-3 text-left">Demand Score</th>
-          <th class="p-3 text-left">Market Size</th>
+          <th class="p-3 text-left">Avg Price</th>
           <th class="p-3 text-left">Action</th>
         </tr>
       </thead>
       <tbody>
-        {% for d in demand %}
+        {% for d in demand or [] %}
         <tr class="border-b hover:bg-gray-50">
           <td class="p-3 font-bold">#{{ loop.index }}</td>
-          <td class="p-3 font-semibold">{{d.product_name}}</td>
-          <td class="p-3">{{d.county}}</td>
+          {# FIXED: MarketMetric has .product, NOT .product_name #}
+          <td class="p-3 font-semibold">{{ d.product or d.product_name or 'Product' }}</td>
+          <td class="p-3">{{ d.county or 'Kenya' }}</td>
           <td class="p-3">
             <div class="flex items-center gap-2">
               <div class="w-24 bg-gray-200 rounded-full h-2">
-                <div class="bg-[#14B8A6] h-2 rounded-full" style="width: {{d.demand_score}}%"></div>
+                <div class="bg-[#14B8A6] h-2 rounded-full" style="width: {{ d.demand_score or 0 }}%"></div>
               </div>
-              <span class="font-bold">{{d.demand_score}}/100</span>
+              <span class="font-bold">{{ "%.0f"|format(d.demand_score or 0) }}/100</span>
             </div>
           </td>
-          <td class="p-3 font-bold">KES {{ "{:,.0f}".format(d.market_size_kes) }}</td>
+          {# FIXED: MarketMetric has NO market_size_kes - use avg_price_kes with safe format, never .format(Undefined) #}
+          <td class="p-3 font-bold">KES {{ "{:,.0f}".format(d.avg_price_kes or 0) }}</td>
           <td class="p-3">
-            <button onclick="runAnalysis('{{d.product_name}}', '{{d.county}}')" class="text-[#14B8A6] font-bold text-sm">Analyze 1 Credit</button>
+            <button onclick="runAnalysis('{{ d.product or d.product_name or '' }}', '{{ d.county or '' }}')" class="text-[#14B8A6] font-bold text-sm">Analyze 1 Credit</button>
           </td>
         </tr>
         {% else %}
