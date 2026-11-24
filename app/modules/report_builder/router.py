@@ -1,6 +1,7 @@
 # ============================================================================
 # FILE: app/modules/report_builder/router.py
 # FINAL - SYNC - STR FIELDS - matches app/core/models.py
+# FIX 2.5.16: naive vs aware datetime in download_report + generate_report
 # ============================================================================
 # Routes:
 #   GET    /reports/                 -> My Reports page
@@ -105,6 +106,14 @@ class GenerateReportRequest(BaseModel):
 # ============================================================================
 # HELPERS
 # ============================================================================
+
+def _as_aware(dt):
+    """NEW 2.5.16: DB returns naive TIMESTAMP, datetime.now(UTC) is aware - normalize."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC)
+    return dt
 
 def get_user_plan(db: Session, user_id: int) -> str:
     try:
@@ -353,10 +362,11 @@ def generate_report(request: Request, req: GenerateReportRequest, db: Session = 
             report.file_size_kb = 0
         report.status = "READY"
         report.error_message = None
+        # FIXED 2.5.16: store naive datetime so DB round-trip matches - no aware/naive crash on download
         if report.is_branded:
-            report.expires_at = datetime.now(UTC) + timedelta(days=30)
+            report.expires_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(days=30)
         else:
-            report.expires_at = datetime.now(UTC) + timedelta(days=7)
+            report.expires_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(days=7)
         db.add(report)
         db.commit()
         return {
@@ -405,7 +415,7 @@ def report_status(report_id: int, db: Session = Depends(get_db)):
     }
 
 # ============================================================================
-# DOWNLOAD - GET /reports/download/{id}
+# DOWNLOAD - GET /reports/download/{id} - FIXED naive vs aware
 # ============================================================================
 
 @router.get("/download/{report_id}")
@@ -430,7 +440,9 @@ def download_report(report_id: int, db: Session = Depends(get_db)):
             status_code=400,
             detail=f"Report not ready yet. Status: {r.status}. Try /reports/status/{report_id}"
         )
-    if r.expires_at and r.expires_at < datetime.now(UTC):
+    # FIXED 2.5.16: normalize expires_at to aware before comparing - was crashing on old reports
+    exp = _as_aware(getattr(r, 'expires_at', None))
+    if exp is not None and exp < datetime.now(UTC):
         r.status = "EXPIRED"
         try:
             db.commit()
