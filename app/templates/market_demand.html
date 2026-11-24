@@ -1,79 +1,34 @@
-{% extends "base.html" %}
-{% block content %}
-<div class="max-w-7xl mx-auto p-6">
-  <div class="flex justify-between items-center mb-6">
-    <div>
-      <h1 class="text-3xl font-bold text-[#0A1F44]">📈 Demand Radar</h1>
-      <p class="text-gray-500">Live product demand by county. Updated every 24h</p>
-    </div>
-    <button class="bg-[#14B8A6] text-white px-4 py-2 rounded-lg font-bold">Export CSV</button>
-  </div>
-
-  <!-- Filters -->
-  <form method="get" class="bg-white p-4 rounded-xl shadow-sm mb-6 flex-wrap gap-3">
-    <select name="sector" class="border p-2 rounded-lg">
-      <option value="">All Sectors</option>
-      <option value="Agriculture" {% if sector=='Agriculture' %}selected{% endif %}>Agriculture</option>
-      <option value="Retail" {% if sector=='Retail' %}selected{% endif %}>Retail</option>
-      <option value="FMCG" {% if sector=='FMCG' %}selected{% endif %}>FMCG</option>
-    </select>
-    <select name="county" class="border p-2 rounded-lg">
-      <option value="">All Counties</option>
-      {% for c in counties or [] %}
-      <option value="{{c}}" {% if county==c %}selected{% endif %}>{{c}}</option>
-      {% endfor %}
-    </select>
-    <button class="bg-[#0A1F44] text-white px-4 py-2 rounded-lg font-bold">Filter</button>
-  </form>
-
-  <!-- Table -->
-  <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-    <table class="w-full text-sm">
-      <thead class="bg-[#0A1F44] text-white">
-        <tr>
-          <th class="p-3 text-left">Rank</th>
-          <th class="p-3 text-left">Product</th>
-          <th class="p-3 text-left">County</th>
-          <th class="p-3 text-left">Demand Score</th>
-          <th class="p-3 text-left">Avg Price</th>
-          <th class="p-3 text-left">Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for d in demand or [] %}
-        <tr class="border-b hover:bg-gray-50">
-          <td class="p-3 font-bold">#{{ loop.index }}</td>
-          {# FIXED: MarketMetric has .product, NOT .product_name #}
-          <td class="p-3 font-semibold">{{ d.product or d.product_name or 'Product' }}</td>
-          <td class="p-3">{{ d.county or 'Kenya' }}</td>
-          <td class="p-3">
-            <div class="flex items-center gap-2">
-              <div class="w-24 bg-gray-200 rounded-full h-2">
-                <div class="bg-[#14B8A6] h-2 rounded-full" style="width: {{ d.demand_score or 0 }}%"></div>
-              </div>
-              <span class="font-bold">{{ "%.0f"|format(d.demand_score or 0) }}/100</span>
-            </div>
-          </td>
-          {# FIXED: MarketMetric has NO market_size_kes - use avg_price_kes with safe format, never .format(Undefined) #}
-          <td class="p-3 font-bold">KES {{ "{:,.0f}".format(d.avg_price_kes or 0) }}</td>
-          <td class="p-3">
-            <button onclick="runAnalysis('{{ d.product or d.product_name or '' }}', '{{ d.county or '' }}')" class="text-[#14B8A6] font-bold text-sm">Analyze 1 Credit</button>
-          </td>
-        </tr>
-        {% else %}
-        <tr><td colspan="6" class="p-10 text-center text-gray-500">No demand data for this filter. Try "All Counties"</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<script>
-function runAnalysis(product, county){
-  if(confirm(`Run full analysis on ${product} in ${county}? This costs 1 credit`)){
-    fetch('/api/run-analysis', {method:'POST', body: JSON.stringify({product, county})})
-   .then(r=>r.json()).then(d=>alert(d.message))
-  }
-}
-</script>
-{% endblock %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Demand Radar - EvidLens</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 20px; background: #f8fafc; color: #0f172a; }
+a { color: #1d4ed8; }
+table { width: 100%; border-collapse: collapse; background: white; }
+th, td { padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+th { background: #0a1f44; color: white; }
+</style>
+</head>
+<body>
+<a href="/">← Dashboard</a>
+<h1>Demand Radar</h1>
+{% if demand is defined and demand %}
+<table>
+<tr><th>Product</th><th>County</th><th>Sector</th><th>Demand Score</th><th>Price (KES)</th></tr>
+{% for d in demand %}
+<tr>
+<td>{{ d.product if d.product is defined else 'Product' }}</td>
+<td>{{ d.county if d.county is defined else 'Kenya' }}</td>
+<td>{{ d.sector if d.sector is defined else }}</td>
+<td>{{ d.score if d.score is defined else (d.demand_score if d.demand_score is defined else 0) }}</td>
+<td>{{ d.price if d.price is defined else (d.avg_price_kes if d.avg_price_kes is defined else 0) }}</td>
+</tr>
+{% endfor %}
+</table>
+{% else %}
+<p>No demand signals yet.</p>
+{% endif %}
+</body>
+</html>
