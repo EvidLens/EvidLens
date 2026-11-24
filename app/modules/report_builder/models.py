@@ -1,6 +1,7 @@
+# app/modules/report_builder/models.py - FINAL - NO Relationship - fixes UnmappedColumnError
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
-from sqlmodel import SQLModel, Field, Relationship, Column, JSON
+from sqlmodel import SQLModel, Field, Column, JSON
 from sqlalchemy.sql import func
 from app.core.models import Report, ReportType, ReportFormat, ReportStatus
 
@@ -28,4 +29,5 @@ class ReportShare(SQLModel, table=True):
     recipient: Optional[str] = Field(default=None, max_length=255)
     access_token: Optional[str] = Field(default=None, max_length=64, unique=True)
     created_at: datetime = Field(default_factory=utc_now, sa_column_kwargs={"server_default": func.now()})
-    report: Optional[Report] = Relationship(sa_relationship_kwargs={"foreign_keys": "[ReportShare.report_id]"})
+    # NO Relationship here - Relationship was breaking Report mapper
+    # If you need the Report, fetch it with: select(Report).where(Report.id == share.report_id)
