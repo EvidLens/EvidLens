@@ -1,6 +1,6 @@
 """
 EvidLens API - Main Application
-Version: 2.5.14
+Version: 2.5.15
 Author: EvidLens Engineering
 Fixes:
     - file_type column added to reports
@@ -8,6 +8,9 @@ Fixes:
     - InFailedSqlTransaction fixed
     - Render PG SSL closed fixed - startup order corrected
     - pool_recycle 280 + keepalives
+    - NEW 2.5.15: company.rating + company.reviews added - fixes seed_all() crash
+    - NEW 2.5.15: fix_company_table() called on startup
+    - NEW 2.5.15: report_builder.models Relationship removed (in models.py) - fixes UnmappedColumnError on Report
 """
 
 import os
@@ -77,7 +80,7 @@ scheduler = AsyncIOScheduler(timezone=getattr(settings, "SCHEDULER_TIMEZONE", "A
 
 app = FastAPI(
     title="EvidLens API",
-    version="2.5.14",
+    version="2.5.15",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -119,7 +122,7 @@ async def get_current_user_optional(
     except Exception:
         try:
             db.rollback()
-        except:
+        except Exception:
             pass
         return None
 
@@ -213,13 +216,45 @@ def fix_reports_table():
     except Exception as e:
         print(f"REPORTS error: {e}")
 
+def fix_company_table():
+    """
+    NEW IN 2.5.15 - Fixes:
+    psycopg2.errors.UndefinedColumn: column "rating" of relation "company" does not exist
+    INSERT INTO company (name, sector, county, rating, reviews) ...
+    Seeder in app/core/seed_master.py expects rating + reviews, but force_create_tables()
+    created company without them.
+    """
+    cols = [
+        "ADD COLUMN IF NOT EXISTS rating FLOAT DEFAULT 0",
+        "ADD COLUMN IF NOT EXISTS reviews INTEGER DEFAULT 0",
+        "ADD COLUMN IF NOT EXISTS description TEXT",
+        "ADD COLUMN IF NOT EXISTS lat FLOAT DEFAULT 0",
+        "ADD COLUMN IF NOT EXISTS lng FLOAT DEFAULT 0",
+    ]
+    try:
+        with engine.connect() as conn:
+            for sql in cols:
+                try:
+                    conn.execute(text(f"ALTER TABLE company {sql}"))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+        print("✓ COMPANY MIGRATED - rating + reviews added")
+    except Exception as e:
+        print(f"COMPANY error: {e}")
+
 def force_create_tables():
     tables = [
         """
         CREATE TABLE IF NOT EXISTS company (
             id SERIAL PRIMARY KEY,
             name VARCHAR, sector VARCHAR, county VARCHAR,
-            description TEXT, created_at TIMESTAMP DEFAULT NOW()
+            description TEXT,
+            rating FLOAT DEFAULT 0,
+            reviews INTEGER DEFAULT 0,
+            lat FLOAT DEFAULT 0,
+            lng FLOAT DEFAULT 0,
+            created_at TIMESTAMP DEFAULT NOW()
         )
         """,
         """
@@ -312,6 +347,10 @@ def on_startup():
         fix_reports_table()
     except Exception as e:
         print(f"Reports migrate error: {e}")
+    try:
+        fix_company_table()
+    except Exception as e:
+        print(f"Company migrate error: {e}")
     try:
         from app.modules.cron.jobs import (
             scrape_kpin_prices,
@@ -445,6 +484,7 @@ def root(
         "logout": "/auth/logout",
         "login": "/login",
     }
+
     def safe_count(stmt):
         try:
             result = db.exec(stmt).first()
@@ -459,6 +499,7 @@ def root(
             except Exception:
                 pass
             return 0
+
     from app.modules.pricing_engine.models import ProductPrice, Competitor as PriceCompetitor
     from app.modules.competitive_engine.models import Company as CompCompany
     from app.core.models import KenyaLensBusiness
@@ -482,25 +523,25 @@ def root(
     county_count = safe_count(select(func.count(func.distinct(MarketMetric.county))))
     policy_count = news_count
     modules = [
-        {"key": "Competitive Engine","name": "Competitive Engine","route": "/competitive","icon": "🎯","count": competitor_count},
-        {"key": "Pricing Engine","name": "Price Oracle","route": "/market/prices","icon": "💰","count": price_count},
-        {"key": "Market Engine","name": "Demand Radar","route": "/market/demand","icon": "📈","count": metric_count},
-        {"key": "Location Engine","name": "County Mapper","route": "/location/counties","icon": "🗺️","count": county_count},
-        {"key": "Consumer Engine","name": "Consumer Pulse","route": "/voice","icon": "👥","count": social_count},
-        {"key": "Core OS","name": "Risk Sentinel","route": "/market/risk","icon": "⚠️","count": news_count},
-        {"key": "Regulatory Engine","name": "Policy Watch","route": "/kb/policy","icon": "📜","count": policy_count},
-        {"key": "Core OS","name": "Funding Radar","route": "/reports/funding","icon": "🏦","count": business_count},
-        {"key": "Business OS","name": "Export Navigator","route": "/market/export","icon": "🚢","count": export_count},
-        {"key": "Core OS","name": "Knowledge Base","route": "/kb","icon": "📚","count": knowledge_count},
-        {"key": "Report Builder","name": "Report Builder","route": "/reports","icon": "📑","count": report_count},
-        {"key": "AI Insights","name": "AI Insights","route": "/ai","icon": "🧠","count": knowledge_count},
+        {"key": "Competitive Engine", "name": "Competitive Engine", "route": "/competitive", "icon": "🎯", "count": competitor_count},
+        {"key": "Pricing Engine", "name": "Price Oracle", "route": "/market/prices", "icon": "💰", "count": price_count},
+        {"key": "Market Engine", "name": "Demand Radar", "route": "/market/demand", "icon": "📈", "count": metric_count},
+        {"key": "Location Engine", "name": "County Mapper", "route": "/location/counties", "icon": "🗺️", "count": county_count},
+        {"key": "Consumer Engine", "name": "Consumer Pulse", "route": "/voice", "icon": "👥", "count": social_count},
+        {"key": "Core OS", "name": "Risk Sentinel", "route": "/market/risk", "icon": "⚠️", "count": news_count},
+        {"key": "Regulatory Engine", "name": "Policy Watch", "route": "/kb/policy", "icon": "📜", "count": policy_count},
+        {"key": "Core OS", "name": "Funding Radar", "route": "/reports/funding", "icon": "🏦", "count": business_count},
+        {"key": "Business OS", "name": "Export Navigator", "route": "/market/export", "icon": "🚢", "count": export_count},
+        {"key": "Core OS", "name": "Knowledge Base", "route": "/kb", "icon": "📚", "count": knowledge_count},
+        {"key": "Report Builder", "name": "Report Builder", "route": "/reports", "icon": "📑", "count": report_count},
+        {"key": "AI Insights", "name": "AI Insights", "route": "/ai", "icon": "🧠", "count": knowledge_count},
     ]
     data_payload = {
         "last_updated": datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),
         "stats": {"insights_generated": metric_count, "reports_exported": report_count},
         "modules": modules,
     }
-    return templates.TemplateResponse("dashboard.html",{"request": request,"API": API,"data": data_payload,"current_user": current_user})
+    return templates.TemplateResponse("dashboard.html", {"request": request, "API": API, "data": data_payload, "current_user": current_user})
 
 @app.post("/api/run-scraper")
 def run_scraper():
@@ -515,7 +556,7 @@ def run_scraper():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": "2.5.14"}
+    return {"status": "ok", "version": "2.5.15"}
 
 if __name__ == "__main__":
     import uvicorn
