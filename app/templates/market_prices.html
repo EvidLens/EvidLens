@@ -1,56 +1,39 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Price Oracle - EvidLens</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background: #f5f7fa; }
-       .header { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        h1 { color: #1e3a8a; margin: 0; }
-       .timestamp { color: #64748b; font-size: 14px; margin-top: 8px; }
-       .refresh-btn { background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; margin-top: 10px; }
-       .refresh-btn:hover { background: #1d4ed8; }
-        table { width: 100%; background: white; border-collapse: collapse; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        th { background: #2563eb; color: white; padding: 14px; text-align: left; }
-        td { padding: 12px 14px; border-bottom: 1px solid #e2e8f0; }
-        tr:hover { background: #f8fafc; }
-    </style>
+<meta charset="utf-8">
+<title>Price Oracle - EvidLens</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 20px; background: #f8fafc; color: #0f172a; }
+a { color: #1d4ed8; }
+table { width: 100%; border-collapse: collapse; background: white; }
+th, td { padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+th { background: #0a1f44; color: white; }
+.card { background: white; padding: 16px; border-radius: 8px; margin-bottom: 16px; }
+</style>
 </head>
 <body>
-    <div class="header">
-        <h1>📈 Price Oracle - Live Market Prices</h1>
-        <div class="timestamp">
-            Last Updated: {{ prices[0].fetched_at if prices else 'No data yet' }}
-        </div>
-        <button class="refresh-btn" onclick="fetch('/api/run-scraper', {method: 'POST'}).then(()=>location.reload())">
-            🔄 Refresh Prices Now
-        </button>
-    </div>
-
-    <table>
-        <thead>
-            <tr>
-                <th>Product</th>
-                <th>Price</th>
-                <th>County</th>
-                <th>Market</th>
-                <th>Source</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for p in prices %}
-            <tr>
-                <td><b>{{p.product_name}}</b></td>
-                <td><b>KES {{ "{:,.2f}".format(p.price) }}</b></td>
-                <td>{{p.county}}</td>
-                <td>{{p.market}}</td>
-                <td>{{p.source}}</td>
-            </tr>
-            {% else %}
-            <tr><td colspan="5">No prices found. Click "Refresh Prices Now" to load data from KPIN.</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<a href="/">← Dashboard</a>
+<h1>Price Oracle</h1>
+<div class="card">
+<p>Live prices from Kenya markets. If a price is missing, it shows 0 - not a crash.</p>
+<p>Total: {{ prices|length if prices is defined else 0 }} prices</p>
+</div>
+<table>
+<tr><th>Product</th><th>County</th><th>Sector</th><th>Price (KES)</th><th>Updated</th></tr>
+{% if prices is defined and prices %}
+{% for p in prices %}
+<tr>
+<td>{{ p.product_name if p.product_name is defined else (p.product if p.product is defined else 'Product') }}</td>
+<td>{{ p.county if p.county is defined else 'Kenya' }}</td>
+<td>{{ p.sector if p.sector is defined else 'Agriculture' }}</td>
+<td>{{ p.price if p.price is defined else (p.avg_price_kes if p.avg_price_kes is defined else 0) }}</td>
+<td>{{ p.created_at if p.created_at is defined else '' }}</td>
+</tr>
+{% endfor %}
+{% else %}
+<tr><td colspan="5">No prices yet. Run scraper: POST /api/run-scraper</td></tr>
+{% endif %}
+</table>
 </body>
 </html>
