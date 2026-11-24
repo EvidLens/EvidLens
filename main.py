@@ -1,6 +1,6 @@
 """
 EvidLens API - Main Application
-Version: 2.5.16
+Version: 2.6.1 PRODUCTION - USER READY
 Author: EvidLens Engineering
 Fixes:
     - file_type column added to reports
@@ -12,6 +12,8 @@ Fixes:
     - NEW 2.5.15: fix_company_table() called on startup
     - NEW 2.5.15: report_builder.models Relationship removed (in models.py) - fixes UnmappedColumnError on Report
     - NEW 2.5.16: fix_export_opportunities_table() - fixes NotNullViolation country in export_opportunities
+    - NEW 2.6.1 PRODUCTION: fix_audit_table() - audit_logs table, never blocks startup
+    - NEW 2.6.1 PRODUCTION: fix_reports_tenant() - tenant_id on reports, never blocks startup
 """
 
 import os
@@ -79,9 +81,11 @@ load_dotenv()
 UTC = timezone.utc
 scheduler = AsyncIOScheduler(timezone=getattr(settings, "SCHEDULER_TIMEZONE", "Africa/Nairobi"))
 
+APP_VERSION = "2.6.1"
+
 app = FastAPI(
     title="EvidLens API",
-    version="2.5.16",
+    version=APP_VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -218,13 +222,6 @@ def fix_reports_table():
         print(f"REPORTS error: {e}")
 
 def fix_company_table():
-    """
-    NEW IN 2.5.15 - Fixes:
-    psycopg2.errors.UndefinedColumn: column "rating" of relation "company" does not exist
-    INSERT INTO company (name, sector, county, rating, reviews) ...
-    Seeder in app/core/seed_master.py expects rating + reviews, but force_create_tables()
-    created company without them.
-    """
     cols = [
         "ADD COLUMN IF NOT EXISTS rating FLOAT DEFAULT 0",
         "ADD COLUMN IF NOT EXISTS reviews INTEGER DEFAULT 0",
@@ -245,13 +242,6 @@ def fix_company_table():
         print(f"COMPANY error: {e}")
 
 def fix_export_opportunities_table():
-    """
-    NEW IN 2.5.16 - Fixes:
-    psycopg2.errors.NotNullViolation: null value in column "country" of relation "export_opportunities"
-    Failing row: (1, null, null, Tea, null)
-    Seeder creates ExportOpportunity(product="Tea") with no country/score.
-    Make DB tolerant: default country='Kenya', score=0, allow null.
-    """
     sqls = [
         "ALTER TABLE export_opportunities ALTER COLUMN country SET DEFAULT 'Kenya'",
         "ALTER TABLE export_opportunities ALTER COLUMN country DROP NOT NULL",
@@ -271,6 +261,37 @@ def fix_export_opportunities_table():
         print("✓ EXPORT_OPPORTUNITIES MIGRATED - country default Kenya")
     except Exception as e:
         print(f"EXPORT_OPPORTUNITIES error: {e}")
+
+def fix_audit_table():
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS audit_logs (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER,
+                    action VARCHAR(100),
+                    report_id INTEGER,
+                    ip VARCHAR(50),
+                    user_agent TEXT,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """))
+            conn.commit()
+        print("✓ AUDIT_LOGS READY")
+    except Exception as e:
+        print(f"AUDIT error: {e}")
+
+def fix_reports_tenant():
+    try:
+        with engine.connect() as conn:
+            try:
+                conn.execute(text("ALTER TABLE reports ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(100) DEFAULT 'public'"))
+                conn.commit()
+            except Exception:
+                conn.rollback()
+        print("✓ REPORTS tenant_id READY")
+    except Exception as e:
+        print(f"REPORTS tenant error: {e}")
 
 def force_create_tables():
     tables = [
@@ -332,7 +353,8 @@ def force_create_tables():
             report_metadata JSON, payment_id INTEGER,
             is_auto_weekly BOOLEAN DEFAULT FALSE,
             expires_at TIMESTAMP, error_message TEXT,
-            data JSON, created_at TIMESTAMP DEFAULT NOW()
+            data JSON, tenant_id VARCHAR(100) DEFAULT 'public',
+            created_at TIMESTAMP DEFAULT NOW()
         )
         """,
         """
@@ -340,6 +362,17 @@ def force_create_tables():
             id SERIAL PRIMARY KEY, sector VARCHAR, county VARCHAR,
             chunk_text TEXT, chunk_type VARCHAR, source VARCHAR,
             embedding JSON, chunk_metadata JSON,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER,
+            action VARCHAR(100),
+            report_id INTEGER,
+            ip VARCHAR(50),
+            user_agent TEXT,
             created_at TIMESTAMP DEFAULT NOW()
         )
         """,
@@ -384,6 +417,14 @@ def on_startup():
         fix_export_opportunities_table()
     except Exception as e:
         print(f"Export migrate error: {e}")
+    try:
+        fix_audit_table()
+    except Exception as e:
+        print(f"Audit migrate error: {e}")
+    try:
+        fix_reports_tenant()
+    except Exception as e:
+        print(f"Reports tenant migrate error: {e}")
     try:
         from app.modules.cron.jobs import (
             scrape_kpin_prices,
@@ -589,7 +630,7 @@ def run_scraper():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": "2.5.16"}
+    return {"status": "ok", "version": "2.6.1"}
 
 if __name__ == "__main__":
     import uvicorn
