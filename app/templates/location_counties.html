@@ -1,6 +1,41 @@
-<!DOCTYPE html><html><head><title>County Mapper</title></head>
-<body><h1>County Data</h1>
-<table border="1">{% for c in counties %}<tr><td>{{c.name}}</td></tr>{% endfor %}</table>
-<h2>Market Size by County</h2>
-<table border="1">{% for s in stats %}<tr><td>{{s.county}}</td><td>KES {{s.market_size}}</td></tr>{% endfor %}</table>
-</body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>County Mapper - EvidLens</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 20px; background: #f8fafc; color: #0f172a; }
+a { color: #1d4ed8; }
+table { width: 100%; border-collapse: collapse; background: white; }
+th, td { padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+th { background: #0a1f44; color: white; }
+.card { background: white; padding: 16px; border-radius: 8px; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+<a href="/">← Dashboard</a>
+<h1>County Mapper</h1>
+<div class="card">
+<p>Market size by county. Built from live MarketMetric, PriceData and Company tables.</p>
+<p>Total counties: {{ counties|length if counties is defined else 0 }}</p>
+</div>
+{% if counties is defined and counties %}
+<table>
+<tr>
+<th>County</th>
+<th>Records</th>
+<th>Market Size (KES)</th>
+</tr>
+{% for c in counties %}
+<tr>
+<td>{{ c.name if c.name is defined else (c.county if c.county is defined else 'County') }}</td>
+<td>{{ c.count if c.count is defined else (c.business_count if c.business_count is defined else 0) }}</td>
+<td>{{ c.market_size if c.market_size is defined else 0 }}</td>
+</tr>
+{% endfor %}
+</table>
+{% else %}
+<p>No county data yet.</p>
+{% endif %}
+</body>
+</html>
