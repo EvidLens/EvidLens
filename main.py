@@ -1,6 +1,6 @@
 """
 EvidLens API - Main Application
-Version: 2.5.15
+Version: 2.5.16
 Author: EvidLens Engineering
 Fixes:
     - file_type column added to reports
@@ -11,6 +11,7 @@ Fixes:
     - NEW 2.5.15: company.rating + company.reviews added - fixes seed_all() crash
     - NEW 2.5.15: fix_company_table() called on startup
     - NEW 2.5.15: report_builder.models Relationship removed (in models.py) - fixes UnmappedColumnError on Report
+    - NEW 2.5.16: fix_export_opportunities_table() - fixes NotNullViolation country in export_opportunities
 """
 
 import os
@@ -80,7 +81,7 @@ scheduler = AsyncIOScheduler(timezone=getattr(settings, "SCHEDULER_TIMEZONE", "A
 
 app = FastAPI(
     title="EvidLens API",
-    version="2.5.15",
+    version="2.5.16",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -243,6 +244,34 @@ def fix_company_table():
     except Exception as e:
         print(f"COMPANY error: {e}")
 
+def fix_export_opportunities_table():
+    """
+    NEW IN 2.5.16 - Fixes:
+    psycopg2.errors.NotNullViolation: null value in column "country" of relation "export_opportunities"
+    Failing row: (1, null, null, Tea, null)
+    Seeder creates ExportOpportunity(product="Tea") with no country/score.
+    Make DB tolerant: default country='Kenya', score=0, allow null.
+    """
+    sqls = [
+        "ALTER TABLE export_opportunities ALTER COLUMN country SET DEFAULT 'Kenya'",
+        "ALTER TABLE export_opportunities ALTER COLUMN country DROP NOT NULL",
+        "ALTER TABLE export_opportunities ALTER COLUMN opportunity_score SET DEFAULT 0",
+        "ALTER TABLE export_opportunities ALTER COLUMN opportunity_score DROP NOT NULL",
+        "UPDATE export_opportunities SET country = 'Kenya' WHERE country IS NULL",
+        "UPDATE export_opportunities SET opportunity_score = 0 WHERE opportunity_score IS NULL",
+    ]
+    try:
+        with engine.connect() as conn:
+            for sql in sqls:
+                try:
+                    conn.execute(text(sql))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+        print("✓ EXPORT_OPPORTUNITIES MIGRATED - country default Kenya")
+    except Exception as e:
+        print(f"EXPORT_OPPORTUNITIES error: {e}")
+
 def force_create_tables():
     tables = [
         """
@@ -351,6 +380,10 @@ def on_startup():
         fix_company_table()
     except Exception as e:
         print(f"Company migrate error: {e}")
+    try:
+        fix_export_opportunities_table()
+    except Exception as e:
+        print(f"Export migrate error: {e}")
     try:
         from app.modules.cron.jobs import (
             scrape_kpin_prices,
@@ -556,7 +589,7 @@ def run_scraper():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": "2.5.15"}
+    return {"status": "ok", "version": "2.5.16"}
 
 if __name__ == "__main__":
     import uvicorn
