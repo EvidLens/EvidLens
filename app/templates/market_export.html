@@ -1,8 +1,43 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><title>EvidLens</title></head>
+<head>
+<meta charset="utf-8">
+<title>Export Navigator - EvidLens</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 20px; background: #f8fafc; color: #0f172a; }
+a { color: #1d4ed8; }
+table { width: 100%; border-collapse: collapse; background: white; }
+th, td { padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+th { background: #0a1f44; color: white; }
+.card { background: white; padding: 16px; border-radius: 8px; margin-bottom: 16px; }
+</style>
+</head>
 <body>
-    <h1>REPORT TITLE</h1>
-    <div id="data">Loading from API...</div>
+<a href="/">← Dashboard</a>
+<h1>Export Navigator</h1>
+<div class="card">
+<p>Export opportunities from Kenya to world markets.</p>
+<p>Total: {{ exports|length if exports is defined else 0 }} opportunities</p>
+</div>
+{% if exports is defined and exports %}
+<table>
+<tr>
+<th>Product</th>
+<th>Destination</th>
+<th>Score</th>
+<th>County</th>
+</tr>
+{% for e in exports %}
+<tr>
+<td>{{ e.product if e.product is defined else 'Product' }}</td>
+<td>{{ e.country if e.country is defined else 'Kenya' }}</td>
+<td>{{ e.opportunity_score if e.opportunity_score is defined else 0 }}</td>
+<td>{{ e.county if e.county is defined else '' }}</td>
+</tr>
+{% endfor %}
+</table>
+{% else %}
+<p>No export opportunities yet. Seed data: POST /api/run-scraper, then refresh.</p>
+{% endif %}
 </body>
 </html>
