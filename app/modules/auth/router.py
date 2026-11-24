@@ -1,11 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi import APIRouter
+from fastapi import Depends
+from fastapi import HTTPException
+from fastapi import Request
+from fastapi import BackgroundTasks
+from fastapi import Form
+from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse
 from fastapi.templating import Jinja2Templates
-from sqlmodel import Session, text
-from pydantic import BaseModel, EmailStr
-from.service import *
-from.models import AuthUser
-from.dependencies import get_current_user, require_active_subscription, require_admin
+from sqlmodel import Session
+from sqlmodel import text
+from pydantic import BaseModel
+from pydantic import EmailStr
+from .service import *
+from .models import AuthUser
+from .dependencies import get_current_user
+from .dependencies import require_active_subscription
+from .dependencies import require_admin
 from app.core.db import get_session as get_db
 import secrets
 import os
@@ -17,7 +27,6 @@ from starlette.config import Config
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 templates = Jinja2Templates(directory="app/templates")
-
 RESEND_KEY = os.getenv("RESEND_API_KEY")
 FROM_EMAIL = os.getenv("FROM_EMAIL", "noreply@evidlens.co.ke")
 FROM_NAME = os.getenv("FROM_NAME", "EvidLens")
@@ -61,12 +70,14 @@ def send_verification_email(to: str, name: str, token: str):
     </div>
     """
     try:
-        resend.Emails.send({
-            "from": f"{FROM_NAME} <{FROM_EMAIL}>",
-            "to": [to],
-            "subject": "Verify your EvidLens account",
-            "html": html
-        })
+        resend.Emails.send(
+            {
+                "from": f"{FROM_NAME} <{FROM_EMAIL}>",
+                "to": [to],
+                "subject": "Verify your EvidLens account",
+                "html": html
+            }
+        )
         print(f"[EMAIL SENT] Verification to {to} via {FROM_EMAIL}")
     except Exception as e:
         print(f"[EMAIL FAILED] {to}: {e}")
@@ -85,10 +96,29 @@ def send_reset_email(to: str, token: str):
     </div>
     """
     try:
-        resend.Emails.send({"from": f"{FROM_NAME} <{FROM_EMAIL}>","to": [to],"subject": "Reset your EvidLens password","html": html})
+        resend.Emails.send(
+            {
+                "from": f"{FROM_NAME} <{FROM_EMAIL}>",
+                "to": [to],
+                "subject": "Reset your EvidLens password",
+                "html": html
+            }
+        )
         print(f"[EMAIL SENT] Reset to {to}")
     except Exception as e:
         print(f"Reset email failed: {e}")
+
+def _set_auth_cookie(response, user_id: int):
+    response.set_cookie(
+        key="user_id",
+        value=str(user_id),
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=86400 * 7,
+        path="/"
+    )
+    return response
 
 class SignupRequest(BaseModel):
     email: EmailStr
@@ -128,12 +158,32 @@ def signup(req: SignupRequest, background_tasks: BackgroundTasks, db: Session = 
     background_tasks.add_task(send_verification_email, user.email, user.full_name or "there", token)
     return {"message": f"Verification email sent from {FROM_EMAIL}. Check inbox.", "email": user.email}
 
+@router.post("/do-signup")
+def do_signup(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    email: str = Form(...),
+    password: str = Form(...),
+    full_name: str = Form(...),
+    phone: str = Form(""),
+    sector: str = Form(""),
+    county: str = Form(""),
+    db: Session = Depends(get_db)
+):
+    if get_user_by_email(db, email):
+        return RedirectResponse(url="/signup?error=email_exists", status_code=302)
+    token = secrets.token_urlsafe(32)
+    req = SignupRequest(email=email, password=password, full_name=full_name, phone=phone, sector=sector, county=county)
+    user = create_user(db, req, token)
+    background_tasks.add_task(send_verification_email, user.email, user.full_name or "there", token)
+    return RedirectResponse(url="/login?signup=1&check_email=1", status_code=302)
+
 @router.get("/verify")
 def verify_email(token: str, db: Session = Depends(get_db)):
     user = verify_user(db, token)
     if not user:
-        raise HTTPException(status_code=400, detail="Invalid or expired verification link")
-    return RedirectResponse(url="/auth/login?verified=1", status_code=302)
+        return RedirectResponse(url="/login?error=invalid_link", status_code=302)
+    return RedirectResponse(url="/login?verified=1", status_code=302)
 
 @router.post("/login")
 def login(req: LoginRequest, db: Session = Depends(get_db)):
@@ -141,15 +191,19 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
     if "error" in result:
         raise HTTPException(status_code=401, detail=result["error"])
     response = JSONResponse(content=result)
-    response.set_cookie(
-        key="user_id",
-        value=str(result["user_id"]),
-        httponly=True,
-        secure=True,
-        samesite="lax",
-        max_age=86400*7,
-        path="/"
-    )
+    response.set_cookie(key="user_id", value=str(result["user_id"]), httponly=True, secure=True, samesite="lax", max_age=86400 * 7, path="/")
+    return response
+
+@router.post("/do-login")
+def do_login(email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+    result = login_user(db, email, password)
+    if "error" in result:
+        err = result["error"]
+        if "verif" in str(err).lower() or "verify" in str(err).lower():
+            return RedirectResponse(url="/login?error=not_verified", status_code=302)
+        return RedirectResponse(url="/login?error=invalid", status_code=302)
+    response = RedirectResponse(url="/", status_code=302)
+    response.set_cookie(key="user_id", value=str(result["user_id"]), httponly=True, secure=True, samesite="lax", max_age=86400 * 7, path="/")
     return response
 
 @router.post("/forgot-password")
@@ -189,16 +243,22 @@ def logout():
 
 @router.get("/logout")
 def logout_get():
-    response = RedirectResponse(url="/auth/login")
+    response = RedirectResponse(url="/login", status_code=302)
     response.delete_cookie("user_id", path="/")
     return response
 
 @router.get("/login")
 def login_page(request: Request):
+    uid = request.cookies.get("user_id")
+    if uid:
+        return RedirectResponse(url="/", status_code=302)
     return templates.TemplateResponse("login.html", {"request": request})
 
 @router.get("/signup")
 def signup_page(request: Request):
+    uid = request.cookies.get("user_id")
+    if uid:
+        return RedirectResponse(url="/", status_code=302)
     return templates.TemplateResponse("signup.html", {"request": request})
 
 @router.get("/oauth/google")
@@ -220,7 +280,7 @@ async def oauth_google_callback(request: Request, db: Session = Depends(get_db))
         admin_role = None
         user_role = None
         try:
-            from.models import UserRole
+            from .models import UserRole
             admin_role = UserRole.ADMIN
             user_role = UserRole.USER
         except Exception:
@@ -267,19 +327,11 @@ async def oauth_google_callback(request: Request, db: Session = Depends(get_db))
                 db.commit()
                 db.refresh(user)
         response = RedirectResponse(url="/", status_code=302)
-        response.set_cookie(
-            key="user_id",
-            value=str(user.id),
-            httponly=True,
-            secure=True,
-            samesite="lax",
-            max_age=86400*7,
-            path="/"
-        )
+        response.set_cookie(key="user_id", value=str(user.id), httponly=True, secure=True, samesite="lax", max_age=86400 * 7, path="/")
         return response
     except Exception as e:
         print(f"[OAUTH ERROR] {e}")
-        return RedirectResponse(url=f"/auth/login?error=oauth_failed&detail={str(e)[:100]}", status_code=302)
+        return RedirectResponse(url=f"/login?error=oauth_failed&detail={str(e)[:100]}", status_code=302)
 
 @router.get("/admin/fix-login")
 def fix_login(db: Session = Depends(get_db), admin: AuthUser = Depends(require_admin)):
