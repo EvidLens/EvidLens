@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <title>Price Oracle - EvidLens</title>
@@ -16,11 +16,17 @@ th { background: #0a1f44; color: white; }
 <a href="/">← Dashboard</a>
 <h1>Price Oracle</h1>
 <div class="card">
-<p>Live prices from Kenya markets. If a price is missing, it shows 0 - not a crash.</p>
+<p>Live prices from Kenya markets.</p>
 <p>Total: {{ prices|length if prices is defined else 0 }} prices</p>
 </div>
 <table>
-<tr><th>Product</th><th>County</th><th>Sector</th><th>Price (KES)</th><th>Updated</th></tr>
+<tr>
+<th>Product</th>
+<th>County</th>
+<th>Sector</th>
+<th>Price (KES)</th>
+<th>Demand</th>
+</tr>
 {% if prices is defined and prices %}
 {% for p in prices %}
 <tr>
@@ -28,7 +34,7 @@ th { background: #0a1f44; color: white; }
 <td>{{ p.county if p.county is defined else 'Kenya' }}</td>
 <td>{{ p.sector if p.sector is defined else 'Agriculture' }}</td>
 <td>{{ p.price if p.price is defined else (p.avg_price_kes if p.avg_price_kes is defined else 0) }}</td>
-<td>{{ p.created_at if p.created_at is defined else '' }}</td>
+<td>{{ p.demand_score if p.demand_score is defined else 0 }}</td>
 </tr>
 {% endfor %}
 {% else %}
