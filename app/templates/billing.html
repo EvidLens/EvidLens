@@ -1,88 +1,121 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="max-w-4xl mx-auto p-6">
-  
+  {% if not current_user is defined or not current_user %}
+  <!-- LOGIN WALL - Free only works when logged in -->
+  <div class="bg-white rounded-2xl shadow-sm border p-10 text-center">
+    <h1 class="text-2xl font-bold text-[#0A1F44]">Billing &amp; Subscriptions</h1>
+    <p class="text-[14px] text-gray-500 mt-2">Login to see your plan, credits, and invoices.<br>Free only works with an account - we need an account to give you credits.</p>
+    <div class="flex flex-wrap justify-center gap-3 mt-6">
+      <a href="/auth/login?next=/billing" class="bg-[#14B8A6] text-white px-6 py-3 rounded-xl font-bold text-[14px]">Login →</a>
+      <a href="/auth/register?next=/billing" class="bg-white border px-6 py-3 rounded-xl font-bold text-[14px]">Create Free Account</a>
+    </div>
+    <p class="text-[12px] text-gray-400 mt-4">Pricing: Starter KES 500 / Pro KES 1,500 / Enterprise KES 5,000 per month.</p>
+  </div>
+  {% else %}
+  <!-- LOGGED IN -->
   <div class="bg-white rounded-2xl shadow-sm border p-6 mb-6">
-    <h1 class="text-2xl font-bold text-[#0A1F44] mb-4">Billing & Subscriptions</h1>
-    
+    <h1 class="text-2xl font-bold text-[#0A1F44] mb-4">Billing &amp; Subscriptions</h1>
     <div class="p-6 bg-gradient-to-r from-[#0A1F44] to-[#14B8A6] text-white rounded-xl">
       <p class="text-sm opacity-80">Current Plan</p>
-      <div class="flex items-center justify-between">
+      <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p class="text-3xl font-bold">{{ current_user.plan if current_user is defined and current_user else 'Free' }}</p>
-          <p class="text-sm opacity-90 mt-1">{{ current_user.credits if current_user is defined and current_user else 0 }} Credits Remaining</p>
+          <p class="text-3xl font-bold">{{ current_user.plan or 'Free' }}</p>
+          <p class="text-sm opacity-90 mt-1">{{ current_user.credits or 0 }} Credits Remaining</p>
+          <p class="text-xs opacity-70 mt-1">{% if current_user.plan_expiry %}Renews / expires: {{ current_user.plan_expiry }}{% else %}Free plan - upgrade to get more credits{% endif %}</p>
         </div>
-        <span class="bg-white text-[#0A1F44] px-4 py-2 rounded-lg font-bold text-sm">ACTIVE</span>
+        <span class="bg-white text-[#0A1F44] px-4 py-2 rounded-lg font-bold text-sm">{{ 'ACTIVE' if current_user.plan and current_user.plan != 'Free' else 'FREE' }}</span>
       </div>
     </div>
-
     <div class="mt-4 grid grid-cols-2 gap-4 text-sm">
-      <div>
-        <p class="text-gray-500">Email</p>
-        <p class="font-semibold">{{ current_user.email if current_user is defined else '' }}</p>
-      </div>
-      <div>
-        <p class="text-gray-500">Member Since</p>
-        <p class="font-semibold">{{ current_user.created_at.strftime('%B %Y') if current_user is defined and current_user.created_at and current_user.created_at.strftime is defined else '' }}</p>
-      </div>
+      <div><p class="text-gray-500">Email</p><p class="font-semibold">{{ current_user.email }}</p></div>
+      <div><p class="text-gray-500">Member Since</p><p class="font-semibold">{% if current_user.created_at %}{{ current_user.created_at.strftime('%B %Y') if current_user.created_at.strftime is defined else current_user.created_at }}{% endif %}</p></div>
+    </div>
+    <div class="mt-4 flex flex-wrap gap-2">
+      <a href="/pricing" class="bg-[#0A1F44] text-white px-4 py-2 rounded-lg text-[13px] font-bold">See All Plans</a>
+      <a href="/contact" class="bg-white border px-4 py-2 rounded-lg text-[13px] font-bold">Talk to Sales</a>
+      <a href="/privacy" class="text-[13px] px-2 py-2 text-slate-500 underline">How we handle payment data</a>
     </div>
   </div>
 
   <div class="bg-white rounded-2xl shadow-sm border p-6">
-    <h2 class="text-xl font-bold text-[#0A1F44] mb-4">Upgrade Your Plan</h2>
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      {% for plan in plans %}
-      <div class="border-2 rounded-xl p-5 {% if current_user is defined and plan.name == current_user.plan %}border-[#14B8A6] bg-teal-50{% else %}border-gray-200{% endif %}">
-        {% if current_user is defined and plan.name == current_user.plan %}
-        <span class="text-xs bg-[#14B8A6] text-white px-2 py-1 rounded-full font-bold">CURRENT</span>
-        {% endif %}
-        <p class="font-bold text-lg mt-2 text-[#0A1F44]">{{ plan.name }}</p>
-        <p class="text-3xl font-bold mt-1">KES {{ "{:,}".format(plan.price) }}</p>
-        <p class="text-sm text-gray-500">{{ plan.credits }} Credits / month</p>
-        
-        <ul class="mt-4 space-y-2 text-sm">
-          <li>✓ {{ plan.credits }} AI Analyses</li>
-          <li>✓ PDF Reports</li>
-          <li>✓ Priority Support</li>
-        </ul>
-
-        {% if current_user is not defined or plan.name != current_user.plan %}
-        <button onclick="upgradePlan('{{ plan.name }}')" class="w-full mt-4 bg-[#F59E0B] text-white py-2 rounded-lg font-bold hover:opacity-90">
-          Upgrade
-        </button>
-        {% else %}
-        <button disabled class="w-full mt-4 bg-gray-200 text-gray-500 py-2 rounded-lg font-bold">
-          Current Plan
-        </button>
-        {% endif %}
-      </div>
-      {% endfor %}
+    <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+      <h2 class="text-xl font-bold text-[#0A1F44]">Upgrade Your Plan</h2>
+      <div class="flex items-center gap-2 text-[13px]"><span id="monthlyLabel" class="font-bold">Monthly</span><button onclick="toggleBilling()" class="w-12 h-6 bg-gray-200 rounded-full relative"><span id="toggleCircle" class="w-5 h-5 bg-[#14B8A6] rounded-full absolute top-0.5 left-0.5 transition-all"></span></button><span id="yearlyLabel" class="text-gray-400 font-bold">Yearly <span class="text-[11px] bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full">Save 17%</span></span></div>
+    </div>
+    <p class="text-[13px] text-gray-500 mb-4">Pay with M-Pesa. You get an STK push on your phone - never share your PIN with us.</p>
+    <div id="plansGrid" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {% if plans %}
+        {% for plan in plans %}
+        <div class="border-2 rounded-xl p-5 {% if plan.name == current_user.plan %}border-[#14B8A6] bg-teal-50{% else %}border-gray-200{% endif %}">
+          {% if plan.name == current_user.plan %}<span class="text-xs bg-[#14B8A6] text-white px-2 py-1 rounded-full font-bold">CURRENT</span>{% endif %}
+          <p class="font-bold text-lg mt-2 text-[#0A1F44]">{{ plan.name }}</p>
+          <p class="text-3xl font-bold mt-1">KES {{ "{:,}".format(plan.price_kes or plan.price or 0) }}</p>
+          <p class="text-xs text-gray-500">/ month • KES {{ "{:,}".format((plan.price_kes or plan.price or 0) * 10) }} / year</p>
+          <p class="text-sm text-gray-500 mt-1">{{ plan.credits or plan.ai_credits or 0 }} Credits / month</p>
+          <ul class="mt-4 space-y-2 text-sm"><li>✓ {{ plan.credits or plan.ai_credits or 0 }} AI Analyses</li><li>✓ PDF Reports</li><li>✓ Priority Support</li></ul>
+          {% if plan.name != current_user.plan %}
+          <button onclick="openCheckout('{{ plan.name }}')" class="w-full mt-4 bg-[#F59E0B] text-white py-2 rounded-lg font-bold hover:opacity-90">Upgrade</button>
+          {% else %}<button disabled class="w-full mt-4 bg-gray-200 text-gray-500 py-2 rounded-lg font-bold">Current Plan</button>{% endif %}
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="border-2 rounded-xl p-5 border-gray-200"><p class="font-bold text-lg text-[#0A1F44]">Starter</p><p class="text-3xl font-bold mt-1">KES 500</p><p class="text-xs text-gray-500">/ month • KES 5,000 / year</p><p class="text-sm text-gray-500 mt-1">20 Credits / month</p><ul class="mt-4 space-y-2 text-sm"><li>✓ 20 AI Analyses</li><li>✓ PDF Reports</li><li>✓ Priority Support</li></ul><button onclick="openCheckout('Starter')" class="w-full mt-4 bg-[#F59E0B] text-white py-2 rounded-lg font-bold">Upgrade</button></div>
+        <div class="border-2 rounded-xl p-5 border-[#14B8A6] bg-teal-50"><span class="text-xs bg-[#14B8A6] text-white px-2 py-1 rounded-full font-bold">MOST POPULAR</span><p class="font-bold text-lg mt-2 text-[#0A1F44]">Pro</p><p class="text-3xl font-bold mt-1">KES 1,500</p><p class="text-xs text-gray-500">/ month • KES 15,000 / year</p><p class="text-sm text-gray-500 mt-1">300 Credits / month</p><ul class="mt-4 space-y-2 text-sm"><li>✓ 300 AI Analyses</li><li>✓ PDF Reports</li><li>✓ Priority Support</li></ul><button onclick="openCheckout('Pro')" class="w-full mt-4 bg-[#F59E0B] text-white py-2 rounded-lg font-bold">Upgrade</button></div>
+        <div class="border-2 rounded-xl p-5 border-gray-200"><p class="font-bold text-lg text-[#0A1F44]">Enterprise</p><p class="text-3xl font-bold mt-1">KES 5,000</p><p class="text-xs text-gray-500">/ month • KES 50,000 / year</p><p class="text-sm text-gray-500 mt-1">Unlimited Credits</p><ul class="mt-4 space-y-2 text-sm"><li>✓ Unlimited AI Analyses</li><li>✓ PDF Reports</li><li>✓ Priority Support</li></ul><button onclick="openCheckout('Enterprise')" class="w-full mt-4 bg-[#F59E0B] text-white py-2 rounded-lg font-bold">Upgrade</button></div>
+      {% endif %}
     </div>
   </div>
 
   <div class="bg-white rounded-2xl shadow-sm border p-6 mt-6">
-    <h2 class="text-xl font-bold text-[#0A1F44] mb-4">Billing History</h2>
+    <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold text-[#0A1F44]">Billing History</h2><button onclick="loadBilling()" class="text-[13px] bg-slate-100 px-3 py-1.5 rounded-lg font-bold">Refresh</button></div>
     <div id="billingHistory" class="text-gray-500 text-sm">Loading...</div>
   </div>
 
+  <div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 mt-6 text-[13px]"><b>Payment didn't activate?</b> WhatsApp us your M-Pesa receipt (not PIN) + email: <a href="https://wa.me/254739758289" class="font-bold text-[#0d9488]">+254 739 758 289</a>. We activate manually within 1 hour in working hours.</div>
+  {% endif %}
 </div>
 
+{% if current_user is defined and current_user %}
+<!-- M-Pesa checkout modal - logged in only -->
+<div id="checkoutModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-2xl p-6 w-full max-w-md"><h3 class="font-bold text-lg" id="checkoutTitle">Checkout</h3><p class="text-sm text-gray-500 mt-1" id="checkoutDesc"></p><label class="text-sm font-semibold mt-4 block">M-Pesa Phone</label><input id="checkoutPhone" class="w-full border rounded-lg px-3 py-2.5 mt-1" placeholder="2547XXXXXXXX" inputmode="tel"><p class="text-xs text-gray-500 mt-1">You will get a Safaricom STK push. Never share your PIN.</p><p id="checkoutMsg" class="text-sm mt-2"></p><div class="flex gap-2 mt-4"><button onclick="closeCheckout()" class="flex-1 border py-2.5 rounded-lg font-bold">Cancel</button><button id="checkoutBtn" onclick="doCheckout()" class="flex-1 bg-[#14B8A6] text-white py-2.5 rounded-lg font-bold">Pay with M-Pesa</button></div></div></div>
+{% endif %}
+
 <script>
+let billing='monthly', selectedPlan=null;
+const PRICES={Starter:{monthly:500,annual:5000},Pro:{monthly:1500,annual:15000},Enterprise:{monthly:5000,annual:50000}};
+function toggleBilling(){billing=billing==='monthly'?'yearly':'monthly';document.getElementById('toggleCircle').style.left=billing==='yearly'?'1.75rem':'0.125rem';document.getElementById('monthlyLabel').style.color=billing==='monthly'?'#000':'#9CA3AF';document.getElementById('yearlyLabel').style.color=billing==='yearly'?'#000':'#9CA3AF';}
 async function loadBilling(){
+  const el=document.getElementById('billingHistory');if(!el)return;
   try{
-    const res = await fetch('/api/billing/my-subscription');
-    if(res.status === 401){ document.getElementById('billingHistory').innerHTML = 'Please login to see invoices.'; return; }
-    const data = await res.json();
-    // You can render invoices here
-    document.getElementById('billingHistory').innerHTML = data.invoices && data.invoices.length ? data.invoices.map(i=>`<div class="flex justify-between py-2 border-b"><span>${i.date}</span><span>KES ${i.amount}</span></div>`).join('') : 'No invoices yet. Upgrade to see billing history here.';
-  }catch(e){
-    document.getElementById('billingHistory').innerHTML = 'No invoices yet.';
-  }
+    const res=await fetch('/api/billing/my-subscription');
+    if(res.status===401){el.innerHTML='Please <a href="/auth/login" class="text-[#0d9488] font-bold underline">login</a> to see invoices.';return;}
+    const data=await res.json();const inv=data.invoices||data.history||[];
+    if(!inv.length){el.innerHTML='No invoices yet. Upgrade to see billing history here.';return;}
+    el.innerHTML='<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-gray-500"><th class="py-2">Date</th><th>Plan</th><th>Amount</th><th>Status</th></tr></thead><tbody>'+inv.map(i=>`<tr class="border-t"><td class="py-2">${i.date||i.created_at||''}</td><td>${i.plan||i.plan_name||''}</td><td>KES ${(i.amount||i.amount_kes||0).toLocaleString()}</td><td>${i.status||'Paid'}</td></tr>`).join('')+'</tbody></table></div>';
+  }catch(e){el.innerHTML='No invoices yet.';}
 }
-async function upgradePlan(planName){
-  if(!confirm('Upgrade to '+planName+'?')) return;
-  const res = await fetch('/api/billing/upgrade', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({plan: planName})});
-  if(res.ok){ alert('Upgrade initiated!'); location.reload(); } else { alert('Failed: '+await res.text()); }
+function openCheckout(plan){
+  {% if not current_user is defined or not current_user %}window.location.href='/auth/login?next=/billing';return;{% endif %}
+  selectedPlan=plan;const p=PRICES[plan]||{monthly:500,annual:5000};const price=billing==='monthly'?p.monthly:p.annual;
+  document.getElementById('checkoutTitle').innerText='Checkout - '+plan;
+  document.getElementById('checkoutDesc').innerText='KES '+price.toLocaleString()+' / '+(billing==='monthly'?'month':'year')+' • M-Pesa STK Push';
+  document.getElementById('checkoutMsg').innerText='';document.getElementById('checkoutModal').classList.remove('hidden');
+}
+function closeCheckout(){document.getElementById('checkoutModal').classList.add('hidden');}
+function validPhone(p){p=p.trim().replace(/^\+/,'').replace(/\s/g,'');if(/^0?7\d{8}$/.test(p))p='254'+p.slice(-9);return /^2547\d{8}$/.test(p)?p:null;}
+async function doCheckout(){
+  const phone=validPhone(document.getElementById('checkoutPhone').value);
+  const msg=document.getElementById('checkoutMsg');const btn=document.getElementById('checkoutBtn');
+  if(!phone){msg.innerText='Enter a valid M-Pesa number: 2547XXXXXXXX';msg.className='text-sm mt-2 text-red-600';return;}
+  btn.innerText='Sending STK Push...';btn.disabled=true;msg.innerText='Check your phone for the M-Pesa prompt...';msg.className='text-sm mt-2 text-gray-600';
+  try{
+    const res=await fetch('/api/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plan_code:selectedPlan,billing,phone})});
+    const data=await res.json().catch(()=>({}));
+    if(res.ok){msg.innerText='✓ STK sent! Enter your M-Pesa PIN on your phone. Plan activates automatically.';msg.className='text-sm mt-2 text-green-600';setTimeout(()=>location.reload(),3000);}
+    else{msg.innerText=data.ResponseDescription||data.message||data.detail||'Checkout failed. WhatsApp +254 739 758 289';msg.className='text-sm mt-2 text-red-600';}
+  }catch(e){msg.innerText='Network error. Try again.';msg.className='text-sm mt-2 text-red-600';}
+  btn.innerText='Pay with M-Pesa';btn.disabled=false;
 }
 loadBilling();
 </script>
