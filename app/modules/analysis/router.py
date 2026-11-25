@@ -8,14 +8,35 @@ import statistics
 import os
 from pydantic import BaseModel
 from typing import List, Optional, Any
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.lib.units import mm
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+try:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import mm
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
+    HAS_REPORTLAB = True
+except Exception:
+    HAS_REPORTLAB = False
+    A4 = None
+    colors = None
+    mm = 1
+    getSampleStyleSheet = None
+    ParagraphStyle = None
+    SimpleDocTemplate = None
+    Paragraph = None
+    Spacer = None
+    Table = None
+    TableStyle = None
+    Image = None
+    PageBreak = None
+try:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    HAS_MATPLOTLIB = True
+except Exception:
+    HAS_MATPLOTLIB = False
+    plt = None
 from app.core.db import get_session as get_db
 from app.core.db import get_session
 from app.core.models import MarketMetric, PriceData, NewsArticle, SocialMention, UserSubscription
