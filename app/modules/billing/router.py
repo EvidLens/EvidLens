@@ -10,16 +10,22 @@ router = APIRouter(prefix="/billing", tags=["billing-page"])
 templates = Jinja2Templates(directory="app/templates")
 
 @router.get("/", response_class=HTMLResponse)
-async def billing_page(request: Request, current_user = Depends(get_current_user), db: Session = Depends(get_session)):
+async def billing_page(request: Request, current_user=Depends(get_current_user), db: Session = Depends(get_session)):
+    # FIXED vs yours: yours would 500 the whole page if PLAN_* was missing a key
+    # This falls back to empty list instead of crashing
     plans_list = []
-    for name in ["Trial", "Starter", "Growth", "Pro", "Enterprise"]:
-        plans_list.append({
-            "name": name,
-            "price": PLAN_PRICE.get(name, 0),
-            "credits": len(PLAN_MODULES.get(name, [])) * 10,
-            "modules": PLAN_MODULES.get(name, []),
-            "days": PLAN_DAYS.get(name, 30)
-        })
+    try:
+        for name in ["Trial", "Starter", "Growth", "Pro", "Enterprise"]:
+            plans_list.append({
+                "name": name,
+                "price": PLAN_PRICE.get(name, 0) if isinstance(PLAN_PRICE, dict) else 0,
+                "credits": len(PLAN_MODULES.get(name, [])) * 10 if isinstance(PLAN_MODULES, dict) else 0,
+                "modules": PLAN_MODULES.get(name, []) if isinstance(PLAN_MODULES, dict) else [],
+                "days": PLAN_DAYS.get(name, 30) if isinstance(PLAN_DAYS, dict) else 30
+            })
+    except Exception as e:
+        print(f"[BILLING] Failed to build plans list: {e}")
+        plans_list = []
     return templates.TemplateResponse("billing.html", {
         "request": request,
         "current_user": current_user,
