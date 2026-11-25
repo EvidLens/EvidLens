@@ -6,7 +6,7 @@ from collections import Counter
 from io import BytesIO
 import statistics
 import os
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import List, Optional, Any
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -18,11 +18,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from app.core.db import get_session as get_db
 from app.core.db import get_session
-from app.core.models import MarketMetric, PriceData, NewsArticle, SocialMention
+from app.core.models import MarketMetric, PriceData, NewsArticle, SocialMention, UserSubscription
 
 router = APIRouter(prefix="/analysis", tags=["Analysis - Trending & Search"])
 api_router = APIRouter(prefix="/api", tags=["Analysis - API"])
-
 NAVY = colors.HexColor("#0A1F44")
 TEAL = colors.HexColor("#14B8A6")
 LIGHT_TEAL = colors.HexColor("#E0F2F1")
@@ -30,6 +29,7 @@ GOLD = colors.HexColor("#C5A880")
 GREEN = colors.HexColor("#16A34A")
 YELLOW = colors.HexColor("#F59E0B")
 RED = colors.HexColor("#DC2626")
+PRICING = {"Starter": {"monthly": 500, "annual": 5000}, "Pro": {"monthly": 1500, "annual": 15000}, "Enterprise": {"monthly": 5000, "annual": 50000}}
 
 class DetailedAnalysisRequest(BaseModel):
     product: Optional[str] = None
@@ -72,6 +72,32 @@ class DetailedAnalysisRequest(BaseModel):
         return 0.0
     def get_business_model(self):
         return self.business_model or "Retail"
+
+def create_chart(fig_func):
+    buf = BytesIO()
+    fig_func()
+    plt.savefig(buf, format="png", dpi=200, bbox_inches="tight", transparent=True)
+    plt.close()
+    buf.seek(0)
+    return Image(buf, width=80*mm, height=50*mm)
+
+def donut_chart(data, labels, title):
+    def _plot():
+        fig, ax = plt.subplots(figsize=(3, 3))
+        ax.pie(data, labels=labels, autopct="%1.0f%%", startangle=90, wedgeprops=dict(width=0.4), colors=["#0A1F44", "#14B8A6", "#C5A880", "#64748B", "#E2E8F0"])
+        ax.set_title(title, fontsize=10, color="#0A1F44", fontweight="bold")
+    return create_chart(_plot)
+
+def bar_chart(data, labels, title):
+    def _plot():
+        fig, ax = plt.subplots(figsize=(4, 3))
+        ax.barh(labels, data, color="#14B8A6")
+        ax.set_title(title, fontsize=10, color="#0A1F44", fontweight="bold")
+        ax.invert_yaxis()
+        for i, v in enumerate(data):
+            ax.text(v, i, f" {v}", va="center", fontsize=8)
+        plt.tight_layout()
+    return create_chart(_plot)
 
 def _run_analysis(req: DetailedAnalysisRequest, session: Session):
     product = req.get_product()
@@ -167,18 +193,7 @@ def _run_analysis(req: DetailedAnalysisRequest, session: Session):
         recommendation = "HOLD - Monitor 30 days"
     else:
         recommendation = "AVOID - High risk"
-    return {
-        "status": "success",
-        "timestamp": now.isoformat(),
-        "input_parameters": {"product": product, "county": county, "sector": sector, "subcounties": subcounties, "budget_kes": budget_kes, "business_model": business_model},
-        "market_overview": {"product": product, "sector": sector, "location": {"county": county, "subcounties": subcounties}, "current_price_kes": round(current_price, 2) if current_price else None, "30_day_avg_kes": round(avg_price_30d, 2) if avg_price_30d else None, "90_day_forecast_kes": forecast_90d, "price_trend": price_trend, "volatility": round(price_volatility, 2), "seasonality": seasonality},
-        "demand_competition": {"demand_level": demand_level, "avg_demand_score": round(avg_demand, 2), "top_products_in_sector": [{"product": p[0], "count": p[1]} for p in top_products], "top_competitors": top_competitors},
-        "financials": {"budget_kes": budget_kes, "business_model": business_model, "estimated_cost_per_unit": round(estimated_cost_price, 2) if estimated_cost_price else None, "estimated_margin_percent": estimated_margin_percent, "estimated_profit_per_unit": round(estimated_profit_per_unit, 2) if estimated_profit_per_unit else None, "units_you_can_buy": units_possible, "estimated_monthly_revenue": round(estimated_revenue, 2), "estimated_monthly_profit": round(estimated_profit, 2), "estimated_roi_percent": round(roi_percent, 2)},
-        "operations": {"recommended_distribution": distribution_channels, "supply_chain_risk": supply_chain_risk, "supply_risk_events": len(supply_news)},
-        "risk_intelligence": {"risk_score_10": risk_score, "risk_level": "High" if risk_score > 6 else "Medium" if risk_score > 3 else "Low", "recent_risks": [{"title": n.title, "date": n.published_at.isoformat() if getattr(n, "published_at", None) else None} for n in risk_news[:3]]},
-        "social_intelligence": {"mentions_7d": len(social), "platforms": dict(platforms), "sentiment_score_10": sentiment_score},
-        "final_verdict": {"overall_score_10": score, "recommendation": recommendation, "key_reasons": reasons, "next_steps": [f"Source suppliers in {county}", "Lock pricing for 30 days if trend is rising", "Monitor news for policy changes"] if score >= 6 else ["Wait and re-evaluate in 30 days", "Test with smaller budget", "Look at alternative products"]}
-    }
+    return {"status": "success", "timestamp": now.isoformat(), "input_parameters": {"product": product, "county": county, "sector": sector, "subcounties": subcounties, "budget_kes": budget_kes, "business_model": business_model}, "market_overview": {"product": product, "sector": sector, "location": {"county": county, "subcounties": subcounties}, "current_price_kes": round(current_price, 2) if current_price else None, "30_day_avg_kes": round(avg_price_30d, 2) if avg_price_30d else None, "90_day_forecast_kes": forecast_90d, "price_trend": price_trend, "volatility": round(price_volatility, 2), "seasonality": seasonality}, "demand_competition": {"demand_level": demand_level, "avg_demand_score": round(avg_demand, 2), "top_products_in_sector": [{"product": p[0], "count": p[1]} for p in top_products], "top_competitors": top_competitors}, "financials": {"budget_kes": budget_kes, "business_model": business_model, "estimated_cost_per_unit": round(estimated_cost_price, 2) if estimated_cost_price else None, "estimated_margin_percent": estimated_margin_percent, "estimated_profit_per_unit": round(estimated_profit_per_unit, 2) if estimated_profit_per_unit else None, "units_you_can_buy": units_possible, "estimated_monthly_revenue": round(estimated_revenue, 2), "estimated_monthly_profit": round(estimated_profit, 2), "estimated_roi_percent": round(roi_percent, 2)}, "operations": {"recommended_distribution": distribution_channels, "supply_chain_risk": supply_chain_risk, "supply_risk_events": len(supply_news)}, "risk_intelligence": {"risk_score_10": risk_score, "risk_level": "High" if risk_score > 6 else "Medium" if risk_score > 3 else "Low", "recent_risks": [{"title": n.title, "date": n.published_at.isoformat() if getattr(n, "published_at", None) else None} for n in risk_news[:3]]}, "social_intelligence": {"mentions_7d": len(social), "platforms": dict(platforms), "sentiment_score_10": sentiment_score}, "final_verdict": {"overall_score_10": score, "recommendation": recommendation, "key_reasons": reasons, "next_steps": [f"Source suppliers in {county}", "Lock pricing for 30 days if trend is rising", "Monitor news for policy changes"] if score >= 6 else ["Wait and re-evaluate in 30 days", "Test with smaller budget", "Look at alternative products"]}}
 
 @api_router.post("/analyze")
 def analyze_api(req: DetailedAnalysisRequest, session: Session = Depends(get_session)):
@@ -200,125 +215,160 @@ def download_pdf(req: DetailedAnalysisRequest, session: Session = Depends(get_se
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=10*mm, leftMargin=10*mm, topMargin=10*mm, bottomMargin=10*mm)
     styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle(name='TitleNavy', fontSize=20, textColor=NAVY, fontName="Helvetica-Bold"))
-    styles.add(ParagraphStyle(name='SubtitleTeal', fontSize=12, textColor=TEAL, fontName="Helvetica-Bold"))
-    styles.add(ParagraphStyle(name='Sidebar', fontSize=9, textColor=colors.white, leading=12))
-    styles.add(ParagraphStyle(name='KPIBig', fontSize=22, textColor=NAVY, fontName="Helvetica-Bold", alignment=1))
-    styles.add(ParagraphStyle(name='KPISmall', fontSize=9, textColor=NAVY, alignment=1))
-    styles.add(ParagraphStyle(name='Insight', fontSize=9, backColor=LIGHT_TEAL, borderPadding=4))
+    styles.add(ParagraphStyle(name="TitleNavy", fontSize=20, textColor=NAVY, fontName="Helvetica-Bold"))
+    styles.add(ParagraphStyle(name="SubtitleTeal", fontSize=12, textColor=TEAL, fontName="Helvetica-Bold"))
+    styles.add(ParagraphStyle(name="Sidebar", fontSize=9, textColor=colors.white, leading=12))
+    styles.add(ParagraphStyle(name="KPIBig", fontSize=22, textColor=NAVY, fontName="Helvetica-Bold", alignment=1))
+    styles.add(ParagraphStyle(name="KPISmall", fontSize=9, textColor=NAVY, alignment=1))
+    styles.add(ParagraphStyle(name="Insight", fontSize=9, backColor=LIGHT_TEAL, borderPadding=4))
     story = []
-    mo = analysis_data['market_overview']
-    fin = analysis_data['financials']
-    fv = analysis_data['final_verdict']
-    dc = analysis_data['demand_competition']
-    ri = analysis_data['risk_intelligence']
-    ops = analysis_data['operations']
-    soc = analysis_data['social_intelligence']
+    mo = analysis_data["market_overview"]
+    fin = analysis_data["financials"]
+    fv = analysis_data["final_verdict"]
+    dc = analysis_data["demand_competition"]
+    ri = analysis_data["risk_intelligence"]
+    ops = analysis_data["operations"]
+    soc = analysis_data["social_intelligence"]
     logo_path = os.path.join(os.getcwd(), "app", "static", "logo.png")
     icon_path = lambda name: os.path.join(os.getcwd(), "app", "static", "icons", f"{name}.png")
     sidebar_elements = []
     if os.path.exists(logo_path):
         sidebar_elements.append(Image(logo_path, width=22*mm, height=22*mm))
-    sidebar_elements.append(Paragraph("EvidLens<br/>Research & Consulting", styles['Sidebar']))
+    sidebar_elements.append(Paragraph("EvidLens<br/>Research & Consulting", styles["Sidebar"]))
     sidebar_elements.append(Spacer(1, 8))
-    sidebar_elements.append(Paragraph("<font color='#14B8A6'>REPORT OVERVIEW</font>", styles['Sidebar']))
+    sidebar_elements.append(Paragraph("<font color='#14B8A6'>REPORT OVERVIEW</font>", styles["Sidebar"]))
     for icon, label, value in [("date", "DATE", datetime.utcnow().strftime("%B %Y")), ("location", "COVERAGE", f"{req.get_county()} County"), ("sector", "SECTOR", req.get_sector()), ("budget", "BUDGET", f"KES {fin['budget_kes']:,.0f}")]:
         row = [Image(icon_path(icon), 4*mm, 4*mm)] if os.path.exists(icon_path(icon)) else []
-        row.append(Paragraph(f"<b>{label}</b><br/>{value}", styles['Sidebar']))
+        row.append(Paragraph(f"<b>{label}</b><br/>{value}", styles["Sidebar"]))
         sidebar_elements.append(Table([row], colWidths=[6*mm, 44*mm]))
     sidebar_table = Table([[el] for el in sidebar_elements], colWidths=[50*mm])
-    sidebar_table.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), NAVY), ('PADDING', (0,0), (-1,-1), 6)]))
+    sidebar_table.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), NAVY), ("PADDING", (0, 0), (-1, -1), 6)]))
     main_elements = []
-    main_elements.append(Paragraph("ANALYTICAL FINDINGS", styles['TitleNavy']))
-    main_elements.append(Paragraph(f"MARKET REPORT - {req.get_product().upper()} IN {req.get_county().upper()}", styles['SubtitleTeal']))
+    main_elements.append(Paragraph("ANALYTICAL FINDINGS", styles["TitleNavy"]))
+    main_elements.append(Paragraph(f"MARKET REPORT - {req.get_product().upper()} IN {req.get_county().upper()}", styles["SubtitleTeal"]))
     main_elements.append(Spacer(1, 6))
-    kpi_data = [[Paragraph(f"KES {mo['current_price_kes'] or 'N/A'}", styles['KPIBig']), Paragraph(f"{dc['demand_level']}", styles['KPIBig']), Paragraph(f"{fv['overall_score_10']}/10", styles['KPIBig'])], [Paragraph("Current Price", styles['KPISmall']), Paragraph("Demand Level", styles['KPISmall']), Paragraph("Overall Score", styles['KPISmall'])]]
+    kpi_data = [[Paragraph(f"KES {mo['current_price_kes'] or 'N/A'}", styles["KPIBig"]), Paragraph(f"{dc['demand_level']}", styles["KPIBig"]), Paragraph(f"{fv['overall_score_10']}/10", styles["KPIBig"])], [Paragraph("Current Price", styles["KPISmall"]), Paragraph("Demand Level", styles["KPISmall"]), Paragraph("Overall Score", styles["KPISmall"])]]
     kpi_table = Table(kpi_data, colWidths=[40*mm, 40*mm, 40*mm])
-    kpi_table.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 1, LIGHT_TEAL), ('BACKGROUND', (0,0), (-1,-1), LIGHT_TEAL)]))
+    kpi_table.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 1, LIGHT_TEAL), ("BACKGROUND", (0, 0), (-1, -1), LIGHT_TEAL)]))
     main_elements.append(kpi_table)
     main_elements.append(Spacer(1, 8))
-    rec_color = GREEN if fv['overall_score_10'] >= 7 else YELLOW if fv['overall_score_10'] >= 4 else RED
-    rec_table = Table([[Paragraph(f"<b>{fv['recommendation']}</b>", styles['Normal'])]], colWidths=[120*mm])
-    rec_table.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), rec_color), ('TEXTCOLOR', (0,0), (-1,-1), colors.white), ('PADDING', (0,0), (-1,-1), 8)]))
+    rec_color = GREEN if fv["overall_score_10"] >= 7 else YELLOW if fv["overall_score_10"] >= 4 else RED
+    rec_table = Table([[Paragraph(f"<b>{fv['recommendation']}</b>", styles["Normal"])]], colWidths=[120*mm])
+    rec_table.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), rec_color), ("TEXTCOLOR", (0, 0), (-1, -1), colors.white), ("PADDING", (0, 0), (-1, -1), 8)]))
     main_elements.append(rec_table)
-    for reason in fv['key_reasons']:
-        main_elements.append(Paragraph(f"- {reason}", styles['Normal']))
+    for reason in fv["key_reasons"]:
+        main_elements.append(Paragraph(f"- {reason}", styles["Normal"]))
     main_elements.append(Spacer(1, 8))
-    main_elements.append(Paragraph(f"<b>Insight:</b> {mo['price_trend']} trend with {mo['seasonality']}. Risk level is {ri['risk_level']}.", styles['Insight']))
+    price_data = [mo["current_price_kes"] or 0, mo["30_day_avg_kes"] or 0, mo["90_day_forecast_kes"] or 0]
+    price_labels = ["Current", "30D Avg", "90D Forecast"]
+    donut = donut_chart(price_data, price_labels, "Price Trend")
+    comp_data = [p["count"] for p in dc["top_products_in_sector"][:5]]
+    comp_labels = [p["product"][:15] for p in dc["top_products_in_sector"][:5]]
+    bar = bar_chart(comp_data, comp_labels, "Top Products in Sector")
+    charts_table = Table([[donut, bar]], colWidths=[85*mm, 85*mm])
+    main_elements.append(charts_table)
+    main_elements.append(Spacer(1, 8))
+    main_elements.append(Paragraph(f"<b>Insight:</b> {mo['price_trend']} trend with {mo['seasonality']}. Risk level is {ri['risk_level']}.", styles["Insight"]))
     page1 = Table([[sidebar_table, main_elements]], colWidths=[55*mm, 125*mm])
-    page1.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'TOP')]))
+    page1.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
     story.append(page1)
     story.append(PageBreak())
-    story.append(Paragraph("DETAILED ANALYSIS", styles['TitleNavy']))
+    story.append(Paragraph("DETAILED ANALYSIS", styles["TitleNavy"]))
     story.append(Spacer(1, 6))
-    story.append(Paragraph("1. FINANCIALS & FEASIBILITY", styles['SubtitleTeal']))
-    fin_data = [["Metric", "Value"], ["Budget KES", f"{fin['budget_kes']:,.0f}"], ["Business Model", fin['business_model']], ["Units You Can Buy", fin['units_you_can_buy']], ["Est. Cost Per Unit", f"KES {fin['estimated_cost_per_unit']}"], ["Est. Monthly Profit", f"KES {fin['estimated_monthly_profit']:,.0f}"], ["Est. ROI", f"{fin['estimated_roi_percent']}%"]]
+    story.append(Paragraph("1. FINANCIALS & FEASIBILITY", styles["SubtitleTeal"]))
+    fin_data = [["Metric", "Value"], ["Budget KES", f"{fin['budget_kes']:,.0f}"], ["Business Model", fin["business_model"]], ["Units You Can Buy", fin["units_you_can_buy"]], ["Est. Cost Per Unit", f"KES {fin['estimated_cost_per_unit']}"], ["Est. Monthly Profit", f"KES {fin['estimated_monthly_profit']:,.0f}"], ["Est. ROI", f"{fin['estimated_roi_percent']}%"]]
     fin_table = Table(fin_data, colWidths=[90*mm, 90*mm])
-    fin_table.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 0.5, colors.grey), ('BACKGROUND', (0,0), (-1,0), NAVY), ('TEXTCOLOR', (0,0), (-1,0), colors.white)]))
+    fin_table.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, colors.grey), ("BACKGROUND", (0, 0), (-1, 0), NAVY), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white)]))
     story.append(fin_table)
     story.append(Spacer(1, 8))
-    story.append(Paragraph("2. DEMAND & COMPETITION", styles['SubtitleTeal']))
-    story.append(Paragraph(f"<b>Demand Score:</b> {dc['avg_demand_score']}/10 - {dc['demand_level']}", styles['Normal']))
-    story.append(Paragraph(f"<b>Top Competitors:</b> {', '.join(dc['top_competitors']) or 'None'}", styles['Normal']))
+    story.append(Paragraph("2. DEMAND & COMPETITION", styles["SubtitleTeal"]))
+    story.append(Paragraph(f"<b>Demand Score:</b> {dc['avg_demand_score']}/10 - {dc['demand_level']}", styles["Normal"]))
+    story.append(Paragraph(f"<b>Top Competitors:</b> {', '.join(dc['top_competitors']) or 'None'}", styles["Normal"]))
     story.append(Spacer(1, 8))
-    story.append(Paragraph("3. OPERATIONS & RISK", styles['SubtitleTeal']))
-    story.append(Paragraph(f"<b>Distribution:</b> {', '.join(ops['recommended_distribution'])}", styles['Normal']))
-    story.append(Paragraph(f"<b>Supply Chain Risk:</b> {ops['supply_chain_risk']} - {ops['supply_risk_events']} events", styles['Normal']))
-    story.append(Paragraph(f"<b>Risk Score:</b> {ri['risk_score_10']}/10 - {ri['risk_level']}", styles['Normal']))
+    story.append(Paragraph("3. OPERATIONS & RISK", styles["SubtitleTeal"]))
+    story.append(Paragraph(f"<b>Distribution:</b> {', '.join(ops['recommended_distribution'])}", styles["Normal"]))
+    story.append(Paragraph(f"<b>Supply Chain Risk:</b> {ops['supply_chain_risk']} - {ops['supply_risk_events']} events", styles["Normal"]))
+    story.append(Paragraph(f"<b>Risk Score:</b> {ri['risk_score_10']}/10 - {ri['risk_level']}", styles["Normal"]))
     story.append(Spacer(1, 8))
-    story.append(Paragraph("4. SOCIAL INTELLIGENCE - 7 DAYS", styles['SubtitleTeal']))
-    story.append(Paragraph(f"Mentions: {soc['mentions_7d']} | Sentiment: {soc['sentiment_score_10']}/10", styles['Normal']))
-    story.append(Paragraph(f"Platforms: {', '.join(soc['platforms'].keys())}", styles['Normal']))
+    story.append(Paragraph("4. SOCIAL INTELLIGENCE - 7 DAYS", styles["SubtitleTeal"]))
+    story.append(Paragraph(f"Mentions: {soc['mentions_7d']} | Sentiment: {soc['sentiment_score_10']}/10", styles["Normal"]))
+    story.append(Paragraph(f"Platforms: {', '.join(soc['platforms'].keys())}", styles["Normal"]))
     story.append(Spacer(1, 8))
-    story.append(Paragraph("5. RECOMMENDATIONS & NEXT STEPS", styles['SubtitleTeal']))
-    for i, step in enumerate(fv['next_steps'], 1):
-        story.append(Paragraph(f"{i}. {step}", styles['Normal']))
+    story.append(Paragraph("5. RECOMMENDATIONS & NEXT STEPS", styles["SubtitleTeal"]))
+    for i, step in enumerate(fv["next_steps"], 1):
+        story.append(Paragraph(f"{i}. {step}", styles["Normal"]))
     story.append(Spacer(1, 15))
-    story.append(Paragraph("Powered by EvidLens | Data is indicative and for decision support only.", styles['Italic']))
+    story.append(Paragraph("Powered by EvidLens | Data is indicative and for decision support only.", styles["Italic"]))
     doc.build(story)
     buffer.seek(0)
     return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=EvidLens_Report_{req.get_product()}_{req.get_county()}.pdf"})
 
 @router.get("/trending")
-def trending(db: Session = Depends(get_db)):
+def get_trending(session: Session = Depends(get_session)):
     try:
-        metrics = db.exec(select(MarketMetric).order_by(MarketMetric.demand_score.desc()).limit(6)).all()
+        two_weeks_ago = datetime.utcnow() - timedelta(days=14)
+        stmt = select(MarketMetric.product, MarketMetric.county, MarketMetric.sector, func.avg(MarketMetric.demand_score).label("avg_demand"), func.avg(MarketMetric.avg_price_kes).label("avg_price"), func.count(MarketMetric.id).label("activity_count")).where(MarketMetric.created_at > two_weeks_ago).group_by(MarketMetric.product, MarketMetric.county, MarketMetric.sector).order_by(desc("activity_count")).limit(6)
+        results = session.exec(stmt).all()
         trending_list = []
-        for m in metrics:
-            price = 0
-            try:
-                p = db.exec(select(PriceData).where(PriceData.product_name == m.product, PriceData.county == m.county).order_by(PriceData.created_at.desc())).first()
-                if p:
-                    price = getattr(p, 'price', getattr(p, 'avg_price_kes', 0))
-            except Exception:
-                pass
-            trend = "up" if (getattr(m, 'demand_score', 0) or 0) >= 7 else "down" if (getattr(m, 'demand_score', 0) or 0) <= 3 else "stable"
-            change = round((getattr(m, 'demand_score', 0) * 2.5), 1)
-            trending_list.append({"id": m.id, "product": m.product, "county": m.county, "sector": m.sector, "demand_score": getattr(m, 'demand_score', 0), "current_price_kes": price or getattr(m, 'avg_price_kes', 0) or 0, "trend": trend, "price_change_percent": change})
+        for r in results:
+            old_stmt = select(func.avg(MarketMetric.avg_price_kes)).where(MarketMetric.product == r.product, MarketMetric.county == r.county, MarketMetric.created_at.between(two_weeks_ago - timedelta(days=30), two_weeks_ago))
+            old_avg = session.exec(old_stmt).first() or r.avg_price
+            price_change = 0
+            if old_avg and old_avg > 0:
+                price_change = round(((r.avg_price - old_avg) / old_avg) * 100, 1)
+            trend = "up" if price_change > 0 else "down" if price_change < 0 else "stable"
+            trending_list.append({"product": r.product, "county": r.county, "sector": r.sector, "demand_score": round(r.avg_demand or 0, 1), "current_price_kes": int(r.avg_price or 0), "price_change_percent": price_change, "trend": trend, "activity": r.activity_count})
         if not trending_list:
-            prices = db.exec(select(PriceData).limit(6)).all()
-            for p in prices:
-                trending_list.append({"id": p.id, "product": getattr(p, 'product_name', 'Product'), "county": getattr(p, 'county', 'Nakuru'), "sector": getattr(p, 'sector', 'Agriculture'), "demand_score": 7, "current_price_kes": getattr(p, 'price', 0), "trend": "up", "price_change_percent": 5.2})
+            metrics = session.exec(select(MarketMetric).order_by(MarketMetric.demand_score.desc()).limit(6)).all()
+            for m in metrics:
+                price = 0
+                try:
+                    p = session.exec(select(PriceData).where(PriceData.product_name == m.product, PriceData.county == m.county).order_by(PriceData.created_at.desc())).first()
+                    if p:
+                        price = getattr(p, "price", getattr(p, "avg_price_kes", 0))
+                except Exception:
+                    pass
+                trending_list.append({"id": m.id, "product": m.product, "county": m.county, "sector": m.sector, "demand_score": getattr(m, "demand_score", 0), "current_price_kes": price or getattr(m, "avg_price_kes", 0) or 0, "trend": "up" if (getattr(m, "demand_score", 0) or 0) >= 7 else "down" if (getattr(m, "demand_score", 0) or 0) <= 3 else "stable", "price_change_percent": round((getattr(m, "demand_score", 0) * 2.5), 1)})
         return {"trending": trending_list}
     except Exception as e:
         print(f"trending failed {e}")
         return {"trending": []}
 
 @router.get("/search")
-def search(q: str = Query(..., min_length=1), db: Session = Depends(get_db)):
+def search_insights(q: str = Query("", min_length=0), county: str = Query(None), sector: str = Query(None), min_demand: float = Query(0), session: Session = Depends(get_session)):
     try:
-        like = f"%{q}%"
-        metrics = db.exec(select(MarketMetric).where(MarketMetric.product.ilike(like)).limit(10)).all()
-        results = []
-        for m in metrics:
-            results.append({"id": m.id, "product": m.product, "county": m.county, "snippet": f"{m.product} in {m.sector} @ {m.county} - Demand {getattr(m, 'demand_score', 0)}/10, Avg KES {getattr(m, 'avg_price_kes', 0)}", "demand_score": getattr(m, 'demand_score', 0), "current_price_kes": getattr(m, 'avg_price_kes', 0)})
-        prices = db.exec(select(PriceData).where(PriceData.product_name.ilike(like)).limit(5)).all()
-        for p in prices:
-            results.append({"id": p.id + 10000, "product": getattr(p, 'product_name', ''), "county": getattr(p, 'county', ''), "snippet": f"Price: {getattr(p, 'product_name', '')} KES {getattr(p, 'price', 0)} in {getattr(p, 'county', '')}", "demand_score": 6, "current_price_kes": getattr(p, 'price', 0)})
-        return {"results": results[:10]}
+        if not q and not county and not sector:
+            return {"results": [], "total": 0}
+        stmt = select(MarketMetric)
+        filters = []
+        if q:
+            search_term = f"%{q}%"
+            filters.append(or_(MarketMetric.product.ilike(search_term), MarketMetric.county.ilike(search_term), MarketMetric.sector.ilike(search_term)))
+        if county:
+            filters.append(MarketMetric.county == county)
+        if sector:
+            filters.append(MarketMetric.sector == sector)
+        if min_demand > 0:
+            filters.append(MarketMetric.demand_score >= min_demand)
+        if filters:
+            stmt = stmt.where(*filters)
+        days_old = func.julianday("now") - func.julianday(MarketMetric.created_at)
+        recency_score = func.max(0, 30 - days_old)
+        relevance = (MarketMetric.demand_score * 0.5) + (recency_score * 0.3)
+        stmt = stmt.order_by(desc(relevance)).limit(50)
+        results = session.exec(stmt).all()
+        formatted = []
+        for r in results:
+            formatted.append({"id": r.id, "product": r.product, "county": r.county, "sector": r.sector, "current_price_kes": r.avg_price_kes, "demand_score": r.demand_score, "timestamp": r.created_at, "snippet": f"{r.product} in {r.sector} @ {r.county} - Demand {getattr(r, 'demand_score', 0)}/10, Avg KES {getattr(r, 'avg_price_kes', 0)}"})
+        if not formatted and q:
+            like = f"%{q}%"
+            prices = session.exec(select(PriceData).where(PriceData.product_name.ilike(like)).limit(5)).all()
+            for p in prices:
+                formatted.append({"id": p.id + 10000, "product": getattr(p, "product_name", ""), "county": getattr(p, "county", ""), "snippet": f"Price: {getattr(p, 'product_name', '')} KES {getattr(p, 'price', 0)} in {getattr(p, 'county', '')}", "demand_score": 6, "current_price_kes": getattr(p, "price", 0)})
+        return {"results": formatted[:50], "total": len(formatted)}
     except Exception as e:
         print(f"search failed {e}")
-        return {"results": []}
+        return {"results": [], "total": 0}
 
 @router.get("/{insight_id}")
 def get_insight(insight_id: int, db: Session = Depends(get_db)):
@@ -331,3 +381,43 @@ def get_insight(insight_id: int, db: Session = Depends(get_db)):
     if not m:
         return {"id": insight_id, "detail": "Not found"}
     return {"id": insight_id, "data": m}
+
+@api_router.post("/mpesa/callback")
+async def mpesa_callback(payload: dict, db: Session = Depends(get_db)):
+    body = payload.get("Body", {}).get("stkCallback", {})
+    result_code = body.get("ResultCode")
+    if result_code != 0:
+        return {"ResultCode": 0, "ResultDesc": "Failed"}
+    items = {item["Name"]: item["Value"] for item in body.get("CallbackMetadata", {}).get("Item", [])}
+    mpesa_receipt = items.get("MpesaReceiptNumber")
+    amount = items.get("Amount")
+    account_ref = items.get("AccountReference")
+    try:
+        user_id_str, plan_name = account_ref.split("_")
+        user_id = int(user_id_str)
+    except Exception:
+        return {"ResultCode": 0, "ResultDesc": "Bad AccountReference"}
+    plan_data = PRICING.get(plan_name)
+    if not plan_data:
+        return {"ResultCode": 0, "ResultDesc": "Plan not found"}
+    is_annual = amount == plan_data["annual"]
+    days = 365 if is_annual else 30
+    expires_at = datetime.utcnow() + timedelta(days=days)
+    try:
+        sub = db.exec(select(UserSubscription).where(UserSubscription.user_id == user_id)).first()
+        if sub:
+            sub.plan_name = plan_name
+            sub.status = "active"
+            sub.mpesa_receipt = mpesa_receipt
+            sub.expires_at = expires_at
+        else:
+            sub = UserSubscription(user_id=user_id, plan_name=plan_name, status="active", mpesa_receipt=mpesa_receipt, expires_at=expires_at)
+            db.add(sub)
+        db.commit()
+    except Exception as e:
+        print(f"mpesa callback db failed: {e}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+    return {"ResultCode": 0, "ResultDesc": "Success"}
