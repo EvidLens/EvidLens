@@ -1,96 +1,215 @@
-from functools import wraps
 from fastapi import Depends, HTTPException
 from sqlmodel import Session, select
+from datetime import datetime, timezone
 from app.core.db import get_session
 from app.core.models import UserSubscription
 from app.modules.auth.dependencies import get_current_user
 
+UTC = timezone.utc
+
 MODULE_NUMBER_TO_KEY = {
-    1: "market_intel", 2: "competitive_intel", 3: "consumer_insights",
-    4: "pricing_intel", 5: "regulatory_intel", 6: "location_intel",
-    7: "report_builder", 8: "ai_insights", 9: "business_os",
-    10: "payments", 11: "kenyalens_iq", 12: "knowledge_base",
+    1: "Competitive Engine",
+    2: "Price Oracle",
+    3: "Demand Radar",
+    4: "County Mapper",
+    5: "Consumer Pulse",
+    6: "Risk Sentinel",
+    7: "Policy Watch",
+    8: "Funding Radar",
+    9: "Export Navigator",
+    10: "Knowledge Base",
+    11: "Report Builder",
+    12: "AI Insights",
+}
+
+KEY_TO_MODULE = {
+    "competitive_engine": "Competitive Engine",
+    "competitive_intel": "Competitive Engine",
+    "price_oracle": "Price Oracle",
+    "pricing_intel": "Price Oracle",
+    "demand_radar": "Demand Radar",
+    "market_intel": "Demand Radar",
+    "county_mapper": "County Mapper",
+    "location_intel": "County Mapper",
+    "consumer_pulse": "Consumer Pulse",
+    "consumer_insights": "Consumer Pulse",
+    "risk_sentinel": "Risk Sentinel",
+    "regulatory_intel": "Risk Sentinel",
+    "policy_watch": "Policy Watch",
+    "funding_radar": "Funding Radar",
+    "export_navigator": "Export Navigator",
+    "knowledge_base": "Knowledge Base",
+    "report_builder": "Report Builder",
+    "ai_insights": "AI Insights",
+    "business_os": "Funding Radar",
 }
 
 PLAN_MODULES_KEYS = {
-    "trial": ["market_intel", "consumer_insights", "ai_insights"],
-    "starter": ["market_intel", "consumer_insights"],
-    "growth": ["market_intel", "competitive_intel", "consumer_insights", "pricing_intel", "location_intel", "ai_insights", "report_builder"],
-    "pro": ["market_intel", "competitive_intel", "consumer_insights", "pricing_intel", "location_intel", "ai_insights", "report_builder", "business_os"],
-    "enterprise": ["market_intel", "competitive_intel", "consumer_insights", "pricing_intel", "regulatory_intel", "location_intel", "report_builder", "ai_insights", "business_os", "payments", "kenyalens_iq", "knowledge_base"],
+    "FREE": [
+        "Demand Radar",
+        "Consumer Pulse",
+        "Risk Sentinel",
+        "Export Navigator",
+        "Knowledge Base",
+        "AI Insights",
+    ],
+    "BASIC": [
+        "Demand Radar",
+        "Consumer Pulse",
+        "Risk Sentinel",
+        "Export Navigator",
+        "Knowledge Base",
+        "AI Insights",
+        "Policy Watch",
+        "Report Builder",
+    ],
+    "PROFESSIONAL": [
+        "Demand Radar",
+        "Consumer Pulse",
+        "Risk Sentinel",
+        "Export Navigator",
+        "Knowledge Base",
+        "AI Insights",
+        "Policy Watch",
+        "Report Builder",
+        "Competitive Engine",
+        "Price Oracle",
+        "County Mapper",
+    ],
+    "ENTERPRISE": [
+        "Competitive Engine",
+        "Price Oracle",
+        "Demand Radar",
+        "County Mapper",
+        "Consumer Pulse",
+        "Risk Sentinel",
+        "Policy Watch",
+        "Funding Radar",
+        "Export Navigator",
+        "Knowledge Base",
+        "Report Builder",
+        "AI Insights",
+    ],
 }
 
 EV_TO_PLAN = {
-    "EV-FREE": "trial", "EV-STARTER": "starter", "EV-SME": "growth",
-    "EV-GROWTH": "growth", "EV-PRO": "pro", "EV-ENT": "enterprise",
-    "Trial": "trial", "Starter": "starter", "Growth": "growth",
-    "Pro": "pro", "Enterprise": "enterprise",
+    "EV-FREE": "FREE",
+    "EV-STARTER": "BASIC",
+    "EV-SME": "PROFESSIONAL",
+    "EV-GROWTH": "PROFESSIONAL",
+    "EV-PRO": "PROFESSIONAL",
+    "EV-ENT": "ENTERPRISE",
+    "EV-ENTERPRISE": "ENTERPRISE",
+    "TRIAL": "FREE",
+    "STARTER": "BASIC",
+    "GROWTH": "PROFESSIONAL",
+    "PRO": "PROFESSIONAL",
+    "ENTERPRISE": "ENTERPRISE",
+    "FREE": "FREE",
+    "BASIC": "BASIC",
+    "PROFESSIONAL": "PROFESSIONAL",
 }
 
-def _resolve_key(*args, **kwargs):
-    key = None
+def normalize_plan(name) -> str:
+    if not name:
+        return "FREE"
+    clean = str(name).strip().upper().replace("EV-", "EV_").replace("EV_", "EV-")
+    if clean in EV_TO_PLAN:
+        return EV_TO_PLAN[clean]
+    key = str(name).strip().upper()
+    if key in EV_TO_PLAN:
+        return EV_TO_PLAN[key]
+    if key in PLAN_MODULES_KEYS:
+        return key
+    return "FREE"
+
+def resolve_module(*args, **kwargs) -> str:
     if args:
         first = args[0]
         if isinstance(first, int):
-            key = MODULE_NUMBER_TO_KEY.get(first)
-        elif isinstance(first, str):
-            key = first.lower()
+            return MODULE_NUMBER_TO_KEY.get(first, "Demand Radar")
+        if isinstance(first, str):
+            low = first.strip().lower()
+            if low in KEY_TO_MODULE:
+                return KEY_TO_MODULE[low]
+            return first
     if "module_number" in kwargs:
-        key = MODULE_NUMBER_TO_KEY.get(kwargs["module_number"])
+        return MODULE_NUMBER_TO_KEY.get(kwargs["module_number"], "Demand Radar")
     if "module_name" in kwargs:
-        key = kwargs["module_name"].lower()
+        name = str(kwargs["module_name"])
+        low = name.strip().lower()
+        if low in KEY_TO_MODULE:
+            return KEY_TO_MODULE[low]
+        return name
     if "key" in kwargs:
         k = kwargs["key"]
-        key = MODULE_NUMBER_TO_KEY.get(k) if isinstance(k, int) else str(k).lower()
-    return key or "market_intel"
+        if isinstance(k, int):
+            return MODULE_NUMBER_TO_KEY.get(k, "Demand Radar")
+        low = str(k).strip().lower()
+        if low in KEY_TO_MODULE:
+            return KEY_TO_MODULE[low]
+        return str(k)
+    return "Demand Radar"
+
+def _resolve_key(*args, **kwargs) -> str:
+    return resolve_module(*args, **kwargs)
+
+def get_active_plan(db: Session, user) -> str:
+    stmt = select(UserSubscription).where(
+        UserSubscription.user_id == user.id,
+        UserSubscription.status == "active",
+        UserSubscription.expires_at > datetime.now(UTC),
+    )
+    sub = db.exec(stmt).first()
+    if not sub:
+        return "FREE"
+    return normalize_plan(sub.plan_name)
 
 def require_module(*args, **kwargs):
-    required_key = _resolve_key(*args, **kwargs)
-    def decorator(func):
-        @wraps(func)
-        async def dependency_check(db: Session = Depends(get_session), user = Depends(get_current_user)):
-            if not user:
-                raise HTTPException(status_code=401, detail="Not authenticated")
-            try:
-                stmt = select(UserSubscription).where(UserSubscription.user_id == user.id, UserSubscription.status == "active")
-                subs = db.exec(stmt).all()
-                if not subs:
-                    if required_key in PLAN_MODULES_KEYS["trial"]:
-                        return True
-                    raise HTTPException(status_code=403, detail=f"Module {required_key} requires subscription")
-                plan_name = subs[0].plan_name
-                normalized = EV_TO_PLAN.get(plan_name, plan_name.lower())
-                allowed = PLAN_MODULES_KEYS.get(normalized, [])
-                direct = [s.module_name.lower() for s in subs]
-                if required_key in allowed or required_key in direct:
-                    return True
-                # allow old "Core OS" naming
-                if any("core" in m.lower() for m in direct) and required_key in ["market_intel", "consumer_insights"]:
-                    return True
-                raise HTTPException(status_code=403, detail=f"Plan {plan_name} does not include {required_key}")
-            except HTTPException:
-                raise
-            except Exception as e:
-                print(f"Guard fail open: {e}")
-                return True
-        @wraps(func)
-        def wrapper(*f_args, **f_kwargs):
-            return func(*f_args, **f_kwargs)
-        wrapper.dependency = dependency_check
-        return wrapper
-    return decorator
+    required_module = resolve_module(*args, **kwargs)
+    def dependency(db: Session = Depends(get_session), user=Depends(get_current_user)):
+        if not user:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        plan = get_active_plan(db, user)
+        allowed = PLAN_MODULES_KEYS.get(plan, PLAN_MODULES_KEYS["FREE"])
+        if required_module in allowed:
+            return user
+        raise HTTPException(status_code=403, detail=f"Module '{required_module}' is locked on {plan}. Upgrade to unlock.")
+    return dependency
 
 def require_module_key(module_key: str):
     return require_module(module_key)
 
 def consume_credits(amount: int = 1):
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            return func(*args, **kwargs)
-        async def credit_dependency(db: Session = Depends(get_session), user = Depends(get_current_user)):
-            # Credits disabled for now - pass through
-            return True
-        wrapper.credit_dep = credit_dependency
-        return wrapper
-    return decorator
+    def dependency(db: Session = Depends(get_session), user=Depends(get_current_user)):
+        if not user:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        credits = getattr(user, "credits", None)
+        if credits is None:
+            try:
+                from app.modules.wallet.models import Wallet
+                wallet = db.exec(select(Wallet).where(Wallet.user_id == user.id)).first()
+                credits = int(wallet.balance or 0) if wallet else 0
+            except Exception:
+                credits = 0
+        else:
+            credits = int(credits or 0)
+        if credits < amount:
+            raise HTTPException(status_code=402, detail=f"Not enough credits. You have {credits}, need {amount}. Buy credits or upgrade.")
+        new_balance = credits - amount
+        if hasattr(user, "credits"):
+            user.credits = new_balance
+            db.add(user)
+            db.commit()
+        else:
+            try:
+                from app.modules.wallet.models import Wallet
+                wallet = db.exec(select(Wallet).where(Wallet.user_id == user.id)).first()
+                if wallet:
+                    wallet.balance = new_balance
+                    db.add(wallet)
+                    db.commit()
+            except Exception:
+                pass
+        return user
+    return dependency
