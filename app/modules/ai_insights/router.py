@@ -11,8 +11,10 @@ import httpx
 from app.modules.ai_insights.service import AIInsightsService
 from app.modules.lens_engine.service import LensEngineService
 from app.core.guards import require_module, consume_credits
-from app.core.models import UserSubscription
+from app.core.models import UserSubscription, User
 from app.core.db import get_session
+from app.modules.auth.dependencies import get_current_user
+
 __all__ = ["router", "router_api", "ask_lens_chat", "ChatRequest", "process_chat"]
 router = APIRouter(prefix="/ai", tags=["Ask Lens"])
 router_api = APIRouter(prefix="/api", tags=["Ask Lens API"])
@@ -20,6 +22,14 @@ templates = Jinja2Templates(directory="app/templates")
 GROQ_KEY = os.getenv("GROQ_API_KEY")
 SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", "support@evidlens.co.ke")
 ai_service = AIInsightsService()
+
+# Optional auth: returns User or None, never 401s - chat works for anon too
+async def get_current_user_optional(request: Request):
+    try:
+        return await get_current_user(request)
+    except Exception:
+        return None
+
 class InsightRequest(BaseModel):
     query: str
     sector: str
@@ -28,13 +38,16 @@ class InsightRequest(BaseModel):
     ward: Optional[str] = None
     export_format: Optional[str] = "json"
     budget_kes: Optional[int] = None
+
 class AlertRequest(BaseModel):
     alert_type: str
     keywords: List[str]
     channel: str
+
 class Message(BaseModel):
     role: str
     content: str
+
 class ChatRequest(BaseModel):
     message: Optional[str] = ""
     history: Optional[List[Message]] = []
@@ -47,6 +60,7 @@ class ChatRequest(BaseModel):
     budget: Optional[Any] = None
     budget_kes: Optional[Any] = None
     model_config = {"extra": "allow"}
+
 SYSTEM_PROMPT = """You are Ask Lens, the AI Agent for EvidLens Kenya Decision Intelligence.
 You have access to 9 Lanes of Kenya data: MarketPrice, BusinessDirectory, DemandSignal, CountyStats, Sectors, Opportunities.
 Personality: Real human, smart, warm, slightly playful, Kenyan. Talk like ChatGPT, not a form. Keep replies 2-5 sentences unless user asks for a full report. Always give 1 actionable next step. Currency KES, counties only.
@@ -64,6 +78,7 @@ TOOLS = [
     {"type": "function", "function": {"name": "export_data", "description": "Export to Excel, PDF DETAILED", "parameters": {"type": "object", "properties": {"format": {"type": "string"}}, "required": ["format"]}}},
     {"type": "function", "function": {"name": "viability_check", "description": "Detailed Go, No-Go, Needs Research with financials", "parameters": {"type": "object", "properties": {"business": {"type": "string"}, "county": {"type": "string"}, "budget": {"type": "string"}}, "required": ["business", "county"]}}}
 ]
+
 async def call_tool(name: str, args: dict, user_id: int, session: Session):
     if name == "data_qa":
         return await ai_service.generate_insights(args["query"], args, user_id)
@@ -76,18 +91,32 @@ async def call_tool(name: str, args: dict, user_id: int, session: Session):
     if name == "export_data":
         return {"status": "Export ready", "format": args["format"], "download_url": "/api/reports/download"}
     return {"error": "Tool not found"}
+
 def safe_consume_credits(session, user_id, credit_type="api_credits", amount=1):
+    # FIXED vs yours: yours did session.get(UserSubscription, user_id) - PK is not user_id, so it never found anything
+    # This version looks up by user_id, and deducts from User.credits or Wallet like guards.py
+    if not user_id:
+        return
     try:
-        sub = session.get(UserSubscription, user_id)
-        if sub and hasattr(sub, credit_type) and getattr(sub, credit_type) >= amount:
-            setattr(sub, credit_type, getattr(sub, credit_type) - amount)
+        user = session.get(User, user_id)
+        if user is not None and hasattr(user, "credits"):
+            if int(user.credits or 0) >= amount:
+                user.credits = int(user.credits or 0) - amount
+                session.add(user)
+                session.commit()
+                return
+        from app.modules.wallet.models import Wallet
+        wallet = session.exec(select(Wallet).where(Wallet.user_id == user_id)).first()
+        if wallet and int(wallet.balance or 0) >= amount:
+            wallet.balance = int(wallet.balance or 0) - amount
+            session.add(wallet)
             session.commit()
-    except:
+    except Exception:
         pass
-async def process_chat(req: ChatRequest, request: Request, session: Session):
-    user_id = getattr(request.state, 'user', None)
-    user_id = user_id.id if user_id else 1
-    user_email = getattr(getattr(request.state, 'user', None), 'email', None) or "anon@evidlens.co.ke"
+
+async def process_chat(req: ChatRequest, request: Request, session: Session, user=None):
+    user_id = user.id if user else 1
+    user_email = getattr(user, "email", None) or "anon@evidlens.co.ke"
     safe_consume_credits(session, user_id, "api_credits", 1)
     history = [{"role": m.role, "content": m.content} for m in (req.history or [])]
     if req.context:
@@ -108,7 +137,7 @@ async def process_chat(req: ChatRequest, request: Request, session: Session):
             full_message = req.message
     else:
         full_message = req.message
-    low = req.message.lower().strip()
+    low = (req.message or "").lower().strip()
     wants_report = any(k in low for k in ["full report", "detailed", "analysis", "viability", "business case", "business plan", "should i start", "market size", "30-day", "30 day", "action plan", "financial"])
     if wants_report:
         market_data = dict(req.context or {})
@@ -121,17 +150,21 @@ async def process_chat(req: ChatRequest, request: Request, session: Session):
     result = await lens.chat(full_message, user_email, history)
     ans = result.get("reply", "") or "How can I help with Kenya markets?"
     return {"reply": ans, "response": ans, "message": ans, "answer": ans, "sources": [result.get("source", "EvidLens DB + Groq")], "verdict": None, "credits_used": 1, "model": lens.groq_model}
+
 @router.get("/", response_class=HTMLResponse)
 async def ai_page(request: Request):
     return templates.TemplateResponse("ai_insights.html", {"request": request})
+
 @router.post("/chat")
-async def ask_lens_chat(request: Request, req: ChatRequest, session: Session = Depends(get_session)):
-    return await process_chat(req, request, session)
+async def ask_lens_chat(request: Request, req: ChatRequest, session: Session = Depends(get_session), user=Depends(get_current_user_optional)):
+    return await process_chat(req, request, session, user=user)
+
 @router_api.post("/chat")
-async def ask_lens_chat_api(request: Request, req: ChatRequest, session: Session = Depends(get_session)):
-    return await process_chat(req, request, session)
+async def ask_lens_chat_api(request: Request, req: ChatRequest, session: Session = Depends(get_session), user=Depends(get_current_user_optional)):
+    return await process_chat(req, request, session, user=user)
+
 @router_api.post("/analyze")
-async def analyze_api(request: Request, req: ChatRequest, session: Session = Depends(get_session)):
+async def analyze_api(request: Request, req: ChatRequest, session: Session = Depends(get_session), user=Depends(get_current_user_optional)):
     if not req.message:
         msg = req.product or req.query or req.q or ""
         if req.sector:
@@ -149,62 +182,65 @@ async def analyze_api(request: Request, req: ChatRequest, session: Session = Dep
         if req.budget_kes or req.budget:
             ctx["budget_kes"] = req.budget_kes or req.budget
         req.context = ctx
-    return await process_chat(req, request, session)
+    return await process_chat(req, request, session, user=user)
+
 @router.get("/chat")
-async def ask_lens_chat_get(message: str = "hello", request: Request = None, session: Session = Depends(get_session)):
-    return await process_chat(ChatRequest(message=message, history=[], context={}), request, session)
+async def ask_lens_chat_get(request: Request, message: str = "hello", session: Session = Depends(get_session), user=Depends(get_current_user_optional)):
+    return await process_chat(ChatRequest(message=message, history=[], context={}), request, session, user=user)
+
 @router.post("/ask")
-async def ask_lens(request: Request, req: InsightRequest, session: Session = Depends(get_session)):
-    user_id = getattr(request.state, 'user', None)
-    user_id = user_id.id if user_id else 1
+async def ask_lens(request: Request, req: InsightRequest, session: Session = Depends(get_session), user=Depends(get_current_user_optional)):
+    user_id = user.id if user else 1
     safe_consume_credits(session, user_id, "api_credits", 1)
     market_data = {"sector": req.sector, "county": req.county, "sub_county": req.sub_county, "ward": req.ward, "budget_kes": req.budget_kes}
     result = await ai_service.generate_insights(req.query, market_data, user_id)
     if req.export_format != "json":
         return export_result(result, req.export_format)
     return {"reply": result["answer"], "response": result["answer"], "answer": result["answer"], "chart_data": result.get("chart"), "table": result.get("table"), "map": result.get("map"), "sources": result.get("sources", []), "verdict": result.get("verdict"), "export_url": f"/ai/export?format={req.export_format}"}
+
 @router.post("/viability")
-async def viability_check(request: Request, req: InsightRequest, session: Session = Depends(get_session)):
-    user_id = getattr(request.state, 'user', None)
-    user_id = user_id.id if user_id else 1
+async def viability_check(request: Request, req: InsightRequest, session: Session = Depends(get_session), user=Depends(get_current_user_optional)):
+    user_id = user.id if user else 1
     safe_consume_credits(session, user_id, "api_credits", 2)
     market_data = {"sector": req.sector, "county": req.county, "budget_kes": req.budget_kes}
     viab_query = f"Should I start a {req.query} business in {req.county}? Budget KES {req.budget_kes}. Give DETAILED Go, No-Go, or Needs Research. Include 8 sections: executive summary, market size KES, pricing table, 5 competitors, county deep dive, financial viability with break-even, monthly profit, ROI%, 3 risks, 30-day action plan."
     result = await ai_service.generate_insights(viab_query, market_data, user_id)
     ans = result["answer"]
     return {"reply": ans, "response": ans, "answer": ans, "analysis": ans, "verdict": result.get("verdict"), "sources": result.get("sources")}
+
 @router.post("/alerts/create")
-def create_alert(request: Request, req: AlertRequest):
-    user_id = getattr(request.state, 'user', None)
-    user_id = user_id.id if user_id else 1
+def create_alert(request: Request, req: AlertRequest, user=Depends(get_current_user_optional)):
+    user_id = user.id if user else 1
     return {"reply": f"Alert for {req.alert_type} created", "response": f"Alert for {req.alert_type} created", "status": "Alert created", "type": req.alert_type, "channel": req.channel}
+
 @router.post("/reports/generate")
-async def generate_report(request: Request, req: InsightRequest, session: Session = Depends(get_session)):
-    user_id = getattr(request.state, 'user', None)
-    user_id = user_id.id if user_id else 1
+async def generate_report(request: Request, req: InsightRequest, session: Session = Depends(get_session), user=Depends(get_current_user_optional)):
+    user_id = user.id if user else 1
     safe_consume_credits(session, user_id, "api_credits", 5)
     report = await ai_service.generate_insights(f"Generate DETAILED board report for {req.sector} in {req.county} with 8 sections", {}, user_id)
     return export_result(report, "pptx")
+
 @router.post("/leads/export")
-async def export_leads(request: Request, req: InsightRequest, session: Session = Depends(get_session)):
-    user_id = getattr(request.state, 'user', None)
-    user_id = user_id.id if user_id else 1
+async def export_leads(request: Request, req: InsightRequest, session: Session = Depends(get_session), user=Depends(get_current_user_optional)):
+    user_id = user.id if user else 1
     try:
-        sub = session.get(UserSubscription, user_id)
-        if sub and sub.lead_credits < 100:
+        sub = session.exec(select(UserSubscription).where(UserSubscription.user_id == user_id)).first()
+        if sub and getattr(sub, "lead_credits", 0) < 100:
             raise HTTPException(status_code=402, detail="Buy lead credits")
         safe_consume_credits(session, user_id, "lead_credits", 100)
     except HTTPException:
         raise
-    except:
+    except Exception:
         pass
     leads = await ai_service.generate_insights(f"Get 100 B2B leads for {req.sector} in {req.county} with contacts", {}, user_id)
     return export_result(leads, "xlsx")
+
 @router.get("/help")
 def ask_lens_help(query: str):
-        help_map = {"pricing": "Starter KES 500/mo (5,000/yr), Pro KES 1,500/mo (15,000/yr), Enterprise KES 5,000/mo (50,000/yr). Pay with M-Pesa. Yearly = 2 months free.", "setup": "Go to Dashboard > Pick Sector > Pick County > Ask Lens", "features": "19 Modules, 9 Lanes, Kenya-First Data"}
-ans = help_map.get(query.lower(), f"Contact {SUPPORT_EMAIL}")
+    help_map = {"pricing": "Starter KES 500/mo (5,000/yr), Pro KES 1,500/mo (15,000/yr), Enterprise KES 5,000/mo (50,000/yr). Pay with M-Pesa. Yearly = 2 months free.", "setup": "Go to Dashboard > Pick Sector > Pick County > Ask Lens", "features": "19 Modules, 9 Lanes, Kenya-First Data"}
+    ans = help_map.get(query.lower(), f"Contact {SUPPORT_EMAIL}")
     return {"reply": ans, "response": ans, "answer": ans}
+
 def export_result(data, format):
     if format == "xlsx":
         output = io.BytesIO()
