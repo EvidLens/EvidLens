@@ -24,10 +24,8 @@ class SubscriptionRequest(BaseModel):
 
 TIER_PRICES = {
     SubscriptionTier.FREE: 0,
-    SubscriptionTier.SME_STARTER: 990,
-    SubscriptionTier.SME_PRO: 2990,
+    SubscriptionTier.BASIC: 990,
     SubscriptionTier.PROFESSIONAL: 7990,
-    SubscriptionTier.BUSINESS: 19990,
     SubscriptionTier.ENTERPRISE: 49990
 }
 
@@ -67,10 +65,11 @@ def verify_payment(checkout_request_id: str, db: Session = Depends(get_db)):
     payment = verify_payment_status(db, checkout_request_id)
     if not payment:
         return {"status": "pending"}
+    status = getattr(payment.status, "value", payment.status)
     return {
-        "status": payment.status.value,
+        "status": status,
         "amount": payment.amount_kes,
-        "mpesa_receipt": payment.mpesa_receipt_number
+        "mpesa_receipt": getattr(payment, "mpesa_receipt_number", getattr(payment, "mpesa_code", None))
     }
 
 @router.get("/check/{reference}")
