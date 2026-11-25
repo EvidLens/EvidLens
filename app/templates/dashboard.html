@@ -37,13 +37,15 @@ tbody tr:hover{background:#F5F7FA}
 <body>
 <script>
 const API = {{ API | tojson }};
+const HAS_REAL_DATA = {{ data.has_real_data | default(true) | tojson }};
+const REAL_COUNT = {{ data.real_count | default(0) | tojson }};
 const tableConfig = {
   'prices': {name: 'Live KES Prices', endpoint: API.prices, headers: {product:"Product", price:"Price", county:"County", market:"Market", fetched_at:"Updated"}},
-  'demand': {name: 'Top Demand Scores', endpoint: API.demand, headers: {product_name:"Product", sector:"Sector", county:"County", demand_score:"Demand", volume:"Volume"}},
+  'demand': {name: 'Top Demand Scores', endpoint: API.demand, headers: {product:"Product", sector:"Sector", county:"County", demand_score:"Demand", volume:"Volume"}},
   'companies': {name: '50+ Real Businesses', endpoint: API.companies, headers: {name:"Name", sector:"Sector", county:"County", rating:"Rating", reviews:"Reviews", address:"Address"}},
   'county-stats': {name: 'County Market Size', endpoint: API.county_stats, headers: {county:"County", market_size:"Market Size KES", growth:"Growth %", volume:"Volume"}},
   'sectors': {name: 'Top Sectors', endpoint: API.sectors, headers: {sector:"Sector", count:"Search Count"}},
-  'opportunities': {name: 'High Opportunity Zones', endpoint: API.opportunities, headers: {county:"County", product_name:"Product", destination_country:"Export To", market_size_kes:"Market Size", demand_score:"Opportunity Score"}}
+  'opportunities': {name: 'High Opportunity Zones', endpoint: API.opportunities, headers: {county:"County", product:"Product", destination_country:"Export To", market_size_kes:"Market Size", demand_score:"Opportunity Score"}}
 }
 const KENYA_COUNTIES_FALLBACK = ["Baringo","Bomet","Bungoma","Busia","Elgeyo-Marakwet","Embu","Garissa","Homa Bay","Isiolo","Kajiado","Kakamega","Kericho","Kiambu","Kilifi","Kirinyaga","Kisii","Kisumu","Kitui","Kwale","Laikipia","Lamu","Machakos","Makueni","Mandera","Marsabit","Meru","Migori","Mombasa","Murang'a","Nairobi","Nakuru","Nandi","Narok","Nyamira","Nyandarua","Nyeri","Samburu","Siaya","Taita-Taveta","Tana River","Tharaka-Nithi","Trans Nzoia","Turkana","Uasin Gishu","Vihiga","Wajir","West Pokot"];
 const KENYA_SECTORS_FALLBACK = ["Banks","Microfinance Institutions","Insurance & HMOs","Fintechs & Mobile Money","Capital Markets & Investment Banks","SACCOs","Retail - Supermarkets & Chains","Retail - Wholesale & Distributors","FMCG - Food & Beverage","FMCG - Personal Care & Household","Manufacturing - Food Processing","Manufacturing - Textiles & Apparel","Manufacturing - Construction Materials","Manufacturing - Automotive & Assembly","Manufacturing - Pharmaceuticals","Manufacturing - Chemicals & Plastics","Agribusiness - Crops & Farming","Agribusiness - Livestock & Dairy","Agribusiness - Horticulture & Flowers","Agribusiness - Fisheries & Aquaculture","Agribusiness - Agro-processing","Telcos & ISPs","Media & Broadcasting","Advertising & Marketing Agencies","PR & Communications","Real Estate - Developers","Real Estate - Agents & Brokers","Real Estate - Property Management","Construction & Infrastructure","Architecture & Engineering","Healthcare - Hospitals & Clinics","Healthcare - Pharmacies","Healthcare - Medical Devices & Pharma","Education - Universities & Colleges","Education - Primary & Secondary Schools","Education - EdTech & Training","Logistics & Transport","E-Commerce & Marketplaces","Hospitality - Hotels & Resorts","Hospitality - Restaurants & QSR","Tourism & Tour Operators","Aviation & Airlines","Maritime & Shipping","Energy - Electricity Generation","Energy - Oil & Gas","Energy - Renewable & Solar","Energy - Utilities & Water","Mining & Minerals","Government - National Ministries","Government - County Governments","Government - State Corporations","Government - Regulatory Authorities","Public Safety & Security","Defense","NGOs","INGOs & UN Agencies","Donors & Development Partners","Foundations & Philanthropy","Investors - PE & VC","Investors - Angel & Family Offices","Professional Services - Law","Professional Services - Consulting","Professional Services - Accounting & Audit","Professional Services - HR & Recruitment","ICT & Software Companies","Data Centers & Cloud Services","Digital Marketing & Creative","Automotive - Dealerships","Automotive - Parts & Aftermarket","Automotive - Ride-hailing & Boda","Gaming & Sports","Entertainment & Events","Beauty & Wellness","Waste Management & Recycling","Environmental & Climate Services"];
@@ -109,9 +111,18 @@ const KENYA_SUBCOUNTIES_FALLBACK = {"Mombasa":["Changamwe","Jomvu","Kisauni","Ny
 
     <div class="mb-8">
       <h2 class="font-bold text-xl mb-4 flex items-center gap-2" style="color:#0A1F44">Trending Now</h2>
+      {% if data.has_real_data %}
       <div id="trending-container" class="grid grid-cols-2 md:grid-cols-3 gap-4">
         <p class="text-gray-400 text-sm col-span-3">Loading trending LIVE...</p>
       </div>
+      {% else %}
+      <div class="card" style="padding:24px;text-align:center">
+        <h3 style="font-weight:700;color:#0A1F44">No live market data yet</h3>
+        <p style="color:#64748b;font-size:14px;margin-top:8px">Real KPIN prices are collected at 03:00 EAT daily. Check back after the next collection.</p>
+        <p style="font-size:12px;color:#94A3B8;margin-top:8px">Last updated: {{ data.last_updated }} • Real records in last 48h: {{ data.real_count | default(0) }}</p>
+      </div>
+      <div id="trending-container" class="grid grid-cols-2 md:grid-cols-3 gap-4" style="display:none"></div>
+      {% endif %}
     </div>
 
     <div class="mb-8"><h2 class="font-bold text-xl mb-4" style="color:#0A1F44">WAVE 2 Intelligence Modules</h2><div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4">
@@ -182,34 +193,45 @@ const KENYA_SUBCOUNTIES_FALLBACK = {"Mombasa":["Changamwe","Jomvu","Kisauni","Ny
 <div id="chatWidget"><div id="chatBox"><div id="chatHeader">🤖 Lens AI Assistant</div><div id="chatMessages"><div class="msg bot">Hi! I'm Lens. Ask me anything about Kenya markets.</div></div><div id="chatInputBox"><input id="chatInput" placeholder="Ask Lens anything..."><button id="chatSend">Send</button></div></div><button id="chatBtn">💬</button></div>
 
 <script>
-// ===== TRENDING NOW - REAL WORKING CONNECTED =====
+// ===== TRENDING NOW - REAL WORKING CONNECTED - PRODUCTION v2.6.4 - NO SEED =====
 async function loadTrending(){
   const container = document.getElementById('trending-container');
+  if(!container) return;
+  if(!HAS_REAL_DATA){
+    container.style.display = 'none';
+    return;
+  }
   try{
     const res = await fetch('/analysis/trending');
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data = await res.json();
     container.innerHTML = '';
     if(!data.trending || data.trending.length === 0){
-      container.innerHTML = `<p class="text-gray-500 col-span-3 text-center">No trending data yet. Run your first analysis above 👆 or seed DB.</p>`;
+      container.innerHTML = `<p class="text-gray-500 col-span-3 text-center">No live market data yet. Real KPIN prices are collected at 03:00 EAT daily.</p>`;
       return;
     }
     data.trending.forEach(item => {
+      const productName = item.product || item.product_name || 'Product';
+      const countyName = item.county || 'Kenya';
+      const sectorName = item.sector || '';
+      const demandVal = Number(item.demand_score || 0);
+      const priceVal = Number(item.current_price_kes || item.avg_price_kes || item.price || 0);
+      const changeVal = Number(item.price_change_percent || 0);
       const trendColor = item.trend === 'up'? 'text-green-600' : item.trend === 'down'? 'text-red-600' : 'text-gray-600';
       const trendIcon = item.trend === 'up'? '▲' : item.trend === 'down'? '▼' : '—';
       container.innerHTML += `
-        <div onclick="analyzeProduct('${item.product}', '${item.county}')"
+        <div onclick="analyzeProduct('${productName}', '${countyName}')"
              class="p-4 bg-white border border-teal-200 rounded-xl shadow-sm hover:shadow-md cursor-pointer transition">
           <div class="flex justify-between items-start">
             <div>
-              <p class="font-bold text-[#0A1F44]">${item.product}</p>
-              <p class="text-sm text-gray-500">${item.county} County • ${item.sector}</p>
+              <p class="font-bold text-[#0A1F44]">${productName}</p>
+              <p class="text-sm text-gray-500">${countyName} County • ${sectorName}</p>
             </div>
-            <span class="text-xs bg-teal-100 text-[#14B8A6] px-2 py-1 rounded">Demand: ${item.demand_score}/10</span>
+            <span class="text-xs bg-teal-100 text-[#14B8A6] px-2 py-1 rounded">Demand: ${demandVal.toFixed(0)}/100</span>
           </div>
           <div class="mt-3 flex justify-between items-center">
-            <p class="font-bold">KES ${Number(item.current_price_kes).toLocaleString()}</p>
-            <p class="${trendColor} font-semibold">${trendIcon} ${Math.abs(item.price_change_percent)}%</p>
+            <p class="font-bold">KES ${priceVal.toLocaleString()}</p>
+            <p class="${trendColor} font-semibold">${trendIcon} ${Math.abs(changeVal)}%</p>
           </div>
         </div>
       `;
@@ -250,11 +272,11 @@ function renderSearchResults(results){
   } else {
     container.innerHTML = results.map(r => `
       <div onclick="openInsight(${r.id})" class="p-3 hover:bg-teal-50 cursor-pointer border-b">
-        <p class="font-bold">${r.product} <span class="text-xs text-gray-500">${r.county}</span></p>
-        <p class="text-sm">${r.snippet}</p>
+        <p class="font-bold">${r.product || r.product_name || 'Product'} <span class="text-xs text-gray-500">${r.county || ''}</span></p>
+        <p class="text-sm">${r.snippet || ''}</p>
         <div class="flex gap-2 mt-1">
-          <span class="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">Demand: ${r.demand_score}</span>
-          <span class="text-xs bg-gray-100 px-2 py-0.5 rounded">KES ${r.current_price_kes}</span>
+          <span class="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">Demand: ${r.demand_score || 0}</span>
+          <span class="text-xs bg-gray-100 px-2 py-0.5 rounded">KES ${Number(r.current_price_kes || r.avg_price_kes || r.price || 0).toLocaleString()}</span>
         </div>
       </div>
     `).join('');
@@ -332,17 +354,41 @@ function sortActive(key){
 function exportCurrentTable(){ window.location = `${API.export}/${activeTable}?search=${state.search}` }
 async function loadActiveTable(){
   const t = tableConfig[activeTable];
-  const res = await fetch(`${t.endpoint}?search=${state.search}&page=${state.page}&limit=15&sort_by=${state.sort_by}&order=${state.order}`);
-  const data = await res.json();
-  let rows = [];
-  if(activeTable=='prices') rows = data.prices.map(p => [p.product, `KES ${p.price}`, p.county, p.market, p.fetched_at.split('T')[0]])
-  if(activeTable=='demand') rows = data.demand.map(d => [d.product_name, d.sector, d.county, d.demand_score, d.volume.toLocaleString()])
-  if(activeTable=='companies') rows = data.companies.map(c => [c.name, c.sector, c.county, c.rating, c.reviews, c.address])
-  if(activeTable=='county-stats') rows = data.stats.map(s => [s.county, `KES ${Number(s.market_size).toLocaleString()}`, `${Number(s.growth).toFixed(2)}%`, Number(s.volume).toLocaleString()])
-  if(activeTable=='sectors') rows = data.sectors.map(s => [s.sector, s.count])
-  if(activeTable=='opportunities') rows = data.opportunities.map(o => [o.county, o.product_name, o.destination_country, `KES ${Number(o.market_size_kes).toLocaleString()}`, o.demand_score])
-  renderActiveTable(t.headers, rows);
-  renderActivePagination(data.total, state.page);
+  try{
+    const res = await fetch(`${t.endpoint}?search=${state.search}&page=${state.page}&limit=15&sort_by=${state.sort_by}&order=${state.order}`);
+    const data = await res.json();
+    let rows = [];
+    if(activeTable=='prices'){
+      const arr = data.prices || data.data || [];
+      rows = arr.map(p => [p.product || p.product_name || 'Product', `KES ${Number(p.price || p.avg_price_kes || 0).toLocaleString()}`, p.county || 'Kenya', p.market || p.sector || '', (p.fetched_at || p.created_at || '').toString().split('T')[0]])
+    }
+    if(activeTable=='demand'){
+      const arr = data.demand || data.data || [];
+      rows = arr.map(d => [d.product || d.product_name || 'Product', d.sector || '', d.county || 'Kenya', Number(d.demand_score || 0).toFixed(0), Number(d.volume || d.avg_price_kes || 0).toLocaleString()])
+    }
+    if(activeTable=='companies'){
+      const arr = data.companies || data.data || [];
+      rows = arr.map(c => [c.name || '', c.sector || '', c.county || '', c.rating || 0, c.reviews || 0, c.address || c.county || ''])
+    }
+    if(activeTable=='county-stats'){
+      const arr = data.stats || data.data || [];
+      rows = arr.map(s => [s.county || '', `KES ${Number(s.market_size || s.market_size_kes || 0).toLocaleString()}`, `${Number(s.growth || 0).toFixed(2)}%`, Number(s.volume || 0).toLocaleString()])
+    }
+    if(activeTable=='sectors'){
+      const arr = data.sectors || data.data || [];
+      rows = arr.map(s => [s.sector || s.name || '', s.count || s.total || 0])
+    }
+    if(activeTable=='opportunities'){
+      const arr = data.opportunities || data.data || [];
+      rows = arr.map(o => [o.county || 'Kenya', o.product || o.product_name || '', o.destination_country || o.country || '', `KES ${Number(o.market_size_kes || o.avg_price_kes || 0).toLocaleString()}`, Number(o.demand_score || o.opportunity_score || 0).toFixed(0)])
+    }
+    renderActiveTable(t.headers, rows);
+    renderActivePagination(data.total || rows.length, state.page);
+  }catch(e){
+    console.error('Table load failed', e);
+    renderActiveTable(t.headers, []);
+    renderActivePagination(0, 1);
+  }
 }
 
 // ===== DROPDOWNS - ALIGNED TO KENYA_COUNTIES + KENYA_SECTORS MODELS =====
