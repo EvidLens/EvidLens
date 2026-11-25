@@ -1,23 +1,12 @@
-from fastapi import APIRouter
-from fastapi import Request
-from fastapi import Depends
-from fastapi.responses import HTMLResponse
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Request, Depends
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlmodel import Session
-from sqlmodel import select
-from sqlmodel import func
-from sqlmodel import desc
-from sqlmodel import or_
+from sqlmodel import Session, select, func, desc, or_
 from jinja2 import TemplateNotFound
 import traceback
 import markdown, bleach
 from app.core.db import get_session as get_db
-from app.core.models import MarketMetric
-from app.core.models import Company
-from app.core.models import NewsArticle
-from app.core.models import SocialMention
-from app.core.models import ExportOpportunity
+from app.core.models import MarketMetric, Company, NewsArticle, SocialMention, ExportOpportunity
 from app.modules.auth.models import AuthUser
 from app.modules.auth.dependencies import get_current_user_optional
 
@@ -27,8 +16,7 @@ TEMPLATE_ALIASES = {"demand.html": "market_demand.html", "prices.html": "market_
 
 PUBLIC_PAGES = {"/login", "/signup", "/forgot-password", "/reset-password", "/privacy", "/terms", "/pricing", "/about", "/contact", "/help", "/changelog"}
 
-# --- Static pages (about / terms / privacy / help) rendered via static_page.html ---
-ALLOWED_TAGS = ["p","h1","h2","h3","h4","ul","ol","li","a","strong","em","br","hr","blockquote","code"]
+ALLOWED_TAGS = ["p", "h1", "h2", "h3", "h4", "ul", "ol", "li", "a", "strong", "em", "br", "hr", "blockquote", "code"]
 ALLOWED_ATTRS = {"a": ["href", "title"]}
 
 PAGES = {
@@ -100,19 +88,17 @@ def _needs_login(request: Request, user):
     if user is not None:
         return None
     if not request.cookies.get("user_id"):
-        return RedirectResponse(url="/login", status_code=302)
+        return RedirectResponse(url=f"/login?next={request.url.path}", status_code=302)
     return None
 
 def safe_template(request: Request, name: str, context: dict, fallback_title: str = ""):
     context["request"] = request
     context.setdefault("current_user", None)
     context.setdefault("user", context.get("current_user"))
-    try_names = [name]
-    if name in TEMPLATE_ALIASES:
-        try_names.append(TEMPLATE_ALIASES[name])
-    if not name.startswith("market_") and not name.startswith("location_"):
-        try_names.append(f"market_{name}")
-        try_names.append(f"location_{name}")
+    try_names = []
+    for candidate in [name, TEMPLATE_ALIASES.get(name), f"market_{name}" if not name.startswith("market_") and not name.startswith("location_") else None, f"location_{name}" if not name.startswith("market_") and not name.startswith("location_") else None]:
+        if candidate and candidate not in try_names:
+            try_names.append(candidate)
     last_err = None
     for try_name in try_names:
         try:
@@ -126,17 +112,27 @@ def safe_template(request: Request, name: str, context: dict, fallback_title: st
             last_err = e
             continue
     print(f"TemplateNotFound: {name} tried {try_names} - {last_err}")
-    title = fallback_title or name.replace('.html', '').title()
+    title = fallback_title or name.replace(".html", "").title()
     return HTMLResponse(f"""<html><head><title>{title}</title><style>body{{font-family:Inter,sans-serif;padding:30px;background:#f8fafc}}.card{{background:white;padding:20px;border-radius:8px;border:1px solid #e2e8f0}}</style></head><body><a href="/">← Dashboard</a><h1>{title}</h1><div class="card"><p>Template <b>{name}</b> not found (tried {try_names}).</p><p>Data keys: {list(context.keys())}</p><p class="text-xs text-red-500">{last_err}</p></div></body></html>""", status_code=200)
 
-@router.get("/market/risk", response_class=HTMLResponse)
-def risk_sentinel_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user_optional)):
-    redir = _needs_login(request, user)
-    if redir is not None:
-        return redir
+def _risk_data(request: Request, db: Session, user):
+    q = (request.query_params.get("q") or "").strip()
+    severity = (request.query_params.get("severity") or "").strip()
     try:
-        news = list(db.exec(select(NewsArticle).order_by(NewsArticle.published_at.desc()).limit(100)))
-        data = [n.model_dump() if hasattr(n, 'model_dump') else {"title": getattr(n, 'title', '-')} for n in news]
+        stmt = select(NewsArticle).order_by(desc(NewsArticle.published_at)).limit(100)
+        if severity:
+            stmt = select(NewsArticle).where(func.lower(NewsArticle.severity) == severity.lower()).order_by(desc(NewsArticle.published_at)).limit(100)
+        news = list(db.exec(stmt))
+        data = []
+        for n in news:
+            if hasattr(n, "model_dump"):
+                row = n.model_dump()
+            else:
+                row = {"title": getattr(n, "title", "-"), "summary": getattr(n, "summary", ""), "description": getattr(n, "description", ""), "source": getattr(n, "source", ""), "url": getattr(n, "url", ""), "sector": getattr(n, "sector", ""), "county": getattr(n, "county", ""), "severity": getattr(n, "severity", "Low"), "published_at": getattr(n, "published_at", None)}
+            data.append(row)
+        if q:
+            ql = q.lower()
+            data = [r for r in data if ql in str(r.get("title") or "").lower() or ql in str(r.get("summary") or "").lower() or ql in str(r.get("description") or "").lower() or ql in str(r.get("sector") or "").lower() or ql in str(r.get("county") or "").lower()]
     except Exception as e:
         print(f"risk query error: {e}")
         try:
@@ -144,7 +140,15 @@ def risk_sentinel_page(request: Request, db: Session = Depends(get_db), user: Au
         except Exception:
             pass
         data = []
-    return safe_template(request, "market_risk.html", {"request": request, "current_user": user, "risk_alerts": data, "risks": data, "risk": data}, "Risk Sentinel")
+    return data
+
+@router.get("/market/risk", response_class=HTMLResponse)
+def risk_sentinel_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user_optional)):
+    redir = _needs_login(request, user)
+    if redir is not None:
+        return redir
+    data = _risk_data(request, db, user)
+    return safe_template(request, "market_risk.html", {"request": request, "current_user": user, "news": data, "risk_alerts": data, "risks": data, "risk": data}, "Risk Sentinel")
 
 @router.get("/market/export", response_class=HTMLResponse)
 def export_navigator_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user_optional)):
@@ -233,7 +237,7 @@ def prices_page(request: Request, db: Session = Depends(get_db), user: AuthUser 
     if redir is not None:
         return redir
     try:
-        prices = list(db.exec(select(MarketMetric).order_by(MarketMetric.created_at.desc()).limit(500)))
+        prices = list(db.exec(select(MarketMetric).order_by(desc(MarketMetric.created_at)).limit(500)))
     except Exception as e:
         print(f"prices query error: {e}")
         try:
@@ -260,11 +264,20 @@ def demand_page(request: Request, db: Session = Depends(get_db), user: AuthUser 
     return safe_template(request, "market_demand.html", {"request": request, "current_user": user, "demand": demand, "voices": demand}, "Demand Radar")
 
 @router.get("/reports/funding", response_class=HTMLResponse)
+def funding_reports_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user_optional)):
+    redir = _needs_login(request, user)
+    if redir is not None:
+        return redir
+    return funding_page_data(request, db, user)
+
 @router.get("/funding", response_class=HTMLResponse)
 def funding_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user_optional)):
     redir = _needs_login(request, user)
     if redir is not None:
         return redir
+    return funding_page_data(request, db, user)
+
+def funding_page_data(request: Request, db: Session, user):
     try:
         funders = list(db.exec(select(Company).where(or_(Company.sector.ilike("%Financial%"), Company.sector.ilike("%Banking%"), Company.sector.ilike("%Insurance%"), Company.sector.ilike("%SACCO%")))))
         counties_raw = list(db.exec(select(func.distinct(Company.county))))
@@ -301,7 +314,10 @@ def history(request: Request, db: Session = Depends(get_db), user: AuthUser = De
 @router.get("/login", response_class=HTMLResponse)
 def login_page(request: Request, user: AuthUser = Depends(get_current_user_optional)):
     if user is not None:
-        return RedirectResponse(url="/", status_code=302)
+        next_url = request.query_params.get("next") or "/"
+        if not next_url.startswith("/"):
+            next_url = "/"
+        return RedirectResponse(url=next_url, status_code=302)
     return safe_template(request, "login.html", {"request": request}, "Login")
 
 @router.get("/signup", response_class=HTMLResponse)
@@ -311,11 +327,20 @@ def signup_page(request: Request, user: AuthUser = Depends(get_current_user_opti
     return safe_template(request, "signup.html", {"request": request}, "Signup")
 
 @router.get("/kb/policy", response_class=HTMLResponse)
+def policy_kb_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user_optional)):
+    redir = _needs_login(request, user)
+    if redir is not None:
+        return redir
+    return policy_page_data(request, db, user)
+
 @router.get("/policy", response_class=HTMLResponse)
 def policy_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user_optional)):
     redir = _needs_login(request, user)
     if redir is not None:
         return redir
+    return policy_page_data(request, db, user)
+
+def policy_page_data(request: Request, db: Session, user):
     try:
         try:
             policies = list(db.exec(select(NewsArticle).where(NewsArticle.category == "policy").order_by(desc(NewsArticle.published_at)).limit(100)))
@@ -343,14 +368,16 @@ def risk(request: Request, db: Session = Depends(get_db), user: AuthUser = Depen
     redir = _needs_login(request, user)
     if redir is not None:
         return redir
-    return safe_template(request, "market_risk.html", {"request": request, "current_user": user}, "Risk")
+    data = _risk_data(request, db, user)
+    return safe_template(request, "market_risk.html", {"request": request, "current_user": user, "news": data, "risk_alerts": data, "risks": data, "risk": data}, "Risk")
 
 @router.get("/security", response_class=HTMLResponse)
-def security(request: Request, user: AuthUser = Depends(get_current_user_optional)):
+def security(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user_optional)):
     redir = _needs_login(request, user)
     if redir is not None:
         return redir
-    return safe_template(request, "security.html", {"request": request, "current_user": user}, "Security")
+    data = _risk_data(request, db, user)
+    return safe_template(request, "security.html", {"request": request, "current_user": user, "news": data, "risk_alerts": data, "risks": data, "risk": data}, "Security")
 
 @router.get("/settings", response_class=HTMLResponse)
 def settings(request: Request, user: AuthUser = Depends(get_current_user_optional)):
@@ -386,7 +413,7 @@ def voice_page(request: Request, db: Session = Depends(get_db), user: AuthUser =
     if redir is not None:
         return redir
     try:
-        posts = list(db.exec(select(SocialMention).order_by(SocialMention.created_at.desc()).limit(100)))
+        posts = list(db.exec(select(SocialMention).order_by(desc(SocialMention.created_at)).limit(100)))
     except Exception as e:
         print(f"voice query error: {e}")
         try:
@@ -397,18 +424,18 @@ def voice_page(request: Request, db: Session = Depends(get_db), user: AuthUser =
     return safe_template(request, "voice.html", {"request": request, "current_user": user, "posts": posts, "voices": posts, "voice": posts}, "Consumer Pulse")
 
 @router.get("/wallet", response_class=HTMLResponse)
-def wallet(request: Request, user: AuthUser = Depends(get_current_user_optional)):
+def wallet(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user_optional)):
     redir = _needs_login(request, user)
     if redir is not None:
         return redir
-    return safe_template(request, "wallet.html", {"request": request, "current_user": user}, "Wallet")
+    return safe_template(request, "wallet.html", {"request": request, "current_user": user, "transactions": []}, "Wallet")
 
 @router.get("/workspaces", response_class=HTMLResponse)
 def workspaces(request: Request, user: AuthUser = Depends(get_current_user_optional)):
     redir = _needs_login(request, user)
     if redir is not None:
         return redir
-    return safe_template(request, "workspaces.html", {"request": request, "current_user": user}, "Workspaces")
+    return safe_template(request, "workspaces.html", {"request": request, "current_user": user, "workspaces": [], "current_workspace_id": None}, "Workspaces")
 
 @router.get("/forgot-password", response_class=HTMLResponse)
 def forgot_page(request: Request):
