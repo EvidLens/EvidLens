@@ -1,119 +1,103 @@
 {% extends "base.html" %}
 {% block title %}Policy Watch | EvidLens{% endblock %}
 {% block content %}
-<div class="min-h-screen bg-[#f8fafc]">
-<div class="max-w-7xl mx-auto p-6">
-  <!-- Header -->
-  <div class="flex justify-between items-start mb-6">
+<div class="max-w-7xl mx-auto">
+  <div class="flex justify-between items-start mb-6 flex-wrap gap-4">
     <div>
       <h1 class="text-3xl font-black text-[#0A1F44]">📜 Policy Watch</h1>
-      <p class="text-gray-500 text-sm mt-1">Government policies & regulations • {{ current_user.sector if current_user and current_user.sector else 'All Sectors' }} • {{ current_user.county if current_user and current_user.county else 'Kenya' }} • REAL-TIME</p>
-      <div class="flex gap-2 mt-3">
-        <span class="bg-[#0A1F44] text-white px-3 py-1 rounded-full text-xs font-bold">{{ policies|length }} ACTIVE POLICIES</span>
-        <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">KRA COMPLIANT</span>
-        <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold">{{ new_count }} New This Week</span>
+      <p class="text-gray-500 text-sm mt-1">Government policies &amp; regulations • {{ (current_user.sector if current_user is defined and current_user and current_user.sector else 'All Sectors') }} • {{ (current_user.county if current_user is defined and current_user and current_user.county else 'Kenya') }}</p>
+      <div class="flex gap-2 mt-3 flex-wrap">
+        <span class="bg-[#0A1F44] text-white px-3 py-1 rounded-full text-xs font-bold">{{ (policies or [])|length }} ACTIVE POLICIES</span>
+        {% if new_count is defined and new_count %}<span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold">{{ new_count }} New This Week</span>{% endif %}
+        <a href="/ai?q={{ 'What new policies affect my business this week?'|urlencode }}" class="bg-teal-100 text-teal-700 px-3 py-1 rounded-full text-xs font-bold">Ask Lens →</a>
       </div>
     </div>
     <div class="bg-white border rounded-xl p-4 text-center min-w-[160px]">
-      <p class="text-[10px] uppercase font-bold text-gray-400">Compliance Score</p>
-      <p class="text-3xl font-black text-green-600">98.2%</p>
-      <p class="text-[11px] text-gray-500">Live monitoring</p>
+      <p class="text-[10px] uppercase font-bold text-gray-400">Policies Tracked</p>
+      <p class="text-3xl font-black text-[#0A1F44]">{{ (policies or [])|length }}</p>
+      <p class="text-[11px] text-gray-500">KRA • KEBS • CBK • Counties</p>
     </div>
   </div>
-
-  <!-- Filters -->
-  <div class="bg-white p-4 rounded-xl shadow-sm mb-6 flex gap-3 items-center">
-    <button class="filter-btn active" data-filter="all">All ({{ policies|length }})</button>
-    <button class="filter-btn" data-filter="Tax">Tax</button>
-    <button class="filter-btn" data-filter="License">License</button>
-    <button class="filter-btn" data-filter="Subsidy">Subsidy</button>
-    <button class="filter-btn" data-filter="High">High Impact</button>
-    <div class="ml-auto flex gap-2 text-xs">
-      <span class="px-2 py-1 bg-gray-100 rounded">KRA ● Live</span>
-      <span class="px-2 py-1 bg-gray-100 rounded">KEBS ● Live</span>
-      <span class="px-2 py-1 bg-gray-100 rounded">CBK ● Live</span>
-    </div>
+  <div class="bg-white p-4 rounded-xl shadow-sm mb-6 flex gap-2 items-center flex-wrap">
+    <button type="button" class="filter-btn active" data-filter="all">All ({{ (policies or [])|length }})</button>
+    <button type="button" class="filter-btn" data-filter="Tax">Tax</button>
+    <button type="button" class="filter-btn" data-filter="License">License</button>
+    <button type="button" class="filter-btn" data-filter="Subsidy">Subsidy</button>
+    <button type="button" class="filter-btn" data-filter="High">High Impact</button>
+    <div class="ml-auto flex gap-2 text-xs flex-wrap"><span class="px-2 py-1 bg-gray-100 rounded">KRA ● Live</span><span class="px-2 py-1 bg-gray-100 rounded">KEBS ● Live</span><span class="px-2 py-1 bg-gray-100 rounded">CBK ● Live</span></div>
   </div>
-
-  <div class="grid grid-cols-3 gap-6">
-    <div class="col-span-2 space-y-4">
-      {% for pol in policies %}
-      <div class="bg-white p-6 rounded-2xl shadow-sm border hover:shadow-md transition policy-card" data-type="{{pol.category}}" data-impact="{{pol.impact}}">
-        <div class="flex justify-between items-start mb-3">
-          <div class="flex-1">
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-2 space-y-4">
+      {% for pol in (policies or []) %}
+      <div class="bg-white p-6 rounded-2xl shadow-sm border hover:shadow-md transition policy-card" data-type="{{ pol.category or '' }}" data-impact="{{ pol.impact or '' }}">
+        <div class="flex justify-between items-start mb-3 gap-3">
+          <div class="flex-1 min-w-0">
             <div class="flex gap-2 mb-2 flex-wrap">
-              <span class="bg-blue-100 text-blue-700 text-[11px] font-bold px-2.5 py-1 rounded-full">{{pol.category}}</span>
-              <span class="bg-gray-100 text-gray-700 text-[11px] font-bold px-2.5 py-1 rounded-full">{{pol.county}}</span>
+              {% if pol.category %}<span class="bg-blue-100 text-blue-700 text-[11px] font-bold px-2.5 py-1 rounded-full">{{ pol.category }}</span>{% endif %}
+              {% if pol.county %}<span class="bg-gray-100 text-gray-700 text-[11px] font-bold px-2.5 py-1 rounded-full">{{ pol.county }}</span>{% endif %}
               {% if pol.impact == 'High' %}<span class="bg-red-600 text-white text-[11px] font-bold px-2.5 py-1 rounded-full">HIGH IMPACT</span>{% endif %}
               {% if pol.impact_statement %}<span class="bg-yellow-100 text-yellow-800 text-[11px] font-bold px-2.5 py-1 rounded-full">Action Required</span>{% endif %}
             </div>
-            <h2 class="text-[17px] font-bold text-[#0A1F44] leading-tight">{{pol.title}}</h2>
+            <h2 class="text-[17px] font-bold text-[#0A1F44] leading-tight">{{ pol.title or 'Policy Update' }}</h2>
           </div>
-          <p class="text-xs text-gray-400 ml-4 whitespace-nowrap">{{ pol.published_at.strftime('%b %d') if pol.published_at else 'Live' }}</p>
+          <p class="text-xs text-gray-400 ml-4 whitespace-nowrap shrink-0">{% if pol.published_at is string %}{{ pol.published_at[:10] }}{% elif pol.published_at %}{{ pol.published_at.strftime('%b %d') }}{% else %}Live{% endif %}</p>
         </div>
-        <p class="text-[14px] text-gray-700 mb-3 leading-relaxed">{{pol.summary}}</p>
+        {% if pol.summary %}<p class="text-[14px] text-gray-700 mb-3 leading-relaxed">{{ pol.summary }}</p>{% endif %}
         {% if pol.impact_statement %}
-        <div class="bg-[#FFFBEB] border-l-4 border-yellow-400 p-3 rounded-r-lg mb-4">
-          <p class="text-[13px]"><b class="text-[#0A1F44]">What this means for you:</b> {{pol.impact_statement}}</p>
-        </div>
+        <div class="bg-[#FFFBEB] border-l-4 border-yellow-400 p-3 rounded-r-lg mb-4"><p class="text-[13px]"><b class="text-[#0A1F44]">What this means for you:</b> {{ pol.impact_statement }}</p></div>
         {% endif %}
-        <div class="flex justify-between items-center pt-2 border-t">
-          <a href="{{pol.url if pol.url else '#'}}" target="_blank" class="text-[#14B8A6] font-bold text-[13px] hover:underline">Read Full Gazette →</a>
+        <div class="flex justify-between items-center pt-2 border-t flex-wrap gap-2">
+          {% if pol.url %}<a href="{{ pol.url }}" target="_blank" rel="noopener" class="text-[#14B8A6] font-bold text-[13px] hover:underline">Read Full Gazette →</a>{% else %}<span class="text-gray-400 text-[13px]">Source: Kenya Gazette</span>{% endif %}
           <div class="flex gap-2">
-            <button onclick="askLens('{{pol.title}}')" class="text-[12px] bg-[#0A1F44] text-white px-4 py-1.5 rounded-lg font-bold">Ask Lens AI</button>
-            <button class="text-[12px] border px-3 py-1.5 rounded-lg font-bold">Mark Read</button>
+            <a href="/ai?q={{ ('How does \"' + (pol.title or 'this policy') + '\" affect my business in ' + (current_user.county if current_user is defined and current_user and current_user.county else 'Kenya') + '?')|urlencode }}" class="text-[12px] bg-[#0A1F44] text-white px-4 py-1.5 rounded-lg font-bold">Ask Lens AI</a>
+            <a href="/reports?policy={{ (pol.title or '')|urlencode }}" class="text-[12px] border px-3 py-1.5 rounded-lg font-bold">Add to Report</a>
           </div>
         </div>
       </div>
       {% else %}
       <div class="bg-white p-16 rounded-2xl text-center border">
         <p class="text-4xl mb-3">✅</p>
-        <p class="font-bold text-[#0A1F44]">All Clear - No new policy for {{ current_user.sector if current_user else 'your sector' }}</p>
+        <p class="font-bold text-[#0A1F44]">All Clear - No new policy for {{ (current_user.sector if current_user is defined and current_user and current_user.sector else 'your sector') }}</p>
         <p class="text-sm text-gray-500 mt-1">Monitoring 47 counties • National Assembly • KRA • KEBS</p>
+        <a href="/ai?q={{ 'What policies should I watch in my sector?'|urlencode }}" class="inline-block mt-4 bg-[#0A1F44] text-white px-4 py-2 rounded-lg font-bold text-[13px]">Ask Lens →</a>
       </div>
       {% endfor %}
     </div>
-
-    <!-- Right Rail -->
     <div class="space-y-4">
       <div class="bg-[#0A1F44] text-white p-5 rounded-2xl">
         <h4 class="font-bold text-sm">Regulatory Exposure</h4>
         <div class="mt-4 space-y-3 text-xs">
-          <div class="flex justify-between"><span class="text-gray-400">Tax Changes</span><span class="text-yellow-400 font-bold">2 New</span></div>
-          <div class="flex justify-between"><span class="text-gray-400">Licenses</span><span class="text-green-400 font-bold">Compliant</span></div>
-          <div class="flex justify-between"><span class="text-gray-400">County Fees</span><span class="text-gray-300">No Change</span></div>
+          <div class="flex justify-between"><span class="text-gray-400">Tax Changes</span><span class="text-yellow-400 font-bold">{% if (policies or [])|selectattr('category','equalto','Tax')|list|length %}{{ (policies or [])|selectattr('category','equalto','Tax')|list|length }} Tracked{% else %}No Change{% endif %}</span></div>
+          <div class="flex justify-between"><span class="text-gray-400">High Impact</span><span class="text-red-400 font-bold">{{ (policies or [])|selectattr('impact','equalto','High')|list|length }} Policies</span></div>
+          <div class="flex justify-between"><span class="text-gray-400">County Fees</span><span class="text-gray-300">Check County</span></div>
         </div>
-        <button class="w-full mt-4 bg-[#14B8A6] text-white py-2 rounded-lg text-xs font-bold">Download Compliance Report PDF</button>
+        <a href="/reports" class="block text-center w-full mt-4 bg-[#14B8A6] text-white py-2 rounded-lg text-xs font-bold">Build Compliance Report</a>
       </div>
       <div class="bg-white p-5 rounded-2xl border">
-        <h4 class="font-bold text-sm">Impact Timeline</h4>
-        <div class="mt-3 space-y-3 text-xs">
-          <div class="border-l-2 border-red-500 pl-3"><p class="font-bold">Finance Act 2026</p><p class="text-gray-500">Effective Jul 1 - Review VAT</p></div>
-          <div class="border-l-2 border-yellow-500 pl-3"><p class="font-bold">County Trade License</p><p class="text-gray-500">Renewal due - 30 days</p></div>
-          <div class="border-l-2 border-green-500 pl-3"><p class="font-bold">KEBS Standard</p><p class="text-gray-500">Compliant</p></div>
+        <h4 class="font-bold text-sm">What To Do Next</h4>
+        <div class="mt-3 space-y-3 text-xs leading-relaxed">
+          <div class="border-l-2 border-red-500 pl-3"><p class="font-bold">High Impact first</p><p class="text-gray-500">Read High Impact policies, ask Lens what they change for you.</p></div>
+          <div class="border-l-2 border-yellow-500 pl-3"><p class="font-bold">Check deadlines</p><p class="text-gray-500">License renewals and tax dates in the full Gazette text.</p></div>
+          <div class="border-l-2 border-green-500 pl-3"><p class="font-bold">Save it</p><p class="text-gray-500">Add to Report to keep a record for KRA / county.</p></div>
         </div>
       </div>
     </div>
   </div>
 </div>
-</div>
-<style>
-.filter-btn{border:1px solid #e5e7eb;padding:8px 16px;border-radius:9999px;font-size:12px;font-weight:700;transition:.2s}
-.filter-btn.active{background:#0A1F44;color:white;border-color:#0A1F44}
-.filter-btn:hover{border-color:#0A1F44}
-</style>
+{% endblock %}
+{% block scripts %}
+<style>.filter-btn{border:1px solid #e5e7eb;padding:8px 16px;border-radius:9999px;font-size:12px;font-weight:700;transition:.2s}.filter-btn.active{background:#0A1F44;color:white;border-color:#0A1F44}.filter-btn:hover{border-color:#0A1F44}</style>
 <script>
-document.querySelectorAll('.filter-btn').forEach(btn=>{
-  btn.onclick=()=>{
-    document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+document.querySelectorAll('.filter-btn').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
     btn.classList.add('active');
-    const f=btn.dataset.filter;
-    document.querySelectorAll('.policy-card').forEach(c=>{
-      const t=c.dataset.type, imp=c.dataset.impact;
-      c.style.display=(f=='all'||t==f||(f=='High'&&imp=='High'))?'block':'none';
-    })
-  }
-})
-function askLens(t){const chat=document.getElementById('lens-chat');const inp=document.getElementById('lens-input');if(chat)chat.classList.remove('hidden');if(inp){inp.value=`How does "${t}" affect my business in ${'{{ current_user.county if current_user else "Kenya" }}'}?`;inp.focus()}}
+    var f=btn.dataset.filter;
+    document.querySelectorAll('.policy-card').forEach(function(c){
+      var t=c.dataset.type, imp=c.dataset.impact;
+      c.style.display=(f==='all'||t===f||(f==='High'&&imp==='High'))?'block':'none';
+    });
+  });
+});
 </script>
 {% endblock %}
