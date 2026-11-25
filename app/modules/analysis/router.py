@@ -56,15 +56,17 @@ class DetailedAnalysisRequest(BaseModel):
     product: Optional[str] = None
     query: Optional[str] = None
     q: Optional[str] = None
-    county: Optional[str] = "Kenya"
+    topic: Optional[str] = None
+    timeframe: Optional[str] = None
+    county: Optional[str] = None
     subcounties: Optional[List[str]] = None
     sub_counties: Optional[List[str]] = None
     sub_county: Optional[str] = None
-    sector: Optional[str] = "Agriculture"
+    sector: Optional[str] = None
     budget_kes: Optional[float] = None
     budget: Optional[Any] = None
-    business_model: Optional[str] = "Retail"
-    model_config = {"extra": "ignore"}
+    business_model: Optional[str] = None
+    model_config = {"extra": "allow"}
     def get_product(self):
         return (self.product or self.query or self.q or "general market analysis").strip()
     def get_county(self):
