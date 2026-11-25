@@ -4,7 +4,7 @@ from fastapi.responses import HTMLResponse
 from sqlmodel import Session, select, desc
 from pydantic import BaseModel
 from typing import List, Optional
-from.service import aggregate_sentiment, fetch_reddit_data
+from .service import aggregate_sentiment, fetch_reddit_data
 from app.core.models import ConsumerFeedback, SentimentSummary, User
 from app.core.db import get_session as get_db
 from app.core.guards import require_module, consume_credits, get_current_user
@@ -39,20 +39,17 @@ async def voice_page(
         {"request": request, "current_user": current_user}
     )
 
-@router.post("/analyze", response_model=SentimentResponse)
-@require_module(module_number=2)
-def analyze_consumer_sentiment(request: Request, req: SentimentRequest, db: Session = Depends(get_db)):
-    user_id = request.state.user.id
-    consume_credits(db, user_id, "api_credits", 3)
+@router.post("/analyze", response_model=SentimentResponse, dependencies=[Depends(require_module(module_number=2)), Depends(consume_credits(3))])
+def analyze_consumer_sentiment(request: Request, req: SentimentRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    user_id = user.id
     try:
         summary = aggregate_sentiment(db, req.sector, req.product_or_topic, req.county)
         return summary
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/feedback/{sector}")
-@require_module(module_number=2)
-def get_feedback_by_sector(request: Request, sector: str, county: Optional[str] = Query(None), limit: int = Query(50), db: Session = Depends(get_db)):
+@router.get("/feedback/{sector}", dependencies=[Depends(require_module(module_number=2))])
+def get_feedback_by_sector(request: Request, sector: str, county: Optional[str] = Query(None), limit: int = Query(50), db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     stmt = select(ConsumerFeedback).where(ConsumerFeedback.sector == sector)
     if county:
         stmt = stmt.where(ConsumerFeedback.county == county)
@@ -60,9 +57,8 @@ def get_feedback_by_sector(request: Request, sector: str, county: Optional[str] 
     results = db.exec(stmt).all()
     return results
 
-@router.get("/summary/{sector}/{product}")
-@require_module(module_number=2)
-def get_summary(request: Request, sector: str, product: str, county: Optional[str] = Query(None), db: Session = Depends(get_db)):
+@router.get("/summary/{sector}/{product}", dependencies=[Depends(require_module(module_number=2))])
+def get_summary(request: Request, sector: str, product: str, county: Optional[str] = Query(None), db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     stmt = select(SentimentSummary).where(SentimentSummary.sector == sector, SentimentSummary.product_or_topic == product)
     if county:
         stmt = stmt.where(SentimentSummary.county == county)
@@ -71,10 +67,8 @@ def get_summary(request: Request, sector: str, product: str, county: Optional[st
         raise HTTPException(status_code=404, detail="No summary found")
     return result
 
-@router.post("/refresh-reddit")
-@require_module(module_number=2)
-def refresh_reddit(request: Request, sector: str, product: str, db: Session = Depends(get_db)):
-    user_id = request.state.user.id
-    consume_credits(db, user_id, "api_credits", 1)
+@router.post("/refresh-reddit", dependencies=[Depends(require_module(module_number=2)), Depends(consume_credits(1))])
+def refresh_reddit(request: Request, sector: str, product: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    user_id = user.id
     count = fetch_reddit_data(db, sector, product)
     return {"message": f"Fetched {count}", "sector": sector, "product": product}
