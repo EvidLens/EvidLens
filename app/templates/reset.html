@@ -1,47 +1,49 @@
-<!DOCTYPE html>
-<html>
-<head>
-<title>Reset Password - EvidLens</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-[#F5F7FA] flex items-center justify-center min-h-screen">
-  <div class="bg-white p-8 rounded-2xl w-96 shadow-lg">
-    <a href="/" class="font-bold text-2xl block text-center mb-4"><span style="color:#0A1F44">Evid</span><span style="color:#14B8A6">Lens</span></a>
+{% extends "base.html" %}
+{% block title %}Reset Password | EvidLens{% endblock %}
+{% block content %}
+<div class="min-h-[70vh] flex items-center justify-center">
+  <div class="bg-white p-8 rounded-2xl w-full max-w-[400px] shadow-lg border">
+    <a href="/" class="font-bold text-2xl block text-center mb-4"><span class="text-[#0A1F44]">Evid</span><span class="text-[#14B8A6]">Lens</span></a>
     <h1 class="text-2xl font-bold mb-2 text-[#0A1F44] text-center">Reset Password</h1>
     <p class="text-gray-500 text-sm text-center mb-6">Enter your new password below</p>
-    
-    <form id="resetForm">
+    {% if error %}<div class="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-[13px] rounded-xl text-center">{{ error }}</div>{% endif %}
+    {% if not token %}
+    <div class="p-4 bg-red-50 border border-red-200 text-red-700 text-[13px] rounded-xl text-center">This reset link is missing a token. Request a new one from the <a href="/auth/forgot-password" class="font-bold underline">Forgot Password</a> page.</div>
+    {% else %}
+    <form id="resetForm" method="post" action="/auth/reset-password">
       <input type="hidden" name="token" value="{{ token }}">
-      <input name="new_password" type="password" required minlength="8" class="w-full p-3 border rounded-lg mb-3 focus:border-[#14B8A6] outline-none" placeholder="New Password - min 8 chars">
-      <button class="bg-[#14B8A6] text-white w-full p-3 rounded-lg font-bold hover:opacity-90">Reset Password</button>
+      <label class="text-[13px] font-semibold text-slate-700" for="new_password">New Password</label>
+      <input id="new_password" name="new_password" type="password" required minlength="8" autocomplete="new-password" class="w-full p-3 border rounded-lg mt-1.5 mb-2 focus:border-[#14B8A6] outline-none" placeholder="New Password - min 8 chars">
+      <label class="text-[13px] font-semibold text-slate-700" for="confirm_password">Confirm Password</label>
+      <input id="confirm_password" name="confirm_password" type="password" required minlength="8" autocomplete="new-password" class="w-full p-3 border rounded-lg mt-1.5 mb-3 focus:border-[#14B8A6] outline-none" placeholder="Confirm Password">
+      <p id="matchErr" class="hidden text-red-600 text-[12px] mb-2">Passwords do not match</p>
+      <p class="text-[11px] text-gray-500 mb-3">At least 8 characters. Use a mix of letters, numbers, and symbols.</p>
+      <button id="resetBtn" type="submit" class="bg-[#14B8A6] text-white w-full p-3 rounded-lg font-bold hover:opacity-90 disabled:opacity-60">Reset Password</button>
     </form>
     <p id="msg" class="mt-3 text-sm text-center"></p>
-    <p class="text-center mt-4 text-sm"><a href="/login" class="text-[#14B8A6]">Back to Login</a></p>
+    {% endif %}
+    <p class="text-center mt-4 text-sm"><a href="/auth/login" class="text-[#0d9488] font-bold">Back to Login</a></p>
   </div>
-
+</div>
+{% endblock %}
+{% block scripts %}
+{% if token %}
 <script>
-document.getElementById('resetForm').onsubmit=async e=>{
-  e.preventDefault();
-  const msg = document.getElementById('msg');
-  msg.innerText = "Resetting...";
-  msg.className = "mt-3 text-sm text-center text-gray-500";
-  
-  const res = await fetch('/auth/reset-password',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(Object.fromEntries(new FormData(e.target)))
+(function(){
+  var form=document.getElementById('resetForm');
+  var pw=document.getElementById('new_password');
+  var confirm=document.getElementById('confirm_password');
+  var matchErr=document.getElementById('matchErr');
+  var msg=document.getElementById('msg');
+  var btn=document.getElementById('resetBtn');
+  function check(){ var bad=pw.value && confirm.value && pw.value!==confirm.value; matchErr.classList.toggle('hidden', !bad); return !bad; }
+  pw.addEventListener('input', check); confirm.addEventListener('input', check);
+  form.addEventListener('submit', function(){
+    if(!check()){ msg.textContent='Passwords do not match'; msg.className='mt-3 text-sm text-center text-red-600'; return false; }
+    btn.disabled=true; btn.textContent='Resetting...';
+    return true;
   });
-  const data = await res.json();
-  
-  if(res.ok){
-    msg.innerText = data.message;
-    msg.className = "mt-3 text-sm text-center text-green-600";
-    setTimeout(()=>window.location.href='/login', 2000);
-  } else {
-    msg.innerText = data.detail || "Error resetting password";
-    msg.className = "mt-3 text-sm text-center text-red-600";
-  }
-}
+})();
 </script>
-</body></html>
+{% endif %}
+{% endblock %}
