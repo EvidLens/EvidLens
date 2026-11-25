@@ -1,57 +1,87 @@
-<!DOCTYPE html>
-<html>
-<head>
-<title>EvidLens - Market Intelligence</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-[#F5F7FA]">
-
-<header class="text-white px-6 py-4 sticky top-0 shadow-md z-40" style="background:#0A1F44">
-  <div class="max-w-7xl mx-auto flex items-center justify-between">
-    <a href="/" class="font-bold text-2xl"><span>Evid</span><span style="color:#14B8A6">Lens</span></a>
-    <div class="relative" id="profileMenu">
-      <button id="profileBtn" class="flex items-center gap-2">
-        <div class="w-9 h-9 rounded-full bg-gradient-to-r from-[#14B8A6] to-[#0A1F44] flex items-center justify-center text-white font-bold">
-          {{ current_user.full_name[:1] if current_user else 'G' }}
-        </div>
-      </button>
-      <div id="profileDropdown" class="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl hidden text-[#0A1F44] z-50">
-        <div class="p-4 border-b border-gray-100">
-          <p class="font-bold">{{ current_user.full_name if current_user else 'Guest' }}</p>
-          <p class="text-xs text-gray-500">{{ current_user.email if current_user else '' }}</p>
-          <span class="text-xs px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 mt-1 inline-block">
-            {{ current_user.plan if current_user else 'Free' }}
-          </span>
-        </div>
-        <div class="p-2 max-h-96 overflow-y-auto">
-          <a href="/settings" class="block px-3 py-2 hover:bg-gray-50 rounded-lg text-sm">Profile & Preferences</a>
-          <a href="/billing" class="block px-3 py-2 hover:bg-gray-50 rounded-lg text-sm">Billing & Subscriptions</a>
-          <a href="/history" class="block px-3 py-2 hover:bg-gray-50 rounded-lg text-sm">Activity & History</a>
-          <a href="/stats" class="block px-3 py-2 hover:bg-gray-50 rounded-lg text-sm">Usage & Stats</a>
-          <a href="/wallet" class="block px-3 py-2 hover:bg-gray-50 rounded-lg text-sm">
-            Wallet / Credits: {{ current_user.credits if current_user else 0 }}
-          </a>
-          <a href="/security" class="block px-3 py-2 hover:bg-gray-50 rounded-lg text-sm">Security & 2FA</a>
-        </div>
-        <div class="p-2 border-t border-gray-100">
-          <button onclick="logout()" class="w-full text-left px-3 py-2 hover:bg-red-50 text-red-600 rounded-lg text-sm">Sign Out</button>
+{% extends "base.html" %}
+{% block title %}EvidLens - Kenya's Decision Intelligence{% endblock %}
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
+    <div>
+      <h1 class="text-3xl font-bold text-[#0A1F44]">Welcome{% if current_user is defined and current_user and current_user.full_name %}, {{ (current_user.full_name|string).split(' ')[0] }}{% endif %}</h1>
+      <p class="text-gray-500 text-[14px] mt-1">{% if current_user is defined and current_user %}What decision are you making today?{% else %}Kenya's Decision Intelligence - start with Ask Lens, no account needed to explore.{% endif %}</p>
+    </div>
+    {% if current_user is defined and current_user %}
+    <div class="flex items-center gap-2">
+      <div class="relative" id="profileMenu">
+        <button id="profileBtn" type="button" class="flex items-center gap-2 bg-white border rounded-full pl-1 pr-3 py-1 shadow-sm">
+          <span class="w-9 h-9 rounded-full bg-gradient-to-r from-[#14B8A6] to-[#0A1F44] flex items-center justify-center text-white font-bold">{{ ((current_user.full_name or current_user.email or 'U')|string)[:1]|upper }}</span>
+          <span class="text-[13px] font-bold text-[#0A1F44] max-w-[140px] truncate">{{ current_user.full_name or current_user.email }}</span>
+          <span class="text-[11px] px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 font-bold">{{ current_user.plan or 'Free' }}</span>
+        </button>
+        <div id="profileDropdown" class="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl hidden text-[#0A1F44] z-50 border">
+          <div class="p-4 border-b border-gray-100">
+            <p class="font-bold truncate">{{ current_user.full_name or 'User' }}</p>
+            <p class="text-xs text-gray-500 truncate">{{ current_user.email or '' }}</p>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 mt-1 inline-block font-bold">{{ current_user.plan or 'Free' }} • {{ current_user.credits if current_user.credits is defined else 0 }} Credits</span>
+          </div>
+          <div class="p-2">
+            <a href="/settings" class="block px-3 py-2 hover:bg-gray-50 rounded-lg text-sm">Profile &amp; Preferences</a>
+            <a href="/billing" class="block px-3 py-2 hover:bg-gray-50 rounded-lg text-sm">Billing &amp; Subscriptions</a>
+            <a href="/history" class="block px-3 py-2 hover:bg-gray-50 rounded-lg text-sm">Activity &amp; History</a>
+            <a href="/stats" class="block px-3 py-2 hover:bg-gray-50 rounded-lg text-sm">Usage &amp; Stats</a>
+            <a href="/billing" class="block px-3 py-2 hover:bg-gray-50 rounded-lg text-sm">Wallet / Credits: {{ current_user.credits if current_user.credits is defined else 0 }}</a>
+            <a href="/security" class="block px-3 py-2 hover:bg-gray-50 rounded-lg text-sm">Security &amp; 2FA</a>
+            <a href="/workspaces" class="block px-3 py-2 hover:bg-gray-50 rounded-lg text-sm">Workspaces</a>
+          </div>
+          <div class="p-2 border-t border-gray-100">
+            <a href="/auth/logout" class="block px-3 py-2 hover:bg-red-50 text-red-600 rounded-lg text-sm">Sign Out</a>
+          </div>
         </div>
       </div>
+    {% else %}
+      <a href="/auth/login" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Login</a>
+      <a href="/auth/register" class="bg-[#14B8A6] text-white px-4 py-2 rounded-lg font-bold text-[13px]">Start Free →</a>
+    {% endif %}
     </div>
   </div>
-</header>
 
-<div class="max-w-7xl mx-auto p-6">
-  <h1 class="text-3xl font-bold text-[#0A1F44]">Welcome{{ ', ' + current_user.full_name.split(' ')[0] if current_user else '' }}</h1>
+  <div class="bg-[#0A1F44] text-white rounded-2xl p-6 md:p-8 mb-6">
+    <h2 class="text-2xl md:text-3xl font-bold">Ask Lens anything about your business</h2>
+    <p class="text-white/70 text-[14px] mt-2">Demand, pricing, competitors, policy risk - with sources, in under a minute.</p>
+    <form action="/ai" method="get" class="flex flex-wrap gap-2 mt-4">
+      <input name="q" placeholder="e.g. Should I open an avocado export business in Nyeri?" class="flex-1 min-w-[220px] rounded-xl px-4 py-3 text-[#0A1F44] text-[14px]">
+      <button class="bg-[#14B8A6] text-white px-5 py-3 rounded-xl font-bold text-[14px]">Ask Lens →</button>
+    </form>
+    <div class="flex flex-wrap gap-2 mt-3 text-[12px]">
+      <a href="/ai?q={{ 'Best business in Nyeri with KES 200k'|urlencode }}" class="bg-white/10 px-3 py-1.5 rounded-full">Best business in Nyeri</a>
+      <a href="/ai?q={{ 'Avocado prices in Kenya this month'|urlencode }}" class="bg-white/10 px-3 py-1.5 rounded-full">Avocado prices</a>
+      <a href="/ai?q={{ 'New taxes affecting small business in Kenya'|urlencode }}" class="bg-white/10 px-3 py-1.5 rounded-full">New taxes</a>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <a href="/market/demand" class="bg-white rounded-2xl border p-6 hover:shadow-md transition"><p class="text-2xl">📊</p><h3 class="font-bold text-[#0A1F44] mt-2">Demand Radar</h3><p class="text-[13px] text-gray-500 mt-1">Where demand is rising, by county + sector.</p><p class="text-[#0d9488] font-bold text-[13px] mt-3">Explore →</p></a>
+    <a href="/voice" class="bg-white rounded-2xl border p-6 hover:shadow-md transition"><p class="text-2xl">🎙️</p><h3 class="font-bold text-[#0A1F44] mt-2">Consumer Pulse</h3><p class="text-[13px] text-gray-500 mt-1">What Kenyans are actually saying and buying.</p><p class="text-[#0d9488] font-bold text-[13px] mt-3">Explore →</p></a>
+    <a href="/policy" class="bg-white rounded-2xl border p-6 hover:shadow-md transition"><p class="text-2xl">📜</p><h3 class="font-bold text-[#0A1F44] mt-2">Policy Watch</h3><p class="text-[13px] text-gray-500 mt-1">New laws, taxes, and regulations that affect you.</p><p class="text-[#0d9488] font-bold text-[13px] mt-3">Explore →</p></a>
+    <a href="/reports/funding" class="bg-white rounded-2xl border p-6 hover:shadow-md transition"><p class="text-2xl">💰</p><h3 class="font-bold text-[#0A1F44] mt-2">Funding Radar</h3><p class="text-[13px] text-gray-500 mt-1">Grants, loans, and investors open now.</p><p class="text-[#0d9488] font-bold text-[13px] mt-3">Explore →</p></a>
+    <a href="/kb" class="bg-white rounded-2xl border p-6 hover:shadow-md transition"><p class="text-2xl">📚</p><h3 class="font-bold text-[#0A1F44] mt-2">Knowledge Base</h3><p class="text-[13px] text-gray-500 mt-1">Playbooks, pricing guides, and templates.</p><p class="text-[#0d9488] font-bold text-[13px] mt-3">Explore →</p></a>
+    <a href="/security" class="bg-white rounded-2xl border p-6 hover:shadow-md transition"><p class="text-2xl">⚠️</p><h3 class="font-bold text-[#0A1F44] mt-2">Risk Sentinel</h3><p class="text-[13px] text-gray-500 mt-1">Market, policy, and fraud risks before they hit you.</p><p class="text-[#0d9488] font-bold text-[13px] mt-3">Explore →</p></a>
+    <a href="/reports" class="bg-white rounded-2xl border p-6 hover:shadow-md transition"><p class="text-2xl">📝</p><h3 class="font-bold text-[#0A1F44] mt-2">Report Builder</h3><p class="text-[13px] text-gray-500 mt-1">Turn any analysis into a PDF report.</p><p class="text-[#0d9488] font-bold text-[13px] mt-3">Build →</p></a>
+    <a href="/competitive" class="bg-white rounded-2xl border p-6 hover:shadow-md transition"><p class="text-2xl">🏆</p><h3 class="font-bold text-[#0A1F44] mt-2">Competitive Engine</h3><p class="text-[13px] text-gray-500 mt-1">Who else is in your sector + county.</p><p class="text-[#0d9488] font-bold text-[13px] mt-3">Analyze →</p></a>
+    <a href="/pricing" class="bg-[#14B8A6] text-white rounded-2xl p-6 hover:shadow-md transition"><p class="text-2xl">⭐</p><h3 class="font-bold mt-2">Go Pro - KES 1,500/mo</h3><p class="text-[13px] text-white/80 mt-1">10 credits, all modules, priority support.</p><p class="font-bold text-[13px] mt-3">See Pricing →</p></a>
+  </div>
+
+  <div class="bg-white rounded-2xl border p-6 mt-6 flex flex-wrap justify-between items-center gap-3">
+    <div><p class="font-bold text-[#0A1F44]">Not sure where to start?</p><p class="text-[13px] text-gray-500">Ask Lens will point you to the right module.</p></div>
+    <div class="flex gap-2"><a href="/ai" class="bg-[#0A1F44] text-white px-4 py-2 rounded-lg font-bold text-[13px]">Ask Lens</a><a href="/help" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Help</a></div>
+  </div>
 </div>
-
+{% endblock %}
+{% block scripts %}
 <script>
-document.getElementById('profileBtn').onclick = () => {
-  document.getElementById('profileDropdown').classList.toggle('hidden')
-}
-function logout(){ window.location.href = '/logout' }
+(function(){
+  var btn=document.getElementById('profileBtn');
+  var dd=document.getElementById('profileDropdown');
+  if(!btn || !dd) return;
+  btn.addEventListener('click',function(e){ e.stopPropagation(); dd.classList.toggle('hidden'); });
+  document.addEventListener('click',function(e){ if(!dd.classList.contains('hidden') && !dd.contains(e.target)) dd.classList.add('hidden'); });
+})();
 </script>
-
-</body>
-</html>
+{% endblock %}
