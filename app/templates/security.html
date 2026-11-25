@@ -1,64 +1,80 @@
 {% extends "base.html" %}
+{% block title %}Risk Sentinel | EvidLens{% endblock %}
 {% block content %}
-<div class="max-w-7xl mx-auto p-6">
+<div class="max-w-7xl mx-auto">
+  {% if not current_user %}
+  <div class="bg-white rounded-2xl shadow-sm border p-10 text-center">
+    <h1 class="text-2xl font-bold text-[#0A1F44]">Risk Sentinel</h1>
+    <p class="text-[14px] text-gray-500 mt-2">Login to see live market and regulatory risks for your sector.</p>
+    <div class="flex flex-wrap justify-center gap-3 mt-6">
+      <a href="/login?next=/security" class="bg-[#14B8A6] text-white px-6 py-3 rounded-xl font-bold text-[14px]">Login →</a>
+      <a href="/signup?next=/security" class="bg-white border px-6 py-3 rounded-xl font-bold text-[14px]">Create Free Account</a>
+    </div>
+  </div>
+  {% else %}
   <div class="bg-white rounded-2xl shadow-sm border p-6">
     <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
       <div>
         <h1 class="text-3xl font-bold text-[#0A1F44] flex items-center gap-2">⚠️ Risk Sentinel</h1>
-        <p class="text-gray-500 text-[14px]">Live market and regulatory risks for your sector</p>
+        <p class="text-gray-500 text-[14px]">Live market and regulatory risks for your sector{% if current_user.sector %} • {{ current_user.sector }}{% endif %}{% if current_user.county %} • {{ current_user.county }}{% endif %}</p>
       </div>
       <a href="/ai" class="bg-[#14B8A6] text-white px-4 py-2 rounded-lg font-bold text-[13px]">New Analysis</a>
     </div>
     <form method="get" action="/security" class="flex flex-wrap gap-2 mb-6">
-      <input name="q" value="{{ request.query_params.get('q','') if request is defined else '' }}" placeholder="Search risks..." class="border rounded-lg px-3 py-2 text-[13px] flex-1 min-w-[160px]">
+      <input name="q" value="{{ request.query_params.get('q', '') }}" placeholder="Search risks..." class="border rounded-lg px-3 py-2 text-[13px] flex-1 min-w-[160px]">
       <select name="severity" class="border rounded-lg px-3 py-2 text-[13px]">
         <option value="">All Severities</option>
-        <option value="High" {% if request is defined and request.query_params.get('severity') == 'High' %}selected{% endif %}>High</option>
-        <option value="Medium" {% if request is defined and request.query_params.get('severity') == 'Medium' %}selected{% endif %}>Medium</option>
-        <option value="Low" {% if request is defined and request.query_params.get('severity') == 'Low' %}selected{% endif %}>Low</option>
+        <option value="High" {% if request.query_params.get('severity') == 'High' %}selected{% endif %}>High</option>
+        <option value="Medium" {% if request.query_params.get('severity') == 'Medium' %}selected{% endif %}>Medium</option>
+        <option value="Low" {% if request.query_params.get('severity') == 'Low' %}selected{% endif %}>Low</option>
       </select>
-      <button class="bg-[#0A1F44] text-white px-4 py-2 rounded-lg text-[13px] font-bold">Filter</button>
+      <button type="submit" class="bg-[#0A1F44] text-white px-4 py-2 rounded-lg text-[13px] font-bold">Filter</button>
       <a href="/security" class="bg-white border px-4 py-2 rounded-lg text-[13px] font-bold">Clear</a>
     </form>
+    {% set items = news | default([], true) %}
+    {% if items %}
+    <p class="text-xs text-gray-500 mb-4">{{ items | length }} risk{{ 's' if items | length != 1 else '' }} found{% if request.query_params.get('q') %} for "{{ request.query_params.get('q') }}"{% endif %}</p>
     <div class="space-y-4">
-      {% if news is defined and news %}
-      {% for n in news %}
-      <div class="border rounded-xl p-4 hover:shadow-md transition">
+      {% for n in items %}
+      {% set severity = ((n.severity or 'Low') | string | lower) %}
+      {% set created = n.published_at if n.published_at is defined else None %}
+      <article class="border rounded-xl p-4 hover:shadow-md transition">
         <div class="flex items-start justify-between gap-4">
           <div class="flex-1 min-w-0">
             <div class="flex flex-wrap items-center gap-2 mb-2">
-              {% if (n.severity or '')|lower == 'high' %}
+              {% if severity == 'high' %}
               <span class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-red-100 text-red-700">HIGH RISK</span>
-              {% elif (n.severity or '')|lower == 'medium' %}
+              {% elif severity == 'medium' %}
               <span class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-700">MEDIUM</span>
               {% else %}
               <span class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">LOW</span>
               {% endif %}
-              <span class="text-xs text-gray-500">{% if n.published_at %}{{ n.published_at.strftime('%b %d, %Y') if n.published_at.strftime is defined else n.published_at }}{% else %}Today{% endif %}</span>
-              {% if n.sector %}<span class="text-xs bg-slate-100 px-2 py-1 rounded-full">{{ n.sector }}</span>{% endif %}
-              {% if n.county %}<span class="text-xs bg-slate-100 px-2 py-1 rounded-full">{{ n.county }}</span>{% endif %}
+              <span class="text-xs text-gray-500">{% if created %}{% if created is string %}{{ created[:10] }}{% else %}{{ created.strftime('%b %d, %Y') }}{% endif %}{% else %}Today{% endif %}</span>
+              {% if n.sector is defined and n.sector %}<span class="text-xs bg-slate-100 px-2 py-1 rounded-full">{{ n.sector }}</span>{% endif %}
+              {% if n.county is defined and n.county %}<span class="text-xs bg-slate-100 px-2 py-1 rounded-full">{{ n.county }}</span>{% endif %}
             </div>
-            <h3 class="font-bold text-[#0A1F44] text-lg mb-1">{{ n.title or 'Risk Alert' }}</h3>
-            <p class="text-sm text-gray-600 mb-2">{{ n.summary or n.description or '' }}</p>
-            <p class="text-xs text-gray-500">Source: {{ n.source or 'EvidLens Risk Sentinel' }}</p>
+            <h3 class="font-bold text-[#0A1F44] text-lg mb-1">{{ n.title if n.title is defined and n.title else 'Risk Alert' }}</h3>
+            <p class="text-sm text-gray-600 mb-2">{{ n.summary if n.summary is defined and n.summary else (n.description if n.description is defined else '') }}</p>
+            <p class="text-xs text-gray-500">Source: {{ n.source if n.source is defined and n.source else 'EvidLens Risk Sentinel' }}</p>
           </div>
-          {% if n.url %}<a href="{{ n.url }}" target="_blank" rel="noopener" class="shrink-0 text-[#14B8A6] text-sm font-bold whitespace-nowrap">Read Full →</a>{% endif %}
+          {% if n.url is defined and n.url %}<a href="{{ n.url }}" target="_blank" rel="noopener" class="shrink-0 text-[#14B8A6] text-sm font-bold whitespace-nowrap">Read Full →</a>{% endif %}
         </div>
-      </div>
+      </article>
       {% endfor %}
-      {% else %}
-      <div class="text-center p-10 text-gray-500">
-        <p class="text-4xl mb-2">✅</p>
-        <p>No active risks detected for your sector right now.</p>
-        <a href="/ai" class="inline-block mt-4 bg-[#14B8A6] text-white px-5 py-2.5 rounded-lg font-bold text-[13px]">Ask Lens About Your Sector →</a>
-      </div>
-      {% endif %}
     </div>
+    {% else %}
+    <div class="text-center p-10 text-gray-500">
+      <p class="text-4xl mb-2">✅</p>
+      <p>No active risks detected for your sector right now.</p>
+      <a href="/ai" class="inline-block mt-4 bg-[#14B8A6] text-white px-5 py-2.5 rounded-lg font-bold text-[13px]">Ask Lens About Your Sector →</a>
+    </div>
+    {% endif %}
     <div class="flex flex-wrap gap-3 mt-6 text-[13px]">
       <a href="/ai" class="bg-[#0A1F44] text-white px-4 py-2 rounded-lg font-bold">Ask Lens</a>
       <a href="/history" class="bg-white border px-4 py-2 rounded-lg font-bold">My History</a>
       <a href="/billing" class="bg-white border px-4 py-2 rounded-lg font-bold">Billing</a>
     </div>
   </div>
+  {% endif %}
 </div>
 {% endblock %}
