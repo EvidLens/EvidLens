@@ -1,49 +1,59 @@
 {% extends "base.html" %}
+{% block title %}Consumer Pulse | EvidLens{% endblock %}
 {% block content %}
-<div class="max-w-5xl mx-auto mt-8 p-6">
-  <div class="flex justify-between items-center mb-6">
-    <h1 class="text-3xl font-bold" style="color:#0A1F44">📊 Consumer Pulse</h1>
+<div class="max-w-5xl mx-auto">
+  <div class="flex flex-wrap gap-3 justify-between items-center mb-2">
+    <h1 class="text-3xl font-bold text-[#0A1F44]">Consumer Pulse</h1>
     <span class="text-sm bg-teal-100 text-teal-700 px-3 py-1 rounded-full">Last 7 Days</span>
   </div>
-  <p class="text-gray-500 mb-6">What people are saying about {{ current_user.sector }} on social media</p>
+  <p class="text-gray-500 mb-6">What people are saying about <b>{{ current_user.sector if current_user and current_user.sector else 'your sector' }}</b> on social media</p>
+
   <div class="grid grid-cols-3 gap-4 mb-8">
     <div class="bg-green-50 p-4 rounded-xl text-center">
-      <p class="text-3xl font-bold text-green-600">{{ sentiment_counts.positive if sentiment_counts else 0 }}</p>
+      <p class="text-3xl font-bold text-green-600">{{ sentiment_counts.positive if sentiment_counts is defined and sentiment_counts.positive is defined else 0 }}</p>
       <p class="text-sm text-gray-600">Positive</p>
     </div>
     <div class="bg-gray-50 p-4 rounded-xl text-center">
-      <p class="text-3xl font-bold text-gray-600">{{ sentiment_counts.neutral if sentiment_counts else 0 }}</p>
+      <p class="text-3xl font-bold text-gray-600">{{ sentiment_counts.neutral if sentiment_counts is defined and sentiment_counts.neutral is defined else 0 }}</p>
       <p class="text-sm text-gray-600">Neutral</p>
     </div>
     <div class="bg-red-50 p-4 rounded-xl text-center">
-      <p class="text-3xl font-bold text-red-600">{{ sentiment_counts.negative if sentiment_counts else 0 }}</p>
+      <p class="text-3xl font-bold text-red-600">{{ sentiment_counts.negative if sentiment_counts is defined and sentiment_counts.negative is defined else 0 }}</p>
       <p class="text-sm text-gray-600">Negative</p>
     </div>
   </div>
+
   <div class="space-y-4">
-    {% for p in posts %}
+    {% for p in posts | default([], true) %}
+    {% set platform = (p.platform if p.platform is defined else (p.source if p.source is defined else '')) | default('', true) | lower %}
+    {% set sentiment = (p.sentiment if p.sentiment is defined else '') | default('', true) | lower %}
+    {% set text = (p.content if p.content is defined else (p.text if p.text is defined else (p.mention if p.mention is defined else ''))) | default('', true) %}
+    {% set author = (p.author if p.author is defined else (p.username if p.username is defined else (p.handle if p.handle is defined else 'Unknown'))) | default('Unknown', true) %}
     <div class="bg-white p-5 rounded-xl shadow-sm border">
       <div class="flex justify-between items-start mb-2">
         <div class="flex items-center gap-2">
-          {% if p.platform == 'Twitter' %}<span class="text-blue-500 font-bold">𝕏</span>
-          {% elif p.platform == 'Facebook' %}<span class="text-blue-700 font-bold">f</span>
-          {% else %}<span class="text-pink-500 font-bold">📷</span>{% endif %}
-          <b class="text-[#0A1F44]">{{ p.platform }}</b>
+          {% if 'twitter' in platform or 'x' == platform %}<span class="text-blue-500 font-bold">𝕏</span>
+          {% elif 'facebook' in platform %}<span class="text-blue-700 font-bold">f</span>
+          {% elif 'instagram' in platform %}<span class="text-pink-500 font-bold">📷</span>
+          {% elif 'tiktok' in platform %}<span class="font-bold">♪</span>
+          {% else %}<span class="text-gray-500 font-bold">💬</span>{% endif %}
+          <b class="text-[#0A1F44]">{{ (p.platform if p.platform is defined else (p.source if p.source is defined else 'Social')) | default('Social', true) | title }}</b>
         </div>
-        {% if p.sentiment == 'Positive' %}<span class="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded">POSITIVE</span>
-        {% elif p.sentiment == 'Negative' %}<span class="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded">NEGATIVE</span>
+        {% if sentiment == 'positive' %}<span class="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded">POSITIVE</span>
+        {% elif sentiment == 'negative' %}<span class="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded">NEGATIVE</span>
         {% else %}<span class="bg-gray-100 text-gray-700 text-xs font-bold px-2 py-1 rounded">NEUTRAL</span>{% endif %}
       </div>
-      <p class="text-gray-800 mb-2">{{ p.content }}</p>
+      <p class="text-gray-800 mb-2">{{ text or 'No text available' }}</p>
       <div class="flex justify-between text-xs text-gray-500">
-        <span>{{ p.author }}</span>
-        <span>{{ p.created_at.strftime('%b %d') if p.created_at else 'Today' }}</span>
+        <span>{{ author }}</span>
+        <span>{% if p.created_at is defined and p.created_at %}{% if p.created_at is string %}{{ p.created_at[:10] }}{% else %}{{ p.created_at.strftime('%b %d') }}{% endif %}{% else %}Today{% endif %}</span>
       </div>
     </div>
     {% else %}
     <div class="bg-white p-10 rounded-xl text-center text-gray-500">
       <p class="text-4xl mb-2">🔍</p>
-      <p>No social mentions found for {{ current_user.sector }} in the last 7 days.</p>
+      <p>No social mentions found for {{ current_user.sector if current_user and current_user.sector else 'your sector' }} in the last 7 days.</p>
+      <a href="/competitive" class="inline-block mt-4 text-sm font-bold text-[#0d9488]">Run an analysis →</a>
     </div>
     {% endfor %}
   </div>
