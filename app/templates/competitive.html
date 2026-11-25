@@ -4,22 +4,56 @@
 <div class="max-w-7xl mx-auto">
   <div class="bg-white rounded-2xl shadow-sm border p-6">
     <div class="flex justify-between items-center mb-6 flex-wrap gap-3">
-      <div><h1 class="text-3xl font-bold text-[#0A1F44]">Competitive Engine</h1><p class="text-gray-500">See who else is in {{ sector or 'your sector' }} in {{ county or 'your county' }}</p></div>
-      <a href="/competitive" class="bg-[#14B8A6] text-white px-4 py-2 rounded-lg font-bold">New Analysis</a>
+      <div>
+        <h1 class="text-3xl font-bold text-[#0A1F44]">Competitive Engine</h1>
+        <p class="text-gray-500">See who else is in {{ sector or 'your sector' }} in {{ county or 'your county' }}</p>
+      </div>
+      <a href="/ai" class="bg-[#14B8A6] text-white px-4 py-2 rounded-lg font-bold text-[13px]">Ask Lens →</a>
     </div>
     <form method="GET" action="/competitive" class="flex gap-3 flex-wrap mb-6">
-      <input name="sector" value="{{ sector or '' }}" placeholder="Sector e.g. Agriculture" class="border rounded-xl px-3 py-2 text-sm"/>
-      <input name="county" value="{{ county or '' }}" placeholder="County e.g. Kirinyaga" class="border rounded-xl px-3 py-2 text-sm"/>
+      <input name="sector" value="{{ sector or '' }}" placeholder="Sector e.g. Agriculture" class="border rounded-xl px-3 py-2 text-sm flex-1 min-w-[160px]">
+      <input name="county" value="{{ county or '' }}" placeholder="County e.g. Kirinyaga" class="border rounded-xl px-3 py-2 text-sm flex-1 min-w-[160px]">
+      <input name="product" value="{{ product or '' }}" placeholder="Product (optional) e.g. Avocado" class="border rounded-xl px-3 py-2 text-sm flex-1 min-w-[160px]">
       <button class="bg-[#0A1F44] text-white px-4 py-2 rounded-xl font-bold text-sm">Analyze →</button>
+      <a href="/competitive" class="bg-white border px-4 py-2 rounded-xl font-bold text-sm">Clear</a>
     </form>
-    <div class="overflow-x-auto"><table class="w-full"><thead><tr class="text-left text-sm text-gray-500 border-b"><th class="p-3">Company</th><th>Sector</th><th>County</th><th>Rating</th><th>Strength</th></tr></thead><tbody>
-      {% for c in (companies or []) %}
-      {% set r = (c.rating or 0)|int %}
-      <tr class="border-b hover:bg-gray-50"><td class="p-3 font-semibold text-[#0A1F44]">{{ c.name or 'Company' }}</td><td>{{ c.sector or '-' }}</td><td>{{ c.county or '-' }}</td><td><span class="text-[#F59E0B]">{{ '★' * r }}{{ '☆' * (5 - r) }}</span> <span class="text-sm ml-1">{{ r }}/5</span></td><td>{% if r >= 4 %}<span class="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full">High Threat</span>{% elif r >= 3 %}<span class="bg-yellow-100 text-yellow-700 text-xs px-2 py-1 rounded-full">Medium</span>{% else %}<span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">Low</span>{% endif %}</td></tr>
-      {% else %}
-      <tr><td colspan="5" class="text-center p-10 text-gray-500">No competitors found yet. Pick a sector + county and click Analyze.</td></tr>
-      {% endfor %}
-    </tbody></table></div>
+    {% if companies is defined and companies %}
+    <div class="grid grid-cols-3 gap-3 mb-6 text-center">
+      <div class="bg-slate-50 rounded-xl p-4"><p class="text-2xl font-bold text-[#0A1F44]">{{ companies|length }}</p><p class="text-xs text-gray-500">Competitors Found</p></div>
+      <div class="bg-red-50 rounded-xl p-4"><p class="text-2xl font-bold text-red-600">{{ companies|selectattr('rating', 'ge', 4)|list|length if companies else 0 }}</p><p class="text-xs text-gray-500">High Threat</p></div>
+      <div class="bg-teal-50 rounded-xl p-4"><p class="text-2xl font-bold text-teal-600">{{ ((companies|map(attribute='rating')|select('defined')|list|sum / companies|length) if companies else 0)|round(1) }}/5</p><p class="text-xs text-gray-500">Avg Rating</p></div>
+    </div>
+    {% endif %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-[14px]">
+        <thead><tr class="text-left text-sm text-gray-500 border-b"><th class="p-3">Company</th><th class="p-3">Sector</th><th class="p-3">County</th><th class="p-3">Rating</th><th class="p-3">Strength</th><th class="p-3"></th></tr></thead>
+        <tbody>
+          {% for c in (companies or []) %}
+          {% set r = ((c.rating or 0)|float)|round|int %}
+          {% if r < 0 %}{% set r = 0 %}{% endif %}
+          {% if r > 5 %}{% set r = 5 %}{% endif %}
+          <tr class="border-b hover:bg-gray-50">
+            <td class="p-3 font-semibold text-[#0A1F44]">{{ c.name or 'Company' }}{% if c.location %}<p class="text-xs text-gray-400 font-normal">{{ c.location }}</p>{% endif %}</td>
+            <td class="p-3">{{ c.sector or sector or '-' }}</td>
+            <td class="p-3">{{ c.county or county or '-' }}</td>
+            <td class="p-3 whitespace-nowrap"><span class="text-[#F59E0B]">{{ '★' * r }}{{ '☆' * (5 - r) }}</span> <span class="text-sm ml-1">{{ r }}/5</span></td>
+            <td class="p-3">{% if r >= 4 %}<span class="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full font-bold">High Threat</span>{% elif r >= 3 %}<span class="bg-yellow-100 text-yellow-700 text-xs px-2 py-1 rounded-full font-bold">Medium</span>{% else %}<span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full font-bold">Low</span>{% endif %}</td>
+            <td class="p-3 text-right">{% if c.url %}<a href="{{ c.url }}" target="_blank" rel="noopener" class="text-[#0d9488] font-bold text-[13px]">View →</a>{% elif c.name %}<a href="/ai?q={{ ('Competitors of ' + c.name + ' in ' + (c.county or county or 'Kenya'))|urlencode }}" class="text-[#0d9488] font-bold text-[13px]">Analyze →</a>{% endif %}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="text-center p-10 text-gray-500">No competitors found yet. Pick a sector + county and click Analyze.<br><a href="/ai" class="text-[#0d9488] font-bold underline">Or ask Lens to find competitors for you →</a></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if companies is defined and companies %}
+    <div class="bg-teal-50 border border-teal-100 rounded-2xl p-5 mt-6 text-[13px]"><b>What this means:</b> High Threat = established, well-rated competitors. You need a clear edge - price, location, quality, or niche. <a href="/ai?q={{ ('How do I beat competitors in ' + (sector or 'my sector') + ' in ' + (county or 'my county'))|urlencode }}" class="font-bold text-[#0d9488]">Ask Lens for a battle plan →</a></div>
+    {% endif %}
+    <div class="flex flex-wrap gap-2 mt-6">
+      <a href="/ai" class="bg-[#0A1F44] text-white px-4 py-2 rounded-lg font-bold text-[13px]">Ask Lens</a>
+      <a href="/market/demand" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Demand Radar</a>
+      <a href="/history" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">My History</a>
+    </div>
   </div>
 </div>
 {% endblock %}
