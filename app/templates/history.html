@@ -1,24 +1,72 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="max-w-5xl mx-auto mt-8 card">
-  <h1 class="text-2xl font-bold mb-4" style="color:#0A1F44">Activity & History</h1>
-  <div class="overflow-x-auto">
-    <table class="w-full">
-      <thead><tr class="text-left border-b"><th class="p-2">Product</th><th>County</th><th>Sector</th><th>Demand</th><th>Date</th></tr></thead>
-      <tbody>
-        {% for a in analyses %}
-        <tr class="border-b hover:bg-gray-50">
-          <td class="p-2 font-semibold">{{ a.product }}</td>
-          <td>{{ a.county }}</td>
-          <td>{{ a.sector }}</td>
-          <td><span class="bg-teal-100 text-teal-700 px-2 py-1 rounded">{{ a.demand_score }}/10</span></td>
-          <td>{{ a.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
-        </tr>
-        {% else %}
-        <tr><td colspan="5" class="text-center p-10 text-gray-500">No activity yet. Run your first analysis on the dashboard.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+<div class="max-w-5xl mx-auto p-6">
+  {% if not current_user is defined or not current_user %}
+  <!-- LOGIN WALL - same rule as billing -->
+  <div class="bg-white rounded-2xl shadow-sm border p-10 text-center">
+    <h1 class="text-2xl font-bold text-[#0A1F44]">Activity &amp; History</h1>
+    <p class="text-[14px] text-gray-500 mt-2">Login to see your past analyses.<br>History is saved to your account - guests have no history to show.</p>
+    <div class="flex flex-wrap justify-center gap-3 mt-6">
+      <a href="/auth/login?next=/history" class="bg-[#14B8A6] text-white px-6 py-3 rounded-xl font-bold text-[14px]">Login →</a>
+      <a href="/auth/register?next=/history" class="bg-white border px-6 py-3 rounded-xl font-bold text-[14px]">Create Free Account</a>
+    </div>
+    <p class="text-[12px] text-gray-400 mt-4">Free account = your analyses are saved. No account = nothing is saved.</p>
   </div>
+  {% else %}
+  <!-- LOGGED IN -->
+  <div class="bg-white rounded-2xl shadow-sm border p-6">
+    <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+      <div>
+        <h1 class="text-2xl font-bold text-[#0A1F44]">Activity &amp; History</h1>
+        <p class="text-[13px] text-gray-500 mt-1">{{ analyses|length if analyses is defined else 0 }} analyses • {{ current_user.email }}</p>
+      </div>
+      <div class="flex gap-2">
+        <a href="/ai" class="bg-[#14B8A6] text-white px-4 py-2 rounded-lg text-[13px] font-bold">+ New Analysis</a>
+        <a href="/billing" class="bg-white border px-4 py-2 rounded-lg text-[13px] font-bold">Billing</a>
+      </div>
+    </div>
+
+    <!-- Filters - works with backend ?q= & ?county= -->
+    <form method="get" action="/history" class="flex flex-wrap gap-2 mb-4">
+      <input name="q" value="{{ request.query_params.get('q','') if request is defined else '' }}" placeholder="Search product..." class="border rounded-lg px-3 py-2 text-[13px] flex-1 min-w-[160px]">
+      <input name="county" value="{{ request.query_params.get('county','') if request is defined else '' }}" placeholder="County..." class="border rounded-lg px-3 py-2 text-[13px] w-[140px]">
+      <button class="bg-[#0A1F44] text-white px-4 py-2 rounded-lg text-[13px] font-bold">Filter</button>
+      <a href="/history" class="bg-white border px-4 py-2 rounded-lg text-[13px] font-bold">Clear</a>
+    </form>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-[14px]">
+        <thead><tr class="text-left border-b text-gray-500"><th class="p-2">Product</th><th class="p-2">County</th><th class="p-2">Sector</th><th class="p-2">Demand</th><th class="p-2">Verdict</th><th class="p-2">Date</th><th class="p-2"></th></tr></thead>
+        <tbody>
+          {% if analyses is defined and analyses %}
+          {% for a in analyses %}
+          <tr class="border-b hover:bg-gray-50">
+            <td class="p-2 font-semibold">{{ a.product or a.query or a.business or 'Analysis' }}</td>
+            <td class="p-2">{{ a.county or 'Kenya' }}</td>
+            <td class="p-2">{{ a.sector or 'General' }}</td>
+            <td class="p-2"><span class="bg-teal-100 text-teal-700 px-2 py-1 rounded text-[12px] font-bold">{{ a.demand_score if a.demand_score is defined else a.score if a.score is defined else '—' }}{% if a.demand_score is defined or a.score is defined %}/10{% endif %}</span></td>
+            <td class="p-2"><span class="px-2 py-1 rounded text-[12px] font-bold {% if (a.verdict or '')|lower == 'go' %}bg-green-100 text-green-700{% elif (a.verdict or '')|lower == 'no-go' %}bg-red-100 text-red-700{% else %}bg-amber-100 text-amber-700{% endif %}">{{ a.verdict or '—' }}</span></td>
+            <td class="p-2 text-gray-500 text-[13px]">{% if a.timestamp %}{{ a.timestamp.strftime('%Y-%m-%d %H:%M') if a.timestamp.strftime is defined else a.timestamp }}{% elif a.created_at %}{{ a.created_at.strftime('%Y-%m-%d %H:%M') if a.created_at.strftime is defined else a.created_at }}{% else %}—{% endif %}</td>
+            <td class="p-2 text-right"><a href="/ai?rerun={{ a.id if a.id is defined else '' }}&q={{ (a.product or a.query or '')|urlencode }}" class="text-[#0d9488] font-bold text-[13px]">Re-run →</a></td>
+          </tr>
+          {% endfor %}
+          {% else %}
+          <tr><td colspan="7" class="text-center p-10 text-gray-500">No activity yet.<br><a href="/ai" class="text-[#0d9488] font-bold underline">Run your first analysis on Ask Lens →</a></td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if total_pages is defined and total_pages and total_pages > 1 %}
+    <div class="flex justify-center gap-2 mt-4 text-[13px]">
+      {% for p in range(1, total_pages + 1) %}
+      <a href="/history?page={{ p }}{% if request is defined %}&q={{ request.query_params.get('q','') }}&county={{ request.query_params.get('county','') }}{% endif %}" class="px-3 py-1.5 rounded-lg border font-bold {% if p == (page or 1) %}bg-[#0A1F44] text-white{% else %}bg-white{% endif %}">{{ p }}</a>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 mt-6 text-[13px]"><b>Missing an analysis?</b> Analyses are only saved when you are logged in. If you ran it as a guest, it was not saved - <a href="/ai" class="font-bold text-[#0d9488]">re-run it while logged in</a>.</div>
+  {% endif %}
 </div>
 {% endblock %}
