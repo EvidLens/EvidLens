@@ -1,44 +1,52 @@
 {% extends "base.html" %}
+{% block title %}Help &amp; Support | EvidLens{% endblock %}
 {% block content %}
 <div class="max-w-5xl mx-auto p-6">
-  <h1 class="text-3xl font-bold text-[#0A1F44] mb-2">Help & Support</h1>
+  <h1 class="text-3xl font-bold text-[#0A1F44] mb-2">Help &amp; Support</h1>
   <p class="text-gray-500 mb-6">How can we help you today?</p>
-
-  <!-- Search -->
   <div class="bg-white p-4 rounded-xl shadow-sm mb-8">
-    <input id="searchHelp" type="text" placeholder="Search: 'How do I buy credits?' 'What is Demand Score?'"
-      class="w-full p-3 border rounded-lg focus:border-[#14B8A6] outline-none">
+    <input id="searchHelp" type="text" placeholder="Search: 'How do I buy credits?' 'What is Demand Score?'" class="w-full p-3 border rounded-lg focus:border-[#14B8A6] outline-none">
+    <p id="searchEmpty" class="hidden text-[13px] text-gray-500 mt-2">No matching answers. Send us a message below - we reply in under 2 hours on weekdays.</p>
   </div>
-
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-    <!-- FAQ -->
     <div class="md:col-span-2">
       <h2 class="text-xl font-bold mb-4">Frequently Asked Questions</h2>
-      <div class="space-y-3">
-        {% for faq in faqs %}
-        <details class="bg-white p-4 rounded-xl shadow-sm cursor-pointer">
-          <summary class="font-semibold text-[#0A1F44]">{{ faq.q }}</summary>
-          <p class="mt-3 text-gray-600">{{ faq.a }}</p>
+      <div class="space-y-3" id="faqList">
+        {% for faq in (faqs or []) %}
+        <details class="faq-item bg-white p-4 rounded-xl shadow-sm cursor-pointer">
+          <summary class="font-semibold text-[#0A1F44]">{{ faq.q or faq.question }}</summary>
+          <p class="mt-3 text-gray-600 text-[14px] leading-relaxed">{{ faq.a or faq.answer }}</p>
         </details>
+        {% else %}
+        <details class="faq-item bg-white p-4 rounded-xl shadow-sm cursor-pointer"><summary class="font-semibold text-[#0A1F44]">How do I buy credits?</summary><p class="mt-3 text-gray-600 text-[14px]">Go to Billing → Buy Credits, choose a pack, pay with M-Pesa. Credits appear instantly. Free = 1 credit, Pro (KES 1,500/mo) = 10 credits, Enterprise (KES 5,000/mo) = unlimited.</p></details>
+        <details class="faq-item bg-white p-4 rounded-xl shadow-sm cursor-pointer"><summary class="font-semibold text-[#0A1F44]">What is Demand Score?</summary><p class="mt-3 text-gray-600 text-[14px]">A 0-100 score from search interest, competition, and buying signals in your county + sector. 70+ = strong demand, 40-69 = moderate, under 40 = weak.</p></details>
+        <details class="faq-item bg-white p-4 rounded-xl shadow-sm cursor-pointer"><summary class="font-semibold text-[#0A1F44]">Why is my report locked?</summary><p class="mt-3 text-gray-600 text-[14px]">You are out of credits, or the module needs Pro. Check Billing for your balance and plan.</p></details>
+        <details class="faq-item bg-white p-4 rounded-xl shadow-sm cursor-pointer"><summary class="font-semibold text-[#0A1F44]">How do I reset my password?</summary><p class="mt-3 text-gray-600 text-[14px]">Go to Login → Forgot password. The link expires in 30 minutes.</p></details>
+        <details class="faq-item bg-white p-4 rounded-xl shadow-sm cursor-pointer"><summary class="font-semibold text-[#0A1F44]">Is my data private?</summary><p class="mt-3 text-gray-600 text-[14px]">Yes. KDPA 2019 compliant. See Privacy, Terms, and DPA. Your prompts are anonymized before AI inference.</p></details>
+        <details class="faq-item bg-white p-4 rounded-xl shadow-sm cursor-pointer"><summary class="font-semibold text-[#0A1F44]">How do refunds work?</summary><p class="mt-3 text-gray-600 text-[14px]">Contact support within 7 days of payment. M-Pesa refunds go to the same number used to pay.</p></details>
         {% endfor %}
       </div>
+      <div class="flex flex-wrap gap-2 mt-6">
+        <a href="/pricing" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Pricing</a>
+        <a href="/billing" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Billing</a>
+        <a href="/privacy" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Privacy</a>
+        <a href="/terms" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Terms</a>
+      </div>
     </div>
-
-    <!-- Contact -->
     <div>
       <div class="bg-gradient-to-b from-[#0A1F44] to-[#14B8A6] p-6 rounded-2xl text-white mb-6">
         <h2 class="text-xl font-bold mb-2">Talk to Us</h2>
         <p class="text-sm opacity-90 mb-4">We reply in under 2 hours on weekdays</p>
-        <a href="https://wa.me/2547XXXXXXXX" target="_blank" class="block bg-white text-[#0A1F44] text-center py-2 rounded-lg font-bold mb-2">💬 WhatsApp</a>
-        <a href="mailto:support@evidlens.co.ke" class="block bg-white/20 text-center py-2 rounded-lg font-bold">support@evidlens.co.ke</a>
+        <a href="mailto:support@evidlens.co.ke" class="block bg-white text-[#0A1F44] text-center py-2 rounded-lg font-bold mb-2">✉️ support@evidlens.co.ke</a>
+        <a href="/contact" class="block bg-white/20 text-center py-2 rounded-lg font-bold">Contact Page →</a>
       </div>
-
-      <!-- Contact Form -->
       <div class="bg-white p-6 rounded-2xl shadow-sm">
         <h2 class="text-lg font-bold mb-3">Send a Message</h2>
-        <form id="supportForm" class="space-y-3">
-          <input name="subject" placeholder="Subject" required class="w-full border p-2 rounded-lg text-sm">
-          <textarea name="message" placeholder="Describe your issue..." required class="w-full border p-2 rounded-lg text-sm h-24"></textarea>
+        {% if current_user is defined and not current_user %}<p class="text-[13px] text-gray-500 mb-3">Include your email so we can reply.</p>{% endif %}
+        <form id="supportForm" method="post" action="/help/contact" class="space-y-3">
+          {% if current_user is defined and not current_user %}<input name="email" type="email" placeholder="Your email" required class="w-full border p-2 rounded-lg text-sm">{% endif %}
+          <input name="subject" placeholder="Subject" required maxlength="120" class="w-full border p-2 rounded-lg text-sm">
+          <textarea name="message" placeholder="Describe your issue..." required maxlength="2000" class="w-full border p-2 rounded-lg text-sm h-24"></textarea>
           <button class="w-full bg-[#14B8A6] text-white py-2 rounded-lg font-bold">Send</button>
         </form>
         <p id="supportMsg" class="text-sm mt-2"></p>
@@ -46,15 +54,45 @@
     </div>
   </div>
 </div>
-
+{% endblock %}
+{% block scripts %}
 <script>
-document.getElementById('supportForm').onsubmit=async e=>{
-  e.preventDefault();
-  const res = await fetch('/help/contact', {method:'POST', body: new FormData(e.target)});
-  const data = await res.json();
-  document.getElementById('supportMsg').innerText = data.message;
-  document.getElementById('supportMsg').className = "text-sm mt-2 text-green-600";
-  e.target.reset();
-}
+(function(){
+  var input=document.getElementById('searchHelp');
+  var items=document.querySelectorAll('.faq-item');
+  var empty=document.getElementById('searchEmpty');
+  if(input){
+    input.addEventListener('input',function(){
+      var q=input.value.toLowerCase().trim();
+      var shown=0;
+      items.forEach(function(el){
+        var match=!q || el.textContent.toLowerCase().indexOf(q)>-1;
+        el.style.display=match?'':'none';
+        if(match) shown++;
+      });
+      if(empty) empty.classList.toggle('hidden', shown>0 || !q);
+    });
+  }
+  var form=document.getElementById('supportForm');
+  var msg=document.getElementById('supportMsg');
+  if(form){
+    form.addEventListener('submit',async function(e){
+      e.preventDefault();
+      if(!msg) return;
+      msg.textContent='Sending...'; msg.className='text-sm mt-2 text-gray-500';
+      try{
+        var res=await fetch('/help/contact',{method:'POST',body:new FormData(form)});
+        var data={}; try{ data=await res.json(); }catch(_){}
+        if(!res.ok) throw new Error(data.message||('Failed: '+res.status));
+        msg.textContent=data.message||'Message sent. We will reply soon.';
+        msg.className='text-sm mt-2 text-green-600';
+        form.reset();
+      }catch(err){
+        msg.textContent=err.message||'Could not send. Email support@evidlens.co.ke directly.';
+        msg.className='text-sm mt-2 text-red-600';
+      }
+    });
+  }
+})();
 </script>
 {% endblock %}
