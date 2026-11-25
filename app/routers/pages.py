@@ -11,6 +11,7 @@ from sqlmodel import desc
 from sqlmodel import or_
 from jinja2 import TemplateNotFound
 import traceback
+import markdown, bleach
 from app.core.db import get_session as get_db
 from app.core.models import MarketMetric
 from app.core.models import Company
@@ -25,6 +26,75 @@ templates = Jinja2Templates(directory="app/templates")
 TEMPLATE_ALIASES = {"demand.html": "market_demand.html", "prices.html": "market_prices.html", "counties.html": "location_counties.html", "risk.html": "market_risk.html", "voice.html": "voice.html", "voices.html": "voice.html"}
 
 PUBLIC_PAGES = {"/login", "/signup", "/forgot-password", "/reset-password", "/privacy", "/terms", "/pricing", "/about", "/contact", "/help", "/changelog"}
+
+# --- Static pages (about / terms / privacy / help) rendered via static_page.html ---
+ALLOWED_TAGS = ["p","h1","h2","h3","h4","ul","ol","li","a","strong","em","br","hr","blockquote","code"]
+ALLOWED_ATTRS = {"a": ["href", "title"]}
+
+PAGES = {
+  "about": {"title": "About EvidLens", "subtitle": "Real market intelligence for Kenyan businesses.", "updated_at": "2026-11-25", "md": """
+## What EvidLens does
+EvidLens helps Kenyan businesses make decisions with real data, not guesswork.
+- **Market Engine** - prices, demand, and competition across 47 counties
+- **Policy Watch** - KRA, KEBS, CBK and county policy changes that affect you
+- **Funding Radar** - banks, SACCOs, grants, and investors
+- **Ask Lens** - ask a business question in plain English, get a sourced answer
+## Who it is for
+Small traders, agribusinesses, retailers, manufacturers, and service businesses operating in Kenya.
+## What we do not do
+We do not lend money, guarantee funding approval, or give legal / tax advice. Always verify terms with the lender or a professional before you commit.
+## Contact
+Email [support@evidlens.co.ke](mailto:support@evidlens.co.ke)
+"""},
+  "terms": {"title": "Terms of Service", "subtitle": "Please read these before using EvidLens.", "updated_at": "2026-11-25", "md": """
+## 1. The Service
+EvidLens provides market, policy, and funding information for general business use.
+## 2. No guarantee
+Data comes from public sources, partners, and user inputs. It may be incomplete or out of date. You are responsible for verifying prices, policy, and lender terms before acting on them.
+## 3. Your account
+You are responsible for keeping your password safe. Do not share your account. Tell us immediately if you think it has been compromised.
+## 4. Fair use
+Do not scrape, resell, or abuse the Service, or try to access other users' data.
+## 5. Changes
+We may update these Terms. The date at the bottom of this page shows the latest version.
+## 6. Contact
+Questions: [support@evidlens.co.ke](mailto:support@evidlens.co.ke)
+"""},
+  "privacy": {"title": "Privacy Policy", "subtitle": "What we collect, why, and what we never sell.", "updated_at": "2026-11-25", "md": """
+## What we collect
+- Account info you give us: name, email, phone, county, sector
+- Questions you ask Lens, and reports you generate
+- Basic usage logs to keep the Service running and secure
+## What we do NOT do
+We do not sell your personal data. We do not share your reports with other users.
+## How we use it
+To run your account, show you relevant market data, improve the Service, and prevent abuse.
+## Your choices
+You can update your profile in Settings. To delete your account, email [support@evidlens.co.ke](mailto:support@evidlens.co.ke) from your registered email.
+## Contact
+Privacy questions: [support@evidlens.co.ke](mailto:support@evidlens.co.ke)
+"""},
+  "help": {"title": "Help", "subtitle": "Get unstuck fast.", "updated_at": "2026-11-25", "md": """
+## Getting started
+1. Create an account and set your county and sector in Settings
+2. Go to the Dashboard to see your market snapshot
+3. Use Ask Lens for any question, e.g. "What is the price of maize in Nyeri this week?"
+## Reports
+Go to My Reports > Generate New Report, enter what to analyze, then download the PDF when status shows READY.
+## Funding
+Go to Funding Radar, filter by sector and county, and always verify interest, fees, and eligibility directly with the lender before sharing documents or paying fees.
+## Still stuck?
+Email [support@evidlens.co.ke](mailto:support@evidlens.co.ke) with your email, what page you were on, and a screenshot if you can.
+"""},
+}
+
+def render_md(md_text: str) -> str:
+    html = markdown.markdown(md_text or "", extensions=["extra"])
+    return bleach.clean(html, tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRS, strip=True)
+
+def static_page(request: Request, slug: str):
+    page = PAGES[slug]
+    return safe_template(request, "static_page.html", {"request": request, "title": page["title"], "subtitle": page.get("subtitle"), "content_html": render_md(page["md"]), "updated_at": page.get("updated_at")}, page["title"])
 
 def _needs_login(request: Request, user):
     if user is not None:
@@ -94,7 +164,7 @@ def export_navigator_page(request: Request, db: Session = Depends(get_db), user:
 
 @router.get("/about", response_class=HTMLResponse)
 def about(request: Request):
-    return safe_template(request, "about.html", {"request": request}, "About")
+    return static_page(request, "about")
 
 @router.get("/billing", response_class=HTMLResponse)
 def billing_page(request: Request, user: AuthUser = Depends(get_current_user_optional)):
@@ -210,7 +280,7 @@ def funding_page(request: Request, db: Session = Depends(get_db), user: AuthUser
 
 @router.get("/help", response_class=HTMLResponse)
 def help_page(request: Request):
-    return safe_template(request, "help.html", {"request": request}, "Help")
+    return static_page(request, "help")
 
 @router.get("/history", response_class=HTMLResponse)
 def history(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user_optional)):
@@ -266,7 +336,7 @@ def pricing_page(request: Request):
 
 @router.get("/privacy", response_class=HTMLResponse)
 def privacy(request: Request):
-    return safe_template(request, "privacy.html", {"request": request}, "Privacy")
+    return static_page(request, "privacy")
 
 @router.get("/risk", response_class=HTMLResponse)
 def risk(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user_optional)):
@@ -308,7 +378,7 @@ def stats(request: Request, db: Session = Depends(get_db), user: AuthUser = Depe
 
 @router.get("/terms", response_class=HTMLResponse)
 def terms(request: Request):
-    return safe_template(request, "terms.html", {"request": request}, "Terms")
+    return static_page(request, "terms")
 
 @router.get("/voice", response_class=HTMLResponse)
 def voice_page(request: Request, db: Session = Depends(get_db), user: AuthUser = Depends(get_current_user_optional)):
@@ -345,5 +415,5 @@ def forgot_page(request: Request):
     return safe_template(request, "forgot.html", {"request": request}, "Forgot Password")
 
 @router.get("/reset-password", response_class=HTMLResponse)
-def reset_page(request: Request, token: str):
+def reset_page(request: Request, token: str = ""):
     return safe_template(request, "reset.html", {"request": request, "token": token}, "Reset Password")
