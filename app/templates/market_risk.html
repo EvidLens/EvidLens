@@ -1,64 +1,68 @@
-<!DOCTYPE html>
-<html>
-<head>
-<title>Risk Sentinel - EvidLens</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<script src="https://cdn.tailwindcss.com"></script>
-<style>
-body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif}
-.card{background:white; border-radius:16px; padding:24px; box-shadow:0 1px 4px rgba(16,24,40,0.06)}
-.badge{font-size:11px; font-weight:700; padding:4px 10px; border-radius:999px}
-</style>
-</head>
-<body class="bg-[#F5F7FA]">
-  <!-- Header -->
-  <header class="bg-[#0A1F44] text-white px-6 py-4">
-    <div class="max-w-7xl mx-auto flex items-center gap-3">
-      <a href="/" class="font-bold text-2xl"><span>Evid</span><span style="color:#14B8A6">Lens</span></a>
-    </div>
-  </header>
-
-  <div class="max-w-7xl mx-auto p-6">
-    <div class="card">
-      <div class="flex justify-between items-center mb-6">
-        <div>
-          <h1 class="text-3xl font-bold text-[#0A1F44] flex items-center gap-2">⚠️ Risk Sentinel</h1>
-          <p class="text-gray-500">Live market and regulatory risks for your sector</p>
-        </div>
-        <a href="/" class="bg-[#14B8A6] text-white px-4 py-2 rounded-lg font-bold">New Analysis</a>
+{% extends "base.html" %}
+{% block title %}Risk Sentinel | EvidLens{% endblock %}
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <div class="bg-white rounded-2xl border p-6 md:p-8">
+    <div class="flex justify-between items-center mb-6 flex-wrap gap-3">
+      <div>
+        <h1 class="text-3xl font-bold text-[#0A1F44] flex items-center gap-2">⚠️ Risk Sentinel</h1>
+        <p class="text-gray-500 text-[14px] mt-1">Market and regulatory risks for {{ (current_user.sector if current_user is defined and current_user and current_user.sector else 'your sector') }} • {{ (current_user.county if current_user is defined and current_user and current_user.county else 'Kenya') }}</p>
       </div>
-
-      <!-- Alerts List -->
-      <div class="space-y-4">
-        {% for n in news %}
-        <div class="border rounded-xl p-4 hover:shadow-md transition">
-          <div class="flex items-start justify-between">
-            <div class="flex-1">
-              <div class="flex items-center gap-2 mb-2">
-                {% if n.severity == 'High' %}
-                  <span class="badge bg-red-100 text-red-700">HIGH RISK</span>
-                {% elif n.severity == 'Medium' %}
-                  <span class="badge bg-yellow-100 text-yellow-700">MEDIUM</span>
-                {% else %}
-                  <span class="badge bg-blue-100 text-blue-700">LOW</span>
-                {% endif %}
-                <span class="text-xs text-gray-500">{{ n.published_at.strftime('%b %d, %Y') if n.published_at else 'Today' }}</span>
-              </div>
-              <h3 class="font-bold text-[#0A1F44] text-lg mb-1">{{ n.title }}</h3>
-              <p class="text-sm text-gray-600 mb-2">{{ n.summary }}</p>
-              <p class="text-xs text-gray-500">Source: {{ n.source }}</p>
+      <a href="/ai" class="bg-[#14B8A6] text-white px-4 py-2 rounded-lg font-bold text-[13px]">New Analysis →</a>
+    </div>
+    <div class="flex gap-2 mb-6 flex-wrap">
+      <button type="button" class="filter-btn active" data-filter="all">All ({{ (news or [])|length }})</button>
+      <button type="button" class="filter-btn" data-filter="High">High Risk</button>
+      <button type="button" class="filter-btn" data-filter="Medium">Medium</button>
+      <button type="button" class="filter-btn" data-filter="Low">Low</button>
+    </div>
+    <div class="space-y-4" id="riskList">
+      {% for n in (news or []) %}
+      <div class="risk-card border rounded-xl p-4 hover:shadow-md transition" data-severity="{{ n.severity or 'Low' }}">
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-2 flex-wrap">
+              {% if n.severity == 'High' %}<span class="badge bg-red-100 text-red-700">HIGH RISK</span>{% elif n.severity == 'Medium' %}<span class="badge bg-yellow-100 text-yellow-700">MEDIUM</span>{% else %}<span class="badge bg-blue-100 text-blue-700">LOW</span>{% endif %}
+              {% if n.category %}<span class="text-xs bg-gray-100 px-2 py-1 rounded-full font-bold text-gray-600">{{ n.category }}</span>{% endif %}
+              <span class="text-xs text-gray-500">{% if n.published_at is string %}{{ n.published_at[:10] }}{% elif n.published_at %}{{ n.published_at.strftime('%b %d, %Y') }}{% else %}Today{% endif %}</span>
             </div>
-            <a href="{{ n.url }}" target="_blank" class="ml-4 text-[#14B8A6] text-sm font-bold whitespace-nowrap">Read Full →</a>
+            <h3 class="font-bold text-[#0A1F44] text-lg mb-1 leading-tight">{{ n.title or 'Risk Alert' }}</h3>
+            {% if n.summary %}<p class="text-sm text-gray-600 mb-2 leading-relaxed">{{ n.summary }}</p>{% endif %}
+            <p class="text-xs text-gray-500">Source: {{ n.source or 'EvidLens' }}</p>
+          </div>
+          <div class="flex flex-col gap-2 shrink-0">
+            {% if n.url %}<a href="{{ n.url }}" target="_blank" rel="noopener" class="text-[#14B8A6] text-sm font-bold whitespace-nowrap">Read Full →</a>{% endif %}
+            <a href="/ai?q={{ ('How does \"' + (n.title or 'this risk') + '\" affect my business? What should I do?')|urlencode }}" class="bg-[#0A1F44] text-white text-[12px] px-3 py-1.5 rounded-lg font-bold text-center">Ask Lens</a>
           </div>
         </div>
-        {% else %}
-        <div class="text-center p-10 text-gray-500">
-          <p class="text-4xl mb-2">✅</p>
-          <p>No active risks detected for your sector right now.</p>
-        </div>
-        {% endfor %}
       </div>
+      {% else %}
+      <div class="text-center p-10 text-gray-500">
+        <p class="text-4xl mb-2">✅</p>
+        <p class="font-bold text-[#0A1F44]">No active risks detected</p>
+        <p class="text-sm mt-1">For {{ (current_user.sector if current_user is defined and current_user and current_user.sector else 'your sector') }} right now. Check back, or ask Lens.</p>
+        <a href="/ai" class="inline-block mt-4 bg-[#0A1F44] text-white px-4 py-2 rounded-lg font-bold text-[13px]">Ask Lens →</a>
+      </div>
+      {% endfor %}
     </div>
   </div>
-</body>
-</html>
+  <div class="flex flex-wrap gap-2 mt-6">
+    <a href="/policy" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Policy Watch</a>
+    <a href="/market/demand" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Demand Radar</a>
+    <a href="/reports" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Reports</a>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<style>.badge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px}.filter-btn{border:1px solid #e5e7eb;padding:8px 16px;border-radius:9999px;font-size:12px;font-weight:700}.filter-btn.active{background:#0A1F44;color:white;border-color:#0A1F44}</style>
+<script>
+document.querySelectorAll('.filter-btn').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
+    btn.classList.add('active');
+    var f=btn.dataset.filter;
+    document.querySelectorAll('.risk-card').forEach(function(c){ c.style.display=(f==='all'||c.dataset.severity===f)?'block':'none'; });
+  });
+});
+</script>
+{% endblock %}
