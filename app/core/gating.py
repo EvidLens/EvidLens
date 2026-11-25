@@ -59,11 +59,13 @@ PLAN_MODULES = {
     "ENTERPRISE": ALL_MODULES,
 }
 
+# Keep both shapes: analyses/reports/seats for old quota code,
+# areas/products/users/competitors/leads for service.py / pricing
 PLAN_LIMITS = {
-    "FREE": {"analyses": 5, "reports": 1, "seats": 1},
-    "BASIC": {"analyses": 10, "reports": 5, "seats": 1},
-    "PROFESSIONAL": {"analyses": 100, "reports": 30, "seats": 1},
-    "ENTERPRISE": {"analyses": 1000000, "reports": 1000000, "seats": 5},
+    "FREE": {"analyses": 5, "reports": 1, "seats": 1, "areas": 1, "products": 1, "users": 1, "competitors": 1, "leads_qtr": 0},
+    "BASIC": {"analyses": 10, "reports": 5, "seats": 1, "areas": 1, "products": 3, "users": 1, "competitors": 3, "leads_qtr": 0},
+    "PROFESSIONAL": {"analyses": 100, "reports": 30, "seats": 1, "areas": 3, "products": 9, "users": 5, "competitors": 10, "leads_qtr": 250},
+    "ENTERPRISE": {"analyses": 1000000, "reports": 1000000, "seats": 5, "areas": 9, "products": 21, "users": -1, "competitors": -1, "leads_qtr": -1},
 }
 
 FEATURE_TO_MODULE = {
@@ -114,11 +116,11 @@ def normalize_plan(name) -> str:
     clean = str(name).strip().upper().replace("EV-", "").replace("EV_", "")
     if clean in ("TRIAL",):
         return "FREE"
-    if clean in ("STARTER", "SME STARTER"):
+    if clean in ("STARTER", "SME STARTER", "SME"):
         return "BASIC"
     if clean in ("PRO", "GROWTH", "SME PRO"):
         return "PROFESSIONAL"
-    if clean in ("BUSINESS",):
+    if clean in ("BUSINESS", "ENT"):
         return "ENTERPRISE"
     if clean in PLAN_MODULES:
         return clean
@@ -133,7 +135,16 @@ def get_active_plan(db: Session, user) -> str:
     sub = db.exec(stmt).first()
     if not sub:
         return "FREE"
-    return normalize_plan(sub.plan_name)
+    # support both column names: plan_name (yours) and plan_code (other files)
+    raw = getattr(sub, "plan_name", None) or getattr(sub, "plan_code", None) or "FREE"
+    return normalize_plan(raw)
+
+def get_plan_limits(plan_code) -> dict:
+    """What service.py was asking for - was missing before."""
+    return dict(PLAN_LIMITS.get(normalize_plan(plan_code), PLAN_LIMITS["FREE"]))
+
+def has_module(plan_code, module_name: str) -> bool:
+    return module_name in PLAN_MODULES.get(normalize_plan(plan_code), PLAN_MODULES["FREE"])
 
 def get_credits(db: Session, user) -> int:
     credits = getattr(user, "credits", None)
