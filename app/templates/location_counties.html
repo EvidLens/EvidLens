@@ -1,41 +1,55 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>County Mapper - EvidLens</title>
-<style>
-body { font-family: Arial, sans-serif; margin: 20px; background: #f8fafc; color: #0f172a; }
-a { color: #1d4ed8; }
-table { width: 100%; border-collapse: collapse; background: white; }
-th, td { padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: left; }
-th { background: #0a1f44; color: white; }
-.card { background: white; padding: 16px; border-radius: 8px; margin-bottom: 16px; }
-</style>
-</head>
-<body>
-<a href="/">← Dashboard</a>
-<h1>County Mapper</h1>
-<div class="card">
-<p>Market size by county. Built from live MarketMetric, PriceData and Company tables.</p>
-<p>Total counties: {{ counties|length if counties is defined else 0 }}</p>
+{% extends "base.html" %}
+{% block title %}County Mapper | EvidLens{% endblock %}
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <div class="flex flex-wrap justify-between items-start gap-4 mb-6">
+    <div>
+      <h1 class="text-3xl font-bold text-[#0A1F44]">County Mapper</h1>
+      <p class="text-gray-500 text-[14px] mt-1">Market size by county. Built from live MarketMetric, PriceData and Company tables.</p>
+    </div>
+    <form method="get" action="/location/counties" class="flex gap-2">
+      <input name="q" value="{{ q or '' }}" placeholder="Search county..." class="border rounded-xl px-3 py-2 text-sm">
+      <button class="bg-[#0A1F44] text-white px-4 py-2 rounded-xl font-bold text-sm">Search</button>
+    </form>
+  </div>
+  <div class="grid grid-cols-3 gap-3 mb-6 text-center">
+    <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-[#0A1F44]">{{ (counties or [])|length }}</p><p class="text-xs text-gray-500">Counties</p></div>
+    <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-[#0A1F44]">{{ (counties or [])|map(attribute='count')|select('defined')|list|sum + (counties or [])|map(attribute='business_count')|select('defined')|list|sum }}</p><p class="text-xs text-gray-500">Total Records</p></div>
+    <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-[#0A1F44]">KES {{ "{:,.0f}".format((counties or [])|map(attribute='market_size')|select('defined')|list|sum) }}</p><p class="text-xs text-gray-500">Total Market Size</p></div>
+  </div>
+  {% if counties is defined and counties %}
+  <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-[14px]">
+        <thead><tr class="text-left text-sm text-gray-500 border-b"><th class="p-3">County</th><th class="p-3">Records</th><th class="p-3">Market Size (KES)</th><th class="p-3"></th></tr></thead>
+        <tbody>
+          {% for c in counties %}
+          {% set name = c.name if c.name is defined else (c.county if c.county is defined else 'County') %}
+          {% set cnt = c.count if c.count is defined else (c.business_count if c.business_count is defined else 0) %}
+          {% set size = c.market_size if c.market_size is defined else 0 %}
+          <tr class="border-b hover:bg-gray-50">
+            <td class="p-3 font-semibold text-[#0A1F44]">{{ name }}</td>
+            <td class="p-3">{{ "{:,}".format(cnt|int) }}</td>
+            <td class="p-3">KES {{ "{:,.0f}".format(size|float) }}</td>
+            <td class="p-3 text-right"><a href="/market/demand?county={{ name|urlencode }}" class="text-[#0d9488] font-bold text-[13px]">Demand →</a> <a href="/ai?q={{ ('Best business in ' + name)|urlencode }}" class="text-[#0A1F44] font-bold text-[13px] ml-2">Ask Lens →</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="bg-white rounded-2xl border p-10 text-center">
+    <p class="text-4xl mb-2">🗺️</p>
+    <p class="font-bold text-[#0A1F44]">No county data yet</p>
+    <p class="text-[14px] text-gray-500 mt-1">Try a different search, or ask Lens for a county breakdown.</p>
+    <a href="/ai" class="inline-block mt-4 bg-[#0A1F44] text-white px-4 py-2 rounded-lg font-bold text-[13px]">Ask Lens →</a>
+  </div>
+  {% endif %}
+  <div class="flex flex-wrap gap-2 mt-6">
+    <a href="/market/demand" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Demand Radar</a>
+    <a href="/competitive" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Competitive</a>
+    <a href="/market/prices" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Prices</a>
+  </div>
 </div>
-{% if counties is defined and counties %}
-<table>
-<tr>
-<th>County</th>
-<th>Records</th>
-<th>Market Size (KES)</th>
-</tr>
-{% for c in counties %}
-<tr>
-<td>{{ c.name if c.name is defined else (c.county if c.county is defined else 'County') }}</td>
-<td>{{ c.count if c.count is defined else (c.business_count if c.business_count is defined else 0) }}</td>
-<td>{{ c.market_size if c.market_size is defined else 0 }}</td>
-</tr>
-{% endfor %}
-</table>
-{% else %}
-<p>No county data yet.</p>
-{% endif %}
-</body>
-</html>
+{% endblock %}
