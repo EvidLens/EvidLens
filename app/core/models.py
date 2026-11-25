@@ -563,3 +563,12 @@ class DetailedAnalysisRequest(BaseModel):
     def strip_text(cls, v: str) -> str:
         return v.strip() if isinstance(v, str) else v
     model_config = {"extra": "allow"}
+
+class GeoData(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    type: str = "county"
+    county: str
+    code: Optional[str] = None
+    region: Optional[str] = None
+    headquarters: Optional[str] = None
