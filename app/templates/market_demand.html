@@ -1,34 +1,56 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>Demand Radar - EvidLens</title>
-<style>
-body { font-family: Arial, sans-serif; margin: 20px; background: #f8fafc; color: #0f172a; }
-a { color: #1d4ed8; }
-table { width: 100%; border-collapse: collapse; background: white; }
-th, td { padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: left; }
-th { background: #0a1f44; color: white; }
-</style>
-</head>
-<body>
-<a href="/">← Dashboard</a>
-<h1>Demand Radar</h1>
-{% if demand is defined and demand %}
-<table>
-<tr><th>Product</th><th>County</th><th>Sector</th><th>Demand Score</th><th>Price (KES)</th></tr>
-{% for d in demand %}
-<tr>
-<td>{{ d.product if d.product is defined else 'Product' }}</td>
-<td>{{ d.county if d.county is defined else 'Kenya' }}</td>
-<td>{{ d.sector if d.sector is defined else }}</td>
-<td>{{ d.score if d.score is defined else (d.demand_score if d.demand_score is defined else 0) }}</td>
-<td>{{ d.price if d.price is defined else (d.avg_price_kes if d.avg_price_kes is defined else 0) }}</td>
-</tr>
-{% endfor %}
-</table>
-{% else %}
-<p>No demand signals yet.</p>
-{% endif %}
-</body>
-</html>
+{% extends "base.html" %}
+{% block title %}Demand Radar | EvidLens{% endblock %}
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <div class="flex flex-wrap justify-between items-start gap-4 mb-6">
+    <div>
+      <h1 class="text-3xl font-bold text-[#0A1F44]">📊 Demand Radar</h1>
+      <p class="text-gray-500 text-[14px] mt-1">Where demand is rising, by county + sector. 70+ = strong, 40-69 = moderate, under 40 = weak.</p>
+    </div>
+    <a href="/ai" class="bg-[#14B8A6] text-white px-4 py-2 rounded-xl font-bold text-[13px]">Ask Lens →</a>
+  </div>
+  <form method="get" action="/market/demand" class="bg-white p-4 rounded-xl shadow-sm border mb-6 flex gap-2 flex-wrap">
+    <input name="q" value="{{ q or '' }}" placeholder="Search product..." class="border rounded-xl px-3 py-2 text-sm flex-1 min-w-[160px]">
+    <input name="county" value="{{ county or '' }}" placeholder="County (e.g. Nyeri)" class="border rounded-xl px-3 py-2 text-sm">
+    <input name="sector" value="{{ sector or '' }}" placeholder="Sector (e.g. Agribusiness)" class="border rounded-xl px-3 py-2 text-sm">
+    <button class="bg-[#0A1F44] text-white px-4 py-2 rounded-xl font-bold text-sm">Filter</button>
+    {% if q or county or sector %}<a href="/market/demand" class="border px-4 py-2 rounded-xl font-bold text-sm">Clear</a>{% endif %}
+  </form>
+  <div class="grid grid-cols-3 gap-3 mb-6 text-center">
+    <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-[#0A1F44]">{{ (demand or [])|length }}</p><p class="text-xs text-gray-500">Signals</p></div>
+    <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-green-600">{{ (demand or [])|selectattr('score','defined')|list|length + (demand or [])|selectattr('demand_score','defined')|list|length }}</p><p class="text-xs text-gray-500">Scored</p></div>
+    <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-[#0A1F44]">{{ (demand or [])|map(attribute='county')|select('defined')|list|unique|list|length }}</p><p class="text-xs text-gray-500">Counties Covered</p></div>
+  </div>
+  {% if demand is defined and demand %}
+  <div class="bg-white rounded-2xl shadow-sm border overflow-hidden"><div class="overflow-x-auto"><table class="w-full text-[14px]">
+    <thead><tr class="text-left text-sm text-gray-500 border-b"><th class="p-3">Product</th><th class="p-3">County</th><th class="p-3">Sector</th><th class="p-3">Demand Score</th><th class="p-3">Price (KES)</th><th class="p-3"></th></tr></thead>
+    <tbody>
+      {% for d in demand %}
+      {% set score = (d.score if d.score is defined else (d.demand_score if d.demand_score is defined else 0))|int %}
+      {% set price = d.price if d.price is defined else (d.avg_price_kes if d.avg_price_kes is defined else 0) %}
+      {% set name = d.product if d.product is defined else 'Product' %}
+      <tr class="border-b hover:bg-gray-50">
+        <td class="p-3 font-semibold text-[#0A1F44]">{{ name }}</td>
+        <td class="p-3">{{ d.county if d.county is defined else 'Kenya' }}</td>
+        <td class="p-3">{{ d.sector if d.sector is defined else '—' }}</td>
+        <td class="p-3"><div class="flex items-center gap-2"><div class="w-20 h-2 bg-gray-100 rounded-full overflow-hidden"><div class="h-2 rounded-full" style="width:{{ score }}%;background:{% if score>=70 %}#16a34a{% elif score>=40 %}#eab308{% else %}#dc2626{% endif %}"></div></div><span class="font-bold {% if score>=70 %}text-green-600{% elif score>=40 %}text-yellow-600{% else %}text-red-600{% endif %}">{{ score }}/100</span></div></td>
+        <td class="p-3">KES {{ "{:,.0f}".format(price|float) }}</td>
+        <td class="p-3 text-right whitespace-nowrap"><a href="/ai?q={{ ('Is demand for ' + name + ' in ' + (d.county if d.county is defined else 'Kenya') + ' strong?')|urlencode }}" class="text-[#0d9488] font-bold text-[13px]">Ask Lens →</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div></div>
+  {% else %}
+  <div class="bg-white rounded-2xl border p-10 text-center">
+    <p class="text-4xl mb-2">📊</p><p class="font-bold text-[#0A1F44]">No demand signals yet</p>
+    <p class="text-[14px] text-gray-500 mt-1">Try a different search, or ask Lens for a demand check.</p>
+    <a href="/ai" class="inline-block mt-4 bg-[#0A1F44] text-white px-4 py-2 rounded-lg font-bold text-[13px]">Ask Lens →</a>
+  </div>
+  {% endif %}
+  <div class="flex flex-wrap gap-2 mt-6">
+    <a href="/market/prices" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Prices</a>
+    <a href="/location/counties" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">County Mapper</a>
+    <a href="/competitive" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Competitive</a>
+  </div>
+</div>
+{% endblock %}
