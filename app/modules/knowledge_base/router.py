@@ -75,8 +75,7 @@ async def policy_page(
 def list_sectors():
     return {"sectors": KENYA_SECTORS, "total": len(KENYA_SECTORS)}
 
-@router.get("/report/{sector}", response_model=ReportResponse)
-@require_module(module_number=3)
+@router.get("/report/{sector}", response_model=ReportResponse, dependencies=[Depends(require_module(module_number=3))])
 def get_report(request: Request, sector: str, county: Optional[str] = Query(None), db: Session = Depends(get_db)):
     if sector not in KENYA_SECTORS:
         raise HTTPException(status_code=404, detail="Sector not found. Use /kb/sectors to list all 75")
@@ -85,8 +84,7 @@ def get_report(request: Request, sector: str, county: Optional[str] = Query(None
         report = generate_report_with_groq(db, sector, county)
     return report
 
-@router.post("/search")
-@require_module(module_number=3)
+@router.post("/search", dependencies=[Depends(require_module(module_number=3))])
 def search_kb(request: Request, req: SearchRequest, db: Session = Depends(get_db)):
     results = search_knowledge(db, req.query, req.sector, req.county, req.top_k)
     return {
@@ -102,8 +100,7 @@ def search_kb(request: Request, req: SearchRequest, db: Session = Depends(get_db
         ]
     }
 
-@router.post("/ingest")
-@require_module(module_number=3)
+@router.post("/ingest", dependencies=[Depends(require_module(module_number=3))])
 def ingest_data(request: Request, background_tasks: BackgroundTasks, sector: str, db: Session = Depends(get_db)):
     if sector not in KENYA_SECTORS:
         raise HTTPException(status_code=404, detail="Sector not found")
