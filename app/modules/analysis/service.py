@@ -1,23 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import StreamingResponse
-from sqlmodel import Session, select, func, desc, or_
-from datetime import datetime, timedelta
-from collections import Counter
-import statistics
-from io import BytesIO
-import os
-from pydantic import BaseModel
-from typing import List, Optional, Any
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.lib.units import mm
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-from app.core.db import get_session, get_db
-from app.core.models import MarketMetric, NewsArticle, SocialMention, PriceData
+from app.modules.analysis.router import _run_analysis as run_detailed_analysis
+from app.modules.analysis.router import DetailedAnalysisRequest
 
 router = APIRouter()
 NAVY = colors.HexColor("#0A1F44")
