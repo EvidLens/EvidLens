@@ -1,69 +1,103 @@
 {% extends "base.html" %}
+{% block title %}Wallet | EvidLens{% endblock %}
 {% block content %}
-<div class="max-w-4xl mx-auto p-6">
+<div class="max-w-4xl mx-auto">
 
   <!-- Balance Card -->
   <div class="bg-gradient-to-r from-[#0A1F44] to-[#14B8A6] p-8 rounded-2xl text-white mb-6">
     <p class="text-sm opacity-80">Your Credits Balance</p>
-    <p class="text-5xl font-bold mt-2">{{ current_user.credits }}</p>
+    <p class="text-5xl font-bold mt-2">{{ current_user.credits if current_user and current_user.credits is not none else 0 }}</p>
     <p class="text-sm mt-1 opacity-80">1 Credit = 1 Analysis</p>
+    <p class="text-xs mt-2 opacity-70">{{ current_user.email if current_user else '' }}</p>
   </div>
 
   <!-- Buy Credits -->
   <div class="bg-white p-6 rounded-2xl shadow-sm mb-6">
     <h2 class="text-xl font-bold text-[#0A1F44] mb-4">Buy More Credits</h2>
-    <form id="buyForm" class="flex flex-col md:flex-row gap-3">
-      <select name="package" class="flex-1 border p-3 rounded-lg">
+    <form id="buyForm" method="post" action="/wallet/buy" class="flex flex-col md:flex-row gap-3">
+      <select name="package" class="flex-1 border p-3 rounded-lg" required>
         <option value="5">5 Credits - KSh 500</option>
-        <option value="20">20 Credits - KSh 1,800 <span class="text-green-600">Save 10%</span></option>
-        <option value="50">50 Credits - KSh 4,000 <span class="text-green-600">Save 20%</span></option>
+        <option value="20">20 Credits - KSh 1,800 (Save 10%)</option>
+        <option value="50">50 Credits - KSh 4,000 (Save 20%)</option>
       </select>
-      <input name="phone" value="{{ current_user.phone }}" placeholder="07XXXXXXXX" class="flex-1 border p-3 rounded-lg">
-      <button class="bg-[#14B8A6] text-white px-6 py-3 rounded-lg font-bold hover:opacity-90">Pay with M-Pesa</button>
+      <input name="phone" type="tel" value="{{ current_user.phone if current_user and current_user.phone else '' }}" placeholder="07XXXXXXXX" pattern="^(07|01|2547|2541)[0-9]{8}$" required class="flex-1 border p-3 rounded-lg">
+      <button id="buyBtn" type="submit" class="bg-[#14B8A6] text-white px-6 py-3 rounded-lg font-bold hover:opacity-90 disabled:opacity-60">Pay with M-Pesa</button>
     </form>
-    <p id="mpesaMsg" class="text-sm mt-3"></p>
+    <p id="mpesaMsg" class="text-sm mt-3 hidden"></p>
+    <p class="text-xs text-gray-400 mt-2">You will receive an M-Pesa prompt on your phone. Enter your M-Pesa PIN to complete. Credits are added only after Safaricom confirms payment.</p>
   </div>
 
   <!-- Transaction History -->
   <div class="bg-white p-6 rounded-2xl shadow-sm">
     <h2 class="text-xl font-bold text-[#0A1F44] mb-4">Transaction History</h2>
+    <div class="overflow-x-auto">
     <table class="w-full text-sm">
       <thead class="text-left text-gray-500 border-b">
-        <tr><th class="pb-2">Date</th><th class="pb-2">Type</th><th class="pb-2">Credits</th><th class="pb-2">Status</th></tr>
+        <tr><th class="pb-2">Date</th><th class="pb-2">Type</th><th class="pb-2">Credits</th><th class="pb-2">Amount</th><th class="pb-2">Status</th></tr>
       </thead>
       <tbody>
-        {% for t in transactions %}
+        {% for t in transactions | default([], true) %}
+        {% set created = t.created_at if t.created_at is defined else None %}
+        {% set credits = (t.credits if t.credits is defined else (t.amount_credits if t.amount_credits is defined else 0)) | default(0, true) %}
+        {% set status = (t.status if t.status is defined else '') | default('', true) | lower %}
         <tr class="border-b">
-          <td class="py-3">{{ t.created_at.strftime('%b %d, %Y') }}</td>
-          <td class="py-3">{{ t.type }}</td>
-          <td class="py-3 font-bold {% if t.credits > 0 %}text-green-600{% else %}text-red-600{% endif %}">
-            {% if t.credits > 0 %}+{% endif %}{{ t.credits }}
+          <td class="py-3">{% if created %}{% if created is string %}{{ created[:10] }}{% else %}{{ created.strftime('%b %d, %Y') }}{% endif %}{% else %}-{% endif %}</td>
+          <td class="py-3">{{ (t.type if t.type is defined else 'Purchase') | default('Purchase', true) | title }}</td>
+          <td class="py-3 font-bold {% if credits > 0 %}text-green-600{% elif credits < 0 %}text-red-600{% else %}text-gray-600{% endif %}">
+            {% if credits > 0 %}+{% endif %}{{ credits }}
           </td>
+          <td class="py-3">{% if t.amount is defined and t.amount is not none %}KSh {{ t.amount }}{% else %}-{% endif %}</td>
           <td class="py-3">
-            {% if t.status == 'Completed' %}
+            {% if status == 'completed' or status == 'success' %}
               <span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">Completed</span>
+            {% elif status == 'failed' or status == 'cancelled' %}
+              <span class="bg-red-100 text-red-700 px-2 py-1 rounded text-xs">{{ status | title }}</span>
             {% else %}
               <span class="bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-xs">Pending</span>
             {% endif %}
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="4" class="py-6 text-center text-gray-500">No transactions yet</td></tr>
+        <tr><td colspan="5" class="py-6 text-center text-gray-500">No transactions yet. <a href="/pricing" class="text-[#0d9488] font-bold">See plans →</a></td></tr>
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
 </div>
-
+{% endblock %}
+{% block scripts %}
 <script>
-document.getElementById('buyForm').onsubmit=async e=>{
-  e.preventDefault();
-  const msg = document.getElementById('mpesaMsg');
-  msg.innerText = "Sending M-Pesa prompt...";
-  const res = await fetch('/wallet/buy', {method:'POST', body: new FormData(e.target)});
-  const data = await res.json();
-  msg.innerText = data.message;
-  msg.className = 'text-sm mt-3 text-green-600';
-}
+(function(){
+  var form = document.getElementById('buyForm');
+  if(!form) return;
+  var msg = document.getElementById('mpesaMsg');
+  var btn = document.getElementById('buyBtn');
+  function show(text, ok){
+    msg.classList.remove('hidden');
+    msg.textContent = text;
+    msg.className = 'text-sm mt-3 ' + (ok ? 'text-green-600' : 'text-red-600');
+  }
+  form.addEventListener('submit', async function(e){
+    e.preventDefault();
+    btn.disabled = true;
+    btn.textContent = 'Sending prompt...';
+    show('Sending M-Pesa prompt... Check your phone.', true);
+    try{
+      var res = await fetch('/wallet/buy', {method:'POST', body: new FormData(form)});
+      var data = {};
+      try{ data = await res.json(); }catch(_){ data = {}; }
+      if(!res.ok) throw new Error(data.detail || data.message || ('Payment failed (' + res.status + ')'));
+      show(data.message || 'Prompt sent. Enter your M-Pesa PIN to complete.', true);
+      // Poll once after 20s - credits only appear after callback confirms
+      setTimeout(function(){ window.location.reload(); }, 20000);
+    }catch(err){
+      show(err.message || 'Payment failed. Try again.', false);
+    }finally{
+      btn.disabled = false;
+      btn.textContent = 'Pay with M-Pesa';
+    }
+  });
+})();
 </script>
 {% endblock %}
