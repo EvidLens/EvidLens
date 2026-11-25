@@ -1,43 +1,55 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>Export Navigator - EvidLens</title>
-<style>
-body { font-family: Arial, sans-serif; margin: 20px; background: #f8fafc; color: #0f172a; }
-a { color: #1d4ed8; }
-table { width: 100%; border-collapse: collapse; background: white; }
-th, td { padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: left; }
-th { background: #0a1f44; color: white; }
-.card { background: white; padding: 16px; border-radius: 8px; margin-bottom: 16px; }
-</style>
-</head>
-<body>
-<a href="/">← Dashboard</a>
-<h1>Export Navigator</h1>
-<div class="card">
-<p>Export opportunities from Kenya to world markets.</p>
-<p>Total: {{ exports|length if exports is defined else 0 }} opportunities</p>
+{% extends "base.html" %}
+{% block title %}Export Navigator | EvidLens{% endblock %}
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <div class="flex flex-wrap justify-between items-start gap-4 mb-6">
+    <div>
+      <h1 class="text-3xl font-bold text-[#0A1F44]">🌍 Export Navigator</h1>
+      <p class="text-gray-500 text-[14px] mt-1">Export opportunities from Kenya to world markets. 70+ = strong, 40-69 = moderate, under 40 = weak.</p>
+    </div>
+    <a href="/ai" class="bg-[#14B8A6] text-white px-4 py-2 rounded-xl font-bold text-[13px]">Ask Lens →</a>
+  </div>
+  <form method="get" action="/market/export" class="bg-white p-4 rounded-xl shadow-sm border mb-6 flex gap-2 flex-wrap">
+    <input name="q" value="{{ q or '' }}" placeholder="Search product..." class="border rounded-xl px-3 py-2 text-sm flex-1 min-w-[160px]">
+    <input name="country" value="{{ country or '' }}" placeholder="Destination country" class="border rounded-xl px-3 py-2 text-sm">
+    <input name="county" value="{{ county or '' }}" placeholder="Kenya county (e.g. Nyeri)" class="border rounded-xl px-3 py-2 text-sm">
+    <button class="bg-[#0A1F44] text-white px-4 py-2 rounded-xl font-bold text-sm">Filter</button>
+    {% if q or country or county %}<a href="/market/export" class="border px-4 py-2 rounded-xl font-bold text-sm">Clear</a>{% endif %}
+  </form>
+  <div class="grid grid-cols-3 gap-3 mb-6 text-center">
+    <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-[#0A1F44]">{{ (exports or [])|length }}</p><p class="text-xs text-gray-500">Opportunities</p></div>
+    <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-green-600">{{ (exports or [])|selectattr('opportunity_score','defined')|list|length }}</p><p class="text-xs text-gray-500">Scored</p></div>
+    <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-[#0A1F44]">{{ (exports or [])|map(attribute='country')|select('defined')|list|unique|list|length }}</p><p class="text-xs text-gray-500">Destinations</p></div>
+  </div>
+  {% if exports is defined and exports %}
+  <div class="bg-white rounded-2xl shadow-sm border overflow-hidden"><div class="overflow-x-auto"><table class="w-full text-[14px]">
+    <thead><tr class="text-left text-sm text-gray-500 border-b"><th class="p-3">Product</th><th class="p-3">Destination</th><th class="p-3">Score</th><th class="p-3">County</th><th class="p-3"></th></tr></thead>
+    <tbody>
+      {% for e in exports %}
+      {% set score = (e.opportunity_score if e.opportunity_score is defined else (e.score if e.score is defined else 0))|int %}
+      {% set prod = e.product if e.product is defined else 'Product' %}
+      {% set dest = e.country if e.country is defined else (e.destination if e.destination is defined else '—') %}
+      <tr class="border-b hover:bg-gray-50">
+        <td class="p-3 font-semibold text-[#0A1F44]">{{ prod }}</td>
+        <td class="p-3">{{ dest }}</td>
+        <td class="p-3"><div class="flex items-center gap-2"><div class="w-20 h-2 bg-gray-100 rounded-full overflow-hidden"><div class="h-2 rounded-full" style="width:{{ score }}%;background:{% if score>=70 %}#16a34a{% elif score>=40 %}#eab308{% else %}#dc2626{% endif %}"></div></div><span class="font-bold {% if score>=70 %}text-green-600{% elif score>=40 %}text-yellow-600{% else %}text-red-600{% endif %}">{{ score }}/100</span></div></td>
+        <td class="p-3">{{ e.county if e.county is defined else 'Kenya' }}</td>
+        <td class="p-3 text-right whitespace-nowrap"><a href="/ai?q={{ ('Should I export ' + prod + ' from Kenya to ' + dest + '? Requirements, costs, buyers?')|urlencode }}" class="text-[#0d9488] font-bold text-[13px]">Ask Lens →</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div></div>
+  {% else %}
+  <div class="bg-white rounded-2xl border p-10 text-center">
+    <p class="text-4xl mb-2">🌍</p><p class="font-bold text-[#0A1F44]">No export opportunities yet</p>
+    <p class="text-[14px] text-gray-500 mt-1">Try a different search, or ask Lens for an export check for your product.</p>
+    <a href="/ai" class="inline-block mt-4 bg-[#0A1F44] text-white px-4 py-2 rounded-lg font-bold text-[13px]">Ask Lens →</a>
+  </div>
+  {% endif %}
+  <div class="flex flex-wrap gap-2 mt-6">
+    <a href="/market/demand" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Demand Radar</a>
+    <a href="/market/prices" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Prices</a>
+    <a href="/policy" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Policy Watch</a>
+  </div>
 </div>
-{% if exports is defined and exports %}
-<table>
-<tr>
-<th>Product</th>
-<th>Destination</th>
-<th>Score</th>
-<th>County</th>
-</tr>
-{% for e in exports %}
-<tr>
-<td>{{ e.product if e.product is defined else 'Product' }}</td>
-<td>{{ e.country if e.country is defined else 'Kenya' }}</td>
-<td>{{ e.opportunity_score if e.opportunity_score is defined else 0 }}</td>
-<td>{{ e.county if e.county is defined else '' }}</td>
-</tr>
-{% endfor %}
-</table>
-{% else %}
-<p>No export opportunities yet. Seed data: POST /api/run-scraper, then refresh.</p>
-{% endif %}
-</body>
-</html>
+{% endblock %}
