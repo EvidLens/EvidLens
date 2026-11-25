@@ -5,8 +5,7 @@ from sqlmodel import Session, select, func
 from typing import Optional
 import traceback
 
-from app.core.db import engine
-from app.modules.database import get_session
+from app.core.db import get_session
 from app.core.models import Competitor, Company, KenyaLensBusiness
 from app.modules.competitive_engine.service import CompetitiveEngineService
 
