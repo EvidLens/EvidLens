@@ -334,6 +334,53 @@ def fix_reports_tenant():
     except Exception as e:
         print(f"REPORTS tenant error: {e}")
 
+def fix_usersubscription_table():
+    cols = []
+    cols.append("ADD COLUMN IF NOT EXISTS plan_name VARCHAR DEFAULT 'FREE'")
+    cols.append("ADD COLUMN IF NOT EXISTS plan_code VARCHAR DEFAULT 'FREE'")
+    cols.append("ADD COLUMN IF NOT EXISTS tenant_id VARCHAR")
+    cols.append("ADD COLUMN IF NOT EXISTS module_name VARCHAR")
+    cols.append("ADD COLUMN IF NOT EXISTS payment_reference VARCHAR")
+    cols.append("ADD COLUMN IF NOT EXISTS lead_credits INTEGER DEFAULT 0")
+    cols.append("ADD COLUMN IF NOT EXISTS api_credits INTEGER DEFAULT 0")
+    cols.append("ADD COLUMN IF NOT EXISTS starts_at TIMESTAMP")
+    cols.append("ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP")
+    cols.append("ADD COLUMN IF NOT EXISTS renews_at TIMESTAMP")
+    cols.append("ADD COLUMN IF NOT EXISTS default_county VARCHAR")
+    cols.append("ADD COLUMN IF NOT EXISTS default_sub_county VARCHAR")
+    cols.append("ADD COLUMN IF NOT EXISTS default_ward VARCHAR")
+    try:
+        with engine.connect() as conn:
+            for col in cols:
+                try:
+                    conn.execute(
+                        text(
+                            f"ALTER TABLE usersubscription {col}"
+                        )
+                    )
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+            try:
+                conn.execute(
+                    text(
+                        "UPDATE usersubscription SET plan_name = COALESCE(NULLIF(plan_name, ''), plan_code, 'FREE') "
+                        "WHERE plan_name IS NULL OR plan_name = ''"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "UPDATE usersubscription SET plan_code = COALESCE(NULLIF(plan_code, ''), plan_name, 'FREE') "
+                        "WHERE plan_code IS NULL OR plan_code = ''"
+                    )
+                )
+                conn.commit()
+            except Exception:
+                conn.rollback()
+        print("✓ USERSUBSCRIPTION MIGRATED")
+    except Exception as e:
+        print(f"USERSUBSCRIPTION error: {e}")
+
 def force_create_tables():
     tables = []
     tables.append(
@@ -525,6 +572,10 @@ def on_startup():
         fix_reports_tenant()
     except Exception as e:
         print(f"Reports tenant migrate error: {e}")
+    try:
+        fix_usersubscription_table()
+    except Exception as e:
+        print(f"Usersubscription migrate error: {e}")
     try:
         from app.modules.cron.jobs import scrape_kpin_prices
         from app.modules.cron.jobs import fetch_real_news
