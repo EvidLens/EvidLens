@@ -1,61 +1,73 @@
 {% extends "base.html" %}
 {% block title %}Funding Radar | EvidLens{% endblock %}
 {% block content %}
-<div class="min-h-screen bg-[#f8fafc]">
-<div class="max-w-7xl mx-auto p-6">
+<div class="max-w-7xl mx-auto">
   <div class="flex justify-between items-start mb-6 flex-wrap gap-3">
     <div>
       <h1 class="text-3xl font-black text-[#0A1F44]">💸 Funding Radar</h1>
-      <p class="text-gray-500 text-sm mt-1">Banks, SACCOs, Grants, Investors • All Sectors • {{ (funders or [])|length }} Live Opportunities</p>
-      <div class="flex gap-2 mt-3">
-        <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">KES 50K - 50M Ticket</span>
-        <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">Verified Lenders</span>
+      <p class="text-gray-500 text-sm mt-1">Banks, SACCOs, Grants, Investors • {{ (funders or [])|length }} Opportunities</p>
+      <div class="flex gap-2 mt-3 flex-wrap">
+        {% if ticket_min is defined and ticket_max is defined %}<span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">KES {{ "{:,.0f}".format(ticket_min|float) }} - {{ "{:,.0f}".format(ticket_max|float) }} Ticket</span>{% endif %}
+        <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">Check lender terms before applying</span>
       </div>
     </div>
+    {% if avg_rate is defined or approval_time is defined %}
     <div class="bg-white border rounded-xl p-3 flex gap-3 text-center">
-      <div><p class="text-[10px] font-bold text-gray-400">AVG RATE</p><p class="font-black">12.5%</p></div>
-      <div class="w-px bg-gray-200"></div>
-      <div><p class="text-[10px] font-bold text-gray-400">APPROVAL</p><p class="font-black text-green-600">72h</p></div>
+      {% if avg_rate is defined %}<div><p class="text-[10px] font-bold text-gray-400">AVG RATE</p><p class="font-black">{{ avg_rate }}%</p></div>{% endif %}
+      {% if approval_time is defined %}<div class="w-px bg-gray-200"></div><div><p class="text-[10px] font-bold text-gray-400">APPROVAL</p><p class="font-black text-green-600">{{ approval_time }}</p></div>{% endif %}
     </div>
+    {% endif %}
   </div>
-  <div class="bg-white p-4 rounded-xl shadow-sm mb-6 flex gap-3 flex-wrap">
-    <select id="filterSector" class="border rounded-full px-4 py-2 text-sm font-bold"><option value="">All Sectors</option><option>Agriculture</option><option>Retail</option><option>Tech</option><option>Manufacturing</option></select>
-    <select id="filterCounty" class="border rounded-full px-4 py-2 text-sm font-bold"><option value="">All Counties</option>{% for c in (counties or []) %}<option value="{{c}}">{{c}}</option>{% endfor %}</select>
-    <select id="filterType" class="border rounded-full px-4 py-2 text-sm font-bold"><option value="">All Types</option><option>Bank</option><option>SACCO</option><option>Grant</option><option>Investor</option></select>
-    <span class="ml-auto text-xs text-gray-400 py-2">Showing {{ (funders or [])|length }} funders</span>
-  </div>
+  <form method="get" action="/reports/funding" class="bg-white p-4 rounded-xl shadow-sm border mb-6 flex gap-3 flex-wrap items-center">
+    <select name="sector" class="border rounded-full px-4 py-2 text-sm font-bold"><option value="">All Sectors</option>{% for s in ['Agriculture','Retail','Tech','Manufacturing','Services','Health','Education'] %}<option value="{{ s }}" {% if sector==s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select>
+    <select name="county" class="border rounded-full px-4 py-2 text-sm font-bold"><option value="">All Counties</option>{% for c in (counties or []) %}<option value="{{ c }}" {% if county==c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
+    <select name="type" class="border rounded-full px-4 py-2 text-sm font-bold"><option value="">All Types</option>{% for t in ['Bank','SACCO','Grant','Investor','MFI'] %}<option value="{{ t }}" {% if type==t %}selected{% endif %}>{{ t }}</option>{% endfor %}</select>
+    <button class="bg-[#0A1F44] text-white px-4 py-2 rounded-full font-bold text-sm">Filter</button>
+    {% if sector or county or type %}<a href="/reports/funding" class="border px-4 py-2 rounded-full font-bold text-sm">Clear</a>{% endif %}
+    <span class="ml-auto text-xs text-gray-400 py-2" id="showingCount">Showing {{ (funders or [])|length }} funders</span>
+  </form>
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5" id="fundersGrid">
     {% for f in (funders or []) %}
     <div class="funder-card bg-white p-6 rounded-2xl shadow-sm border hover:shadow-xl transition" data-sector="{{ f.sector or '' }}" data-county="{{ f.county or '' }}" data-type="{{ f.type or '' }}">
-      <div class="flex justify-between items-start mb-4">
-        <div><h2 class="text-[16px] font-black text-[#0A1F44]">{{ f.name or 'Funder' }}</h2><span class="bg-teal-50 text-teal-700 border text-[11px] font-bold px-2.5 py-1 rounded-full mt-1 inline-block">{{ f.type or 'Bank' }}</span></div>
-        <div class="text-right"><div class="text-yellow-500 text-sm">{{ '★' * ((f.rating or 4)|int) }}</div><p class="text-[10px] text-gray-400 font-bold uppercase mt-1">Trust {{ f.rating or 4 }}/5</p></div>
+      <div class="flex justify-between items-start mb-4 gap-2">
+        <div class="min-w-0"><h2 class="text-[16px] font-black text-[#0A1F44] leading-tight">{{ f.name or 'Funder' }}</h2><span class="bg-teal-50 text-teal-700 border text-[11px] font-bold px-2.5 py-1 rounded-full mt-1 inline-block">{{ f.type or '—' }}</span></div>
+        {% if f.rating is defined %}<div class="text-right shrink-0"><div class="text-yellow-500 text-sm">{{ '★' * ((f.rating|int) if (f.rating|int) <= 5 else 5) }}{{ '☆' * (5 - ((f.rating|int) if (f.rating|int) <= 5 else 5)) }}</div><p class="text-[10px] text-gray-400 font-bold uppercase mt-1">Rating {{ f.rating }}/5</p></div>{% endif %}
       </div>
       <div class="space-y-2 text-[13px] mb-4">
-        <div class="flex justify-between"><span class="text-gray-500">Sector</span><span class="font-bold">{{ f.sector or 'Agriculture' }}</span></div>
-        <div class="flex justify-between"><span class="text-gray-500">County</span><span class="font-bold">{{ f.county or 'Nairobi' }}</span></div>
-        <div class="flex justify-between"><span class="text-gray-500">Ticket</span><span class="font-black text-[#0A1F44]">KES {{ (f.min_amount or 50000)|int }} - {{ (f.max_amount or 5000000)|int }}</span></div>
-        <div class="flex justify-between"><span class="text-gray-500">Interest</span><span class="font-bold text-green-700">{{ f.interest_rate or 12.5 }}% p.a</span></div>
+        <div class="flex justify-between gap-2"><span class="text-gray-500">Sector</span><span class="font-bold text-right">{{ f.sector or 'All Sectors' }}</span></div>
+        <div class="flex justify-between gap-2"><span class="text-gray-500">County</span><span class="font-bold text-right">{{ f.county or 'All Counties' }}</span></div>
+        {% if f.min_amount is defined or f.max_amount is defined %}<div class="flex justify-between gap-2"><span class="text-gray-500">Ticket</span><span class="font-black text-[#0A1F44] text-right">{% if f.min_amount is defined %}KES {{ "{:,.0f}".format(f.min_amount|float) }}{% endif %}{% if f.max_amount is defined %} - {{ "{:,.0f}".format(f.max_amount|float) }}{% endif %}</span></div>{% endif %}
+        {% if f.interest_rate is defined %}<div class="flex justify-between gap-2"><span class="text-gray-500">Interest</span><span class="font-bold text-green-700">{{ f.interest_rate }}% p.a</span></div>{% endif %}
       </div>
-      <div class="bg-[#f8fafc] p-3 rounded-xl mb-4 border"><p class="text-[11px] text-gray-600"><b>Requirements:</b> {{ f.requirements or 'ID, Business registration, 6 months statements' }}</p></div>
-      <div class="flex gap-2"><a href="{{ f.apply_link or '#' }}" target="_blank" class="flex-1 text-center bg-[#0A1F44] text-white py-2.5 rounded-xl font-bold text-sm">Apply Now →</a></div>
+      {% if f.requirements %}<div class="bg-[#f8fafc] p-3 rounded-xl mb-4 border"><p class="text-[11px] text-gray-600"><b>Requirements:</b> {{ f.requirements }}</p></div>{% endif %}
+      <div class="flex gap-2">
+        {% if f.apply_link %}<a href="{{ f.apply_link }}" target="_blank" rel="noopener" class="flex-1 text-center bg-[#0A1F44] text-white py-2.5 rounded-xl font-bold text-sm">Apply Now →</a>{% else %}<span class="flex-1 text-center bg-gray-100 text-gray-500 py-2.5 rounded-xl font-bold text-sm">No apply link</span>{% endif %}
+        <a href="/ai?q={{ ('Is ' + (f.name or 'this funder') + ' a good fit for my business? What do I need to apply?')|urlencode }}" class="border px-3 py-2.5 rounded-xl font-bold text-sm">Ask Lens</a>
+      </div>
     </div>
     {% else %}
-    <div class="col-span-3 bg-white p-16 rounded-2xl text-center border"><p class="text-4xl mb-3">🏦</p><p class="font-bold">No funders found</p><p class="text-sm text-gray-500 mt-1">Try All Counties + All Sectors</p></div>
+    <div class="col-span-3 bg-white p-16 rounded-2xl text-center border"><p class="text-4xl mb-3">🏦</p><p class="font-bold text-[#0A1F44]">No funders found</p><p class="text-sm text-gray-500 mt-1">Try All Counties + All Sectors, or ask Lens for funding options.</p><a href="/ai" class="inline-block mt-4 bg-[#0A1F44] text-white px-4 py-2 rounded-lg font-bold text-[13px]">Ask Lens →</a></div>
     {% endfor %}
   </div>
+  <p class="text-[11px] text-gray-400 mt-6 text-center">EvidLens does not lend money or guarantee approval. Always verify terms, fees, and eligibility directly with the lender before sharing documents or paying fees.</p>
 </div>
-</div>
+{% endblock %}
+{% block scripts %}
 <script>
-document.getElementById('filterSector').addEventListener('change', filterFunders);
-document.getElementById('filterCounty').addEventListener('change', filterFunders);
-document.getElementById('filterType').addEventListener('change', filterFunders);
-function filterFunders(){
-  const s = document.getElementById('filterSector').value, c = document.getElementById('filterCounty').value, t = document.getElementById('filterType').value;
-  document.querySelectorAll('.funder-card').forEach(card=>{
-    const show = (!s || card.dataset.sector===s) && (!c || card.dataset.county===c) && (!t || card.dataset.type===t);
-    card.style.display = show ? '' : 'none';
-  });
-}
+(function(){
+  var selects=document.querySelectorAll('select[name]');
+  var cards=document.querySelectorAll('.funder-card');
+  var count=document.getElementById('showingCount');
+  function filter(){
+    var s=document.querySelector('select[name="sector"]').value, c=document.querySelector('select[name="county"]').value, t=document.querySelector('select[name="type"]').value;
+    var shown=0;
+    cards.forEach(function(card){
+      var show=(!s||card.dataset.sector===s)&&(!c||card.dataset.county===c)&&(!t||card.dataset.type===t);
+      card.style.display=show?'':'none'; if(show) shown++;
+    });
+    if(count) count.textContent='Showing '+shown+' funders';
+  }
+  selects.forEach(function(sel){ sel.addEventListener('change', filter); });
+})();
 </script>
 {% endblock %}
