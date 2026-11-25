@@ -1,56 +1,76 @@
 from sqlmodel import SQLModel, Session, create_engine
 from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
-from typing import Generator
-from.config import settings
-import redis
+from typing import Generator, Optional
+from app.core.config import settings
 import logging
 
 logger = logging.getLogger(__name__)
 
-if not settings.DATABASE_URL or not settings.DATABASE_URL.strip():
-    raise ValueError("DATABASE_URL not set")
+def build_database_url(raw: str) -> str:
+    url = (raw or "").strip()
+    if not url:
+        raise ValueError("DATABASE_URL not set")
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
+    if url.startswith("sqlite"):
+        return url
+    if "sslmode" not in url:
+        url += "?sslmode=require" if "?" not in url else "&sslmode=require"
+    return url
 
-DATABASE_URL = settings.DATABASE_URL.strip()
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+DATABASE_URL = build_database_url(settings.DATABASE_URL or settings.DEV_DATABASE_URL)
+IS_SQLITE = DATABASE_URL.startswith("sqlite")
 
-if "sslmode" not in DATABASE_URL:
-    DATABASE_URL += ("?sslmode=require" if "?" not in DATABASE_URL else "&sslmode=require")
-
-engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,
-    pool_recycle=280,
-    pool_size=5,
-    max_overflow=5,
-    echo=False,
-    connect_args={
-        "keepalives": 1,
-        "keepalives_idle": 30,
-        "keepalives_interval": 10,
-        "keepalives_count": 5,
-        "connect_timeout": 10,
-        "sslmode": "require",
-    },
-)
+if IS_SQLITE:
+    engine = create_engine(
+        DATABASE_URL,
+        echo=False,
+        connect_args={"check_same_thread": False},
+    )
+else:
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+        pool_recycle=280,
+        pool_size=5,
+        max_overflow=5,
+        echo=False,
+        connect_args={
+            "keepalives": 1,
+            "keepalives_idle": 30,
+            "keepalives_interval": 10,
+            "keepalives_count": 5,
+            "connect_timeout": 10,
+            "sslmode": "require",
+        },
+    )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=Session)
 
-redis_client = None
-if getattr(settings, "REDIS_URL", None):
+def get_redis_client():
     try:
-        redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True, socket_connect_timeout=2)
-        redis_client.ping()
-        logger.info("Redis connected")
+        import redis
+    except Exception:
+        return None
+    url = settings.effective_redis_url
+    if not url:
+        return None
+    try:
+        client = redis.from_url(url, decode_responses=True, socket_connect_timeout=2, socket_timeout=2)
+        client.ping()
+        return client
     except Exception as e:
-        logger.warning(f"Redis failed: {e}")
-        redis_client = None
+        logger.warning("Redis unavailable, continuing without cache: %s", e)
+        return None
+
+redis_client = get_redis_client()
 
 def get_session() -> Generator[Session, None, None]:
     with Session(engine) as session:
         try:
             yield session
+            session.commit()
         except Exception:
             session.rollback()
             raise
@@ -58,87 +78,42 @@ def get_session() -> Generator[Session, None, None]:
             session.close()
 
 def get_db() -> Generator[Session, None, None]:
-    db = SessionLocal()
-    try:
-        yield db
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()
+    yield from get_session()
 
 def _import_all_models():
-    try:
-        from app.core import models as core_models
-    except Exception as e:
-        print(f"core.models import error: {e}")
-    try:
-        from app.modules.auth import models as auth_models
-    except Exception as e:
-        print(f"auth.models import error: {e}")
-    try:
-        from app.modules.payments import models as payments_models
-    except Exception as e:
-        print(f"payments.models skip: {e}")
-    try:
-        from app.modules.report_builder import models as rb_models
-    except Exception as e:
-        print(f"report_builder skip: {e}")
-    try:
-        from app.modules.pricing_engine import models as pe_models
-    except Exception as e:
-        print(f"pricing_engine skip: {e}")
-    try:
-        from app.modules.regulatory_engine import models as re_models
-    except Exception as e:
-        print(f"regulatory_engine skip: {e}")
-    try:
-        from app.modules.consumer_voice import models as cv_models
-    except Exception as e:
-        print(f"consumer_voice skip: {e}")
-    try:
-        from app.modules.location_intel import models as li_models
-    except Exception as e:
-        print(f"location_intel skip: {e}")
-    try:
-        from app.modules.business_os import models as bos_models
-    except Exception as e:
-        print(f"business_os skip: {e}")
-    try:
-        from app.modules.knowledge_base import models as kb_models
-    except Exception as e:
-        print(f"knowledge_base skip: {e}")
-    try:
-        from app.modules.competitive_engine import models as ce_models
-    except Exception as e:
-        print(f"competitive_engine skip: {e}")
-
-_import_all_models()
+    modules = [
+        "app.core.models",
+        "app.modules.auth.models",
+        "app.modules.wallet.models",
+        "app.modules.payments.models",
+        "app.modules.report_builder.models",
+        "app.modules.pricing_engine.models",
+        "app.modules.regulatory_engine.models",
+        "app.modules.consumer_voice.models",
+        "app.modules.location_intel.models",
+        "app.modules.business_os.models",
+        "app.modules.knowledge_base.models",
+        "app.modules.competitive_engine.models",
+    ]
+    for path in modules:
+        try:
+            __import__(path)
+        except ModuleNotFoundError:
+            logger.warning("Model module not found, skipping: %s", path)
+        except Exception as e:
+            logger.exception("Model import failed: %s - %s", path, e)
+            raise
 
 def init_db():
     _import_all_models()
-    try:
-        from app.modules.auth.models import AuthUser
-    except Exception as e:
-        print(f"auth_user direct import error: {e}")
-        logger.error(f"auth_user direct import error: {e}")
-        raise
     tables = list(SQLModel.metadata.tables.keys())
-    print(f"TABLES TO CREATE: {tables}")
-    logger.info(f"TABLES TO CREATE: {tables}")
+    logger.info("Tables to create: %s", tables)
     if "auth_user" not in SQLModel.metadata.tables:
-        print("CRITICAL: auth_user NOT in metadata - aborting create_all, import failed")
-        logger.error("CRITICAL: auth_user NOT in metadata - aborting create_all, import failed")
         raise RuntimeError("auth_user table not registered in SQLModel metadata")
-    try:
-        SQLModel.metadata.create_all(bind=engine, checkfirst=True)
-        print("DB CORE TABLES CREATED - SUCCESS")
-        logger.info("DB CORE TABLES CREATED - SUCCESS")
-    except Exception as e:
-        print(f"Core create error: {e}")
-        logger.error(f"Core create error: {e}")
-        raise
-    # Fix audit_logs missing columns + wrong FK to old "user" table
+    SQLModel.metadata.create_all(bind=engine, checkfirst=True)
+    logger.info("DB tables created")
+    if IS_SQLITE:
+        return
     try:
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS report_id INTEGER"))
@@ -147,7 +122,6 @@ def init_db():
             conn.execute(text("ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()"))
             conn.execute(text("ALTER TABLE audit_logs DROP CONSTRAINT IF EXISTS audit_logs_user_id_fkey"))
             conn.execute(text("ALTER TABLE audit_logs ALTER COLUMN user_id DROP NOT NULL"))
-        print("✓ AUDIT_LOGS FIXED - report_id added, bad FK dropped")
+        logger.info("audit_logs columns fixed")
     except Exception as e:
-        print(f"audit_logs fix skipped: {e}")
-    print("DB init_db DONE - All tables exist")
+        logger.warning("audit_logs fix skipped: %s", e)
