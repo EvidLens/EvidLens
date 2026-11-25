@@ -43,13 +43,25 @@ from app.core.models import MarketMetric, PriceData, NewsArticle, SocialMention,
 
 router = APIRouter(prefix="/analysis", tags=["Analysis - Trending & Search"])
 api_router = APIRouter(prefix="/api", tags=["Analysis - API"])
-NAVY = colors.HexColor("#0A1F44")
-TEAL = colors.HexColor("#14B8A6")
-LIGHT_TEAL = colors.HexColor("#E0F2F1")
-GOLD = colors.HexColor("#C5A880")
-GREEN = colors.HexColor("#16A34A")
-YELLOW = colors.HexColor("#F59E0B")
-RED = colors.HexColor("#DC2626")
+
+# FIXED vs yours: yours called colors.HexColor even when colors=None -> crash at import
+# This dummy lets the file import even without reportlab, PDF endpoint then returns 503
+class _DummyColor:
+    def __init__(self, *a, **k):
+        pass
+
+def _hex_color(code: str):
+    if HAS_REPORTLAB and colors is not None:
+        return colors.HexColor(code)
+    return _DummyColor()
+
+NAVY = _hex_color("#0A1F44")
+TEAL = _hex_color("#14B8A6")
+LIGHT_TEAL = _hex_color("#E0F2F1")
+GOLD = _hex_color("#C5A880")
+GREEN = _hex_color("#16A34A")
+YELLOW = _hex_color("#F59E0B")
+RED = _hex_color("#DC2626")
 PRICING = {"Starter": {"monthly": 500, "annual": 5000}, "Pro": {"monthly": 1500, "annual": 15000}, "Enterprise": {"monthly": 5000, "annual": 50000}}
 
 class DetailedAnalysisRequest(BaseModel):
@@ -97,6 +109,9 @@ class DetailedAnalysisRequest(BaseModel):
         return self.business_model or "Retail"
 
 def create_chart(fig_func):
+    # FIXED vs yours: yours called plt.savefig even if plt=None
+    if not HAS_MATPLOTLIB or not HAS_REPORTLAB:
+        return Spacer(1, 10)
     buf = BytesIO()
     fig_func()
     plt.savefig(buf, format="png", dpi=200, bbox_inches="tight", transparent=True)
@@ -234,6 +249,9 @@ def detailed_analysis(req: DetailedAnalysisRequest, session: Session = Depends(g
 
 @router.post("/download-pdf")
 def download_pdf(req: DetailedAnalysisRequest, session: Session = Depends(get_session)):
+    # FIXED vs yours: yours crashed if reportlab missing. Now returns 503 instead.
+    if not HAS_REPORTLAB:
+        raise HTTPException(status_code=503, detail="PDF export not available - reportlab not installed")
     analysis_data = _run_analysis(req, session)
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=10*mm, leftMargin=10*mm, topMargin=10*mm, bottomMargin=10*mm)
@@ -330,7 +348,8 @@ def download_pdf(req: DetailedAnalysisRequest, session: Session = Depends(get_se
 def get_trending(session: Session = Depends(get_session)):
     try:
         two_weeks_ago = datetime.utcnow() - timedelta(days=14)
-        stmt = select(MarketMetric.product, MarketMetric.county, MarketMetric.sector, func.avg(MarketMetric.demand_score).label("avg_demand"), func.avg(MarketMetric.avg_price_kes).label("avg_price"), func.count(MarketMetric.id).label("activity_count")).where(MarketMetric.created_at > two_weeks_ago).group_by(MarketMetric.product, MarketMetric.county, MarketMetric.sector).order_by(desc("activity_count")).limit(6)
+        activity_count = func.count(MarketMetric.id).label("activity_count")
+        stmt = select(MarketMetric.product, MarketMetric.county, MarketMetric.sector, func.avg(MarketMetric.demand_score).label("avg_demand"), func.avg(MarketMetric.avg_price_kes).label("avg_price"), activity_count).where(MarketMetric.created_at > two_weeks_ago).group_by(MarketMetric.product, MarketMetric.county, MarketMetric.sector).order_by(desc(activity_count)).limit(6)
         results = session.exec(stmt).all()
         trending_list = []
         for r in results:
