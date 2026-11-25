@@ -1,31 +1,22 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }} - EvidLens</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="/static/css/style.css" rel="stylesheet">
-</head>
-<body class="bg-[#F5F7FA]">
-    <!-- Header with logo so user doesn't get lost -->
-    <header class="bg-[#0A1F44] text-white px-6 py-4">
-      <div class="max-w-7xl mx-auto flex items-center gap-3">
-        <a href="/" class="font-bold text-2xl"><span>Evid</span><span style="color:#14B8A6">Lens</span></a>
-      </div>
-    </header>
-
-    <div class="container mx-auto p-8 max-w-4xl">
-        <a href="/" class="text-[#14B8A6] font-semibold">← Back to Dashboard</a>
-        <h1 class="text-3xl font-bold mt-4 mb-6 text-[#0A1F44]">{{ title }}</h1>
-        
-        <div class="bg-white p-8 rounded-2xl shadow-sm prose max-w-none">
-            {{ content | safe }}
-        </div>
-
-        <div class="mt-6 text-center text-sm text-gray-500">
-            Need help? Contact: <a href="mailto:support@evidlens.co.ke" class="text-[#14B8A6]">support@evidlens.co.ke</a>
-        </div>
-    </div>
-</body>
-</html>
+{% extends "base.html" %}
+{% block title %}{{ title or 'Page' }} | EvidLens{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <a href="/" class="text-[#0d9488] font-semibold text-sm">← Back to Dashboard</a>
+  <h1 class="text-3xl font-bold mt-4 mb-2 text-[#0A1F44]">{{ title or 'Page' }}</h1>
+  {% if subtitle %}<p class="text-gray-600 text-[15px] mb-6">{{ subtitle }}</p>{% endif %}
+  <div class="bg-white p-6 md:p-8 rounded-2xl shadow-sm border prose max-w-none prose-headings:text-[#0A1F44] prose-a:text-[#0d9488] prose-a:font-bold">
+    {% if content_html %}{{ content_html | safe }}{% elif content %}{{ content }}{% else %}<p class="text-gray-500">This page is coming soon.</p>{% endif %}
+  </div>
+  {% if updated_at %}<p class="text-xs text-gray-400 mt-4">Last updated: {% if updated_at is string %}{{ updated_at[:10] }}{% else %}{{ updated_at.strftime('%b %d, %Y') }}{% endif %}</p>{% endif %}
+  <div class="mt-6 flex flex-wrap gap-2 justify-center text-sm">
+    <a href="/about" class="border px-3 py-1.5 rounded-full font-bold">About</a>
+    <a href="/terms" class="border px-3 py-1.5 rounded-full font-bold">Terms</a>
+    <a href="/privacy" class="border px-3 py-1.5 rounded-full font-bold">Privacy</a>
+    <a href="/help" class="border px-3 py-1.5 rounded-full font-bold">Help</a>
+  </div>
+  <div class="mt-4 text-center text-sm text-gray-500">
+    Need help? <a href="mailto:support@evidlens.co.ke" class="text-[#0d9488] font-bold">support@evidlens.co.ke</a>
+  </div>
+</div>
+{% endblock %}
