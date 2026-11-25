@@ -62,9 +62,6 @@ from app.modules.api import data
 from app.modules.api import meta
 from app.core import billing
 
-app.include_router(analysis_router)
-app.include_router(analysis_api_router)
-
 load_dotenv()
 UTC = timezone.utc
 scheduler = AsyncIOScheduler(
@@ -629,6 +626,7 @@ app.include_router(billing.router)
 app.include_router(data.router)
 app.include_router(meta.router)
 app.include_router(analysis_router)
+app.include_router(analysis_api_router)
 
 @app.get("/privacy", response_class=HTMLResponse)
 def privacy_page(request: Request):
