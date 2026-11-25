@@ -138,14 +138,16 @@ def init_db():
         print(f"Core create error: {e}")
         logger.error(f"Core create error: {e}")
         raise
-    # Fix audit_logs missing columns - production table was created without them
+    # Fix audit_logs missing columns + wrong FK to old "user" table
     try:
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS report_id INTEGER"))
             conn.execute(text("ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS ip VARCHAR"))
             conn.execute(text("ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_agent VARCHAR"))
             conn.execute(text("ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()"))
-        print("✓ AUDIT_LOGS FIXED - report_id added")
+            conn.execute(text("ALTER TABLE audit_logs DROP CONSTRAINT IF EXISTS audit_logs_user_id_fkey"))
+            conn.execute(text("ALTER TABLE audit_logs ALTER COLUMN user_id DROP NOT NULL"))
+        print("✓ AUDIT_LOGS FIXED - report_id added, bad FK dropped")
     except Exception as e:
         print(f"audit_logs fix skipped: {e}")
     print("DB init_db DONE - All tables exist")
