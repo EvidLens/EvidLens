@@ -202,7 +202,7 @@ async def export_leads(request: Request, req: InsightRequest, session: Session =
     return export_result(leads, "xlsx")
 @router.get("/help")
 def ask_lens_help(query: str):
-    help_map = {"pricing": "EV-SME 20k, EV-GROWTH 50k, EV-PRO 100k, EV-ENT 200k", "setup": "Go to Dashboard > Pick Sector > Pick County > Ask Lens", "features": "19 Modules, 9 Lanes, Kenya-First Data"}
+        help_map = {"pricing": "Starter KES 500/mo (5,000/yr), Pro KES 1,500/mo (15,000/yr), Enterprise KES 5,000/mo (50,000/yr). Pay with M-Pesa. Yearly = 2 months free.", "setup": "Go to Dashboard > Pick Sector > Pick County > Ask Lens", "features": "19 Modules, 9 Lanes, Kenya-First Data"}
     ans = help_map.get(query.lower(), f"Contact {SUPPORT_EMAIL}")
     return {"reply": ans, "response": ans, "answer": ans}
 def export_result(data, format):
