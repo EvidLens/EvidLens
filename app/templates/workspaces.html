@@ -1,13 +1,14 @@
 {% extends "base.html" %}
+{% block title %}Workspaces | EvidLens{% endblock %}
 {% block content %}
-<div class="max-w-5xl mx-auto p-6">
-  {% if not current_user is defined or not current_user %}
+<div class="max-w-5xl mx-auto">
+  {% if not current_user %}
   <div class="bg-white rounded-2xl shadow-sm border p-10 text-center">
     <h1 class="text-2xl font-bold text-[#0A1F44]">Workspaces</h1>
     <p class="text-[14px] text-gray-500 mt-2">Login to see your workspaces.<br>Workspaces are tied to your account - guests have no team, no shared credits.</p>
     <div class="flex flex-wrap justify-center gap-3 mt-6">
-      <a href="/auth/login?next=/workspaces" class="bg-[#14B8A6] text-white px-6 py-3 rounded-xl font-bold text-[14px]">Login →</a>
-      <a href="/auth/register?next=/workspaces" class="bg-white border px-6 py-3 rounded-xl font-bold text-[14px]">Create Free Account</a>
+      <a href="/login?next=/workspaces" class="bg-[#14B8A6] text-white px-6 py-3 rounded-xl font-bold text-[14px]">Login →</a>
+      <a href="/signup?next=/workspaces" class="bg-white border px-6 py-3 rounded-xl font-bold text-[14px]">Create Free Account</a>
     </div>
   </div>
   {% else %}
@@ -16,37 +17,40 @@
       <h1 class="text-3xl font-bold text-[#0A1F44]">Workspaces</h1>
       <p class="text-gray-500 text-[14px] mt-1">Collaborate with your team. Share credits and analyses.</p>
     </div>
-    <button onclick="document.getElementById('newWsModal').classList.remove('hidden')" class="bg-[#14B8A6] text-white px-4 py-2 rounded-lg font-bold text-[13px]">+ New Workspace</button>
+    <button id="openNewWs" type="button" class="bg-[#14B8A6] text-white px-4 py-2 rounded-lg font-bold text-[13px]">+ New Workspace</button>
   </div>
-  {% if workspaces is defined and workspaces %}
+  {% if workspaces | default([], true) %}
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
     {% for ws in workspaces %}
-    <div class="bg-white p-6 rounded-2xl shadow-sm border-2 {% if ws.id == current_workspace_id %}border-[#14B8A6]{% else %}border-transparent{% endif %}">
+    {% set members = ws.members if ws.members is defined else [] %}
+    {% set member_count = members | length if members is iterable and members is not string else 0 %}
+    <div class="bg-white p-6 rounded-2xl shadow-sm border-2 {% if current_workspace_id is defined and ws.id == current_workspace_id %}border-[#14B8A6]{% else %}border-transparent{% endif %}">
       <div class="flex justify-between items-start gap-3">
         <div class="min-w-0">
-          <h2 class="text-xl font-bold text-[#0A1F44] truncate">{{ ws.name or 'Workspace' }}</h2>
-          <p class="text-sm text-gray-500">{{ (ws.members|length if ws.members is defined else 0) }} Members • {{ ws.credits if ws.credits is defined else 0 }} Credits</p>
-          {% if ws.plan %}<p class="text-xs text-gray-400 mt-1">{{ ws.plan }} Plan</p>{% endif %}
+          <h2 class="text-xl font-bold text-[#0A1F44] truncate">{{ ws.name if ws.name is defined and ws.name else 'Workspace' }}</h2>
+          <p class="text-sm text-gray-500">{{ member_count }} Member{{ 's' if member_count != 1 else '' }} • {{ ws.credits if ws.credits is defined and ws.credits is not none else 0 }} Credits</p>
+          {% if ws.plan is defined and ws.plan %}<p class="text-xs text-gray-400 mt-1">{{ ws.plan | title }} Plan</p>{% endif %}
         </div>
-        {% if ws.id == current_workspace_id %}
+        {% if current_workspace_id is defined and ws.id == current_workspace_id %}
         <span class="bg-teal-100 text-teal-700 text-xs font-bold px-3 py-1 rounded-full shrink-0">ACTIVE</span>
         {% endif %}
       </div>
       <div class="mt-4">
         <p class="text-sm font-semibold mb-2">Members</p>
         <div class="flex -space-x-2">
-          {% if ws.members is defined and ws.members %}
-          {% for m in ws.members[:5] %}
-          <img src="https://ui-avatars.com/api/?name={{ (m.full_name or m.name or m.email or 'User')|urlencode }}&background=14B8A6&color=fff" alt="{{ m.full_name or m.name or 'Member' }}" class="w-8 h-8 rounded-full border-2 border-white bg-slate-100">
+          {% if members %}
+          {% for m in members[:5] %}
+          {% set label = (m.full_name if m.full_name is defined and m.full_name else (m.name if m.name is defined and m.name else (m.email if m.email is defined else 'User'))) | default('User', true) %}
+          <img src="https://ui-avatars.com/api/?name={{ label | urlencode }}&background=14B8A6&color=fff" alt="{{ label }}" title="{{ label }}" loading="lazy" class="w-8 h-8 rounded-full border-2 border-white bg-slate-100">
           {% endfor %}
-          {% if ws.members|length > 5 %}<span class="w-8 h-8 rounded-full border-2 border-white bg-slate-200 text-[11px] font-bold flex items-center justify-center">+{{ ws.members|length - 5 }}</span>{% endif %}
+          {% if member_count > 5 %}<span class="w-8 h-8 rounded-full border-2 border-white bg-slate-200 text-[11px] font-bold flex items-center justify-center">+{{ member_count - 5 }}</span>{% endif %}
           {% else %}
           <span class="text-[13px] text-gray-400">No members yet</span>
           {% endif %}
         </div>
       </div>
       <div class="mt-4 flex flex-wrap gap-2">
-        {% if ws.id != current_workspace_id %}
+        {% if current_workspace_id is not defined or ws.id != current_workspace_id %}
         <form action="/workspaces/switch" method="post">
           <input type="hidden" name="workspace_id" value="{{ ws.id }}">
           <button class="bg-[#0A1F44] text-white px-4 py-2 rounded-lg text-sm font-bold">Switch</button>
@@ -63,24 +67,38 @@
     <p class="text-4xl mb-2">👥</p>
     <p class="font-bold text-[#0A1F44]">No workspaces yet</p>
     <p class="text-[14px] text-gray-500 mt-1">Create one to share credits and analyses with your team.</p>
-    <button onclick="document.getElementById('newWsModal').classList.remove('hidden')" class="mt-4 bg-[#14B8A6] text-white px-5 py-2.5 rounded-lg font-bold text-[13px]">+ Create Workspace</button>
+    <button id="openNewWsEmpty" type="button" class="mt-4 bg-[#14B8A6] text-white px-5 py-2.5 rounded-lg font-bold text-[13px]">+ Create Workspace</button>
   </div>
   {% endif %}
   <div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 mt-6 text-[13px]"><b>How credits work:</b> Credits are shared inside a workspace. Switching workspace switches which credits Ask Lens uses. <a href="/billing" class="font-bold text-[#0d9488]">See Billing →</a></div>
   {% endif %}
 </div>
-{% if current_user is defined and current_user %}
-<div id="newWsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+{% if current_user %}
+<div id="newWsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 items-center justify-center p-4 z-50">
   <div class="bg-white p-6 rounded-2xl w-full max-w-md">
     <h2 class="text-xl font-bold mb-1">Create New Workspace</h2>
     <p class="text-[13px] text-gray-500 mb-4">For your company, team, or project. You can invite members after.</p>
     <form action="/workspaces/create" method="post">
-      <label class="text-sm font-semibold">Workspace Name</label>
-      <input name="name" placeholder="e.g Acme Ltd Marketing" required maxlength="80" class="w-full border p-3 rounded-lg mt-1 mb-4">
+      <label class="text-sm font-semibold" for="wsName">Workspace Name</label>
+      <input id="wsName" name="name" placeholder="e.g Acme Ltd Marketing" required maxlength="80" autocomplete="organization" class="w-full border p-3 rounded-lg mt-1 mb-4">
       <button class="w-full bg-[#14B8A6] text-white p-3 rounded-lg font-bold">Create</button>
     </form>
-    <button onclick="document.getElementById('newWsModal').classList.add('hidden')" class="w-full mt-2 text-gray-500 text-[13px]">Cancel</button>
+    <button id="closeNewWs" type="button" class="w-full mt-2 text-gray-500 text-[13px]">Cancel</button>
   </div>
 </div>
 {% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  var modal = document.getElementById('newWsModal');
+  if(!modal) return;
+  function open(){ modal.classList.remove('hidden'); modal.classList.add('flex'); var i=document.getElementById('wsName'); if(i) i.focus(); }
+  function close(){ modal.classList.add('hidden'); modal.classList.remove('flex'); }
+  ['openNewWs','openNewWsEmpty'].forEach(function(id){ var b=document.getElementById(id); if(b) b.addEventListener('click', open); });
+  var c=document.getElementById('closeNewWs'); if(c) c.addEventListener('click', close);
+  modal.addEventListener('click', function(e){ if(e.target===modal) close(); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') close(); });
+})();
+</script>
 {% endblock %}
