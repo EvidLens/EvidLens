@@ -1,4 +1,27 @@
-<!DOCTYPE html><html><body style="font-family:sans-serif; background:#F5F7FA; padding:40px; text-align:center">
-<h1 style="color:#0A1F44">{{ page|title }} — Coming Soon</h1>
-<p><a href="/">← Back to Dashboard</a></p>
-</body></html>
+{% extends "base.html" %}
+{% block title %}{{ (page or 'Feature')|title }} — Coming Soon | EvidLens{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto p-6">
+  <div class="bg-white rounded-2xl shadow-sm border p-10 text-center">
+    <p class="text-5xl mb-4">🚀</p>
+    <h1 class="text-3xl font-bold text-[#0A1F44]">{{ (page or 'This feature')|title }} — Coming Soon</h1>
+    <p class="text-[14px] text-gray-500 mt-3">We are building this now. It will be live in the next EvidLens update.<br>Ask Lens, Demand Radar, and Risk Sentinel are already live - start there.</p>
+    {% if page %}
+    <p class="inline-block mt-4 text-[12px] bg-slate-100 px-3 py-1.5 rounded-full font-bold text-slate-600">{{ page|title }}</p>
+    {% endif %}
+    <div class="flex flex-wrap justify-center gap-3 mt-6">
+      <a href="/" class="bg-[#0A1F44] text-white px-6 py-3 rounded-xl font-bold text-[14px]">← Back to Dashboard</a>
+      <a href="/ai" class="bg-[#14B8A6] text-white px-6 py-3 rounded-xl font-bold text-[14px]">Try Ask Lens →</a>
+      <a href="/pricing" class="bg-white border px-6 py-3 rounded-xl font-bold text-[14px]">See Pricing</a>
+    </div>
+    {% if current_user is defined and not current_user %}
+    <p class="text-[13px] text-gray-500 mt-6">Want early access? <a href="/auth/register?next=/" class="text-[#0d9488] font-bold underline">Create a Free Account</a> - we notify you when this launches.</p>
+    {% endif %}
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 text-center">
+    <a href="/ai" class="bg-white rounded-2xl border p-5 hover:shadow-md transition"><p class="text-2xl">🤖</p><p class="font-bold text-[#0A1F44] mt-2 text-[14px]">Ask Lens</p><p class="text-[12px] text-gray-500">AI business analysis</p></a>
+    <a href="/market/demand" class="bg-white rounded-2xl border p-5 hover:shadow-md transition"><p class="text-2xl">📊</p><p class="font-bold text-[#0A1F44] mt-2 text-[14px]">Demand Radar</p><p class="text-[12px] text-gray-500">Where demand is rising</p></a>
+    <a href="/security" class="bg-white rounded-2xl border p-5 hover:shadow-md transition"><p class="text-2xl">⚠️</p><p class="font-bold text-[#0A1F44] mt-2 text-[14px]">Risk Sentinel</p><p class="text-[12px] text-gray-500">Market &amp; policy risks</p></a>
+  </div>
+</div>
+{% endblock %}
