@@ -3,7 +3,7 @@ from fastapi.responses import StreamingResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sqlmodel import Session, select
-from typing import Optional, List
+from typing import Optional, List, Any
 import json
 import io
 import os
@@ -36,9 +36,17 @@ class Message(BaseModel):
     role: str
     content: str
 class ChatRequest(BaseModel):
-    message: str
+    message: Optional[str] = ""
     history: Optional[List[Message]] = []
     context: Optional[dict] = {}
+    product: Optional[str] = None
+    query: Optional[str] = None
+    q: Optional[str] = None
+    sector: Optional[str] = None
+    county: Optional[str] = None
+    budget: Optional[Any] = None
+    budget_kes: Optional[Any] = None
+    model_config = {"extra": "allow"}
 SYSTEM_PROMPT = """You are Ask Lens, the AI Agent for EvidLens Kenya Decision Intelligence.
 You have access to 9 Lanes of Kenya data: MarketPrice, BusinessDirectory, DemandSignal, CountyStats, Sectors, Opportunities.
 Personality: Real human, smart, warm, slightly playful, Kenyan. Talk like ChatGPT, not a form. Keep replies 2-5 sentences unless user asks for a full report. Always give 1 actionable next step. Currency KES, counties only.
@@ -124,6 +132,23 @@ async def ask_lens_chat_api(request: Request, req: ChatRequest, session: Session
     return await process_chat(req, request, session)
 @router_api.post("/analyze")
 async def analyze_api(request: Request, req: ChatRequest, session: Session = Depends(get_session)):
+    if not req.message:
+        msg = req.product or req.query or req.q or ""
+        if req.sector:
+            msg += f" in {req.sector}"
+        if req.county:
+            msg += f" in {req.county}"
+        if not msg.strip():
+            msg = "Give me a detailed market analysis"
+        req.message = msg
+        ctx = dict(req.context or {})
+        if req.sector:
+            ctx["sector"] = req.sector
+        if req.county:
+            ctx["county"] = req.county
+        if req.budget_kes or req.budget:
+            ctx["budget_kes"] = req.budget_kes or req.budget
+        req.context = ctx
     return await process_chat(req, request, session)
 @router.get("/chat")
 async def ask_lens_chat_get(message: str = "hello", request: Request = None, session: Session = Depends(get_session)):
