@@ -17,18 +17,67 @@ page_router = APIRouter(prefix="/billing", tags=["billing-page"])
 templates = Jinja2Templates(directory="app/templates")
 
 ALL_MODULES = [
-    "Demand Lens",
-    "Competitive Lens",
+    "Competitive Engine",
+    "Price Oracle",
+    "Demand Radar",
+    "County Mapper",
+    "Consumer Pulse",
     "Risk Sentinel",
-    "Market Intelligence",
     "Policy Watch",
+    "Funding Radar",
+    "Export Navigator",
+    "Knowledge Base",
     "Report Builder",
+    "AI Insights",
 ]
 
+MODULE_ENGINE = {
+    "Competitive Engine": "Competitive Engine",
+    "Price Oracle": "Pricing Engine",
+    "Demand Radar": "Market Engine",
+    "County Mapper": "Location Engine",
+    "Consumer Pulse": "Consumer Engine",
+    "Risk Sentinel": "Regulatory Engine",
+    "Policy Watch": "Regulatory Engine",
+    "Funding Radar": "Business OS",
+    "Export Navigator": "Business OS",
+    "Knowledge Base": "Core OS",
+    "Report Builder": "Core OS",
+    "AI Insights": "AI Insights",
+}
+
 PLAN_MODULES = {
-    "FREE": [],
-    "BASIC": ALL_MODULES,
-    "PROFESSIONAL": ALL_MODULES,
+    "FREE": [
+        "Demand Radar",
+        "Consumer Pulse",
+        "Risk Sentinel",
+        "Export Navigator",
+        "Knowledge Base",
+        "AI Insights",
+    ],
+    "BASIC": [
+        "Demand Radar",
+        "Consumer Pulse",
+        "Risk Sentinel",
+        "Export Navigator",
+        "Knowledge Base",
+        "AI Insights",
+        "Policy Watch",
+        "Report Builder",
+    ],
+    "PROFESSIONAL": [
+        "Demand Radar",
+        "Consumer Pulse",
+        "Risk Sentinel",
+        "Export Navigator",
+        "Knowledge Base",
+        "AI Insights",
+        "Policy Watch",
+        "Report Builder",
+        "Competitive Engine",
+        "Price Oracle",
+        "County Mapper",
+    ],
     "ENTERPRISE": ALL_MODULES,
 }
 
@@ -40,22 +89,20 @@ PLAN_LIMITS = {
 }
 
 PLAN_DAYS = {"FREE": 0, "BASIC": 30, "PROFESSIONAL": 30, "ENTERPRISE": 30}
-
 PLAN_PRICE = {"FREE": 0, "BASIC": 500, "PROFESSIONAL": 1500, "ENTERPRISE": 5000}
-
 PLAN_YEARLY_PRICE = {"FREE": 0, "BASIC": 5000, "PROFESSIONAL": 15000, "ENTERPRISE": 50000}
-
 PLAN_PRICES = PLAN_PRICE
-
 PLAN_NAMES = ["FREE", "BASIC", "PROFESSIONAL", "ENTERPRISE"]
 
 def normalize_plan(name: Optional[str]) -> str:
     if not name:
         return "FREE"
     clean = str(name).strip().upper().replace("EV-", "").replace("EV_", "")
-    if clean in ("SME STARTER", "STARTER"):
+    if clean in ("TRIAL",):
+        return "FREE"
+    if clean in ("STARTER", "SME STARTER"):
         return "BASIC"
-    if clean in ("SME PRO", "PRO", "GROWTH"):
+    if clean in ("PRO", "GROWTH", "SME PRO"):
         return "PROFESSIONAL"
     if clean in ("BUSINESS",):
         return "ENTERPRISE"
@@ -91,6 +138,8 @@ async def billing_page(request: Request, current_user=Depends(get_current_user),
         "current_user": current_user,
         "plans": plans_list,
         "plans_yearly": plans_list_yearly,
+        "all_modules": ALL_MODULES,
+        "module_engine": MODULE_ENGINE,
     })
 
 @router.get("/plans")
@@ -98,6 +147,8 @@ def get_plans():
     return {
         "plans": [plan_payload(name, "monthly") for name in PLAN_NAMES],
         "plans_yearly": [plan_payload(name, "yearly") for name in PLAN_NAMES],
+        "all_modules": ALL_MODULES,
+        "module_engine": MODULE_ENGINE,
     }
 
 @router.get("/my-subscription")
@@ -108,7 +159,7 @@ def my_subscription(db: Session = Depends(get_session), user=Depends(get_current
     )
     subs = db.exec(stmt).all()
     if not subs:
-        return {"plan": "FREE", "modules": [], "limits": PLAN_LIMITS["FREE"], "expired": True}
+        return {"plan": "FREE", "modules": PLAN_MODULES["FREE"], "limits": PLAN_LIMITS["FREE"], "expired": True}
     plan = normalize_plan(subs[0].plan_name)
     return {
         "plan": plan,
@@ -122,7 +173,7 @@ def my_subscription(db: Session = Depends(get_session), user=Depends(get_current
 def subscribe(req: SubscribeRequest, db: Session = Depends(get_session), user=Depends(get_current_user)):
     plan = normalize_plan(req.plan_name)
     if plan == "FREE":
-        raise HTTPException(status_code=400, detail="FREE plan needs no subscription. Use credits or upgrade.")
+        raise HTTPException(status_code=400, detail="FREE plan needs no subscription. Use free credits or upgrade.")
     billing = req.billing.lower() if req.billing else "monthly"
     if billing not in ("monthly", "yearly"):
         raise HTTPException(status_code=400, detail="billing must be monthly or yearly")
