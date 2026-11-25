@@ -1,21 +1,47 @@
 {% extends "base.html" %}
+{% block title %}Usage & Stats | EvidLens{% endblock %}
 {% block content %}
-<div class="max-w-5xl mx-auto mt-8">
-  <h1 class="text-3xl font-bold mb-6" style="color:#0A1F44">Usage & Stats</h1>
-  
+<div class="max-w-5xl mx-auto">
+  <h1 class="text-3xl font-bold mb-1 text-[#0A1F44]">Usage &amp; Stats</h1>
+  <p class="text-gray-500 text-sm mb-6">What you've used, and what's left on your plan.</p>
+
   <!-- Stats Cards -->
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
     <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-[#14B8A6]">
       <p class="text-sm text-gray-500">Total Analyses</p>
-      <p class="text-4xl font-bold text-[#0A1F44] mt-2">{{ total_analyses }}</p>
+      <p class="text-4xl font-bold text-[#0A1F44] mt-2">{{ total_analyses | default(0) }}</p>
+      <p class="text-xs text-gray-400 mt-1">All time</p>
     </div>
-    <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-[#14B8A6]">
+    <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-[#0A1F44]">
       <p class="text-sm text-gray-500">Credits Spent</p>
-      <p class="text-4xl font-bold text-[#0A1F44] mt-2">{{ credits_spent }}</p>
+      <p class="text-4xl font-bold text-[#0A1F44] mt-2">{{ credits_spent | default(total_analyses | default(0)) }}</p>
+      <p class="text-xs text-gray-400 mt-1">1 analysis = 1 credit</p>
     </div>
     <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-[#14B8A6]">
       <p class="text-sm text-gray-500">Credits Left</p>
-      <p class="text-4xl font-bold text-[#14B8A6] mt-2">{{ current_user.credits }}</p>
+      <p class="text-4xl font-bold text-[#14B8A6] mt-2">{{ current_user.credits if current_user and current_user.credits is not none else 0 }}</p>
+      {% if current_user and current_user.credits is not none and current_user.credits <= 3 %}
+      <a href="/pricing" class="inline-block mt-2 text-xs font-bold text-[#0d9488] underline">Running low - upgrade →</a>
+      {% else %}
+      <p class="text-xs text-gray-400 mt-1"><a href="/pricing" class="text-[#0d9488] font-bold">View plans →</a></p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+    <div class="bg-white p-6 rounded-2xl shadow-sm">
+      <h2 class="font-bold text-lg mb-1 text-[#0A1F44]">Your Plan</h2>
+      <p class="text-gray-600 text-sm">{{ current_user.plan | default('Free', true) | title if current_user else 'Free' }}</p>
+      <p class="text-xs text-gray-400 mt-1">{{ current_user.email if current_user else '' }}</p>
+      <a href="/pricing" class="inline-block mt-3 text-sm font-bold text-[#0d9488]">Change plan →</a>
+    </div>
+    <div class="bg-white p-6 rounded-2xl shadow-sm">
+      <h2 class="font-bold text-lg mb-1 text-[#0A1F44]">Quick Actions</h2>
+      <div class="flex flex-wrap gap-2 mt-2">
+        <a href="/competitive" class="bg-[#0A1F44] text-white text-sm font-bold px-4 py-2 rounded-lg">New Analysis</a>
+        <a href="/history" class="border text-sm font-bold px-4 py-2 rounded-lg">History</a>
+        <a href="/settings" class="border text-sm font-bold px-4 py-2 rounded-lg">Settings</a>
+      </div>
     </div>
   </div>
 
@@ -24,15 +50,18 @@
     <h2 class="font-bold text-xl mb-4 text-[#0A1F44]">Top Counties You Searched</h2>
     {% if top_counties %}
     <ul class="divide-y">
-      {% for county, count in top_counties %}
+      {% for row in top_counties %}
+      {# Handles: tuple (county, count), Row, dict, or object - your backend returns different shapes #}
+      {% set county = row[0] if row is sequence and row is not string else (row.county if row.county is defined else (row['county'] if row['county'] is defined else row)) %}
+      {% set count = row[1] if row is sequence and row is not string and row | length > 1 else (row.c if row.c is defined else (row['c'] if row['c'] is defined else (row.count if row.count is defined else 0))) %}
       <li class="flex justify-between py-3">
-        <span class="text-gray-700">{{ county }}</span>
-        <span class="font-bold text-[#0A1F44]">{{ count }} times</span>
+        <span class="text-gray-700">{{ county or 'Unknown' }}</span>
+        <span class="font-bold text-[#0A1F44]">{{ count }} {{ 'time' if count == 1 else 'times' }}</span>
       </li>
       {% endfor %}
     </ul>
     {% else %}
-    <p class="text-gray-500">No analyses yet. <a href="/competitive" class="text-[#14B8A6]">Run your first analysis →</a></p>
+    <p class="text-gray-500">No analyses yet. <a href="/competitive" class="text-[#0d9488] font-bold">Run your first analysis →</a></p>
     {% endif %}
   </div>
 </div>
