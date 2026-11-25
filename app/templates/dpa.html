@@ -1,36 +1,22 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DPA - EvidLens</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-<style>body{font-family:Inter,sans-serif}</style>
-</head>
-<body class="bg-[#f8fafc]">
-<div class="bg-[#0B1220] text-white p-6">
-  <div class="max-w-4xl mx-auto flex justify-between items-center">
-    <a href="/" class="flex items-center gap-2"><div class="w-8 h-8 bg-[#14B8A6] rounded-lg flex items-center justify-center font-bold">E</div><span class="font-bold">EvidLens</span></a>
-    <a href="/auth/login" class="text-[13px] bg-white/10 px-4 py-2 rounded-lg">Back to Login</a>
-  </div>
-</div>
-<div class="max-w-4xl mx-auto p-6 lg:p-10">
+{% extends "base.html" %}
+{% block title %}Data Processing Agreement | EvidLens{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto">
   <div class="bg-white rounded-[20px] border border-slate-200 p-8 lg:p-10">
-    <h1 class="text-[32px] font-extrabold">Data Processing Agreement</h1>
+    <h1 class="text-[32px] font-extrabold text-[#0A1F44]">Data Processing Agreement</h1>
     <p class="text-[13px] text-slate-500 mt-2"><b>Last Updated: April 26, 2026</b> | KDPA 2019 Compliant | Processor: EvidLens Ltd</p>
-
     <p class="mt-6 text-[14px] leading-relaxed">This DPA forms part of Terms between EvidLens Ltd (“Processor”) and Customer (“Controller”) per Kenya Data Protection Act 2019.</p>
 
-    <h2 class="font-bold mt-8">1. Subject & Duration</h2>
-    <p class="text-[14px] mt-2">Processing of Account, Usage, Payment data to provide Decision Intelligence OS. Duration = subscription term + 7 years for tax records.</p>
+    <h2 class="font-bold mt-8 text-[#0A1F44]">1. Subject &amp; Duration</h2>
+    <p class="text-[14px] mt-2 leading-relaxed">Processing of Account, Usage, Payment data to provide Decision Intelligence OS. Duration = subscription term + 7 years for tax records.</p>
 
-    <h2 class="font-bold mt-6">2. Nature & Purpose</h2>
-    <p class="text-[14px] mt-2">Collection, storage, analysis, AI inference, reporting, payment processing via M-Pesa, email delivery.</p>
+    <h2 class="font-bold mt-6 text-[#0A1F44]">2. Nature &amp; Purpose</h2>
+    <p class="text-[14px] mt-2 leading-relaxed">Collection, storage, analysis, AI inference, reporting, payment processing via M-Pesa, email delivery.</p>
 
-    <h2 class="font-bold mt-6">3. Types of Personal Data</h2>
-    <p class="text-[14px] mt-2">Name, email, phone, county, sector, IP, device, M-Pesa transaction IDs. No sensitive data per Sec 2 KDPA processed unless explicitly provided.</p>
+    <h2 class="font-bold mt-6 text-[#0A1F44]">3. Types of Personal Data</h2>
+    <p class="text-[14px] mt-2 leading-relaxed">Name, email, phone, county, sector, IP, device, M-Pesa transaction IDs. No sensitive data per Sec 2 KDPA processed unless explicitly provided.</p>
 
-    <h2 class="font-bold mt-6">4. Obligations of Processor</h2>
+    <h2 class="font-bold mt-6 text-[#0A1F44]">4. Obligations of Processor</h2>
     <ol class="list-decimal ml-5 mt-2 text-[14px] space-y-1">
       <li>Process only on documented instructions from Controller</li>
       <li>Ensure staff confidentiality and 2FA</li>
@@ -40,7 +26,7 @@
       <li>Delete/return data within 30 days of termination except legal hold</li>
     </ol>
 
-    <h2 class="font-bold mt-6">5. Sub-Processors</h2>
+    <h2 class="font-bold mt-6 text-[#0A1F44]">5. Sub-Processors</h2>
     <div class="mt-3 border rounded-xl text-[13px] overflow-hidden">
       <div class="grid grid-cols-3 bg-slate-50 p-3 font-semibold"><span>Name</span><span>Purpose</span><span>Location</span></div>
       <div class="grid grid-cols-3 p-3 border-t"><span>Render / AWS</span><span>Hosting, Postgres</span><span>South Africa</span></div>
@@ -50,24 +36,29 @@
     </div>
     <p class="text-[13px] mt-2">All sub-processors under DPA. Customer may object within 14 days.</p>
 
-    <h2 class="font-bold mt-6">6. Security Measures - Sec 41 KDPA</h2>
-    <p class="text-[14px] mt-2">Encryption, pseudonymization, VPC isolation, WAF via Cloudflare, daily backups, least-privilege IAM, annual penetration test.</p>
+    <h2 class="font-bold mt-6 text-[#0A1F44]">6. Security Measures - Sec 41 KDPA</h2>
+    <p class="text-[14px] mt-2 leading-relaxed">Encryption, pseudonymization, VPC isolation, WAF via Cloudflare, daily backups, least-privilege IAM, annual penetration test.</p>
 
-    <h2 class="font-bold mt-6">7. Data Transfers</h2>
-    <p class="text-[14px] mt-2">Primary storage South Africa. Where transfer outside Kenya required (AI, email), we apply adequacy safeguards and anonymization per Sec 49 KDPA.</p>
+    <h2 class="font-bold mt-6 text-[#0A1F44]">7. Data Transfers</h2>
+    <p class="text-[14px] mt-2 leading-relaxed">Primary storage South Africa. Where transfer outside Kenya required (AI, email), we apply adequacy safeguards and anonymization per Sec 49 KDPA.</p>
 
-    <h2 class="font-bold mt-6">8. Audit Rights</h2>
-    <p class="text-[14px] mt-2">Controller may audit once per year with 30 days notice. Processor provides SOC2 report and ODPC registration cert.</p>
+    <h2 class="font-bold mt-6 text-[#0A1F44]">8. Audit Rights</h2>
+    <p class="text-[14px] mt-2 leading-relaxed">Controller may audit once per year with 30 days notice. Processor provides SOC2 report and ODPC registration cert.</p>
 
-    <h2 class="font-bold mt-6">9. Contact</h2>
-    <p class="text-[14px] mt-2">DPO: dpo@evidlens.co.ke • Legal: info@evidlens.co.ke • Address: Kimathi House, 2nd Floor, Nyeri 10100</p>
+    <h2 class="font-bold mt-6 text-[#0A1F44]">9. Contact</h2>
+    <p class="text-[14px] mt-2 leading-relaxed">DPO: <a href="mailto:dpo@evidlens.co.ke" class="text-[#0d9488] font-bold underline">dpo@evidlens.co.ke</a> • Legal: <a href="mailto:info@evidlens.co.ke" class="text-[#0d9488] font-bold underline">info@evidlens.co.ke</a> • Address: Kimathi House, 2nd Floor, Nyeri 10100</p>
 
     <div class="mt-8 p-4 bg-[#0B1220] text-white rounded-xl text-[13px]">
-      <p class="font-bold">Sign & Return</p><p class="text-slate-300 mt-1">For Enterprise & Government procurement, signed DPA available on request. Email dpo@evidlens.co.ke with subject: SIGNED DPA REQUEST - [Company Name]</p>
+      <p class="font-bold">Sign &amp; Return</p>
+      <p class="text-slate-300 mt-1">For Enterprise &amp; Government procurement, signed DPA available on request. Email <a href="mailto:dpo@evidlens.co.ke?subject=SIGNED%20DPA%20REQUEST" class="text-teal-300 font-bold underline">dpo@evidlens.co.ke</a> with subject: SIGNED DPA REQUEST - [Company Name]</p>
     </div>
-
-    <p class="mt-10 text-[11px] text-slate-400">© 2026 EvidLens Ltd • <a href="/privacy" class="underline">Privacy</a> • <a href="/terms" class="underline">Terms</a></p>
+    <div class="flex flex-wrap gap-2 mt-8 text-[13px]">
+      <a href="/privacy" class="bg-white border px-4 py-2 rounded-lg font-bold">Privacy Policy</a>
+      <a href="/terms" class="bg-white border px-4 py-2 rounded-lg font-bold">Terms</a>
+      <a href="/contact" class="bg-white border px-4 py-2 rounded-lg font-bold">Contact</a>
+      <a href="/pricing" class="bg-[#0A1F44] text-white px-4 py-2 rounded-lg font-bold">See Pricing</a>
+    </div>
+    <p class="mt-8 text-[11px] text-slate-400">© 2026 EvidLens Ltd • <a href="/privacy" class="underline">Privacy</a> • <a href="/terms" class="underline">Terms</a></p>
   </div>
 </div>
-</body>
-</html>
+{% endblock %}
