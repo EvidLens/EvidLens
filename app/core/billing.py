@@ -3,6 +3,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select
 from sqlmodel import delete as sql_delete
+from sqlalchemy import text
+from sqlalchemy.exc import ProgrammingError
 from pydantic import BaseModel
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
@@ -153,14 +155,39 @@ def get_plans():
 
 @router.get("/my-subscription")
 def my_subscription(db: Session = Depends(get_session), user=Depends(get_current_user)):
-    stmt = select(UserSubscription).where(
-        UserSubscription.user_id == user.id,
-        UserSubscription.status == "active",
-    )
-    subs = db.exec(stmt).all()
+    try:
+        stmt = select(UserSubscription).where(
+            UserSubscription.user_id == user.id,
+            UserSubscription.status == "active",
+        )
+        subs = db.exec(stmt).all()
+    except ProgrammingError:
+        # Old DB: usersubscription.plan_name column does not exist yet.
+        # Fall back to plan_code only, which does exist.
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        rows = db.exec(text(
+            "SELECT plan_code, expires_at FROM usersubscription "
+            "WHERE user_id = :uid AND status = 'active' LIMIT 1"
+        ).bindparams(uid=user.id)).all()
+        if not rows:
+            return {"plan": "FREE", "modules": PLAN_MODULES["FREE"], "limits": PLAN_LIMITS["FREE"], "expired": True}
+        plan = normalize_plan(rows[0][0])
+        expires_at = rows[0][1] if len(rows[0]) > 1 else None
+        return {
+            "plan": plan,
+            "modules": PLAN_MODULES[plan],
+            "limits": PLAN_LIMITS[plan],
+            "expires_at": expires_at,
+            "expired": bool(expires_at and expires_at < datetime.now(UTC)),
+        }
     if not subs:
         return {"plan": "FREE", "modules": PLAN_MODULES["FREE"], "limits": PLAN_LIMITS["FREE"], "expired": True}
-    plan = normalize_plan(subs[0].plan_name)
+    # Prefer plan_name, fall back to plan_code if plan_name is empty / old row
+    raw_plan = getattr(subs[0], "plan_name", None) or getattr(subs[0], "plan_code", None) or "FREE"
+    plan = normalize_plan(raw_plan)
     return {
         "plan": plan,
         "modules": PLAN_MODULES[plan],
@@ -207,6 +234,7 @@ def subscribe(req: SubscribeRequest, db: Session = Depends(get_session), user=De
             user_id=user.id,
             module_name=module_name,
             plan_name=plan,
+            plan_code=plan,
             payment_reference=req.payment_reference or req.checkout_request_id or "",
             starts_at=now,
             expires_at=expires_at,
