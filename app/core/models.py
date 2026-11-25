@@ -268,8 +268,12 @@ class GeoData(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True, max_length=100)
-    type: str = Field(index=True, max_length=20)
+    type: str = Field(default="county", index=True, max_length=20)
     parent: Optional[str] = Field(default=None, index=True, max_length=100)
+    county: Optional[str] = Field(default=None, index=True, max_length=100)
+    code: Optional[str] = Field(default=None, index=True, max_length=10)
+    region: Optional[str] = Field(default=None, index=True, max_length=50)
+    headquarters: Optional[str] = Field(default=None, max_length=100)
 
 class Company(SQLModel, table=True):
     __tablename__ = "company"
@@ -563,12 +567,3 @@ class DetailedAnalysisRequest(BaseModel):
     def strip_text(cls, v: str) -> str:
         return v.strip() if isinstance(v, str) else v
     model_config = {"extra": "allow"}
-
-class GeoData(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    name: str
-    type: str = "county"
-    county: str
-    code: Optional[str] = None
-    region: Optional[str] = None
-    headquarters: Optional[str] = None
