@@ -1,4 +1,5 @@
 from sqlmodel import SQLModel, Session, create_engine
+from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
 from typing import Generator
 from.config import settings
@@ -137,4 +138,14 @@ def init_db():
         print(f"Core create error: {e}")
         logger.error(f"Core create error: {e}")
         raise
+    # Fix audit_logs missing columns - production table was created without them
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS report_id INTEGER"))
+            conn.execute(text("ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS ip VARCHAR"))
+            conn.execute(text("ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_agent VARCHAR"))
+            conn.execute(text("ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()"))
+        print("✓ AUDIT_LOGS FIXED - report_id added")
+    except Exception as e:
+        print(f"audit_logs fix skipped: {e}")
     print("DB init_db DONE - All tables exist")
