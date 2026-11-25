@@ -1,18 +1,99 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Contact EvidLens</h1>
+<div class="max-w-6xl mx-auto px-4 py-8 lg:py-12">
+  <div class="text-center max-w-2xl mx-auto">
+    <p class="text-[11px] font-bold tracking-widest text-[#0d9488]">WE REPLY WITHIN 24 HOURS • MON-FRI</p>
+    <h1 class="text-[32px] lg:text-[40px] font-extrabold tracking-tight mt-2">Contact EvidLens</h1>
+    <p class="text-[14px] text-slate-600 mt-3">Support, sales, data requests, DPO / privacy, or partnerships. Pick the right channel below - it gets you answered faster than a generic email.</p>
+  </div>
 
-<h2>Support</h2>
-<p>Email: info@evidlens.co.ke</p>
-<p>WhatsApp: +254 739758289</p>
-<p>Hours: Mon-Fri 8AM - 6PM EAT</p>
+  <!-- Quick channels -->
+  <div class="grid md:grid-cols-3 gap-4 mt-8">
+    <div class="bg-white border border-slate-200 rounded-[20px] p-6">
+      <div class="w-10 h-10 bg-teal-50 rounded-xl flex items-center justify-center text-[18px]">💬</div>
+      <h2 class="font-bold mt-3">Support</h2>
+      <p class="text-[13px] text-slate-600 mt-1">Login, billing, reports, Ask Lens not working, credits.</p>
+      <p class="text-[13px] mt-3"><a href="mailto:support@evidlens.co.ke" class="text-[#0d9488] font-semibold">support@evidlens.co.ke</a></p>
+      <a href="https://wa.me/254739758289?text=Hi%20EvidLens%2C%20I%20need%20support" target="_blank" class="inline-block mt-3 bg-[#25D366] text-white px-4 py-2 rounded-lg text-[13px] font-bold">WhatsApp Support</a>
+      <p class="text-[11px] text-slate-500 mt-2">Mon-Fri 8AM-6PM EAT • Sat 9AM-1PM</p>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-[20px] p-6">
+      <div class="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center text-[18px]">💼</div>
+      <h2 class="font-bold mt-3">Sales &amp; Enterprise</h2>
+      <p class="text-[13px] text-slate-600 mt-1">Custom reports, data onboarding, team training, API, bulk licences.</p>
+      <p class="text-[13px] mt-3"><a href="mailto:sales@evidlens.co.ke" class="text-[#0d9488] font-semibold">sales@evidlens.co.ke</a></p>
+      <a href="https://wa.me/254739758289?text=Hi%20EvidLens%2C%20I%20want%20Enterprise%20pricing" target="_blank" class="inline-block mt-3 bg-[#0B1220] text-white px-4 py-2 rounded-lg text-[13px] font-bold">Talk to Sales</a>
+      <p class="text-[11px] text-slate-500 mt-2">Reply within 1 business day • Demo available</p>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-[20px] p-6">
+      <div class="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center text-[18px]">🔒</div>
+      <h2 class="font-bold mt-3">Privacy / DPO</h2>
+      <p class="text-[13px] text-slate-600 mt-1">Access, delete, export your data, breach report, KDPA complaint.</p>
+      <p class="text-[13px] mt-3"><a href="mailto:dpo@evidlens.co.ke" class="text-[#0d9488] font-semibold">dpo@evidlens.co.ke</a></p>
+      <a href="/privacy" class="inline-block mt-3 bg-white border px-4 py-2 rounded-lg text-[13px] font-bold">Read Privacy Policy</a>
+      <p class="text-[11px] text-slate-500 mt-2">DPO replies within 21 days • Breach: 72h</p>
+    </div>
+  </div>
 
-<h2>Sales & Enterprise</h2>
-<p>Email: sales@evidlens.co.ke</p>
-<p>For custom reports, data onboarding, and team training.</p>
+  <div class="grid lg:grid-cols-5 gap-6 mt-6">
+    <!-- Form -->
+    <div class="lg:col-span-3 bg-white border border-slate-200 rounded-[20px] p-6 lg:p-8">
+      <h2 class="text-[20px] font-bold">Send us a message</h2>
+      <p class="text-[13px] text-slate-600 mt-1">We reply to the email / phone you give. Do <b>not</b> send M-Pesa PINs, passwords, or ID numbers.</p>
+      <form id="contactForm" class="mt-5 space-y-4" onsubmit="submitContact(event)">
+        <div class="grid md:grid-cols-2 gap-4">
+          <div><label class="text-[13px] font-semibold">Full name *</label><input id="c_name" required class="w-full mt-1 border rounded-lg px-3 py-2.5 text-[14px]" placeholder="Jane Wanjiru"></div>
+          <div><label class="text-[13px] font-semibold">Email *</label><input id="c_email" type="email" required class="w-full mt-1 border rounded-lg px-3 py-2.5 text-[14px]" placeholder="you@email.com"></div>
+        </div>
+        <div class="grid md:grid-cols-2 gap-4">
+          <div><label class="text-[13px] font-semibold">Phone / WhatsApp</label><input id="c_phone" class="w-full mt-1 border rounded-lg px-3 py-2.5 text-[14px]" placeholder="+254 7XX XXX XXX"></div>
+          <div><label class="text-[13px] font-semibold">Topic *</label><select id="c_topic" class="w-full mt-1 border rounded-lg px-3 py-2.5 text-[14px]"><option value="Support">Support - account / billing / bug</option><option value="Sales">Sales &amp; Enterprise</option><option value="Data">Data / Report request</option><option value="Privacy">Privacy / DPO</option><option value="Partnership">Partnership</option><option value="Other">Other</option></select></div>
+        </div>
+        <div><label class="text-[13px] font-semibold">County (optional)</label><input id="c_county" class="w-full mt-1 border rounded-lg px-3 py-2.5 text-[14px]" placeholder="Nyeri"></div>
+        <div><label class="text-[13px] font-semibold">Message *</label><textarea id="c_message" required rows="5" class="w-full mt-1 border rounded-lg px-3 py-2.5 text-[14px]" placeholder="Tell us what you need..."></textarea></div>
+        <label class="flex gap-2 text-[12px] text-slate-600"><input type="checkbox" required> I agree to EvidLens contacting me about this message. See <a href="/privacy" class="text-[#0d9488] font-semibold underline">Privacy Policy</a>.</label>
+        <button class="w-full bg-[#14B8A6] text-white py-3 rounded-xl font-bold text-[14px]">Send Message →</button>
+        <p id="contactMsg" class="text-[13px]"></p>
+      </form>
+      <div class="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-[13px]"><b>Urgent billing issue?</b> WhatsApp us with your M-Pesa receipt number (not PIN) + email. We check payments in under 1 hour during working hours.</div>
+    </div>
 
-<h2>Office</h2>
-<p>EvidLens Ltd<br>
-Kimathi House, 2nd Floor<br>
-Nyeri, 10100, Kenya</p>
+    <!-- Office + FAQ -->
+    <div class="lg:col-span-2 space-y-4">
+      <div class="bg-[#0B1220] text-white rounded-[20px] p-6">
+        <h2 class="font-bold">Office</h2>
+        <p class="text-[13px] text-slate-300 mt-2">EvidLens Ltd<br>Kimathi House, 2nd Floor<br>Nyeri, 10100, Kenya</p>
+        <p class="text-[13px] mt-4">📧 <a href="mailto:info@evidlens.co.ke" class="text-[#14B8A6] font-semibold">info@evidlens.co.ke</a></p>
+        <p class="text-[13px] mt-1">📞 <a href="tel:+254739758289" class="font-semibold">+254 739 758 289</a></p>
+        <p class="text-[13px] mt-1">🕐 Mon-Fri 8AM-6PM EAT</p>
+        <a href="https://maps.google.com/?q=Kimathi+House+Nyeri" target="_blank" class="inline-block mt-4 bg-white text-black px-4 py-2 rounded-lg text-[13px] font-bold">Get Directions →</a>
+      </div>
+      <div class="bg-white border border-slate-200 rounded-[20px] p-6">
+        <h2 class="font-bold">Before you write - FAQ</h2>
+        <details class="mt-3 text-[13px]"><summary class="font-semibold cursor-pointer">My M-Pesa payment succeeded but plan didn't activate?</summary><p class="text-slate-600 mt-1">Send receipt + email on WhatsApp. We activate manually if Daraja callback failed.</p></details>
+        <details class="mt-2 text-[13px]"><summary class="font-semibold cursor-pointer">How do I delete / export my data?</summary><p class="text-slate-600 mt-1">Dashboard → Settings, or email dpo@evidlens.co.ke. See <a href="/privacy" class="text-[#0d9488]">Privacy</a>.</p></details>
+        <details class="mt-2 text-[13px]"><summary class="font-semibold cursor-pointer">Do you offer demos?</summary><p class="text-slate-600 mt-1">Yes - pick Sales above. 20-min demo, Nyeri / Zoom.</p></details>
+        <details class="mt-2 text-[13px]"><summary class="font-semibold cursor-pointer">Can I get data for my county?</summary><p class="text-slate-600 mt-1">Yes - all 47 counties. Pick Data in the form.</p></details>
+      </div>
+      <div class="bg-teal-50 border border-teal-200 rounded-[20px] p-6">
+        <h2 class="font-bold text-[14px]">Response times</h2>
+        <p class="text-[13px] text-slate-600 mt-1">Support: &lt;24h • Sales: 1 business day • DPO: 21 days • Breach: 72h • Billing urgent: &lt;1h (working hours)</p>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+async function submitContact(e){
+  e.preventDefault();
+  const msg=document.getElementById('contactMsg');
+  const payload={name:document.getElementById('c_name').value, email:document.getElementById('c_email').value, phone:document.getElementById('c_phone').value, topic:document.getElementById('c_topic').value, county:document.getElementById('c_county').value, message:document.getElementById('c_message').value};
+  msg.innerText='Sending...';
+  try{
+    const r=await fetch('/contact/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const d=await r.json();
+    if(r.ok){msg.innerText='✓ Message sent. We will reply within 24 hours.';msg.className='text-[13px] text-green-600';document.getElementById('contactForm').reset();}
+    else{msg.innerText=d.detail||'Could not send. Email us at support@evidlens.co.ke';msg.className='text-[13px] text-red-600';}
+  }catch{msg.innerText='Could not send. Email us at support@evidlens.co.ke or WhatsApp +254 739 758 289';msg.className='text-[13px] text-red-600';}
+}
+</script>
 {% endblock %}
