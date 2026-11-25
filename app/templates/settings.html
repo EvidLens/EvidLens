@@ -1,86 +1,128 @@
-<!DOCTYPE html>
-<html>
-<head>
-<title>Settings - EvidLens</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<script src="https://cdn.tailwindcss.com"></script>
-<style>
-body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif}
-.card{background:white; border-radius:16px; padding:24px; box-shadow:0 1px 4px rgba(16,24,40,0.06)}
-</style>
-</head>
-<body class="bg-[#F5F7FA]">
-  <!-- Header -->
-  <header class="bg-[#0A1F44] text-white px-6 py-4">
-    <div class="max-w-7xl mx-auto flex items-center gap-3">
-      <a href="/" class="font-bold text-2xl"><span>Evid</span><span style="color:#14B8A6">Lens</span></a>
-    </div>
-  </header>
+{% extends "base.html" %}
+{% block title %}Settings | EvidLens{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <h1 class="text-3xl font-bold text-[#0A1F44] mb-6">Settings</h1>
 
-  <div class="max-w-4xl mx-auto p-6">
-    <h1 class="text-3xl font-bold text-[#0A1F44] mb-6">Settings</h1>
+  {% if not current_user %}
+  <div class="bg-white rounded-2xl shadow-sm border p-10 text-center">
+    <p class="font-bold text-[#0A1F44]">Login to change settings.</p>
+    <a href="/login?next=/settings" class="inline-block mt-4 bg-[#14B8A6] text-white px-6 py-3 rounded-xl font-bold text-sm">Login →</a>
+  </div>
+  {% else %}
 
-    <!-- Profile Card -->
-    <div class="card mb-6">
-      <h2 class="text-xl font-bold text-[#0A1F44] mb-4">Profile & Preferences</h2>
-      <form id="profileForm" class="space-y-4">
+  <!-- Profile Card -->
+  <div class="bg-white rounded-2xl p-6 shadow-sm border mb-6">
+    <h2 class="text-xl font-bold text-[#0A1F44] mb-4">Profile &amp; Preferences</h2>
+    <form id="profileForm" method="post" action="/settings/profile" class="space-y-4">
+      <div>
+        <label for="full_name" class="text-sm font-semibold text-gray-700">Full Name</label>
+        <input id="full_name" name="full_name" value="{{ current_user.full_name or '' }}" required autocomplete="name" class="w-full p-3 border rounded-lg mt-1 focus:border-[#14B8A6] outline-none">
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label class="text-sm font-semibold text-gray-700">Full Name</label>
-          <input name="full_name" value="{{ current_user.full_name }}" class="w-full p-3 border rounded-lg mt-1 focus:border-[#14B8A6] outline-none">
+          <label for="phone" class="text-sm font-semibold text-gray-700">Phone</label>
+          <input id="phone" name="phone" type="tel" value="{{ current_user.phone or '' }}" placeholder="07XXXXXXXX" pattern="^(07|01|2547|2541)[0-9]{8}$" autocomplete="tel" class="w-full p-3 border rounded-lg mt-1 focus:border-[#14B8A6] outline-none">
         </div>
         <div>
-          <label class="text-sm font-semibold text-gray-700">Email</label>
-          <input name="email" value="{{ current_user.email }}" readonly class="w-full p-3 border rounded-lg mt-1 bg-gray-100">
+          <label for="email" class="text-sm font-semibold text-gray-700">Email</label>
+          <input id="email" name="email" type="email" value="{{ current_user.email or '' }}" readonly class="w-full p-3 border rounded-lg mt-1 bg-gray-100">
+          <p class="text-xs text-gray-400 mt-1">Email cannot be changed. Contact support if you need to change it.</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label for="county" class="text-sm font-semibold text-gray-700">County</label>
+          <input id="county" name="county" value="{{ current_user.county or '' }}" placeholder="e.g. Nyeri" autocomplete="address-level1" class="w-full p-3 border rounded-lg mt-1 focus:border-[#14B8A6] outline-none">
         </div>
         <div>
-          <label class="text-sm font-semibold text-gray-700">Plan</label>
-          <div class="flex items-center gap-2 mt-1">
-            <span class="px-3 py-1 rounded-full bg-teal-100 text-teal-700 font-bold">{{ current_user.plan }}</span>
-            <a href="/billing" class="text-[#14B8A6] text-sm font-bold">Upgrade</a>
-          </div>
+          <label for="sector" class="text-sm font-semibold text-gray-700">Sector</label>
+          <input id="sector" name="sector" value="{{ current_user.sector or '' }}" placeholder="e.g. Agriculture" class="w-full p-3 border rounded-lg mt-1 focus:border-[#14B8A6] outline-none">
         </div>
-        <button class="bg-[#14B8A6] text-white px-6 py-3 rounded-lg font-bold">Save Changes</button>
-        <p id="profileMsg" class="text-sm"></p>
-      </form>
-    </div>
-
-    <!-- Password Card -->
-    <div class="card mb-6">
-      <h2 class="text-xl font-bold text-[#0A1F44] mb-4">Change Password</h2>
-      <form id="passwordForm" class="space-y-4">
-        <input name="old_password" type="password" placeholder="Current Password" class="w-full p-3 border rounded-lg">
-        <input name="new_password" type="password" placeholder="New Password" class="w-full p-3 border rounded-lg">
-        <button class="bg-[#0A1F44] text-white px-6 py-3 rounded-lg font-bold">Update Password</button>
-        <p id="passMsg" class="text-sm"></p>
-      </form>
-    </div>
-
-    <!-- Credits Card -->
-    <div class="card">
-      <h2 class="text-xl font-bold text-[#0A1F44] mb-4">Wallet & Credits</h2>
-      <p class="text-3xl font-bold">{{ current_user.credits }} <span class="text-base font-normal text-gray-500">Credits</span></p>
-      <a href="/wallet" class="text-[#14B8A6] font-bold mt-2 inline-block">Buy More Credits →</a>
-    </div>
-
+      </div>
+      <div>
+        <label class="text-sm font-semibold text-gray-700">Plan</label>
+        <div class="flex items-center gap-2 mt-1">
+          <span class="px-3 py-1 rounded-full bg-teal-100 text-teal-700 font-bold text-sm">{{ (current_user.plan or 'free') | title }}</span>
+          <a href="/billing" class="text-[#0d9488] text-sm font-bold">Upgrade →</a>
+        </div>
+      </div>
+      <button id="profileBtn" type="submit" class="bg-[#14B8A6] text-white px-6 py-3 rounded-lg font-bold disabled:opacity-60">Save Changes</button>
+      <p id="profileMsg" role="status" class="text-sm hidden"></p>
+    </form>
   </div>
 
-<script>
-// Save profile
-document.getElementById('profileForm').onsubmit=async e=>{
-  e.preventDefault();
-  const res=await fetch('/settings/profile',{method:'POST',body:new FormData(e.target)});
-  const data=await res.json();
-  document.getElementById('profileMsg').innerText=data.message;
-  document.getElementById('profileMsg').className='text-sm text-green-600';
-}
+  <!-- Password Card -->
+  <div class="bg-white rounded-2xl p-6 shadow-sm border mb-6">
+    <h2 class="text-xl font-bold text-[#0A1F44] mb-4">Change Password</h2>
+    <form id="passwordForm" method="post" action="/settings/password" class="space-y-4">
+      <div>
+        <label for="old_password" class="text-sm font-semibold text-gray-700">Current Password</label>
+        <input id="old_password" name="old_password" type="password" required autocomplete="current-password" placeholder="Current Password" class="w-full p-3 border rounded-lg mt-1">
+      </div>
+      <div>
+        <label for="new_password" class="text-sm font-semibold text-gray-700">New Password</label>
+        <input id="new_password" name="new_password" type="password" required minlength="8" autocomplete="new-password" placeholder="New Password - 8+ chars, 1 uppercase, 1 number" class="w-full p-3 border rounded-lg mt-1">
+      </div>
+      <div>
+        <label for="confirm_password" class="text-sm font-semibold text-gray-700">Confirm New Password</label>
+        <input id="confirm_password" name="confirm_password" type="password" required autocomplete="new-password" placeholder="Repeat new password" class="w-full p-3 border rounded-lg mt-1">
+      </div>
+      <button id="passBtn" type="submit" class="bg-[#0A1F44] text-white px-6 py-3 rounded-lg font-bold disabled:opacity-60">Update Password</button>
+      <p id="passMsg" role="status" class="text-sm hidden"></p>
+    </form>
+  </div>
 
-// Change password
-document.getElementById('passwordForm').onsubmit=async e=>{
-  e.preventDefault();
-  const res=await fetch('/settings/password',{method:'POST',body:new FormData(e.target)});
-  const data=await res.json();
-  document.getElementById('passMsg').innerText=data.message;
-  document.getElementById('passMsg').className=res.ok ? 'text-sm text-green-600' : 'text-sm text-red-600';
-}
+  <!-- Credits Card -->
+  <div class="bg-white rounded-2xl p-6 shadow-sm border">
+    <h2 class="text-xl font-bold text-[#0A1F44] mb-4">Wallet &amp; Credits</h2>
+    <p class="text-3xl font-bold">{{ current_user.credits if current_user.credits is not none else 0 }} <span class="text-base font-normal text-gray-500">Credits</span></p>
+    <a href="/wallet" class="text-[#0d9488] font-bold mt-2 inline-block">Buy More Credits →</a>
+    <span class="text-gray-300 mx-2">•</span>
+    <a href="/billing" class="text-[#0d9488] font-bold mt-2 inline-block">Billing →</a>
+  </div>
+
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  function show(el, text, ok){
+    el.classList.remove('hidden');
+    el.textContent = text;
+    el.className = 'text-sm ' + (ok ? 'text-green-600' : 'text-red-600');
+  }
+  async function postForm(form, msgEl, btn){
+    btn.disabled = true;
+    try{
+      var res = await fetch(form.action, {method:'POST', body: new FormData(form)});
+      var data = {};
+      try{ data = await res.json(); }catch(_){ data = {}; }
+      if(!res.ok){
+        var m = data.detail || data.message;
+        if(Array.isArray(m)) m = m.map(function(x){ return x.msg || x; }).join(', ');
+        throw new Error(m || ('Save failed (' + res.status + ')'));
+      }
+      show(msgEl, data.message || 'Saved.', true);
+      return true;
+    }catch(err){
+      show(msgEl, err.message || 'Save failed. Try again.', false);
+      return false;
+    }finally{ btn.disabled = false; }
+  }
+  var pf = document.getElementById('profileForm');
+  if(pf) pf.addEventListener('submit', function(e){ e.preventDefault(); postForm(pf, document.getElementById('profileMsg'), document.getElementById('profileBtn')); });
+  var pw = document.getElementById('passwordForm');
+  if(pw) pw.addEventListener('submit', function(e){
+    e.preventDefault();
+    var np = document.getElementById('new_password').value;
+    var cp = document.getElementById('confirm_password').value;
+    var msg = document.getElementById('passMsg');
+    if(np.length < 8 || !/[A-Z]/.test(np) || !/[0-9]/.test(np)){ show(msg, 'New password: 8+ chars, 1 uppercase, 1 number required', false); return; }
+    if(np !== cp){ show(msg, 'New passwords do not match.', false); return; }
+    postForm(pw, msg, document.getElementById('passBtn')).then(function(ok){ if(ok) pw.reset(); });
+  });
+})();
 </script>
-</body></html>
+{% endblock %}
