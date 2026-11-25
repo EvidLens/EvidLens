@@ -14,7 +14,7 @@
     <div class="absolute -top-40 -left-40 w-[600px] h-[600px] bg-[#14B8A6]/20 rounded-full blur-[100px]"></div>
     <div class="relative z-10">
       <div class="flex items-center gap-3"><div class="w-11 h-11 bg-[#14B8A6] rounded-xl flex items-center justify-center font-extrabold text-xl">E</div><span class="text-[22px] font-bold">Evid<span class="text-[#14B8A6]">Lens</span></span><span class="ml-3 px-2.5 py-0.5 text-[10px] bg-white/10 border border-white/20 rounded-full">ENTERPRISE</span></div>
-      <div class="mt-24 max-w-[480px]"><h1 class="text-[40px] font-extrabold leading-[1.05]">Get access to <span class="text-[#2dd4bf]">Decision Intelligence</span></h1><p class="mt-4 text-slate-300 text-[15px]">For Governments, NGOs & Enterprises. Reviewed within 24 hours. Includes 5 free credits.</p></div>
+      <div class="mt-24 max-w-[480px]"><h1 class="text-[40px] font-extrabold leading-[1.05]">Get access to <span class="text-[#2dd4bf]">Decision Intelligence</span></h1><p class="mt-4 text-slate-300 text-[15px]">For Governments, NGOs &amp; Enterprises. Reviewed within 24 hours. Includes 5 free credits.</p></div>
     </div>
     <div class="relative z-10 text-[11px] text-slate-400">© 2026 EvidLens • support@evidlens.co.ke</div>
   </div>
@@ -24,10 +24,10 @@
       <h2 class="text-[22px] font-bold">Sign Up</h2>
       <p class="text-[13px] text-slate-500 mt-1">All emails allowed • 5 free credits to start</p>
 
-      <div id="err" class="hidden mt-4 p-3 bg-red-50 border border-red-200 text-red-700 text-[13px] rounded-xl"></div>
-      <div id="ok" class="hidden mt-4 p-3 bg-green-50 border border-green-200 text-green-700 text-[13px] rounded-xl"></div>
+      <div id="err" role="alert" class="hidden mt-4 p-3 bg-red-50 border border-red-200 text-red-700 text-[13px] rounded-xl"></div>
+      <div id="ok" role="status" class="hidden mt-4 p-3 bg-green-50 border border-green-200 text-green-700 text-[13px] rounded-xl"></div>
 
-      <form id="f" class="mt-6 space-y-3.5" autocomplete="off">
+      <form id="f" class="mt-6 space-y-3.5" autocomplete="on" method="post" action="/auth/signup" novalidate>
         <div>
           <label for="full_name" class="text-[12px] font-semibold text-slate-700">Full Name</label>
           <input id="full_name" name="full_name" placeholder="John Doe" required autocomplete="name" class="mt-1 w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-[#14B8A6] outline-none text-[14px]">
@@ -35,7 +35,7 @@
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label for="phone" class="text-[12px] font-semibold text-slate-700">Phone</label>
-            <input id="phone" name="phone" placeholder="07XXXXXXXX" required pattern="07[0-9]{8}" autocomplete="tel" class="mt-1 w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-[#14B8A6] outline-none text-[14px]">
+            <input id="phone" name="phone" type="tel" placeholder="07XXXXXXXX" required pattern="^(07|01|2547|2541)[0-9]{8}$" title="Use 07XXXXXXXX, 01XXXXXXXX, or 2547XXXXXXXX" autocomplete="tel" class="mt-1 w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-[#14B8A6] outline-none text-[14px]">
           </div>
           <div>
             <label for="email" class="text-[12px] font-semibold text-slate-700">Email</label>
@@ -49,7 +49,7 @@
               <option value="">Select Sector</option>
               <option>Government</option><option>NGO</option><option>Enterprise</option><option>Agriculture</option><option>Research</option><option>Development</option>
               <option disabled>──────────</option>
-              <option>Banks</option><option>Microfinance Institutions</option><option>Insurance & HMOs</option><option>Fintechs & Mobile Money</option><option>Capital Markets & Investment Banks</option><option>SACCOs</option><option>Retail - Supermarkets & Chains</option><option>Retail - Wholesale & Distributors</option><option>FMCG - Food & Beverage</option><option>FMCG - Personal Care & Household</option><option>Manufacturing - Food Processing</option><option>Manufacturing - Textiles & Apparel</option><option>Manufacturing - Construction Materials</option><option>Manufacturing - Automotive & Assembly</option><option>Manufacturing - Pharmaceuticals</option><option>Manufacturing - Chemicals & Plastics</option><option>Agribusiness - Crops & Farming</option><option>Agribusiness - Livestock & Dairy</option><option>Agribusiness - Horticulture & Flowers</option><option>Agribusiness - Fisheries & Aquaculture</option><option>Agribusiness - Agro-processing</option><option>Telcos & ISPs</option><option>Media & Broadcasting</option><option>Advertising & Marketing Agencies</option><option>PR & Communications</option><option>Real Estate - Developers</option><option>Real Estate - Agents & Brokers</option><option>Real Estate - Property Management</option><option>Construction & Infrastructure</option><option>Architecture & Engineering</option><option>Healthcare - Hospitals & Clinics</option><option>Healthcare - Pharmacies</option><option>Healthcare - Medical Devices & Pharma</option><option>Education - Universities & Colleges</option><option>Education - Primary & Secondary Schools</option><option>Education - EdTech & Training</option><option>Logistics & Transport</option><option>E-Commerce & Marketplaces</option><option>Hospitality - Hotels & Resorts</option><option>Hospitality - Restaurants & QSR</option><option>Tourism & Tour Operators</option><option>Aviation & Airlines</option><option>Maritime & Shipping</option><option>Energy - Electricity Generation</option><option>Energy - Oil & Gas</option><option>Energy - Renewable & Solar</option><option>Energy - Utilities & Water</option><option>Mining & Minerals</option><option>Government - National Ministries</option><option>Government - County Governments</option><option>Government - State Corporations</option><option>Government - Regulatory Authorities</option><option>Public Safety & Security</option><option>Defense</option><option>NGOs</option><option>INGOs & UN Agencies</option><option>Donors & Development Partners</option><option>Foundations & Philanthropy</option><option>Investors - PE & VC</option><option>Investors - Angel & Family Offices</option><option>Professional Services - Law</option><option>Professional Services - Consulting</option><option>Professional Services - Accounting & Audit</option><option>Professional Services - HR & Recruitment</option><option>ICT & Software Companies</option><option>Data Centers & Cloud Services</option><option>Digital Marketing & Creative</option><option>Automotive - Dealerships</option><option>Automotive - Parts & Aftermarket</option><option>Automotive - Ride-hailing & Boda</option><option>Gaming & Sports</option><option>Entertainment & Events</option><option>Beauty & Wellness</option><option>Waste Management & Recycling</option><option>Environmental & Climate Services</option>
+              <option>Banks</option><option>Microfinance Institutions</option><option>Insurance &amp; HMOs</option><option>Fintechs &amp; Mobile Money</option><option>Capital Markets &amp; Investment Banks</option><option>SACCOs</option><option>Retail - Supermarkets &amp; Chains</option><option>Retail - Wholesale &amp; Distributors</option><option>FMCG - Food &amp; Beverage</option><option>FMCG - Personal Care &amp; Household</option><option>Manufacturing - Food Processing</option><option>Manufacturing - Textiles &amp; Apparel</option><option>Manufacturing - Construction Materials</option><option>Manufacturing - Automotive &amp; Assembly</option><option>Manufacturing - Pharmaceuticals</option><option>Manufacturing - Chemicals &amp; Plastics</option><option>Agribusiness - Crops &amp; Farming</option><option>Agribusiness - Livestock &amp; Dairy</option><option>Agribusiness - Horticulture &amp; Flowers</option><option>Agribusiness - Fisheries &amp; Aquaculture</option><option>Agribusiness - Agro-processing</option><option>Telcos &amp; ISPs</option><option>Media &amp; Broadcasting</option><option>Advertising &amp; Marketing Agencies</option><option>PR &amp; Communications</option><option>Real Estate - Developers</option><option>Real Estate - Agents &amp; Brokers</option><option>Real Estate - Property Management</option><option>Construction &amp; Infrastructure</option><option>Architecture &amp; Engineering</option><option>Healthcare - Hospitals &amp; Clinics</option><option>Healthcare - Pharmacies</option><option>Healthcare - Medical Devices &amp; Pharma</option><option>Education - Universities &amp; Colleges</option><option>Education - Primary &amp; Secondary Schools</option><option>Education - EdTech &amp; Training</option><option>Logistics &amp; Transport</option><option>E-Commerce &amp; Marketplaces</option><option>Hospitality - Hotels &amp; Resorts</option><option>Hospitality - Restaurants &amp; QSR</option><option>Tourism &amp; Tour Operators</option><option>Aviation &amp; Airlines</option><option>Maritime &amp; Shipping</option><option>Energy - Electricity Generation</option><option>Energy - Oil &amp; Gas</option><option>Energy - Renewable &amp; Solar</option><option>Energy - Utilities &amp; Water</option><option>Mining &amp; Minerals</option><option>Government - National Ministries</option><option>Government - County Governments</option><option>Government - State Corporations</option><option>Government - Regulatory Authorities</option><option>Public Safety &amp; Security</option><option>Defense</option><option>NGOs</option><option>INGOs &amp; UN Agencies</option><option>Donors &amp; Development Partners</option><option>Foundations &amp; Philanthropy</option><option>Investors - PE &amp; VC</option><option>Investors - Angel &amp; Family Offices</option><option>Professional Services - Law</option><option>Professional Services - Consulting</option><option>Professional Services - Accounting &amp; Audit</option><option>Professional Services - HR &amp; Recruitment</option><option>ICT &amp; Software Companies</option><option>Data Centers &amp; Cloud Services</option><option>Digital Marketing &amp; Creative</option><option>Automotive - Dealerships</option><option>Automotive - Parts &amp; Aftermarket</option><option>Automotive - Ride-hailing &amp; Boda</option><option>Gaming &amp; Sports</option><option>Entertainment &amp; Events</option><option>Beauty &amp; Wellness</option><option>Waste Management &amp; Recycling</option><option>Environmental &amp; Climate Services</option>
             </select>
           </div>
           <div>
@@ -65,7 +65,7 @@
           <input id="password" name="password" type="password" required minlength="8" placeholder="8+ chars, uppercase, number" autocomplete="new-password" class="mt-1 w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-[#14B8A6] outline-none text-[14px]">
           <p class="mt-1.5 text-[11px] text-slate-400">Must have 8+ characters, 1 uppercase, 1 number</p>
         </div>
-        <label class="flex gap-2 text-[11px] text-slate-500 leading-tight"><input type="checkbox" required class="mt-0.5"> I agree to <a href="/terms" class="text-[#0d9488] font-semibold">Terms</a>, <a href="/privacy" class="text-[#0d9488] font-semibold">Privacy</a> & <a href="/dpa" class="text-[#0d9488] font-semibold">DPA</a></label>
+        <label class="flex gap-2 text-[11px] text-slate-500 leading-tight"><input type="checkbox" required class="mt-0.5"> I agree to <a href="/terms" class="text-[#0d9488] font-semibold">Terms</a> &amp; <a href="/privacy" class="text-[#0d9488] font-semibold">Privacy</a></label>
         <button id="btn" type="submit" class="w-full bg-[#14B8A6] hover:bg-[#0d9488] text-white font-semibold py-3 rounded-xl shadow flex items-center justify-center gap-2 disabled:opacity-60"><span id="btnText">Request Access</span><span id="loader" class="hidden w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span></button>
       </form>
       <p class="mt-5 text-center text-[13px] text-slate-600">Already Signed Up? <a href="/login" class="font-semibold text-[#0d9488]">Sign in</a></p>
@@ -75,22 +75,35 @@
 </div>
 
 <script>
-const f=document.getElementById('f'),err=document.getElementById('err'),ok=document.getElementById('ok'),btn=document.getElementById('btn'),btnText=document.getElementById('btnText'),loader=document.getElementById('loader');
-f.onsubmit=async e=>{
-  e.preventDefault();
-  const pass=document.getElementById('password').value;
-  if(pass.length<8 ||!/[A-Z]/.test(pass) ||!/[0-9]/.test(pass)){err.textContent='Password: 8+ chars, 1 uppercase, 1 number required';err.classList.remove('hidden');ok.classList.add('hidden');return;}
-  btn.disabled=true;btnText.textContent='Submitting...';loader.classList.remove('hidden');err.classList.add('hidden');
-  const payload={full_name:document.getElementById('full_name').value.trim(),phone:document.getElementById('phone').value.trim(),email:document.getElementById('email').value.trim().toLowerCase(),sector:document.getElementById('sector').value,county:document.getElementById('county').value,password:pass};
-  try{
-    const r=await fetch('/auth/signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    const d=await r.json();
-    if(!r.ok)throw new Error(d.detail||'Signup failed');
-    ok.textContent='Request sent! Check '+payload.email+' to verify. Includes 5 free credits.';ok.classList.remove('hidden');
-    setTimeout(()=>location.href='/login?verify_sent=1',1500);
-  }catch(ex){err.textContent=ex.message;err.classList.remove('hidden');}
-  finally{btn.disabled=false;btnText.textContent='Request Access';loader.classList.add('hidden');}
-};
+(function(){
+  var f=document.getElementById('f'),err=document.getElementById('err'),ok=document.getElementById('ok'),btn=document.getElementById('btn'),btnText=document.getElementById('btnText'),loader=document.getElementById('loader');
+  function show(el,msg){ el.textContent=msg; el.classList.remove('hidden'); }
+  function hide(el){ el.classList.add('hidden'); }
+  f.addEventListener('submit', async function(e){
+    e.preventDefault();
+    hide(err); hide(ok);
+    var pass=document.getElementById('password').value;
+    if(pass.length<8 || !/[A-Z]/.test(pass) || !/[0-9]/.test(pass)){ show(err,'Password: 8+ chars, 1 uppercase, 1 number required'); return; }
+    var phone=document.getElementById('phone').value.trim();
+    if(!/^(07|01|2547|2541)[0-9]{8}$/.test(phone)){ show(err,'Enter a valid Kenyan phone: 07XXXXXXXX, 01XXXXXXXX, or 2547XXXXXXXX'); return; }
+    btn.disabled=true; btnText.textContent='Submitting...'; loader.classList.remove('hidden');
+    var payload={full_name:document.getElementById('full_name').value.trim(),phone:phone,email:document.getElementById('email').value.trim().toLowerCase(),sector:document.getElementById('sector').value,county:document.getElementById('county').value,password:pass};
+    try{
+      var r=await fetch('/auth/signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      var d={};
+      try{ d=await r.json(); }catch(_){ d={}; }
+      if(!r.ok){
+        var msg = d.detail;
+        if(Array.isArray(msg)) msg = msg.map(function(x){ return x.msg || x; }).join(', ');
+        throw new Error(msg || ('Signup failed (' + r.status + ')'));
+      }
+      show(ok,'Request sent! Check '+payload.email+' to verify. Includes 5 free credits.');
+      var next = new URLSearchParams(window.location.search).get('next') || '/login?verify_sent=1';
+      setTimeout(function(){ window.location.href = next; }, 1500);
+    }catch(ex){ show(err, ex.message || 'Signup failed. Try again.'); }
+    finally{ btn.disabled=false; btnText.textContent='Request Access'; loader.classList.add('hidden'); }
+  });
+})();
 </script>
 </body>
 </html>
