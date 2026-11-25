@@ -16,12 +16,25 @@ PRICING = {
     "Enterprise": {"monthly": 5000, "yearly": 50000, "areas": 9, "products": 21, "users": UNLIMITED, "competitors": UNLIMITED, "leads_qtr": UNLIMITED, "lens": "Enterprise", "api": True, "briefings": "Weekly"},
 }
 
+# gating.py canonical -> display name for frontend / pricing page
+# gating: FREE / BASIC / PROFESSIONAL / ENTERPRISE
+# display: Free / Starter / Pro / Enterprise
+GATING_TO_DISPLAY = {
+    "FREE": "Free",
+    "BASIC": "Starter",
+    "PROFESSIONAL": "Pro",
+    "ENTERPRISE": "Enterprise",
+}
+
+DISPLAY_TO_GATING = {v: k for k, v in GATING_TO_DISPLAY.items()}
+
 class CoreService:
     def __init__(self, db: Optional[Session] = None):
         self.db = db
 
     PRICING = PRICING
 
+    # DB plan_code -> display name. Handles old EV- codes too.
     PLAN_NAME_MAP = {
         "FREE": "Free",
         "EV-FREE": "Free",
@@ -92,9 +105,11 @@ class CoreService:
                 code = self.PLAN_NAME_MAP.get((p.code or "").upper(), p.code)
                 if code not in PRICING:
                     continue
+                # FIX: use getattr, Plan may have annual_price OR yearly_price, not both
+                yearly = getattr(p, "yearly_price", None) or getattr(p, "annual_price", None) or PRICING[code]["yearly"]
                 out[code] = {
-                    "monthly": p.monthly_price or PRICING[code]["monthly"],
-                    "yearly": p.annual_price or p.yearly_price or PRICING[code]["yearly"],
+                    "monthly": getattr(p, "monthly_price", None) or PRICING[code]["monthly"],
+                    "yearly": yearly,
                     "areas": getattr(p, "areas", PRICING[code]["areas"]),
                     "products": getattr(p, "products", PRICING[code]["products"]),
                     "users": getattr(p, "users", PRICING[code]["users"]),
@@ -143,13 +158,15 @@ class CoreService:
         db = db or self.db
         if db is None or not user_id:
             return {"allowed": False, "plan": "Free", "modules": PLAN_MODULES["FREE"], "limits": self.PRICING["Free"]}
-        plan = get_active_plan(db, type("U", (), {"id": user_id})())
-        plan_name = self.PLAN_NAME_MAP.get(plan, "Free")
-        canonical = normalize_plan(plan_name)
+        # FIX: get_active_plan already returns canonical gating name: FREE/BASIC/PROFESSIONAL/ENTERPRISE
+        # Do NOT map it again through PLAN_NAME_MAP - that was double-mapping BASIC -> Starter -> BASIC
+        canonical = get_active_plan(db, type("U", (), {"id": user_id})())
+        plan_name = GATING_TO_DISPLAY.get(canonical, "Free")
         modules = PLAN_MODULES.get(canonical, PLAN_MODULES["FREE"])
+        limits = get_plan_limits(canonical)
         if area_name and area_name not in modules:
-            return {"allowed": False, "plan": plan_name, "modules": modules, "limits": self.PRICING.get(plan_name, self.PRICING["Free"]), "reason": f"{area_name} not in {plan_name} plan"}
-        return {"allowed": True, "plan": plan_name, "modules": modules, "limits": get_plan_limits(canonical)}
+            return {"allowed": False, "plan": plan_name, "modules": modules, "limits": limits, "reason": f"{area_name} not in {plan_name} plan"}
+        return {"allowed": True, "plan": plan_name, "modules": modules, "limits": limits}
 
     def health(self) -> Dict[str, Any]:
         db_ok = False
