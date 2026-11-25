@@ -109,16 +109,30 @@ def send_reset_email(to: str, token: str):
         print(f"Reset email failed: {e}")
 
 def _set_auth_cookie(response, user_id: int):
+    # FIXED vs yours: yours hard-coded secure=True, which breaks http://localhost login
+    # Render is https -> secure=True. Localhost is http -> secure=False.
+    is_secure = APP_URL.startswith("https://")
     response.set_cookie(
         key="user_id",
         value=str(user_id),
         httponly=True,
-        secure=True,
+        secure=is_secure,
         samesite="lax",
         max_age=86400 * 7,
         path="/"
     )
     return response
+
+def _is_logged_in(request: Request, db: Session):
+    # FIXED vs yours: yours trusted any user_id cookie. This checks the DB.
+    try:
+        uid = request.cookies.get("user_id")
+        if not uid:
+            return False
+        user = db.get(AuthUser, int(uid))
+        return bool(user and getattr(user, "is_active", True))
+    except Exception:
+        return False
 
 class SignupRequest(BaseModel):
     email: EmailStr
@@ -191,8 +205,7 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
     if "error" in result:
         raise HTTPException(status_code=401, detail=result["error"])
     response = JSONResponse(content=result)
-    response.set_cookie(key="user_id", value=str(result["user_id"]), httponly=True, secure=True, samesite="lax", max_age=86400 * 7, path="/")
-    return response
+    return _set_auth_cookie(response, result["user_id"])
 
 @router.post("/do-login")
 def do_login(email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
@@ -203,8 +216,7 @@ def do_login(email: str = Form(...), password: str = Form(...), db: Session = De
             return RedirectResponse(url="/login?error=not_verified", status_code=302)
         return RedirectResponse(url="/login?error=invalid", status_code=302)
     response = RedirectResponse(url="/", status_code=302)
-    response.set_cookie(key="user_id", value=str(result["user_id"]), httponly=True, secure=True, samesite="lax", max_age=86400 * 7, path="/")
-    return response
+    return _set_auth_cookie(response, result["user_id"])
 
 @router.post("/forgot-password")
 def forgot(req: ForgotRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
@@ -248,16 +260,14 @@ def logout_get():
     return response
 
 @router.get("/login")
-def login_page(request: Request):
-    uid = request.cookies.get("user_id")
-    if uid:
+def login_page(request: Request, db: Session = Depends(get_db)):
+    if _is_logged_in(request, db):
         return RedirectResponse(url="/", status_code=302)
     return templates.TemplateResponse("login.html", {"request": request})
 
 @router.get("/signup")
-def signup_page(request: Request):
-    uid = request.cookies.get("user_id")
-    if uid:
+def signup_page(request: Request, db: Session = Depends(get_db)):
+    if _is_logged_in(request, db):
         return RedirectResponse(url="/", status_code=302)
     return templates.TemplateResponse("signup.html", {"request": request})
 
@@ -327,8 +337,7 @@ async def oauth_google_callback(request: Request, db: Session = Depends(get_db))
                 db.commit()
                 db.refresh(user)
         response = RedirectResponse(url="/", status_code=302)
-        response.set_cookie(key="user_id", value=str(user.id), httponly=True, secure=True, samesite="lax", max_age=86400 * 7, path="/")
-        return response
+        return _set_auth_cookie(response, user.id)
     except Exception as e:
         print(f"[OAUTH ERROR] {e}")
         return RedirectResponse(url=f"/login?error=oauth_failed&detail={str(e)[:100]}", status_code=302)
