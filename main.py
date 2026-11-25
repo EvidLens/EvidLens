@@ -40,7 +40,7 @@ from app.modules.database import get_session as get_db
 from app.routers.pages import router as pages_router
 from app.modules.data_layer.router import router as data_router
 from app.modules.billing.router import router as billing_page_router
-from app.modules.analysis.router import router as analysis_router
+from app.modules.analysis.router import router as analysis_router, api_router as analysis_api_router
 from app.modules.auth.router import router as auth_router
 from app.modules.auth.middleware import AuthMiddleware
 from app.core.router import router as core_router
@@ -61,6 +61,9 @@ from app.modules.storage.router import router as storage_router
 from app.modules.api import data
 from app.modules.api import meta
 from app.core import billing
+
+app.include_router(analysis_router)
+app.include_router(analysis_api_router)
 
 load_dotenv()
 UTC = timezone.utc
