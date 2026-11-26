@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from sqlmodel import SQLModel, Field, Column, Index
 from sqlalchemy.sql import func
@@ -64,39 +64,68 @@ KENYA_SUBCOUNTIES = {
     "Nairobi": ["Westlands", "Dagoretti North", "Dagoretti South", "Lang'ata", "Kibra", "Roysambu", "Kasarani", "Ruaraka", "Embakasi North", "Embakasi South", "Embakasi East", "Embakasi West", "Embakasi Central", "Makadara", "Kamukunji", "Starehe", "Mathare"]
 }
 
+COUNTY_ALIASES = {
+    "muranga": "Murang'a",
+    "murang'a": "Murang'a",
+    "muranga'a": "Murang'a",
+    "taita taveta": "Taita-Taveta",
+    "taita-taveta": "Taita-Taveta",
+    "tharakaa nithi": "Tharaka-Nithi",
+    "tharakaa-nithi": "Tharaka-Nithi",
+    "elgeyo marakwet": "Elgeyo-Marakwet",
+    "transnzoia": "Trans Nzoia",
+    "trans nzoia": "Trans Nzoia",
+    "uasin gishu": "Uasin Gishu",
+    "west pokot": "West Pokot",
+    "tana river": "Tana River",
+    "homa bay": "Homa Bay",
+}
+
+def normalize_county(name: Optional[str]) -> Optional[str]:
+    if not name:
+        return None
+    key = str(name).strip().lower()
+    if key in COUNTY_ALIASES:
+        return COUNTY_ALIASES[key]
+    for c in KENYA_COUNTIES:
+        if c.lower() == key:
+            return c
+    return str(name).strip()
+
+def get_subcounties(county: str):
+    canonical = normalize_county(county) or county
+    return KENYA_SUBCOUNTIES.get(canonical, [])
+
+def is_valid_county(name: str) -> bool:
+    canonical = normalize_county(name)
+    return canonical in KENYA_COUNTIES
+
+def _utcnow():
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 class LocationGeo(SQLModel, table=True):
     __tablename__ = "location_geo"
-
     id: Optional[int] = Field(default=None, primary_key=True)
-    level: str = Field(max_length=20, index=True) # county, sub_county, ward, town
+    level: str = Field(max_length=20, index=True)
     name: str = Field(max_length=100, index=True)
     parent: Optional[str] = Field(default=None, max_length=100, index=True)
     lat: Optional[float] = Field(default=None)
     lng: Optional[float] = Field(default=None)
-
-    __table_args__ = (
-        Index('ix_geo_level_parent', 'level', 'parent'),
-    )
+    __table_args__ = (Index('ix_geo_level_parent', 'level', 'parent'),)
 
 class LocationComparison(SQLModel, table=True):
     __tablename__ = "location_comparisons"
-
     id: Optional[int] = Field(default=None, primary_key=True)
     sector: str = Field(max_length=100, index=True)
     location_type: str = Field(default="county", max_length=20)
     location_a: str = Field(max_length=100, index=True)
     location_b: str = Field(max_length=100, index=True)
     comparison_data: Dict[str, Any] = Field(default={}, sa_column=Column(JSON))
-    calculated_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
-
-    __table_args__ = (
-        Index('ix_comparison_sector_locations', 'sector', 'location_type', 'location_a', 'location_b'),
-    )
+    calculated_at: datetime = Field(default_factory=_utcnow, sa_column_kwargs={"server_default": func.now()})
+    __table_args__ = (Index('ix_comparison_sector_locations', 'sector', 'location_type', 'location_a', 'location_b'),)
 
 class OpportunityHeatmap(SQLModel, table=True):
     __tablename__ = "opportunity_heatmaps"
-
     id: Optional[int] = Field(default=None, primary_key=True)
     sector: str = Field(max_length=100, index=True)
     country: str = Field(default="Kenya", max_length=50)
@@ -104,19 +133,15 @@ class OpportunityHeatmap(SQLModel, table=True):
     sub_county: Optional[str] = Field(default=None, max_length=100, index=True)
     ward: Optional[str] = Field(default=None, max_length=100, index=True)
     town: Optional[str] = Field(default=None, max_length=100, index=True)
-    opportunity_score: float
+    opportunity_score: Optional[float] = Field(default=None)
     lat: Optional[float] = Field(default=None)
     lng: Optional[float] = Field(default=None)
     factors: Dict[str, Any] = Field(default={}, sa_column=Column(JSON))
-    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now(), "onupdate": func.now()})
-
-    __table_args__ = (
-        Index('ix_heatmap_geo', 'sector', 'county', 'sub_county', 'ward', 'town'),
-    )
+    updated_at: datetime = Field(default_factory=_utcnow, sa_column_kwargs={"server_default": func.now(), "onupdate": func.now()})
+    __table_args__ = (Index('ix_heatmap_geo', 'sector', 'county', 'sub_county', 'ward', 'town'),)
 
 class PriceArbitrage(SQLModel, table=True):
     __tablename__ = "price_arbitrage"
-
     id: Optional[int] = Field(default=None, primary_key=True)
     product: str = Field(max_length=255, index=True)
     location_type: str = Field(max_length=20)
@@ -126,13 +151,10 @@ class PriceArbitrage(SQLModel, table=True):
     sub_county_to: Optional[str] = Field(default=None, max_length=100)
     town_from: Optional[str] = Field(default=None, max_length=100)
     town_to: Optional[str] = Field(default=None, max_length=100)
-    price_gap_kes: float
-    margin_percent: float
-    calculated_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
-
-    __table_args__ = (
-        Index('ix_arbitrage_product_location', 'product', 'location_type'),
-    )
+    price_gap_kes: Optional[float] = Field(default=None)
+    margin_percent: Optional[float] = Field(default=None)
+    calculated_at: datetime = Field(default_factory=_utcnow, sa_column_kwargs={"server_default": func.now()})
+    __table_args__ = (Index('ix_arbitrage_product_location', 'product', 'location_type'),)
 
 class LocationComparisonResponse(BaseModel):
     sector: str
@@ -140,30 +162,27 @@ class LocationComparisonResponse(BaseModel):
     location_a: str
     location_b: str
     comparison_data: dict
-
     class Config:
         from_attributes = True
 
 class LocationDemand(SQLModel, table=True):
     __tablename__ = "location_demand"
-
     id: Optional[int] = Field(default=None, primary_key=True)
     county: str = Field(max_length=100, index=True)
     sub_county: Optional[str] = Field(default=None, max_length=100)
     ward: Optional[str] = Field(default=None, max_length=100)
     product_category: str = Field(max_length=100, index=True)
-    demand_score: float = Field(default=0.0)
-    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
+    demand_score: Optional[float] = Field(default=None)
+    created_at: datetime = Field(default_factory=_utcnow, sa_column_kwargs={"server_default": func.now()})
 
 class PropertyListing(SQLModel, table=True):
     __tablename__ = "property_listings"
-
     id: Optional[int] = Field(default=None, primary_key=True)
     business_id: Optional[int] = Field(default=None, foreign_key="businesses.id")
     title: str = Field(max_length=255)
     description: Optional[str] = Field(default=None)
     county: str = Field(max_length=100, index=True)
     sub_county: Optional[str] = Field(default=None, max_length=100)
-    price_kes: float = Field(default=0.0)
+    price_kes: Optional[float] = Field(default=None)
     is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
+    created_at: datetime = Field(default_factory=_utcnow, sa_column_kwargs={"server_default": func.now()})
