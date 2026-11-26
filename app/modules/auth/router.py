@@ -109,12 +109,29 @@ def send_reset_email(to: str, token: str):
         print(f"Reset email failed: {e}")
 
 def _set_auth_cookie(response, user_id: int):
-    is_secure = APP_URL.startswith("https://")
     response.set_cookie(
         key="user_id",
         value=str(user_id),
         httponly=True,
-        secure=is_secure,
+        secure=True,
+        samesite="lax",
+        max_age=86400 * 7,
+        path="/"
+    )
+    response.set_cookie(
+        key="session",
+        value=str(user_id),
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=86400 * 7,
+        path="/"
+    )
+    response.set_cookie(
+        key="auth_user_id",
+        value=str(user_id),
+        httponly=True,
+        secure=True,
         samesite="lax",
         max_age=86400 * 7,
         path="/"
@@ -123,7 +140,7 @@ def _set_auth_cookie(response, user_id: int):
 
 def _is_logged_in(request: Request, db: Session):
     try:
-        uid = request.cookies.get("user_id")
+        uid = request.cookies.get("user_id") or request.cookies.get("session") or request.cookies.get("auth_user_id")
         if not uid:
             return False
         user = db.get(AuthUser, int(uid))
@@ -273,12 +290,16 @@ def me(user: AuthUser = Depends(get_current_user)):
 def logout():
     response = JSONResponse(content={"message": "Logged out"})
     response.delete_cookie("user_id", path="/")
+    response.delete_cookie("session", path="/")
+    response.delete_cookie("auth_user_id", path="/")
     return response
 
 @router.get("/logout")
 def logout_get():
     response = RedirectResponse(url="/login", status_code=303)
     response.delete_cookie("user_id", path="/")
+    response.delete_cookie("session", path="/")
+    response.delete_cookie("auth_user_id", path="/")
     return response
 
 @router.get("/login")
@@ -378,4 +399,6 @@ def clear_cache(db: Session = Depends(get_db), admin: AuthUser = Depends(require
     db.commit()
     response = JSONResponse(content={"cleared": True, "message": "All users cleared - fresh signup required"})
     response.delete_cookie("user_id", path="/")
+    response.delete_cookie("session", path="/")
+    response.delete_cookie("auth_user_id", path="/")
     return response
