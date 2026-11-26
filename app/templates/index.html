@@ -1,7 +1,28 @@
-{% extends "base.html" %}
-{% block title %}EvidLens - Kenya's Decision Intelligence{% endblock %}
-{% block content %}
-<div class="max-w-7xl mx-auto">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EvidLens - Kenya's Decision Intelligence</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>body{font-family:Inter,sans-serif}</style>
+</head>
+<body class="bg-[#f8fafc]">
+<div class="bg-[#0B1220] text-white p-6">
+  <div class="max-w-7xl mx-auto flex justify-between items-center">
+    <a href="/" class="flex items-center gap-2"><div class="w-8 h-8 bg-[#14B8A6] rounded-lg flex items-center justify-center font-bold">E</div><span class="font-bold">EvidLens</span></a>
+    <div class="flex items-center gap-2">
+      {% if current_user is defined and current_user %}
+      <span class="text-[13px] bg-white/10 px-3 py-1.5 rounded-full">{{ current_user.full_name or current_user.email }}</span>
+      <a href="/auth/logout" class="text-[13px] bg-white/10 px-3 py-1.5 rounded-full">Sign Out</a>
+      {% else %}
+      <a href="/auth/login" class="text-[13px] bg-white/10 px-3 py-1.5 rounded-full">Login</a>
+      <a href="/auth/register" class="text-[13px] bg-[#14B8A6] px-3 py-1.5 rounded-full font-bold">Start Free →</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+<div class="max-w-7xl mx-auto p-6 lg:p-8">
   <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
     <div>
       <h1 class="text-3xl font-bold text-[#0A1F44]">Welcome{% if current_user is defined and current_user and current_user.full_name %}, {{ (current_user.full_name|string).split(' ')[0] }}{% endif %}</h1>
@@ -41,7 +62,6 @@
     {% endif %}
     </div>
   </div>
-
   <div class="bg-[#0A1F44] text-white rounded-2xl p-6 md:p-8 mb-6">
     <h2 class="text-2xl md:text-3xl font-bold">Ask Lens anything about your business</h2>
     <p class="text-white/70 text-[14px] mt-2">Demand, pricing, competitors, policy risk - with sources, in under a minute.</p>
@@ -55,7 +75,6 @@
       <a href="/ai?q={{ 'New taxes affecting small business in Kenya'|urlencode }}" class="bg-white/10 px-3 py-1.5 rounded-full">New taxes</a>
     </div>
   </div>
-
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
     <a href="/market/demand" class="bg-white rounded-2xl border p-6 hover:shadow-md transition"><p class="text-2xl">📊</p><h3 class="font-bold text-[#0A1F44] mt-2">Demand Radar</h3><p class="text-[13px] text-gray-500 mt-1">Where demand is rising, by county + sector.</p><p class="text-[#0d9488] font-bold text-[13px] mt-3">Explore →</p></a>
     <a href="/voice" class="bg-white rounded-2xl border p-6 hover:shadow-md transition"><p class="text-2xl">🎙️</p><h3 class="font-bold text-[#0A1F44] mt-2">Consumer Pulse</h3><p class="text-[13px] text-gray-500 mt-1">What Kenyans are actually saying and buying.</p><p class="text-[#0d9488] font-bold text-[13px] mt-3">Explore →</p></a>
@@ -67,14 +86,67 @@
     <a href="/competitive" class="bg-white rounded-2xl border p-6 hover:shadow-md transition"><p class="text-2xl">🏆</p><h3 class="font-bold text-[#0A1F44] mt-2">Competitive Engine</h3><p class="text-[13px] text-gray-500 mt-1">Who else is in your sector + county.</p><p class="text-[#0d9488] font-bold text-[13px] mt-3">Analyze →</p></a>
     <a href="/pricing" class="bg-[#14B8A6] text-white rounded-2xl p-6 hover:shadow-md transition"><p class="text-2xl">⭐</p><h3 class="font-bold mt-2">Go Pro - KES 1,500/mo</h3><p class="text-[13px] text-white/80 mt-1">10 credits, all modules, priority support.</p><p class="font-bold text-[13px] mt-3">See Pricing →</p></a>
   </div>
-
+  <div class="mt-8">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-bold text-[#0A1F44]">Trending Now</h2>
+      <a href="/market/prices" class="text-[#0d9488] font-bold text-[13px]">View all prices →</a>
+    </div>
+    <p class="text-[12px] text-gray-400 mb-4">Indicative prices. Demand and change show — where no real history exists yet.</p>
+    {% if trending is defined and trending %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {% for t in trending %}
+      {% set name = t.product_name if t.product_name is defined else (t.product if t.product is defined else 'Product') %}
+      {% set price = t.price if t.price is defined else (t.avg_price_kes if t.avg_price_kes is defined else None) %}
+      {% set dem = t.demand_score if t.demand_score is defined else (t.demand if t.demand is defined else None) %}
+      {% set chg = t.change_pct if t.change_pct is defined else (t.change if t.change is defined else None) %}
+      {% set upd = t.updated_at if t.updated_at is defined else (t.created_at if t.created_at is defined else '') %}
+      <div class="bg-white rounded-2xl border p-5">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="font-bold text-[#0A1F44]">{{ name }}</p>
+            <p class="text-[12px] text-gray-400">{{ t.county if t.county is defined else 'Kenya' }}{% if t.unit is defined and t.unit %} • {{ t.unit }}{% endif %}</p>
+          </div>
+          <span class="text-[11px] font-bold px-2 py-1 rounded-full bg-teal-50 text-teal-700">Indicative</span>
+        </div>
+        <p class="text-2xl font-bold text-[#0A1F44] mt-3">{% if price is not none %}KES {{ "{:,.0f}".format(price|float) }}{% else %}—{% endif %}</p>
+        <div class="flex gap-4 mt-3 text-[13px]">
+          <p class="text-gray-500">Demand: {% if dem is not none %}<span class="font-bold text-[#0A1F44]">{{ dem|int }}/100</span>{% else %}<span class="text-slate-400">—</span>{% endif %}</p>
+          <p class="text-gray-500">Change: {% if chg is not none %}<span class="font-bold {% if chg|float > 0 %}text-red-600{% elif chg|float < 0 %}text-green-600{% else %}text-gray-500{% endif %}">{{ "%+.1f"|format(chg|float) }}%</span>{% else %}<span class="text-slate-400">—</span>{% endif %}</p>
+        </div>
+        <p class="text-[11px] text-gray-400 mt-3">{% if upd %}Updated {{ upd|string|truncate(10, True, '') }}{% else %}Updated —{% endif %} • {{ t.source if t.source is defined else 'MarketMetric' }}</p>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="bg-white rounded-2xl border p-8 text-center">
+      <p class="text-3xl mb-2">📈</p>
+      <p class="font-bold text-[#0A1F44]">No trending prices yet</p>
+      <p class="text-[13px] text-gray-500 mt-1">Once KPIN refreshes, trending prices will appear here with real demand and change.</p>
+      <a href="/market/prices" class="inline-block mt-4 bg-[#0A1F44] text-white px-4 py-2 rounded-lg font-bold text-[13px]">View Price Oracle</a>
+    </div>
+    {% endif %}
+  </div>
   <div class="bg-white rounded-2xl border p-6 mt-6 flex flex-wrap justify-between items-center gap-3">
     <div><p class="font-bold text-[#0A1F44]">Not sure where to start?</p><p class="text-[13px] text-gray-500">Ask Lens will point you to the right module.</p></div>
     <div class="flex gap-2"><a href="/ai" class="bg-[#0A1F44] text-white px-4 py-2 rounded-lg font-bold text-[13px]">Ask Lens</a><a href="/help" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Help</a></div>
   </div>
+  <p class="text-[12px] text-slate-400 mt-6">Last updated: 2026-11-25</p>
+  <div class="flex justify-center gap-2 mt-4 flex-wrap">
+    <a href="/about" class="bg-white border px-4 py-2 rounded-full font-bold text-[13px]">About</a>
+    <a href="/terms" class="bg-white border px-4 py-2 rounded-full font-bold text-[13px]">Terms</a>
+    <a href="/privacy" class="bg-white border px-4 py-2 rounded-full font-bold text-[13px]">Privacy</a>
+    <a href="/help" class="bg-white border px-4 py-2 rounded-full font-bold text-[13px]">Help</a>
+  </div>
+  <p class="text-center text-[13px] text-gray-500 mt-4">Need help? <a href="mailto:support@evidlens.co.ke" class="text-[#0d9488] font-bold">support@evidlens.co.ke</a></p>
 </div>
-{% endblock %}
-{% block scripts %}
+<div class="bg-[#0A1F44] text-white mt-10">
+  <div class="max-w-7xl mx-auto px-6 py-8 text-center">
+    <p class="font-bold text-[15px]">EvidLens — Kenya's Decision Intelligence</p>
+    <p class="text-[13px] text-slate-300 mt-2">Demand Radar • Consumer Pulse • Policy Watch • Funding Radar • Knowledge Base • Report Builder</p>
+    <p class="text-[13px] mt-3"><a href="/pricing" class="underline">Pricing</a> • <a href="/privacy" class="underline">Privacy</a> • <a href="/terms" class="underline">Terms</a> • <a href="/contact" class="underline">Contact</a> • <a href="/market/risk" class="underline">Risk Sentinel</a></p>
+    <p class="text-[12px] text-slate-400 mt-3">© 2026 EvidLens. All rights reserved.</p>
+  </div>
+</div>
 <script>
 (function(){
   var btn=document.getElementById('profileBtn');
@@ -84,4 +156,5 @@
   document.addEventListener('click',function(e){ if(!dd.classList.contains('hidden') && !dd.contains(e.target)) dd.classList.add('hidden'); });
 })();
 </script>
-{% endblock %}
+</body>
+</html>
