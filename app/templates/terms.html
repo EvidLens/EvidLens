@@ -11,44 +11,69 @@
 <div class="bg-[#0B1220] text-white p-6">
   <div class="max-w-4xl mx-auto flex justify-between items-center">
     <a href="/" class="flex items-center gap-2"><div class="w-8 h-8 bg-[#14B8A6] rounded-lg flex items-center justify-center font-bold">E</div><span class="font-bold">EvidLens</span></a>
-    <a href="/auth/login" class="text-[13px] bg-white/10 px-4 py-2 rounded-lg">Back to Login</a>
+    <a href="/login" class="text-[13px] bg-white/10 px-4 py-2 rounded-lg">Back to Login</a>
   </div>
 </div>
 <div class="max-w-4xl mx-auto p-6 lg:p-10">
   <div class="bg-white rounded-[20px] border border-slate-200 p-8 lg:p-10">
     <h1 class="text-[32px] font-extrabold">Terms of Service</h1>
-    <p class="text-[13px] text-slate-500 mt-2"><b>Last Updated: April 26, 2026</b> • Governing Law: Kenya</p>
+    <p class="text-[13px] text-slate-500 mt-2"><b>Last Updated: April 26, 2026</b> • Governing Law: Kenya • Operator: EvidLens Ltd, Nyeri, Kenya</p>
 
-    <p class="mt-6 text-[14px] leading-relaxed">By accessing EvidLens, you agree to these Terms. Operated by EvidLens Ltd, Kenya.</p>
+    <p class="mt-6 text-[14px] leading-relaxed">By accessing or using EvidLens - including the dashboard, Ask Lens, reports, and pricing pages - you agree to these Terms. If you do not agree, do not use EvidLens. These Terms, together with our <a href="/privacy" class="text-[#0d9488] font-semibold">Privacy Policy</a> and <a href="/dpa" class="text-[#0d9488] font-semibold">Data Processing Addendum (DPA)</a>, form the full agreement between you and EvidLens Ltd.</p>
+    <p class="mt-3 text-[14px] leading-relaxed">EvidLens is a decision-intelligence tool. It provides market information and AI-generated analysis to help you decide. It does not provide legal, tax, financial, or investment advice, and it does not guarantee any business outcome.</p>
 
-    <h2 class="font-bold mt-8 text-[16px]">1. Accounts & Subscriptions</h2>
-    <p class="text-[14px] mt-2">BASIC KES 500/mo, PROFESSIONAL KES 1500/mo, ENTERPRISE KES 5000/mo. Annual = 2 months free. Auto-renew, cancel anytime. Free tier: 3 AI queries/day.</p>
+    <h2 class="font-bold mt-8 text-[16px]">1. Definitions</h2>
+    <p class="text-[14px] mt-2 leading-relaxed"><b>Account:</b> your EvidLens login. <b>Analysis:</b> one Ask Lens query / engine run that counts against your plan limit. <b>Report:</b> one generated PDF / exported report that counts against your plan limit. <b>Seat:</b> one named user who can log in under your subscription. Sharing one login across multiple people does not create extra seats - it breaches Section 3. <b>Plan:</b> FREE, Starter (BASIC), Pro (PROFESSIONAL), or Enterprise, as set out in Section 2.</p>
 
-    <h2 class="font-bold mt-6 text-[16px]">2. M-Pesa Payments</h2>
-    <p class="text-[14px] mt-2">All payments via M-Pesa Paybill. Authorize Safaricom debit. Failed = downgrade to Free after 3 days grace. Refunds only for duplicates within 7 days. No refunds for generated reports.</p>
+    <h2 class="font-bold mt-8 text-[16px]">2. Accounts, Plans &amp; Limits</h2>
+    <p class="text-[14px] mt-2 leading-relaxed">You must be 18 or older, or have a parent / guardian's consent, to create an account. You are responsible for keeping your password and M-Pesa phone number secure, and for all activity on your account.</p>
+    <div class="overflow-x-auto mt-3">
+      <table class="w-full text-[13px] border">
+        <tr class="bg-slate-50"><th class="text-left p-2 border">Plan</th><th class="text-left p-2 border">Monthly (KES)</th><th class="text-left p-2 border">Annual (KES)</th><th class="text-left p-2 border">Analyses / month</th><th class="text-left p-2 border">Reports / month</th><th class="text-left p-2 border">Seats</th><th class="text-left p-2 border">Engines</th></tr>
+        <tr><td class="p-2 border font-semibold">FREE</td><td class="p-2 border">0</td><td class="p-2 border">0</td><td class="p-2 border">5</td><td class="p-2 border">1</td><td class="p-2 border">1</td><td class="p-2 border">6</td></tr>
+        <tr><td class="p-2 border font-semibold">Starter (BASIC)</td><td class="p-2 border">500</td><td class="p-2 border">5,000</td><td class="p-2 border">10</td><td class="p-2 border">5</td><td class="p-2 border">1</td><td class="p-2 border">8</td></tr>
+        <tr><td class="p-2 border font-semibold">Pro (PROFESSIONAL)</td><td class="p-2 border">1,500</td><td class="p-2 border">15,000</td><td class="p-2 border">100</td><td class="p-2 border">30</td><td class="p-2 border">1</td><td class="p-2 border">11</td></tr>
+        <tr><td class="p-2 border font-semibold">Enterprise</td><td class="p-2 border">5,000</td><td class="p-2 border">50,000</td><td class="p-2 border">Unlimited*</td><td class="p-2 border">Unlimited*</td><td class="p-2 border">5</td><td class="p-2 border">12</td></tr>
+      </table>
+    </div>
+    <p class="text-[13px] text-slate-500 mt-2">Annual = 10 months' price = 2 months free (KES 500 x 10 = 5,000, not 6,000). Prices are in KES, inclusive of any applicable taxes unless stated otherwise. *Enterprise "unlimited" is subject to fair use in Section 3 - it is not a licence to resell or to automate bulk scraping.</p>
+    <p class="text-[14px] mt-3 leading-relaxed">When you hit your plan limit, further analyses / reports are blocked until your next billing cycle or until you upgrade. Your existing reports remain accessible. Downgrading does not delete your old reports, but you lose access to the higher-plan engines until you upgrade again.</p>
 
-    <h2 class="font-bold mt-6 text-[16px]">3. Acceptable Use</h2>
-    <p class="text-[14px] mt-2">No scraping, reselling without license, sharing logins beyond seat limit, or illegal AI use. Violation = immediate suspension.</p>
+    <h2 class="font-bold mt-6 text-[16px]">3. Acceptable Use &amp; Fair Use</h2>
+    <p class="text-[14px] mt-2 leading-relaxed">You agree not to: (a) scrape, copy, or bulk-download EvidLens data, prices, or AI outputs to build a competing product; (b) resell, sub-licence, or share your subscription outside your seat limit - including sharing one login across a team; (c) use EvidLens for illegal activity, fraud, or to generate misleading / defamatory content; (d) attempt to bypass limits, reverse-engineer prompts, or abuse the API; (e) use automated bots to generate analyses at a rate no human could sustain.</p>
+    <p class="text-[14px] mt-2 leading-relaxed">Violation may result in a warning, temporary suspension, or immediate termination under Section 8, depending on severity. We may rate-limit or block accounts that show clear automated abuse, even on Enterprise.</p>
 
-    <h2 class="font-bold mt-6 text-[16px]">4. IP</h2>
-    <p class="text-[14px] mt-2">Dashboard, prompts, aggregated insights © EvidLens Ltd. You own exported reports. You grant license to use anonymized queries to improve AI.</p>
+    <h2 class="font-bold mt-6 text-[16px]">4. M-Pesa Payments, Renewal &amp; Refunds</h2>
+    <p class="text-[14px] mt-2 leading-relaxed">All payments are via M-Pesa. By starting a subscription you authorise Safaricom to debit the amount shown at checkout for the plan and billing period you selected. You must complete the STK Push / payment confirmation - an unconfirmed checkout is not a subscription.</p>
+    <p class="text-[14px] mt-2 leading-relaxed"><b>Auto-renew:</b> Monthly and annual subscriptions auto-renew at the then-current price unless you cancel before renewal. You can cancel anytime from Settings / Billing - cancellation takes effect at the end of the current period, and you keep access until then.</p>
+    <p class="text-[14px] mt-2 leading-relaxed"><b>Failed payment:</b> If a renewal payment fails, we give you a 3-day grace period. If it is still unpaid after 3 days, your account is downgraded to FREE. You do not lose your account or old reports.</p>
+    <p class="text-[14px] mt-2 leading-relaxed"><b>Refunds:</b> We refund duplicate charges if you report them within 7 days with the M-Pesa receipt / checkout ID. We do not refund for reports or analyses already generated, or for a period you already used, unless the charge was a duplicate or an error on our side. Price changes do not entitle you to a refund for a period already paid.</p>
 
-    <h2 class="font-bold mt-6 text-[16px]">5. Disclaimer</h2>
-    <p class="text-[14px] mt-2">Prices, news, AI insights from third parties, AS IS. No guarantee of accuracy. Not liable for business losses. Verify with primary sources.</p>
+    <h2 class="font-bold mt-6 text-[16px]">5. Intellectual Property</h2>
+    <p class="text-[14px] mt-2 leading-relaxed">The EvidLens dashboard, code, prompts, design, and aggregated / anonymised insights are owned by EvidLens Ltd. <b>You own the reports you export</b> - you can share them with your bank, investor, SACCO, or partners. You may not claim that EvidLens data is your own proprietary dataset, or resell raw EvidLens data as a standalone product without a written licence.</p>
+    <p class="text-[14px] mt-2 leading-relaxed">By using EvidLens, you grant us a licence to use anonymised, aggregated queries - with all personal and business-identifying details removed - to improve the product and AI. This does not include selling your data. See <a href="/privacy" class="text-[#0d9488] font-semibold">Privacy Policy</a>.</p>
 
-    <h2 class="font-bold mt-6 text-[16px]">6. Liability</h2>
-    <p class="text-[14px] mt-2">Limited to amount paid in last 3 months per Kenyan law. No indirect damages.</p>
+    <h2 class="font-bold mt-6 text-[16px]">6. Data, AI &amp; Disclaimer - Read This</h2>
+    <p class="text-[14px] mt-2 leading-relaxed">Prices, news, policy updates, and AI insights come from third-party sources and from AI models. They are provided <b>AS IS</b>, without guarantee of accuracy, completeness, or timeliness. Every number in EvidLens is labelled Live, Recent, or Estimated - <b>Estimated means we do not have live data for that exact product / county / date, and you should verify it before spending money.</b></p>
+    <p class="text-[14px] mt-2 leading-relaxed">EvidLens is not a substitute for your own checks. Before you sign a lease, take stock on credit, take a loan, or commit capital, verify prices with your supplier / buyer, verify policy with KRA / KEBS / your county, and verify funding terms with the funder. A "Go" from Ask Lens is a recommendation based on available data, not a guarantee you will profit.</p>
+    <p class="text-[14px] mt-2 leading-relaxed">We are not liable for business losses, lost profit, or decisions made on the basis of EvidLens outputs. See Section 7.</p>
 
-    <h2 class="font-bold mt-6 text-[16px]">7. Termination</h2>
-    <p class="text-[14px] mt-2">We may terminate for fraud/chargebacks/abuse. Delete from Settings. PII removed within 30 days except legal records.</p>
+    <h2 class="font-bold mt-6 text-[16px]">7. Liability</h2>
+    <p class="text-[14px] mt-2 leading-relaxed">To the maximum extent permitted by Kenyan law, our total liability to you for any claim arising from EvidLens is limited to the amount you paid to EvidLens in the 3 months before the claim. We are not liable for indirect, incidental, consequential, or lost-profit damages, even if we were told they were possible. Nothing in these Terms limits liability that cannot be limited under Kenyan law.</p>
 
-    <h2 class="font-bold mt-6 text-[16px]">8. Governing Law</h2>
-    <p class="text-[14px] mt-2">Laws of Kenya. Disputes in Nyeri Courts.</p>
+    <h2 class="font-bold mt-6 text-[16px]">8. Termination &amp; Deletion</h2>
+    <p class="text-[14px] mt-2 leading-relaxed">We may suspend or terminate your account for fraud, chargebacks, abuse, or breach of Section 3. You may delete your account from Settings at any time. On deletion, we remove your personal data within 30 days, except for records we must keep by law (for example, payment / tax records) and anonymised data that no longer identifies you. Exported reports you already downloaded remain yours.</p>
 
-    <h2 class="font-bold mt-6 text-[16px]">9. Contact</h2>
-    <p class="text-[14px] mt-2">Legal: info@evidlens.co.ke • Support: support@evidlens.co.ke</p>
+    <h2 class="font-bold mt-6 text-[16px]">9. Changes to Terms &amp; Prices</h2>
+    <p class="text-[14px] mt-2 leading-relaxed">We may update these Terms or our prices. We will post the new Terms with a new "Last Updated" date, and for material price changes we will notify you before your next renewal. Continuing to use EvidLens after a change means you accept the new Terms. If you do not accept a price change, cancel before your next renewal and you will not be charged the new price.</p>
 
-    <p class="mt-10 text-[11px] text-slate-400">© 2026 EvidLens Ltd • <a href="/privacy" class="underline">Privacy</a> • <a href="/dpa" class="underline">DPA</a></p>
+    <h2 class="font-bold mt-6 text-[16px]">10. Governing Law &amp; Disputes</h2>
+    <p class="text-[14px] mt-2 leading-relaxed">These Terms are governed by the laws of Kenya. We will first try to resolve any dispute by good-faith discussion - contact us at the address in Section 11. If we cannot resolve it, disputes will be heard in the courts of Nyeri, Kenya, unless Kenyan law requires otherwise.</p>
+
+    <h2 class="font-bold mt-6 text-[16px]">11. Contact</h2>
+    <p class="text-[14px] mt-2">Legal: <a href="mailto:info@evidlens.co.ke" class="text-[#0d9488] font-semibold">info@evidlens.co.ke</a> • Support: <a href="mailto:support@evidlens.co.ke" class="text-[#0d9488] font-semibold">support@evidlens.co.ke</a> • EvidLens Ltd, Kimathi House, 2nd Floor, Nyeri, 10100, Kenya • +254 739 758 289</p>
+
+    <p class="mt-10 text-[11px] text-slate-400">© 2026 EvidLens Ltd • <a href="/privacy" class="underline">Privacy</a> • <a href="/dpa" class="underline">DPA</a> • <a href="/pricing" class="underline">Pricing</a></p>
   </div>
 </div>
 </body>
