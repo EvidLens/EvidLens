@@ -11,9 +11,9 @@ from app.modules.pricing_engine.models import ProductPrice
 router = APIRouter(prefix="/market/prices", tags=["Price Oracle"])
 templates = Jinja2Templates(directory="app/templates")
 
-@router.get("", response_class=HTMLResponse)
-def price_page(request: Request):
-    return templates.TemplateResponse("market_prices.html", {"request": request})
+# REMOVED: GET "" page route - it conflicted with market_engine GET /market/prices
+# and served market_prices.html with NO prices passed, so the template fell back
+# to JS / fake data. market_engine is now the single owner of /market/prices page.
 
 @router.get("/api/search")
 def api_search(q: str, sector: str, county: str, db: Session = Depends(get_session)):
