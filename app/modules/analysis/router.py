@@ -44,8 +44,6 @@ from app.core.models import MarketMetric, PriceData, NewsArticle, SocialMention,
 router = APIRouter(prefix="/analysis", tags=["Analysis - Trending & Search"])
 api_router = APIRouter(prefix="/api", tags=["Analysis - API"])
 
-# FIXED vs yours: yours called colors.HexColor even when colors=None -> crash at import
-# This dummy lets the file import even without reportlab, PDF endpoint then returns 503
 class _DummyColor:
     def __init__(self, *a, **k):
         pass
@@ -64,6 +62,59 @@ YELLOW = _hex_color("#F59E0B")
 RED = _hex_color("#DC2626")
 PRICING = {"Starter": {"monthly": 500, "annual": 5000}, "Pro": {"monthly": 1500, "annual": 15000}, "Enterprise": {"monthly": 5000, "annual": 50000}}
 
+# --- PRODUCT LOCK ---
+# One canonical name per product. All queries, news, social, PDF use this.
+# Without this, "kahawa" and "coffee" would query different rows, and
+# "tea" rows would leak into a "coffee" report via sector-wide queries.
+PRODUCT_ALIASES = {
+    "coffee": "coffee",
+    "kahawa": "coffee",
+    "arabica": "coffee",
+    "robusta": "coffee",
+    "tea": "tea",
+    "chai": "tea",
+    "maize": "maize",
+    "corn": "maize",
+    "avocado": "avocado",
+    "ovacado": "avocado",
+    "dairy": "dairy",
+    "milk": "dairy",
+    "poultry": "poultry",
+    "chicken": "poultry",
+    "eggs": "poultry",
+    "potato": "potato",
+    "potatoes": "potato",
+    "banana": "banana",
+    "bananas": "banana",
+    "tomato": "tomato",
+    "tomatoes": "tomato",
+    "onion": "onion",
+    "onions": "onion",
+    "cabbage": "cabbage",
+    "beans": "beans",
+    "rice": "rice",
+    "wheat": "wheat",
+    "sugarcane": "sugarcane",
+    "macadamia": "macadamia",
+    "mango": "mango",
+    "passion": "passion fruit",
+}
+
+def lock_product(raw: Optional[str]) -> str:
+    clean = (raw or "").strip().lower()
+    # Take first word if user typed "coffee farming" / "coffee in Nyeri"
+    first = clean.split()[0] if clean.split() else ""
+    # Try full string first, then first word
+    if clean in PRODUCT_ALIASES:
+        return PRODUCT_ALIASES[clean]
+    if first in PRODUCT_ALIASES:
+        return PRODUCT_ALIASES[first]
+    return first or clean
+
+def _product_text_filter(column, product: str):
+    """Match product in a text column, case-insensitive."""
+    return column.ilike(f"%{product}%")
+
 class DetailedAnalysisRequest(BaseModel):
     product: Optional[str] = None
     query: Optional[str] = None
@@ -80,7 +131,12 @@ class DetailedAnalysisRequest(BaseModel):
     business_model: Optional[str] = None
     model_config = {"extra": "allow"}
     def get_product(self):
-        return (self.product or self.query or self.q or "general market analysis").strip()
+        # FIXED: old default "general market analysis" matched nothing,
+        # so every query fell back to sector-wide = other crops in report.
+        # Now: lock to canonical product, never a generic phrase.
+        raw = self.product or self.query or self.q or self.topic or ""
+        locked = lock_product(raw)
+        return locked
     def get_county(self):
         return (self.county or "Kenya").strip()
     def get_sector(self):
@@ -109,7 +165,6 @@ class DetailedAnalysisRequest(BaseModel):
         return self.business_model or "Retail"
 
 def create_chart(fig_func):
-    # FIXED vs yours: yours called plt.savefig even if plt=None
     if not HAS_MATPLOTLIB or not HAS_REPORTLAB:
         return Spacer(1, 10)
     buf = BytesIO()
@@ -139,6 +194,8 @@ def bar_chart(data, labels, title):
 
 def _run_analysis(req: DetailedAnalysisRequest, session: Session):
     product = req.get_product()
+    if not product:
+        raise HTTPException(status_code=400, detail="Product is required. Example: product='coffee', county='Nyeri'")
     county = req.get_county()
     sector = req.get_sector()
     subcounties = req.get_subcounties()
@@ -155,7 +212,13 @@ def _run_analysis(req: DetailedAnalysisRequest, session: Session):
             subcounty_filter = MarketMetric.subcounty.in_(subcounties)
         except Exception:
             subcounty_filter = True
-    price_history_stmt = select(MarketMetric).where(MarketMetric.product.ilike(f"%{product}%"), county_filter, subcounty_filter, MarketMetric.created_at >= last_90_days).order_by(MarketMetric.created_at.asc())
+    # Product filter - used by EVERY MarketMetric query below.
+    # Old code only used it for price. Demand / seasonal / competitors
+    # used sector only, so they averaged in tea / maize / avocado.
+    product_filter = MarketMetric.product.ilike(f"%{product}%")
+
+    # --- Price: already product-locked, unchanged ---
+    price_history_stmt = select(MarketMetric).where(product_filter, county_filter, subcounty_filter, MarketMetric.created_at >= last_90_days).order_by(MarketMetric.created_at.asc())
     price_history = session.exec(price_history_stmt).all()
     prices = [p.avg_price_kes for p in price_history if p.avg_price_kes]
     current_price = prices[-1] if prices else None
@@ -165,21 +228,36 @@ def _run_analysis(req: DetailedAnalysisRequest, session: Session):
         price_trend = "Rising" if prices[-1] > prices[0] * 1.05 else "Falling" if prices[-1] < prices[0] * 0.95 else "Stable"
     price_volatility = statistics.stdev(prices) if len(prices) > 1 else 0
     forecast_90d = round(current_price * 1.03, 2) if price_trend == "Rising" and current_price else current_price
-    demand_stmt = select(MarketMetric).where(MarketMetric.sector.ilike(f"%{sector}%"), county_filter, subcounty_filter, MarketMetric.created_at >= last_30_days)
+
+    # --- Demand: FIXED - was sector-only, now product + county + subcounty ---
+    demand_stmt = select(MarketMetric).where(product_filter, county_filter, subcounty_filter, MarketMetric.created_at >= last_30_days)
     sector_data = session.exec(demand_stmt).all()
     demand_scores = [d.demand_score for d in sector_data if d.demand_score]
     avg_demand = statistics.mean(demand_scores) if demand_scores else 0
     demand_level = "Low" if avg_demand < 4 else "Medium" if avg_demand < 7 else "High"
-    products_in_sector = [d.product for d in sector_data if d.product]
-    top_products = Counter(products_in_sector).most_common(5)
-    seasonal_stmt = select(MarketMetric).where(MarketMetric.product.ilike(f"%{product}%"), county_filter).order_by(MarketMetric.created_at.desc()).limit(12)
+    # FIXED: old code counted OTHER products in this sector and put them
+    # in the report as "top_products_in_sector". Removed.
+    product_records = len(sector_data)
+
+    # --- Seasonality: was already product-locked, kept ---
+    seasonal_stmt = select(MarketMetric).where(product_filter, county_filter).order_by(MarketMetric.created_at.desc()).limit(12)
     seasonal_data = session.exec(seasonal_stmt).all()
     seasonality = "Peak Season" if len(seasonal_data) > 6 and statistics.mean([d.demand_score or 0 for d in seasonal_data[:3]]) > statistics.mean([d.demand_score or 0 for d in seasonal_data[-3:]]) else "Off Season"
-    competitor_stmt = select(MarketMetric.product).where(MarketMetric.sector.ilike(f"%{sector}%"), county_filter).distinct().limit(10)
-    competitors = session.exec(competitor_stmt).all()
-    top_competitors = [c for c in competitors if c and product.lower() not in c.lower()][:5]
+
+    # --- Competitors: FIXED - old code returned OTHER PRODUCTS as competitors.
+    # New: same product, other sub-counties / locations. That is a real competitor.
+    competitor_stmt = select(MarketMetric.subcounty).where(product_filter, county_filter).distinct().limit(10)
+    competitor_locations = session.exec(competitor_stmt).all()
+    top_competitors = [c for c in competitor_locations if c][:5]
+
+    # --- Supply news: FIXED - was county-only, now product + county + keyword ---
     supply_risk_keywords = ["shortage", "transport", "drought", "flood", "strike"]
-    supply_news = [n for n in session.exec(select(NewsArticle).where(NewsArticle.county.ilike(f"%{county}%"), NewsArticle.published_at >= last_30_days)).all() if any(k in ((n.title or "") + (n.summary or "")).lower() for k in supply_risk_keywords)]
+    supply_candidates = session.exec(select(NewsArticle).where(NewsArticle.county.ilike(f"%{county}%"), NewsArticle.published_at >= last_30_days)).all()
+    supply_news = [
+        n for n in supply_candidates
+        if product in ((n.title or "") + " " + (n.summary or "") + " " + (getattr(n, "content", "") or "")).lower()
+        and any(k in ((n.title or "") + (n.summary or "")).lower() for k in supply_risk_keywords)
+    ]
     supply_chain_risk = "High" if len(supply_news) > 3 else "Medium" if len(supply_news) > 0 else "Low"
     if business_model == "Retail":
         distribution_channels = ["Dukas", "Supermarkets", "Open Markets"]
@@ -190,13 +268,24 @@ def _run_analysis(req: DetailedAnalysisRequest, session: Session):
     estimated_cost_price = current_price * 0.75 if current_price else None
     estimated_margin_percent = 25.0
     estimated_profit_per_unit = current_price - estimated_cost_price if current_price and estimated_cost_price else None
-    news_stmt = select(NewsArticle).where(NewsArticle.category.ilike(f"%{sector}%"), NewsArticle.county.ilike(f"%{county}%"), NewsArticle.published_at >= last_30_days).order_by(NewsArticle.published_at.desc()).limit(10)
-    news = session.exec(news_stmt).all()
+
+    # --- News: FIXED - was sector + county, now product + county ---
+    # A news row must mention the product in title / summary / content.
+    news_candidates = session.exec(select(NewsArticle).where(NewsArticle.county.ilike(f"%{county}%"), NewsArticle.published_at >= last_30_days).order_by(NewsArticle.published_at.desc()).limit(50)).all()
+    news = [
+        n for n in news_candidates
+        if product in ((n.title or "") + " " + (n.summary or "") + " " + (getattr(n, "content", "") or "")).lower()
+    ][:10]
     risk_keywords = ["ban", "shortage", "tax", "drought", "protest", "inflation", "disease", "policy"]
     risk_news = [n for n in news if any(k in ((n.title or "") + (n.summary or "")).lower() for k in risk_keywords)]
     risk_score = min(10, len(risk_news) * 2)
-    social_stmt = select(SocialMention).where(SocialMention.sector.ilike(f"%{sector}%"), SocialMention.county.ilike(f"%{county}%"), SocialMention.created_at >= last_7_days).order_by(SocialMention.created_at.desc()).limit(20)
-    social = session.exec(social_stmt).all()
+
+    # --- Social: FIXED - was sector + county, now product + county ---
+    social_candidates = session.exec(select(SocialMention).where(SocialMention.county.ilike(f"%{county}%"), SocialMention.created_at >= last_7_days).order_by(SocialMention.created_at.desc()).limit(100)).all()
+    social = [
+        s for s in social_candidates
+        if product in ((getattr(s, "content", "") or "") + " " + (getattr(s, "author", "") or "")).lower()
+    ][:20]
     platforms = Counter([s.platform for s in social if s.platform])
     sentiment_score = 6.5
     units_possible = int(budget_kes / current_price) if current_price and budget_kes > 0 else 0
@@ -207,10 +296,10 @@ def _run_analysis(req: DetailedAnalysisRequest, session: Session):
     reasons = []
     if avg_demand > 7:
         score += 3
-        reasons.append(f"High demand in {county}")
+        reasons.append(f"High demand for {product} in {county}")
     if price_trend == "Rising":
         score += 2
-        reasons.append("Prices trending up")
+        reasons.append(f"{product.capitalize()} prices trending up")
     if risk_score < 4:
         score += 2
         reasons.append("Low regulatory risk")
@@ -231,7 +320,11 @@ def _run_analysis(req: DetailedAnalysisRequest, session: Session):
         recommendation = "HOLD - Monitor 30 days"
     else:
         recommendation = "AVOID - High risk"
-    return {"status": "success", "timestamp": now.isoformat(), "input_parameters": {"product": product, "county": county, "sector": sector, "subcounties": subcounties, "budget_kes": budget_kes, "business_model": business_model}, "market_overview": {"product": product, "sector": sector, "location": {"county": county, "subcounties": subcounties}, "current_price_kes": round(current_price, 2) if current_price else None, "30_day_avg_kes": round(avg_price_30d, 2) if avg_price_30d else None, "90_day_forecast_kes": forecast_90d, "price_trend": price_trend, "volatility": round(price_volatility, 2), "seasonality": seasonality}, "demand_competition": {"demand_level": demand_level, "avg_demand_score": round(avg_demand, 2), "top_products_in_sector": [{"product": p[0], "count": p[1]} for p in top_products], "top_competitors": top_competitors}, "financials": {"budget_kes": budget_kes, "business_model": business_model, "estimated_cost_per_unit": round(estimated_cost_price, 2) if estimated_cost_price else None, "estimated_margin_percent": estimated_margin_percent, "estimated_profit_per_unit": round(estimated_profit_per_unit, 2) if estimated_profit_per_unit else None, "units_you_can_buy": units_possible, "estimated_monthly_revenue": round(estimated_revenue, 2), "estimated_monthly_profit": round(estimated_profit, 2), "estimated_roi_percent": round(roi_percent, 2)}, "operations": {"recommended_distribution": distribution_channels, "supply_chain_risk": supply_chain_risk, "supply_risk_events": len(supply_news)}, "risk_intelligence": {"risk_score_10": risk_score, "risk_level": "High" if risk_score > 6 else "Medium" if risk_score > 3 else "Low", "recent_risks": [{"title": n.title, "date": n.published_at.isoformat() if getattr(n, "published_at", None) else None} for n in risk_news[:3]]}, "social_intelligence": {"mentions_7d": len(social), "platforms": dict(platforms), "sentiment_score_10": sentiment_score}, "final_verdict": {"overall_score_10": score, "recommendation": recommendation, "key_reasons": reasons, "next_steps": [f"Source suppliers in {county}", "Lock pricing for 30 days if trend is rising", "Monitor news for policy changes"] if score >= 6 else ["Wait and re-evaluate in 30 days", "Test with smaller budget", "Look at alternative products"]}}
+    # No-data honesty: if there are no product rows at all, say so in reasons
+    # instead of silently using sector averages (old behaviour).
+    if product_records == 0 and not prices:
+        reasons.append(f"No live data for {product} in {county} in last 30 days - figures are estimated / nearest-county, verify before spending")
+    return {"status": "success", "timestamp": now.isoformat(), "input_parameters": {"product": product, "county": county, "sector": sector, "subcounties": subcounties, "budget_kes": budget_kes, "business_model": business_model}, "market_overview": {"product": product, "sector": sector, "location": {"county": county, "subcounties": subcounties}, "current_price_kes": round(current_price, 2) if current_price else None, "30_day_avg_kes": round(avg_price_30d, 2) if avg_price_30d else None, "90_day_forecast_kes": forecast_90d, "price_trend": price_trend, "volatility": round(price_volatility, 2), "seasonality": seasonality}, "demand_competition": {"demand_level": demand_level, "avg_demand_score": round(avg_demand, 2), "product_records_in_sector": product_records, "top_competitors": top_competitors}, "financials": {"budget_kes": budget_kes, "business_model": business_model, "estimated_cost_per_unit": round(estimated_cost_price, 2) if estimated_cost_price else None, "estimated_margin_percent": estimated_margin_percent, "estimated_profit_per_unit": round(estimated_profit_per_unit, 2) if estimated_profit_per_unit else None, "units_you_can_buy": units_possible, "estimated_monthly_revenue": round(estimated_revenue, 2), "estimated_monthly_profit": round(estimated_profit, 2), "estimated_roi_percent": round(roi_percent, 2)}, "operations": {"recommended_distribution": distribution_channels, "supply_chain_risk": supply_chain_risk, "supply_risk_events": len(supply_news)}, "risk_intelligence": {"risk_score_10": risk_score, "risk_level": "High" if risk_score > 6 else "Medium" if risk_score > 3 else "Low", "recent_risks": [{"title": n.title, "date": n.published_at.isoformat() if getattr(n, "published_at", None) else None} for n in risk_news[:3]]}, "social_intelligence": {"mentions_7d": len(social), "platforms": dict(platforms), "sentiment_score_10": sentiment_score}, "final_verdict": {"overall_score_10": score, "recommendation": recommendation, "key_reasons": reasons, "next_steps": [f"Source {product} suppliers in {county}", "Lock pricing for 30 days if trend is rising", "Monitor news for policy changes"] if score >= 6 else ["Wait and re-evaluate in 30 days", "Test with smaller budget", f"Look at alternative products to {product}"]}}
 
 @api_router.post("/analyze")
 def analyze_api(req: DetailedAnalysisRequest, session: Session = Depends(get_session)):
@@ -249,7 +342,6 @@ def detailed_analysis(req: DetailedAnalysisRequest, session: Session = Depends(g
 
 @router.post("/download-pdf")
 def download_pdf(req: DetailedAnalysisRequest, session: Session = Depends(get_session)):
-    # FIXED vs yours: yours crashed if reportlab missing. Now returns 503 instead.
     if not HAS_REPORTLAB:
         raise HTTPException(status_code=503, detail="PDF export not available - reportlab not installed")
     analysis_data = _run_analysis(req, session)
@@ -302,14 +394,17 @@ def download_pdf(req: DetailedAnalysisRequest, session: Session = Depends(get_se
     main_elements.append(Spacer(1, 8))
     price_data = [mo["current_price_kes"] or 0, mo["30_day_avg_kes"] or 0, mo["90_day_forecast_kes"] or 0]
     price_labels = ["Current", "30D Avg", "90D Forecast"]
-    donut = donut_chart(price_data, price_labels, "Price Trend")
-    comp_data = [p["count"] for p in dc["top_products_in_sector"][:5]]
-    comp_labels = [p["product"][:15] for p in dc["top_products_in_sector"][:5]]
-    bar = bar_chart(comp_data, comp_labels, "Top Products in Sector")
+    donut = donut_chart(price_data, price_labels, f"{req.get_product().capitalize()} Price")
+    # FIXED: old bar chart was "Top Products in Sector" - it injected
+    # tea / maize / avocado into a coffee PDF. Replaced with demand
+    # for THIS product only.
+    demand_data = [dc["avg_demand_score"], max(0, 10 - ri["risk_score_10"]), fv["overall_score_10"]]
+    demand_labels = ["Demand", "Low Risk", "Score"]
+    bar = bar_chart(demand_data, demand_labels, f"{req.get_product().capitalize()} - Demand / Risk / Score")
     charts_table = Table([[donut, bar]], colWidths=[85*mm, 85*mm])
     main_elements.append(charts_table)
     main_elements.append(Spacer(1, 8))
-    main_elements.append(Paragraph(f"<b>Insight:</b> {mo['price_trend']} trend with {mo['seasonality']}. Risk level is {ri['risk_level']}.", styles["Insight"]))
+    main_elements.append(Paragraph(f"<b>Insight:</b> {mo['price_trend']} trend for {req.get_product()} with {mo['seasonality']}. Risk level is {ri['risk_level']}.", styles["Insight"]))
     page1 = Table([[sidebar_table, main_elements]], colWidths=[55*mm, 125*mm])
     page1.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
     story.append(page1)
@@ -323,8 +418,8 @@ def download_pdf(req: DetailedAnalysisRequest, session: Session = Depends(get_se
     story.append(fin_table)
     story.append(Spacer(1, 8))
     story.append(Paragraph("2. DEMAND & COMPETITION", styles["SubtitleTeal"]))
-    story.append(Paragraph(f"<b>Demand Score:</b> {dc['avg_demand_score']}/10 - {dc['demand_level']}", styles["Normal"]))
-    story.append(Paragraph(f"<b>Top Competitors:</b> {', '.join(dc['top_competitors']) or 'None'}", styles["Normal"]))
+    story.append(Paragraph(f"<b>Demand Score for {req.get_product()}:</b> {dc['avg_demand_score']}/10 - {dc['demand_level']}", styles["Normal"]))
+    story.append(Paragraph(f"<b>Same product, other locations:</b> {', '.join(dc['top_competitors']) or 'None recorded'}", styles["Normal"]))
     story.append(Spacer(1, 8))
     story.append(Paragraph("3. OPERATIONS & RISK", styles["SubtitleTeal"]))
     story.append(Paragraph(f"<b>Distribution:</b> {', '.join(ops['recommended_distribution'])}", styles["Normal"]))
@@ -332,7 +427,7 @@ def download_pdf(req: DetailedAnalysisRequest, session: Session = Depends(get_se
     story.append(Paragraph(f"<b>Risk Score:</b> {ri['risk_score_10']}/10 - {ri['risk_level']}", styles["Normal"]))
     story.append(Spacer(1, 8))
     story.append(Paragraph("4. SOCIAL INTELLIGENCE - 7 DAYS", styles["SubtitleTeal"]))
-    story.append(Paragraph(f"Mentions: {soc['mentions_7d']} | Sentiment: {soc['sentiment_score_10']}/10", styles["Normal"]))
+    story.append(Paragraph(f"Mentions for {req.get_product()}: {soc['mentions_7d']} | Sentiment: {soc['sentiment_score_10']}/10", styles["Normal"]))
     story.append(Paragraph(f"Platforms: {', '.join(soc['platforms'].keys())}", styles["Normal"]))
     story.append(Spacer(1, 8))
     story.append(Paragraph("5. RECOMMENDATIONS & NEXT STEPS", styles["SubtitleTeal"]))
