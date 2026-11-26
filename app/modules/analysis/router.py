@@ -57,39 +57,7 @@ GREEN = _hex_color("#16A34A")
 YELLOW = _hex_color("#F59E0B")
 RED = _hex_color("#DC2626")
 PRICING = {"Starter": {"monthly": 500, "annual": 5000}, "Pro": {"monthly": 1500, "annual": 15000}, "Enterprise": {"monthly": 5000, "annual": 50000}}
-PRODUCT_ALIASES = {
-    "coffee": "coffee",
-    "kahawa": "coffee",
-    "arabica": "coffee",
-    "robusta": "coffee",
-    "tea": "tea",
-    "chai": "tea",
-    "maize": "maize",
-    "corn": "maize",
-    "avocado": "avocado",
-    "ovacado": "avocado",
-    "dairy": "dairy",
-    "milk": "dairy",
-    "poultry": "poultry",
-    "chicken": "poultry",
-    "eggs": "poultry",
-    "potato": "potato",
-    "potatoes": "potato",
-    "banana": "banana",
-    "bananas": "banana",
-    "tomato": "tomato",
-    "tomatoes": "tomato",
-    "onion": "onion",
-    "onions": "onion",
-    "cabbage": "cabbage",
-    "beans": "beans",
-    "rice": "rice",
-    "wheat": "wheat",
-    "sugarcane": "sugarcane",
-    "macadamia": "macadamia",
-    "mango": "mango",
-    "passion": "passion fruit",
-}
+PRODUCT_ALIASES = {"coffee": "coffee", "kahawa": "coffee", "arabica": "coffee", "robusta": "coffee", "tea": "tea", "chai": "tea", "maize": "maize", "corn": "maize", "avocado": "avocado", "ovacado": "avocado", "dairy": "dairy", "milk": "dairy", "poultry": "poultry", "chicken": "poultry", "eggs": "poultry", "potato": "potato", "potatoes": "potato", "banana": "banana", "bananas": "banana", "tomato": "tomato", "tomatoes": "tomato", "onion": "onion", "onions": "onion", "cabbage": "cabbage", "beans": "beans", "rice": "rice", "wheat": "wheat", "sugarcane": "sugarcane", "macadamia": "macadamia", "mango": "mango", "passion": "passion fruit"}
 def lock_product(raw: Optional[str]) -> str:
     clean = (raw or "").strip().lower()
     first = clean.split()[0] if clean.split() else ""
@@ -98,8 +66,6 @@ def lock_product(raw: Optional[str]) -> str:
     if first in PRODUCT_ALIASES:
         return PRODUCT_ALIASES[first]
     return first or clean
-def _product_text_filter(column, product: str):
-    return column.ilike(f"%{product}%")
 def _safe_float(v):
     try:
         if v is None or v == "":
@@ -129,8 +95,7 @@ class DetailedAnalysisRequest(BaseModel):
     model_config = {"extra": "allow"}
     def get_product(self):
         raw = self.product or self.query or self.q or self.topic or ""
-        locked = lock_product(raw)
-        return locked
+        return lock_product(raw)
     def get_county(self):
         return (self.county or "Kenya").strip()
     def get_sector(self):
@@ -231,11 +196,7 @@ def _run_analysis(req: DetailedAnalysisRequest, session: Session):
     top_competitors = [c for c in competitor_locations if c][:5]
     supply_risk_keywords = ["shortage", "transport", "drought", "flood", "strike"]
     supply_candidates = session.exec(select(NewsArticle).where(NewsArticle.county.ilike(f"%{county}%"), NewsArticle.published_at >= last_30_days)).all()
-    supply_news = [
-        n for n in supply_candidates
-        if product in ((n.title or "") + " " + (n.summary or "") + " " + (getattr(n, "content", "") or "")).lower()
-        and any(k in ((n.title or "") + (n.summary or "")).lower() for k in supply_risk_keywords)
-    ]
+    supply_news = [n for n in supply_candidates if product in ((n.title or "") + " " + (n.summary or "") + " " + (getattr(n, "content", "") or "")).lower() and any(k in ((n.title or "") + (n.summary or "")).lower() for k in supply_risk_keywords)]
     supply_chain_risk = "High" if len(supply_news) > 3 else "Medium" if len(supply_news) > 0 else "Low"
     if business_model == "Retail":
         distribution_channels = ["Dukas", "Supermarkets", "Open Markets"]
@@ -247,22 +208,14 @@ def _run_analysis(req: DetailedAnalysisRequest, session: Session):
     estimated_margin_percent = 25.0 if current_price is not None else None
     estimated_profit_per_unit = current_price - estimated_cost_price if current_price is not None and estimated_cost_price is not None else None
     news_candidates = session.exec(select(NewsArticle).where(NewsArticle.county.ilike(f"%{county}%"), NewsArticle.published_at >= last_30_days).order_by(NewsArticle.published_at.desc()).limit(50)).all()
-    news = [
-        n for n in news_candidates
-        if product in ((n.title or "") + " " + (n.summary or "") + " " + (getattr(n, "content", "") or "")).lower()
-    ][:10]
+    news = [n for n in news_candidates if product in ((n.title or "") + " " + (n.summary or "") + " " + (getattr(n, "content", "") or "")).lower()][:10]
     risk_keywords = ["ban", "shortage", "tax", "drought", "protest", "inflation", "disease", "policy"]
     risk_news = [n for n in news if any(k in ((n.title or "") + (n.summary or "")).lower() for k in risk_keywords)]
     risk_score = min(10, len(risk_news) * 2)
     social_candidates = session.exec(select(SocialMention).where(SocialMention.county.ilike(f"%{county}%"), SocialMention.created_at >= last_7_days).order_by(SocialMention.created_at.desc()).limit(100)).all()
-    social = [
-        s for s in social_candidates
-        if product in ((getattr(s, "content", "") or "") + " " + (getattr(s, "author", "") or "")).lower()
-    ][:20]
+    social = [s for s in social_candidates if product in ((getattr(s, "content", "") or "") + " " + (getattr(s, "author", "") or "")).lower()][:20]
     platforms = Counter([s.platform for s in social if s.platform])
-    sentiment_score = None
-    if social:
-        sentiment_score = 6.5
+    sentiment_score = 6.5 if social else None
     units_possible = int(budget_kes / current_price) if current_price is not None and budget_kes > 0 else 0
     estimated_revenue = units_possible * current_price if current_price is not None else 0
     estimated_profit = units_possible * estimated_profit_per_unit if estimated_profit_per_unit is not None else 0
@@ -297,7 +250,7 @@ def _run_analysis(req: DetailedAnalysisRequest, session: Session):
         recommendation = "AVOID - High risk"
     if product_records == 0 and not prices:
         reasons.append(f"No live data for {product} in {county} in last 30 days - figures are estimated / nearest-county, verify before spending")
-    return {"status": "success", "timestamp": now.isoformat(), "input_parameters": {"product": product, "county": county, "sector": sector, "subcounties": subcounties, "budget_kes": budget_kes, "business_model": business_model}, "market_overview": {"product": product, "sector": sector, "location": {"county": county, "subcounties": subcounties}, "current_price_kes": round(current_price, 2) if current_price is not None else None, "30_day_avg_kes": round(avg_price_30d, 2) if avg_price_30d is not None else None, "90_day_forecast_kes": forecast_90d, "price_trend": price_trend, "volatility": round(price_volatility, 2) if price_volatility is not None else None, "seasonality": seasonality}, "demand_competition": {"demand_level": demand_level, "avg_demand_score": round(avg_demand, 2) if avg_demand is not None else None, "product_records_in_sector": product_records, "top_competitors": top_competitors}, "financials": {"budget_kes": budget_kes, "business_model": business_model, "estimated_cost_per_unit": round(estimated_cost_price, 2) if estimated_cost_price is not None else None, "estimated_margin_percent": estimated_margin_percent, "estimated_profit_per_unit": round(estimated_profit_per_unit, 2) if estimated_profit_per_unit is not None else None, "units_you_can_buy": units_possible, "estimated_monthly_revenue": round(estimated_revenue, 2), "estimated_monthly_profit": round(estimated_profit, 2), "estimated_roi_percent": round(roi_percent, 2)}, "operations": {"recommended_distribution": distribution_channels, "supply_chain_risk": supply_chain_risk, "supply_risk_events": len(supply_news)}, "risk_intelligence": {"risk_score_10": risk_score, "risk_level": "High" if risk_score > 6 else "Medium" if risk_score > 3 else "Low", "recent_risks": [{"title": n.title, "date": n.published_at.isoformat() if getattr(n, "published_at", None) else None} for n in risk_news[:3]]}, "social_intelligence": {"mentions_7d": len(social), "platforms": dict(platforms), "sentiment_score_10": sentiment_score}, "final_verdict": {"overall_score_10": score, "recommendation": recommendation, "key_reasons": reasons, "next_steps": [f"Source {product} suppliers in {county}", "Lock pricing for 30 days if trend is rising", "Monitor news for policy changes"] if score >= 6 else ["Wait and re-evaluate in 30 days", "Test with smaller budget", f"Look at alternative products to {product}"]}}
+    return {"status": "success", "timestamp": now.isoformat(), "input_parameters": {"product": product, "county": county, "sector": sector, "subcounties": subcounties, "budget_kes": budget_kes, "business_model": business_model}, "market_overview": {"product": product, "sector": sector, "location": {"county": county, "subcounties": subcounties}, "current_price_kes": round(current_price, 2) if current_price is not None else None, "30_day_avg_kes": round(avg_price_30d, 2) if avg_price_30d is not None else None, "90_day_forecast_kes": forecast_90d, "price_trend": price_trend, "volatility": round(price_volatility, 2) if price_volatility is not None else None, "seasonality": seasonality}, "demand_competition": {"demand_level": demand_level, "avg_demand_score": round(avg_demand, 2) if avg_demand is not None else None, "product_records_in_sector": product_records, "top_products_in_sector": [], "top_competitors": top_competitors}, "financials": {"budget_kes": budget_kes, "business_model": business_model, "estimated_cost_per_unit": round(estimated_cost_price, 2) if estimated_cost_price is not None else None, "estimated_margin_percent": estimated_margin_percent, "estimated_profit_per_unit": round(estimated_profit_per_unit, 2) if estimated_profit_per_unit is not None else None, "units_you_can_buy": units_possible, "estimated_monthly_revenue": round(estimated_revenue, 2), "estimated_monthly_profit": round(estimated_profit, 2), "estimated_roi_percent": round(roi_percent, 2)}, "operations": {"recommended_distribution": distribution_channels, "supply_chain_risk": supply_chain_risk, "supply_risk_events": len(supply_news)}, "risk_intelligence": {"risk_score_10": risk_score, "risk_level": "High" if risk_score > 6 else "Medium" if risk_score > 3 else "Low", "recent_risks": [{"title": n.title, "date": n.published_at.isoformat() if getattr(n, "published_at", None) else None} for n in risk_news[:3]]}, "social_intelligence": {"mentions_7d": len(social), "platforms": dict(platforms), "sentiment_score_10": sentiment_score}, "final_verdict": {"overall_score_10": score, "recommendation": recommendation, "key_reasons": reasons, "next_steps": [f"Source {product} suppliers in {county}", "Lock pricing for 30 days if trend is rising", "Monitor news for policy changes"] if score >= 6 else ["Wait and re-evaluate in 30 days", "Test with smaller budget", f"Look at alternative products to {product}"]}}
 @api_router.post("/analyze")
 def analyze_api(req: DetailedAnalysisRequest, session: Session = Depends(get_session)):
     try:
