@@ -13,12 +13,22 @@ def _utcnow():
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 def _get_user_id_from_request(request: Request):
+    # 1. Starlette session
     try:
         sess = request.session.get("user_id") if hasattr(request, "session") else None
         if sess:
             return str(sess)
     except Exception:
         pass
+    # 2. COOKIES - THIS WAS MISSING. This is what login actually sets.
+    for key in ("user_id", "session", "auth_user_id"):
+        try:
+            v = request.cookies.get(key)
+            if v and str(v).isdigit():
+                return str(v)
+        except Exception:
+            continue
+    # 3. Bearer header
     auth = request.headers.get("Authorization")
     if auth and auth.startswith("Bearer "):
         token = auth.replace("Bearer ", "").strip()
