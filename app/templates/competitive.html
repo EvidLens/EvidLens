@@ -14,7 +14,6 @@
     <a href="/" class="text-[13px] bg-white/10 px-4 py-2 rounded-lg">← Dashboard</a>
   </div>
 </div>
-
 <div class="max-w-7xl mx-auto p-6 lg:p-8">
   <div class="bg-white rounded-2xl shadow-sm border p-6">
     <div class="flex justify-between items-center mb-6 flex-wrap gap-3">
@@ -25,25 +24,28 @@
       <a href="/ai" class="bg-[#14B8A6] text-white px-4 py-2 rounded-lg font-bold text-[13px]">Ask Lens →</a>
     </div>
     <form method="GET" action="/competitive" class="flex gap-3 flex-wrap mb-6">
-      <input name="sector" value="{{ sector or '' }}" placeholder="Sector e.g. Agriculture" class="border rounded-xl px-3 py-2 text-sm flex-1 min-w-[160px]">
-      <input name="county" value="{{ county or '' }}" placeholder="County e.g. Kirinyaga" class="border rounded-xl px-3 py-2 text-sm flex-1 min-w-[160px]">
-      <input name="product" value="{{ product or '' }}" placeholder="Product (optional) e.g. Avocado" class="border rounded-xl px-3 py-2 text-sm flex-1 min-w-[160px]">
-      <button class="bg-[#0A1F44] text-white px-4 py-2 rounded-xl font-bold text-sm">Analyze →</button>
+      <input name="sector" value="{{ sector or '' }}" placeholder="Sector e.g. Agriculture" class="border rounded-xl px-3 py-2 text-sm flex-1 min-w-[160px]" autocomplete="off">
+      <input name="county" value="{{ county or '' }}" placeholder="County e.g. Kirinyaga" class="border rounded-xl px-3 py-2 text-sm flex-1 min-w-[160px]" autocomplete="off">
+      <input name="product" value="{{ product or '' }}" placeholder="Product (optional) e.g. Avocado" class="border rounded-xl px-3 py-2 text-sm flex-1 min-w-[160px]" autocomplete="off">
+      <button type="submit" class="bg-[#0A1F44] text-white px-4 py-2 rounded-xl font-bold text-sm">Analyze →</button>
       <a href="/competitive" class="bg-white border px-4 py-2 rounded-xl font-bold text-sm">Clear</a>
     </form>
     {% if companies is defined and companies %}
-    {# FIXED: app.core.models.Company has NO 'rating' attribute. c.rating throws UndefinedError and kills the whole page. Use c.__dict__.get('rating') which returns None instead of throwing. #}
-    {% set ns = namespace(high=0, total=0, sum=0) %}
+    {% set ns = namespace(high=0, total=0, rated=0, sum=0) %}
     {% for c in companies %}
-      {% set _r = (c.__dict__.get('rating') or 0)|float %}
-      {% set ns.sum = ns.sum + _r %}
-      {% if _r >= 4 %}{% set ns.high = ns.high + 1 %}{% endif %}
+      {% set _r_raw = c.get('rating') if c is mapping else c.__dict__.get('rating') %}
+      {% if _r_raw is not none %}
+        {% set _r = _r_raw|float %}
+        {% set ns.sum = ns.sum + _r %}
+        {% set ns.rated = ns.rated + 1 %}
+        {% if _r >= 4 %}{% set ns.high = ns.high + 1 %}{% endif %}
+      {% endif %}
       {% set ns.total = ns.total + 1 %}
     {% endfor %}
     <div class="grid grid-cols-3 gap-3 mb-6 text-center">
       <div class="bg-slate-50 rounded-xl p-4"><p class="text-2xl font-bold text-[#0A1F44]">{{ companies|length }}</p><p class="text-xs text-gray-500">Competitors Found</p></div>
       <div class="bg-red-50 rounded-xl p-4"><p class="text-2xl font-bold text-red-600">{{ ns.high }}</p><p class="text-xs text-gray-500">High Threat</p></div>
-      <div class="bg-teal-50 rounded-xl p-4"><p class="text-2xl font-bold text-teal-600">{{ ((ns.sum / ns.total) if ns.total else 0)|round(1) }}/5</p><p class="text-xs text-gray-500">Avg Rating</p></div>
+      <div class="bg-teal-50 rounded-xl p-4"><p class="text-2xl font-bold text-teal-600">{% if ns.rated %}{{ ((ns.sum / ns.rated))|round(1) }}/5{% else %}—{% endif %}</p><p class="text-xs text-gray-500">Avg Rating</p></div>
     </div>
     {% endif %}
     <div class="overflow-x-auto">
@@ -51,18 +53,27 @@
         <thead><tr class="text-left text-sm text-gray-500 border-b"><th class="p-3">Company</th><th class="p-3">Sector</th><th class="p-3">County</th><th class="p-3">Rating</th><th class="p-3">Strength</th><th class="p-3"></th></tr></thead>
         <tbody>
           {% for c in (companies or []) %}
-          {% set r = ((c.__dict__.get('rating') or 0)|float)|round|int %}
-          {% if r < 0 %}{% set r = 0 %}{% endif %}
-          {% if r > 5 %}{% set r = 5 %}{% endif %}
-          {% set _loc = c.__dict__.get('location') %}
-          {% set _url = c.__dict__.get('url') %}
+          {% set _r_raw = c.get('rating') if c is mapping else c.__dict__.get('rating') %}
+          {% set _name = c.get('name') if c is mapping else c.__dict__.get('name') %}
+          {% set _sector = c.get('sector') if c is mapping else c.__dict__.get('sector') %}
+          {% set _county = c.get('county') if c is mapping else c.__dict__.get('county') %}
+          {% set _loc = c.get('location') if c is mapping else c.__dict__.get('location') %}
+          {% set _url = c.get('url') if c is mapping else c.__dict__.get('url') %}
+          {% set _is_safe_url = _url and (_url|string|lower).startswith('http') %}
+          {% if _r_raw is not none %}
+            {% set r = ((_r_raw|float)|round|int) %}
+            {% if r < 0 %}{% set r = 0 %}{% endif %}
+            {% if r > 5 %}{% set r = 5 %}{% endif %}
+          {% else %}
+            {% set r = None %}
+          {% endif %}
           <tr class="border-b hover:bg-gray-50">
-            <td class="p-3 font-semibold text-[#0A1F44]">{{ c.name or 'Company' }}{% if _loc %}<p class="text-xs text-gray-400 font-normal">{{ _loc }}</p>{% endif %}</td>
-            <td class="p-3">{{ c.sector or sector or '-' }}</td>
-            <td class="p-3">{{ c.county or county or '-' }}</td>
-            <td class="p-3 whitespace-nowrap"><span class="text-[#F59E0B]">{{ '★' * r }}{{ '☆' * (5 - r) }}</span> <span class="text-sm ml-1">{{ r }}/5</span></td>
-            <td class="p-3">{% if r >= 4 %}<span class="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full font-bold">High Threat</span>{% elif r >= 3 %}<span class="bg-yellow-100 text-yellow-700 text-xs px-2 py-1 rounded-full font-bold">Medium</span>{% else %}<span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full font-bold">Low</span>{% endif %}</td>
-            <td class="p-3 text-right">{% if _url %}<a href="{{ _url }}" target="_blank" rel="noopener" class="text-[#0d9488] font-bold text-[13px]">View →</a>{% elif c.name %}<a href="/ai?q={{ ('Competitors of ' + c.name + ' in ' + (c.county or county or 'Kenya'))|urlencode }}" class="text-[#0d9488] font-bold text-[13px]">Analyze →</a>{% endif %}</td>
+            <td class="p-3 font-semibold text-[#0A1F44]">{{ _name or 'Company' }}{% if _loc %}<p class="text-xs text-gray-400 font-normal">{{ _loc }}</p>{% endif %}</td>
+            <td class="p-3">{{ _sector or sector or '-' }}</td>
+            <td class="p-3">{{ _county or county or '-' }}</td>
+            <td class="p-3 whitespace-nowrap">{% if r is not none %}<span class="text-[#F59E0B]">{{ '★' * r }}{{ '☆' * (5 - r) }}</span> <span class="text-sm ml-1">{{ r }}/5</span>{% else %}<span class="text-slate-400">—</span>{% endif %}</td>
+            <td class="p-3">{% if r is not none and r >= 4 %}<span class="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full font-bold">High Threat</span>{% elif r is not none and r >= 3 %}<span class="bg-yellow-100 text-yellow-700 text-xs px-2 py-1 rounded-full font-bold">Medium</span>{% elif r is not none %}<span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full font-bold">Low</span>{% else %}<span class="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full font-bold">Unknown</span>{% endif %}</td>
+            <td class="p-3 text-right">{% if _is_safe_url %}<a href="{{ _url }}" target="_blank" rel="noopener noreferrer" class="text-[#0d9488] font-bold text-[13px]">View →</a>{% elif _name %}<a href="/ai?q={{ ('Competitors of ' + _name + ' in ' + (_county or county or 'Kenya'))|urlencode }}" class="text-[#0d9488] font-bold text-[13px]">Analyze →</a>{% endif %}</td>
           </tr>
           {% else %}
           <tr><td colspan="6" class="text-center p-10 text-gray-500">No competitors found yet. Pick a sector + county and click Analyze.<br><a href="/ai" class="text-[#0d9488] font-bold underline">Or ask Lens to find competitors for you →</a></td></tr>
