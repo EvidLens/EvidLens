@@ -13,8 +13,6 @@ FROM_EMAIL = os.getenv("FROM_EMAIL", "noreply@evidlens.co.ke")
 FROM_NAME = os.getenv("FROM_NAME", "EvidLens")
 APP_URL = os.getenv("APP_URL", "https://app.evidlens.co.ke")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "")
-MAX_FAILED_LOGINS = 5
-LOCK_MINUTES = 15
 
 def _utcnow():
     return datetime.now(timezone.utc).replace(tzinfo=None)
@@ -129,22 +127,12 @@ def login_user(db: Session, email: str, password: str):
         return {"error": "Database temporarily unavailable, please retry"}
     if not user:
         return {"error": "Invalid credentials"}
-    if user.locked_until and user.locked_until > _utcnow():
-        return {"error": "Account locked - too many failed attempts. Try again in 15 minutes"}
     if not user.is_active:
         return {"error": "Account disabled"}
     if not verify_password(password, user.hashed_password):
-        user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
-        if user.failed_login_attempts >= MAX_FAILED_LOGINS:
-            user.locked_until = _utcnow() + timedelta(minutes=LOCK_MINUTES)
-            user.failed_login_attempts = 0
-        db.add(user)
-        db.commit()
         return {"error": "Invalid credentials"}
     if not user.email_verified:
         return {"error": "Email not verified - check inbox for verification email"}
-    user.failed_login_attempts = 0
-    user.locked_until = None
     user.last_login = _utcnow()
     db.add(user)
     db.commit()
@@ -179,8 +167,6 @@ def reset_password(db: Session, token: str, new_password: str):
     user.reset_token_expires = None
     user.email_verified = True
     user.is_active = True
-    user.failed_login_attempts = 0
-    user.locked_until = None
     db.add(user)
     db.commit()
     db.refresh(user)
