@@ -67,11 +67,20 @@ class AuthMiddleware(BaseHTTPMiddleware):
             if path == p or path.startswith(p + "/"):
                 return await call_next(request)
         has_auth = False
+        # 1. Session
         try:
             if request.session.get("user_id"):
                 has_auth = True
         except Exception:
             pass
+        # 2. COOKIES - THIS WAS MISSING. This is what survives restarts.
+        if not has_auth:
+            for key in ("user_id", "session", "auth_user_id"):
+                v = request.cookies.get(key)
+                if v and str(v).isdigit():
+                    has_auth = True
+                    break
+        # 3. Bearer
         if not has_auth:
             auth = request.headers.get("Authorization")
             if auth and auth.startswith("Bearer "):
