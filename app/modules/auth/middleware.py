@@ -23,10 +23,13 @@ PUBLIC_PATHS = [
     "/redoc",
     "/openapi.json",
     "/static",
+    "/favicon.ico",
+    "/robots.txt",
+    "/api/auth",
+    "/api/public",
 ]
 
 PROTECTED_PAGE_PREFIXES = [
-    "/",
     "/dashboard",
     "/competitive",
     "/market",
@@ -63,19 +66,25 @@ class AuthMiddleware(BaseHTTPMiddleware):
         for p in PUBLIC_PATHS:
             if path == p or path.startswith(p + "/"):
                 return await call_next(request)
-        user_id = request.cookies.get("user_id")
-        auth = request.headers.get("Authorization")
-        has_auth = bool(user_id) or bool(auth)
+        has_auth = False
+        try:
+            if request.session.get("user_id"):
+                has_auth = True
+        except Exception:
+            pass
+        if not has_auth:
+            auth = request.headers.get("Authorization")
+            if auth and auth.startswith("Bearer "):
+                token = auth.replace("Bearer ", "").strip()
+                if token.isdigit():
+                    has_auth = True
+        if path == "/":
+            return await call_next(request)
         is_protected_page = False
         for prefix in PROTECTED_PAGE_PREFIXES:
-            if prefix == "/":
-                if path == "/":
-                    is_protected_page = True
-                    break
-            else:
-                if path == prefix or path.startswith(prefix + "/") or path == prefix + "/":
-                    is_protected_page = True
-                    break
+            if path == prefix or path.startswith(prefix + "/"):
+                is_protected_page = True
+                break
         if is_protected_page:
             if not has_auth:
                 accept = request.headers.get("accept", "")
