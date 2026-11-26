@@ -56,39 +56,7 @@ GREEN = _hex_color("#16A34A")
 YELLOW = _hex_color("#F59E0B")
 RED = _hex_color("#DC2626")
 PRICING = {"Starter": {"monthly": 500, "annual": 5000}, "Pro": {"monthly": 1500, "annual": 15000}, "Enterprise": {"monthly": 5000, "annual": 50000}}
-PRODUCT_ALIASES = {
-    "coffee": "coffee",
-    "kahawa": "coffee",
-    "arabica": "coffee",
-    "robusta": "coffee",
-    "tea": "tea",
-    "chai": "tea",
-    "maize": "maize",
-    "corn": "maize",
-    "avocado": "avocado",
-    "ovacado": "avocado",
-    "dairy": "dairy",
-    "milk": "dairy",
-    "poultry": "poultry",
-    "chicken": "poultry",
-    "eggs": "poultry",
-    "potato": "potato",
-    "potatoes": "potato",
-    "banana": "banana",
-    "bananas": "banana",
-    "tomato": "tomato",
-    "tomatoes": "tomato",
-    "onion": "onion",
-    "onions": "onion",
-    "cabbage": "cabbage",
-    "beans": "beans",
-    "rice": "rice",
-    "wheat": "wheat",
-    "sugarcane": "sugarcane",
-    "macadamia": "macadamia",
-    "mango": "mango",
-    "passion": "passion fruit",
-}
+PRODUCT_ALIASES = {"coffee": "coffee", "kahawa": "coffee", "arabica": "coffee", "robusta": "coffee", "tea": "tea", "chai": "tea", "maize": "maize", "corn": "maize", "avocado": "avocado", "ovacado": "avocado", "dairy": "dairy", "milk": "dairy", "poultry": "poultry", "chicken": "poultry", "eggs": "poultry", "potato": "potato", "potatoes": "potato", "banana": "banana", "bananas": "banana", "tomato": "tomato", "tomatoes": "tomato", "onion": "onion", "onions": "onion", "cabbage": "cabbage", "beans": "beans", "rice": "rice", "wheat": "wheat", "sugarcane": "sugarcane", "macadamia": "macadamia", "mango": "mango", "passion": "passion fruit"}
 def lock_product(raw: Optional[str]) -> str:
     clean = (raw or "").strip().lower()
     first = clean.split()[0] if clean.split() else ""
@@ -356,14 +324,14 @@ def download_pdf(req: DetailedAnalysisRequest, session: Session = Depends(get_se
     main_elements.append(Spacer(1, 8))
     price_data = [mo["current_price_kes"] or 0, mo["30_day_avg_kes"] or 0, mo["90_day_forecast_kes"] or 0]
     price_labels = ["Current", "30D Avg", "90D Forecast"]
-    donut = donut_chart(price_data, price_labels, "Price Trend")
+    donut = donut_chart(price_data, price_labels, f"{req.get_product().capitalize()} Price")
     demand_data = [dc["avg_demand_score"] or 0, max(0, 10 - ri["risk_score_10"]), fv["overall_score_10"]]
     demand_labels = ["Demand", "Low Risk", "Score"]
     bar = bar_chart(demand_data, demand_labels, f"{req.get_product().capitalize()} - Demand / Risk / Score")
     charts_table = Table([[donut, bar]], colWidths=[85*mm, 85*mm])
     main_elements.append(charts_table)
     main_elements.append(Spacer(1, 8))
-    main_elements.append(Paragraph(f"<b>Insight:</b> {mo['price_trend'] or 'No trend yet'} trend with {mo['seasonality'] or 'seasonality unknown'}. Risk level is {ri['risk_level']}.", styles["Insight"]))
+    main_elements.append(Paragraph(f"<b>Insight:</b> {mo['price_trend'] or 'No trend yet'} trend for {req.get_product()} with {mo['seasonality'] or 'seasonality unknown'}. Risk level is {ri['risk_level']}.", styles["Insight"]))
     page1 = Table([[sidebar_table, main_elements]], colWidths=[55*mm, 125*mm])
     page1.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
     story.append(page1)
