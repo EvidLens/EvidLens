@@ -10,32 +10,43 @@
     <a href="/ai" class="bg-[#14B8A6] text-white px-4 py-2 rounded-xl font-bold text-[13px]">Ask Lens →</a>
   </div>
   <form method="get" action="/market/demand" class="bg-white p-4 rounded-xl shadow-sm border mb-6 flex gap-2 flex-wrap">
-    <input name="q" value="{{ q or '' }}" placeholder="Search product..." class="border rounded-xl px-3 py-2 text-sm flex-1 min-w-[160px]">
-    <input name="county" value="{{ county or '' }}" placeholder="County (e.g. Nyeri)" class="border rounded-xl px-3 py-2 text-sm">
-    <input name="sector" value="{{ sector or '' }}" placeholder="Sector (e.g. Agribusiness)" class="border rounded-xl px-3 py-2 text-sm">
-    <button class="bg-[#0A1F44] text-white px-4 py-2 rounded-xl font-bold text-sm">Filter</button>
+    <input name="q" value="{{ q or '' }}" placeholder="Search product..." class="border rounded-xl px-3 py-2 text-sm flex-1 min-w-[160px]" autocomplete="off">
+    <input name="county" value="{{ county or '' }}" placeholder="County (e.g. Nyeri)" class="border rounded-xl px-3 py-2 text-sm" autocomplete="off">
+    <input name="sector" value="{{ sector or '' }}" placeholder="Sector (e.g. Agribusiness)" class="border rounded-xl px-3 py-2 text-sm" autocomplete="off">
+    <button type="submit" class="bg-[#0A1F44] text-white px-4 py-2 rounded-xl font-bold text-sm">Filter</button>
     {% if q or county or sector %}<a href="/market/demand" class="border px-4 py-2 rounded-xl font-bold text-sm">Clear</a>{% endif %}
   </form>
+  {% set _scored = namespace(value=0) %}
+  {% set _counties = [] %}
+  {% for d in (demand or []) %}
+    {% set _s = d.score if d.score is defined and d.score is not none else (d.demand_score if d.demand_score is defined and d.demand_score is not none else None) %}
+    {% if _s is not none %}{% set _scored.value = _scored.value + 1 %}{% endif %}
+    {% if d.county is defined and d.county and d.county not in _counties %}{% set _ = _counties.append(d.county) %}{% endif %}
+  {% endfor %}
   <div class="grid grid-cols-3 gap-3 mb-6 text-center">
     <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-[#0A1F44]">{{ (demand or [])|length }}</p><p class="text-xs text-gray-500">Signals</p></div>
-    <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-green-600">{{ (demand or [])|selectattr('score','defined')|list|length + (demand or [])|selectattr('demand_score','defined')|list|length }}</p><p class="text-xs text-gray-500">Scored</p></div>
-    <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-[#0A1F44]">{{ (demand or [])|map(attribute='county')|select('defined')|list|unique|list|length }}</p><p class="text-xs text-gray-500">Counties Covered</p></div>
+    <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-green-600">{{ _scored.value }}</p><p class="text-xs text-gray-500">Scored</p></div>
+    <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-[#0A1F44]">{{ _counties|length }}</p><p class="text-xs text-gray-500">Counties Covered</p></div>
   </div>
   {% if demand is defined and demand %}
   <div class="bg-white rounded-2xl shadow-sm border overflow-hidden"><div class="overflow-x-auto"><table class="w-full text-[14px]">
     <thead><tr class="text-left text-sm text-gray-500 border-b"><th class="p-3">Product</th><th class="p-3">County</th><th class="p-3">Sector</th><th class="p-3">Demand Score</th><th class="p-3">Price (KES)</th><th class="p-3"></th></tr></thead>
     <tbody>
       {% for d in demand %}
-      {% set score = (d.score if d.score is defined else (d.demand_score if d.demand_score is defined else 0))|int %}
-      {% set price = d.price if d.price is defined else (d.avg_price_kes if d.avg_price_kes is defined else 0) %}
-      {% set name = d.product if d.product is defined else 'Product' %}
+      {% set score_raw = d.score if d.score is defined and d.score is not none else (d.demand_score if d.demand_score is defined and d.demand_score is not none else None) %}
+      {% set score = score_raw|int if score_raw is not none else None %}
+      {% set score_clamped = ([0, score]|max if score is not none else 0) %}
+      {% set score_clamped = ([100, score_clamped]|min) %}
+      {% set price = d.price if d.price is defined and d.price is not none else (d.avg_price_kes if d.avg_price_kes is defined and d.avg_price_kes is not none else (d.current_price_kes if d.current_price_kes is defined and d.current_price_kes is not none else None)) %}
+      {% set name = d.product if d.product is defined and d.product else (d.product_name if d.product_name is defined and d.product_name else 'Product') %}
+      {% set _county = d.county if d.county is defined and d.county else 'Kenya' %}
       <tr class="border-b hover:bg-gray-50">
         <td class="p-3 font-semibold text-[#0A1F44]">{{ name }}</td>
-        <td class="p-3">{{ d.county if d.county is defined else 'Kenya' }}</td>
-        <td class="p-3">{{ d.sector if d.sector is defined else '—' }}</td>
-        <td class="p-3"><div class="flex items-center gap-2"><div class="w-20 h-2 bg-gray-100 rounded-full overflow-hidden"><div class="h-2 rounded-full" style="width:{{ score }}%;background:{% if score>=70 %}#16a34a{% elif score>=40 %}#eab308{% else %}#dc2626{% endif %}"></div></div><span class="font-bold {% if score>=70 %}text-green-600{% elif score>=40 %}text-yellow-600{% else %}text-red-600{% endif %}">{{ score }}/100</span></div></td>
-        <td class="p-3">KES {{ "{:,.0f}".format(price|float) }}</td>
-        <td class="p-3 text-right whitespace-nowrap"><a href="/ai?q={{ ('Is demand for ' + name + ' in ' + (d.county if d.county is defined else 'Kenya') + ' strong?')|urlencode }}" class="text-[#0d9488] font-bold text-[13px]">Ask Lens →</a></td>
+        <td class="p-3">{{ _county }}</td>
+        <td class="p-3">{{ d.sector if d.sector is defined and d.sector else '—' }}</td>
+        <td class="p-3">{% if score is not none %}<div class="flex items-center gap-2"><div class="w-20 h-2 bg-gray-100 rounded-full overflow-hidden"><div class="h-2 rounded-full" style="width:{{ score_clamped }}%;background:{% if score>=70 %}#16a34a{% elif score>=40 %}#eab308{% else %}#dc2626{% endif %}"></div></div><span class="font-bold {% if score>=70 %}text-green-600{% elif score>=40 %}text-yellow-600{% else %}text-red-600{% endif %}">{{ score }}/100</span></div>{% else %}<span class="text-slate-400">-</span>{% endif %}</td>
+        <td class="p-3">{% if price is not none %}KES {{ "{:,.0f}".format(price|float) }}{% else %}—{% endif %}</td>
+        <td class="p-3 text-right whitespace-nowrap"><a href="/ai?q={{ ('Is demand for ' + name + ' in ' + _county + ' strong?')|urlencode }}" class="text-[#0d9488] font-bold text-[13px]">Ask Lens →</a></td>
       </tr>
       {% endfor %}
     </tbody>
