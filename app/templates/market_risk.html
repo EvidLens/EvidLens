@@ -10,19 +10,28 @@
       </div>
       <a href="/ai" class="bg-[#14B8A6] text-white px-4 py-2 rounded-lg font-bold text-[13px]">New Analysis →</a>
     </div>
+    {% set _high = namespace(value=0) %}
+    {% set _med = namespace(value=0) %}
+    {% set _low = namespace(value=0) %}
+    {% for n in (news or []) %}
+      {% set _sev = (n.severity|string|lower) if n.severity is defined and n.severity else 'low' %}
+      {% if _sev == 'high' %}{% set _high.value = _high.value + 1 %}{% elif _sev == 'medium' %}{% set _med.value = _med.value + 1 %}{% else %}{% set _low.value = _low.value + 1 %}{% endif %}
+    {% endfor %}
     <div class="flex gap-2 mb-6 flex-wrap">
       <button type="button" class="filter-btn active" data-filter="all">All ({{ (news or [])|length }})</button>
-      <button type="button" class="filter-btn" data-filter="High">High Risk</button>
-      <button type="button" class="filter-btn" data-filter="Medium">Medium</button>
-      <button type="button" class="filter-btn" data-filter="Low">Low</button>
+      <button type="button" class="filter-btn" data-filter="high">High Risk ({{ _high.value }})</button>
+      <button type="button" class="filter-btn" data-filter="medium">Medium ({{ _med.value }})</button>
+      <button type="button" class="filter-btn" data-filter="low">Low ({{ _low.value }})</button>
     </div>
     <div class="space-y-4" id="riskList">
       {% for n in (news or []) %}
-      <div class="risk-card border rounded-xl p-4 hover:shadow-md transition" data-severity="{{ n.severity or 'Low' }}">
+      {% set _sev = (n.severity|string|lower) if n.severity is defined and n.severity else 'low' %}
+      {% set _is_safe_url = n.url is defined and n.url and (n.url|string|lower).startswith('http') %}
+      <div class="risk-card border rounded-xl p-4 hover:shadow-md transition" data-severity="{{ _sev }}">
         <div class="flex items-start justify-between gap-3">
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 mb-2 flex-wrap">
-              {% if n.severity == 'High' %}<span class="badge bg-red-100 text-red-700">HIGH RISK</span>{% elif n.severity == 'Medium' %}<span class="badge bg-yellow-100 text-yellow-700">MEDIUM</span>{% else %}<span class="badge bg-blue-100 text-blue-700">LOW</span>{% endif %}
+              {% if _sev == 'high' %}<span class="badge bg-red-100 text-red-700">HIGH RISK</span>{% elif _sev == 'medium' %}<span class="badge bg-yellow-100 text-yellow-700">MEDIUM</span>{% else %}<span class="badge bg-blue-100 text-blue-700">LOW</span>{% endif %}
               {% if n.category %}<span class="text-xs bg-gray-100 px-2 py-1 rounded-full font-bold text-gray-600">{{ n.category }}</span>{% endif %}
               <span class="text-xs text-gray-500">{% if n.published_at is string %}{{ n.published_at[:10] }}{% elif n.published_at %}{{ n.published_at.strftime('%b %d, %Y') }}{% else %}Today{% endif %}</span>
             </div>
@@ -31,7 +40,7 @@
             <p class="text-xs text-gray-500">Source: {{ n.source or 'EvidLens' }}</p>
           </div>
           <div class="flex flex-col gap-2 shrink-0">
-            {% if n.url %}<a href="{{ n.url }}" target="_blank" rel="noopener" class="text-[#14B8A6] text-sm font-bold whitespace-nowrap">Read Full →</a>{% endif %}
+            {% if _is_safe_url %}<a href="{{ n.url }}" target="_blank" rel="noopener noreferrer" class="text-[#14B8A6] text-sm font-bold whitespace-nowrap">Read Full →</a>{% endif %}
             <a href="/ai?q={{ ('How does \"' + (n.title or 'this risk') + '\" affect my business? What should I do?')|urlencode }}" class="bg-[#0A1F44] text-white text-[12px] px-3 py-1.5 rounded-lg font-bold text-center">Ask Lens</a>
           </div>
         </div>
