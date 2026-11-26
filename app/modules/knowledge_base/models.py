@@ -1,12 +1,17 @@
 from app.core.models import SectorReport, KnowledgeChunk
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from sqlmodel import SQLModel, Field
 from sqlalchemy.sql import func
 
+__all__ = ["SectorReport", "KnowledgeChunk", "KENYA_SECTORS", "KnowledgeDocument", "normalize_sector", "is_valid_sector"]
+
+def _utcnow():
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
 KENYA_SECTORS = [
     "Banks",
-    "Microfinance Institutions", 
+    "Microfinance Institutions",
     "Insurance & HMOs",
     "Fintechs & Mobile Money",
     "Capital Markets & Investment Banks",
@@ -82,12 +87,52 @@ KENYA_SECTORS = [
     "Environmental & Climate Services"
 ]
 
+SECTOR_ALIASES = {
+    "bank": "Banks",
+    "banks": "Banks",
+    "insurance": "Insurance & HMOs",
+    "sacco": "SACCOs",
+    "saccos": "SACCOs",
+    "agribusiness": "Agribusiness - Crops & Farming",
+    "farming": "Agribusiness - Crops & Farming",
+    "retail": "Retail - Supermarkets & Chains",
+    "ecommerce": "E-Commerce & Marketplaces",
+    "e-commerce": "E-Commerce & Marketplaces",
+    "tourism": "Tourism & Tour Operators",
+    "hospitality": "Hospitality - Hotels & Resorts",
+    "health": "Healthcare - Hospitals & Clinics",
+    "healthcare": "Healthcare - Hospitals & Clinics",
+    "education": "Education - Universities & Colleges",
+    "energy": "Energy - Electricity Generation",
+    "solar": "Energy - Renewable & Solar",
+    "fintech": "Fintechs & Mobile Money",
+    "telco": "Telcos & ISPs",
+}
+
+def normalize_sector(name: Optional[str]) -> Optional[str]:
+    if not name:
+        return None
+    key = str(name).strip().lower()
+    if key in SECTOR_ALIASES:
+        return SECTOR_ALIASES[key]
+    for s in KENYA_SECTORS:
+        if s.lower() == key:
+            return s
+    return str(name).strip()
+
+def is_valid_sector(name: str) -> bool:
+    return normalize_sector(name) in KENYA_SECTORS
+
 class KnowledgeDocument(SQLModel, table=True):
     __tablename__ = "knowledge_documents"
-
     id: Optional[int] = Field(default=None, primary_key=True)
     title: str = Field(max_length=255, index=True)
     category: Optional[str] = Field(default=None, max_length=100, index=True)
-    content: str
+    sector: Optional[str] = Field(default=None, max_length=100, index=True)
+    county: Optional[str] = Field(default=None, max_length=100, index=True)
+    content: str = Field(default="")
     source: Optional[str] = Field(default=None, max_length=255)
-    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()})
+    source_url: Optional[str] = Field(default=None, max_length=500)
+    is_active: bool = Field(default=True, index=True)
+    created_at: datetime = Field(default_factory=_utcnow, sa_column_kwargs={"server_default": func.now()})
+    updated_at: datetime = Field(default_factory=_utcnow, sa_column_kwargs={"server_default": func.now(), "onupdate": func.now()})
