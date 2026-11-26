@@ -8,14 +8,22 @@
       <p class="text-gray-500 text-[14px] mt-1">Market size by county. Built from live MarketMetric, PriceData and Company tables.</p>
     </div>
     <form method="get" action="/location/counties" class="flex gap-2">
-      <input name="q" value="{{ q or '' }}" placeholder="Search county..." class="border rounded-xl px-3 py-2 text-sm">
-      <button class="bg-[#0A1F44] text-white px-4 py-2 rounded-xl font-bold text-sm">Search</button>
+      <input name="q" value="{{ q or '' }}" placeholder="Search county..." class="border rounded-xl px-3 py-2 text-sm" autocomplete="off">
+      <button type="submit" class="bg-[#0A1F44] text-white px-4 py-2 rounded-xl font-bold text-sm">Search</button>
     </form>
   </div>
+  {% set total_records = namespace(value=0) %}
+  {% set total_size = namespace(value=0) %}
+  {% for c in counties or [] %}
+    {% set cnt = c.count if c.count is defined and c.count is not none else (c.business_count if c.business_count is defined and c.business_count is not none else 0) %}
+    {% set size = c.market_size if c.market_size is defined and c.market_size is not none else 0 %}
+    {% set total_records.value = total_records.value + (cnt | int) %}
+    {% set total_size.value = total_size.value + (size | float) %}
+  {% endfor %}
   <div class="grid grid-cols-3 gap-3 mb-6 text-center">
     <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-[#0A1F44]">{{ (counties or [])|length }}</p><p class="text-xs text-gray-500">Counties</p></div>
-    <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-[#0A1F44]">{{ (counties or [])|map(attribute='count')|select('defined')|list|sum + (counties or [])|map(attribute='business_count')|select('defined')|list|sum }}</p><p class="text-xs text-gray-500">Total Records</p></div>
-    <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-[#0A1F44]">KES {{ "{:,.0f}".format((counties or [])|map(attribute='market_size')|select('defined')|list|sum) }}</p><p class="text-xs text-gray-500">Total Market Size</p></div>
+    <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-[#0A1F44]">{{ "{:,}".format(total_records.value) }}</p><p class="text-xs text-gray-500">Total Records</p></div>
+    <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-[#0A1F44]">KES {{ "{:,.0f}".format(total_size.value) }}</p><p class="text-xs text-gray-500">Total Market Size</p></div>
   </div>
   {% if counties is defined and counties %}
   <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
@@ -24,9 +32,9 @@
         <thead><tr class="text-left text-sm text-gray-500 border-b"><th class="p-3">County</th><th class="p-3">Records</th><th class="p-3">Market Size (KES)</th><th class="p-3"></th></tr></thead>
         <tbody>
           {% for c in counties %}
-          {% set name = c.name if c.name is defined else (c.county if c.county is defined else 'County') %}
-          {% set cnt = c.count if c.count is defined else (c.business_count if c.business_count is defined else 0) %}
-          {% set size = c.market_size if c.market_size is defined else 0 %}
+          {% set name = c.name if c.name is defined and c.name else (c.county if c.county is defined and c.county else 'County') %}
+          {% set cnt = c.count if c.count is defined and c.count is not none else (c.business_count if c.business_count is defined and c.business_count is not none else 0) %}
+          {% set size = c.market_size if c.market_size is defined and c.market_size is not none else 0 %}
           <tr class="border-b hover:bg-gray-50">
             <td class="p-3 font-semibold text-[#0A1F44]">{{ name }}</td>
             <td class="p-3">{{ "{:,}".format(cnt|int) }}</td>
