@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Export Readiness | EvidLens{% endblock %}
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <div class="flex flex-wrap justify-between items-start gap-4 mb-6">
+    <div>
+      <h1 class="text-3xl font-bold text-[#0A1F44]">🌍 Export Readiness</h1>
+      <p class="text-gray-500 text-[14px] mt-1">Can your business export? What you still need for {{ (current_user.sector if current_user is defined and current_user and current_user.sector else 'your sector') }} • {{ (current_user.county if current_user is defined and current_user and current_user.county else 'Kenya') }}</p>
+    </div>
+    <a href="/ai" class="bg-[#14B8A6] text-white px-4 py-2 rounded-xl font-bold text-[13px]">Ask Lens →</a>
+  </div>
+  <form method="get" action="/business-os/export" class="bg-white p-4 rounded-xl shadow-sm border mb-6 flex gap-2 flex-wrap">
+    <input name="product" value="{{ product or '' }}" placeholder="Product (e.g. Avocado)" class="border rounded-xl px-3 py-2 text-sm flex-1 min-w-[160px]" autocomplete="off">
+    <input name="market" value="{{ market or '' }}" placeholder="Target market (e.g. Dubai, EU, UK)" class="border rounded-xl px-3 py-2 text-sm flex-1 min-w-[160px]" autocomplete="off">
+    <input name="sector" value="{{ sector or '' }}" placeholder="Sector" class="border rounded-xl px-3 py-2 text-sm" autocomplete="off">
+    <button type="submit" class="bg-[#0A1F44] text-white px-4 py-2 rounded-xl font-bold text-sm">Check Readiness</button>
+    {% if product or market or sector %}<a href="/business-os/export" class="border px-4 py-2 rounded-xl font-bold text-sm">Clear</a>{% endif %}
+  </form>
+  {% set _checks = checklist if checklist is defined and checklist else (steps if steps is defined and steps else (requirements if requirements is defined and requirements else [])) %}
+  {% set _done = namespace(value=0) %}
+  {% set _total = namespace(value=0) %}
+  {% for c in _checks %}
+    {% set _is_done = (c.done if c.done is defined else (c.completed if c.completed is defined else (c.checked if c.checked is defined else False))) %}
+    {% if _is_done %}{% set _done.value = _done.value + 1 %}{% endif %}
+    {% set _total.value = _total.value + 1 %}
+  {% endfor %}
+  {% set _score = ((_done.value / _total.value) * 100)|round|int if _total.value else 0 %}
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+    <div class="bg-white rounded-2xl border p-5 text-center">
+      <p class="text-3xl font-bold text-[#0A1F44]">{{ _score }}%</p>
+      <p class="text-xs text-gray-500 mt-1">Readiness Score</p>
+      <div class="bg-gray-100 rounded-full h-2 mt-3 overflow-hidden"><div class="h-2 rounded-full {% if _score >= 80 %}bg-green-500{% elif _score >= 50 %}bg-yellow-500{% else %}bg-red-500{% endif %}" style="width: {{ _score }}%"></div></div>
+      <p class="text-[12px] text-gray-500 mt-2">{% if _score >= 80 %}Ready to approach buyers{% elif _score >= 50 %}Almost ready - close the gaps below{% elif _total.value %}Not ready yet - start with the red items{% else %}Enter a product + market above{% endif %}</p>
+    </div>
+    <div class="bg-white rounded-2xl border p-5 text-center">
+      <p class="text-3xl font-bold text-green-600">{{ _done.value }}</p>
+      <p class="text-xs text-gray-500 mt-1">Done</p>
+      <p class="text-[12px] text-gray-500 mt-2">Out of {{ _total.value }} checks</p>
+    </div>
+    <div class="bg-white rounded-2xl border p-5 text-center">
+      <p class="text-3xl font-bold text-red-600">{{ _total.value - _done.value }}</p>
+      <p class="text-xs text-gray-500 mt-1">Still Missing</p>
+      <p class="text-[12px] text-gray-500 mt-2">Focus on these first</p>
+    </div>
+  </div>
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-2 space-y-3">
+      {% for c in _checks %}
+      {% set _title = c.title if c.title is defined and c.title else (c.name if c.name is defined and c.name else (c.requirement if c.requirement is defined and c.requirement else 'Checklist item')) %}
+      {% set _desc = c.description if c.description is defined and c.description else (c.detail if c.detail is defined and c.detail else (c.summary if c.summary is defined and c.summary else '')) %}
+      {% set _is_done = (c.done if c.done is defined else (c.completed if c.completed is defined else (c.checked if c.checked is defined else False))) %}
+      {% set _required = (c.required if c.required is defined else True) %}
+      {% set _url = c.url if c.url is defined and c.url else (c.link if c.link is defined and c.link else None) %}
+      {% set _is_safe_url = _url and (_url|string|lower).startswith('http') %}
+      <div class="bg-white p-4 rounded-2xl border flex gap-3 items-start export-card" data-done="{{ 'yes' if _is_done else 'no' }}">
+        <span class="text-xl shrink-0">{% if _is_done %}✅{% else %}⬜{% endif %}</span>
+        <div class="flex-1 min-w-0">
+          <div class="flex gap-2 flex-wrap items-center">
+            <h2 class="font-bold text-[#0A1F44] text-[15px]">{{ _title }}</h2>
+            {% if _required and not _is_done %}<span class="bg-red-100 text-red-700 text-[11px] font-bold px-2 py-0.5 rounded-full">REQUIRED</span>{% endif %}
+            {% if _is_done %}<span class="bg-green-100 text-green-700 text-[11px] font-bold px-2 py-0.5 rounded-full">DONE</span>{% endif %}
+          </div>
+          {% if _desc %}<p class="text-[13px] text-gray-600 mt-1 leading-relaxed">{{ _desc }}</p>{% endif %}
+        </div>
+        {% if _is_safe_url %}<a href="{{ _url }}" target="_blank" rel="noopener noreferrer" class="text-[#14B8A6] font-bold text-[13px] shrink-0">Get it →</a>{% endif %}
+      </div>
+      {% else %}
+      <div class="bg-white p-8 rounded-2xl border text-center">
+        <p class="text-4xl mb-2">📋</p>
+        <p class="font-bold text-[#0A1F44]">No checklist yet</p>
+        <p class="text-[14px] text-gray-500 mt-1">Enter a product and target market above, or ask Lens to build your export checklist.</p>
+        <a href="/ai?q={{ ('Build my export readiness checklist for ' + (product or 'my product') + ' to ' + (market or 'export market') + '. What documents, certifications and packaging do I need?')|urlencode }}" class="inline-block mt-4 bg-[#0A1F44] text-white px-4 py-2 rounded-lg font-bold text-[13px]">Ask Lens to Build My Checklist →</a>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="space-y-4">
+      <div class="bg-white p-5 rounded-2xl border">
+        <h3 class="font-bold text-sm">Common Documents</h3>
+        <div class="mt-3 space-y-2 text-[13px] text-gray-600">
+          <p>• Business registration + KRA PIN</p>
+          <p>• KEBS / KEPHIS certificate (for food / crops)</p>
+          <p>• Certificate of Origin</p>
+          <p>• Phytosanitary / Health certificate</p>
+          <p>• Commercial invoice + packing list</p>
+          <p>• Export licence (if required for your product)</p>
+        </div>
+      </div>
+      <div class="bg-[#0A1F44] text-white p-5 rounded-2xl">
+        <h3 class="font-bold text-sm">Next Step</h3>
+        <p class="text-[13px] text-gray-300 mt-2 leading-relaxed">Close the REQUIRED items first. Buyers will not sign without documents.</p>
+        <a href="/ai?q={{ ('What am I missing to export ' + (product or 'my product') + ' to ' + (market or 'my target market') + '? Give me the exact next 3 steps.')|urlencode }}" class="block text-center mt-4 bg-[#14B8A6] text-white py-2 rounded-lg text-[13px] font-bold">Ask Lens: What Am I Missing? →</a>
+        <a href="/market/export" class="block text-center mt-2 border border-white/20 py-2 rounded-lg text-[13px] font-bold">See Market Export Prices →</a>
+      </div>
+      <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-[12px] text-amber-800">⚠️ Requirements vary by product and destination. Confirm with KEBS / KEPHIS and your buyer before shipping.</div>
+    </div>
+  </div>
+  <div class="flex flex-wrap gap-2 mt-6">
+    <a href="/business-os" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Business OS</a>
+    <a href="/market/export" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Market Export Data</a>
+    <a href="/business-os/funding" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Funding</a>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<style>.export-card{transition:.2s}.export-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.06)}</style>
+<script></script>
+{% endblock %}
