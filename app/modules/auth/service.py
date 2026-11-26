@@ -1,10 +1,11 @@
 from sqlmodel import Session, select
 import bcrypt
-from.models import AuthUser, UserRole
+from .models import AuthUser, UserRole
 import requests
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 import time
+import secrets
 from sqlalchemy.exc import OperationalError
 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
@@ -12,6 +13,11 @@ FROM_EMAIL = os.getenv("FROM_EMAIL", "noreply@evidlens.co.ke")
 FROM_NAME = os.getenv("FROM_NAME", "EvidLens")
 APP_URL = os.getenv("APP_URL", "https://app.evidlens.co.ke")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "")
+MAX_FAILED_LOGINS = 5
+LOCK_MINUTES = 15
+
+def _utcnow():
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 def send_email(to: str, subject: str, html: str):
     if not RESEND_API_KEY:
@@ -25,7 +31,7 @@ def send_email(to: str, subject: str, html: str):
             timeout=10
         )
         print(f"[EMAIL] {to} -> {resp.status_code} via {FROM_EMAIL}")
-        if resp.status_code!= 200:
+        if resp.status_code not in (200, 201):
             print(f"[EMAIL BODY] {resp.text}")
     except Exception as e:
         print(f"[EMAIL ERROR] {e}")
@@ -37,32 +43,37 @@ def hash_password(password: str):
 def verify_password(plain_password: str, hashed_password: str):
     try:
         return bcrypt.checkpw(plain_password.encode('utf-8')[:72], hashed_password.encode('utf-8'))
-    except:
+    except Exception:
         return False
 
 def get_user_by_email(db: Session, email: str):
+    if not email:
+        return None
+    normalized = email.lower().strip()
     for attempt in range(2):
         try:
-            return db.exec(select(AuthUser).where(AuthUser.email == email.lower().strip())).first()
+            return db.exec(select(AuthUser).where(AuthUser.email == normalized)).first()
         except OperationalError as e:
             print(f"[DB RETRY {attempt}] OperationalError: {e}")
             try:
                 db.rollback()
-            except:
+            except Exception:
                 pass
             if attempt == 0:
                 time.sleep(0.5)
                 continue
             raise
-        except Exception:
-            raise
 
 def create_user(db: Session, req, token: str):
     admin_emails = [e.strip().lower() for e in ADMIN_EMAIL.split(",") if e.strip()]
-    is_admin = req.email.lower().strip() in admin_emails
+    email_norm = req.email.lower().strip()
+    is_admin = email_norm in admin_emails
+    existing = get_user_by_email(db, email_norm)
+    if existing:
+        return {"error": "Email already registered"}
     hashed_pw = hash_password(req.password)
     db_user = AuthUser(
-        email=req.email.lower().strip(),
+        email=email_norm,
         phone=req.phone,
         hashed_password=hashed_pw,
         full_name=req.full_name,
@@ -73,7 +84,7 @@ def create_user(db: Session, req, token: str):
         is_active=True,
         email_verified=True if is_admin else False,
         credits=999999 if is_admin else 5,
-        plan="enterprise" if is_admin else "free"
+        plan="ENTERPRISE" if is_admin else "FREE"
     )
     db.add(db_user)
     db.commit()
@@ -99,6 +110,8 @@ def create_user(db: Session, req, token: str):
     return db_user
 
 def verify_user(db: Session, token: str):
+    if not token:
+        return None
     user = db.exec(select(AuthUser).where(AuthUser.verification_token == token)).first()
     if not user:
         return None
@@ -116,40 +129,58 @@ def login_user(db: Session, email: str, password: str):
         return {"error": "Database temporarily unavailable, please retry"}
     if not user:
         return {"error": "Invalid credentials"}
-    if not user.email_verified:
-        return {"error": "Email not verified - check inbox for verification email"}
+    if user.locked_until and user.locked_until > _utcnow():
+        return {"error": "Account locked - too many failed attempts. Try again in 15 minutes"}
     if not user.is_active:
         return {"error": "Account disabled"}
     if not verify_password(password, user.hashed_password):
+        user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+        if user.failed_login_attempts >= MAX_FAILED_LOGINS:
+            user.locked_until = _utcnow() + timedelta(minutes=LOCK_MINUTES)
+            user.failed_login_attempts = 0
+        db.add(user)
+        db.commit()
         return {"error": "Invalid credentials"}
+    if not user.email_verified:
+        return {"error": "Email not verified - check inbox for verification email"}
+    user.failed_login_attempts = 0
+    user.locked_until = None
+    user.last_login = _utcnow()
+    db.add(user)
+    db.commit()
+    db.refresh(user)
     return {"message": "Login successful", "user_id": user.id, "role": user.role, "email": user.email}
 
 def request_password_reset(db: Session, email: str):
     user = get_user_by_email(db, email)
     if not user:
         return {"message": "If email exists, reset link sent"}
-    token = os.urandom(32).hex()
+    token = secrets.token_urlsafe(32)
     user.reset_token = token
-    user.reset_token_expires = datetime.utcnow() + timedelta(hours=1)
+    user.reset_token_expires = _utcnow() + timedelta(hours=1)
     db.add(user)
     db.commit()
     db.refresh(user)
     reset_link = f"{APP_URL}/reset-password?token={token}"
-    html = f"<div style='font-family:Inter'><h2>Reset Password</h2><p>Click to reset (30 min):</p><p><a href='{reset_link}' style='background:#14B8A6;color:white;padding:12px 24px;border-radius:10px;text-decoration:none'>Reset Password</a></p><p style='font-size:12px;color:#64748b'>{reset_link}</p></div>"
+    html = f"<div style='font-family:Inter'><h2>Reset Password</h2><p>Click to reset (1 hour):</p><p><a href='{reset_link}' style='background:#14B8A6;color:white;padding:12px 24px;border-radius:10px;text-decoration:none'>Reset Password</a></p><p style='font-size:12px;color:#64748b'>{reset_link}</p></div>"
     send_email(email, "Reset your EvidLens Password", html)
-    return {"message": "Reset email sent", "reset_token": token}
+    return {"message": "If email exists, reset link sent"}
 
 def reset_password(db: Session, token: str, new_password: str):
+    if not token:
+        return {"error": "Invalid or expired token"}
     user = db.exec(select(AuthUser).where(AuthUser.reset_token == token)).first()
     if not user:
         return {"error": "Invalid or expired token"}
-    if not user.reset_token_expires or user.reset_token_expires < datetime.utcnow():
+    if not user.reset_token_expires or user.reset_token_expires < _utcnow():
         return {"error": "Invalid or expired token"}
     user.hashed_password = hash_password(new_password)
     user.reset_token = None
     user.reset_token_expires = None
     user.email_verified = True
     user.is_active = True
+    user.failed_login_attempts = 0
+    user.locked_until = None
     db.add(user)
     db.commit()
     db.refresh(user)
