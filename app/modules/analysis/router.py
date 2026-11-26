@@ -40,19 +40,15 @@ except Exception:
 from app.core.db import get_session as get_db
 from app.core.db import get_session
 from app.core.models import MarketMetric, PriceData, NewsArticle, SocialMention, UserSubscription
-
 router = APIRouter(prefix="/analysis", tags=["Analysis - Trending & Search"])
 api_router = APIRouter(prefix="/api", tags=["Analysis - API"])
-
 class _DummyColor:
     def __init__(self, *a, **k):
         pass
-
 def _hex_color(code: str):
     if HAS_REPORTLAB and colors is not None:
         return colors.HexColor(code)
     return _DummyColor()
-
 NAVY = _hex_color("#0A1F44")
 TEAL = _hex_color("#14B8A6")
 LIGHT_TEAL = _hex_color("#E0F2F1")
@@ -61,11 +57,6 @@ GREEN = _hex_color("#16A34A")
 YELLOW = _hex_color("#F59E0B")
 RED = _hex_color("#DC2626")
 PRICING = {"Starter": {"monthly": 500, "annual": 5000}, "Pro": {"monthly": 1500, "annual": 15000}, "Enterprise": {"monthly": 5000, "annual": 50000}}
-
-# --- PRODUCT LOCK ---
-# One canonical name per product. All queries, news, social, PDF use this.
-# Without this, "kahawa" and "coffee" would query different rows, and
-# "tea" rows would leak into a "coffee" report via sector-wide queries.
 PRODUCT_ALIASES = {
     "coffee": "coffee",
     "kahawa": "coffee",
@@ -99,22 +90,28 @@ PRODUCT_ALIASES = {
     "mango": "mango",
     "passion": "passion fruit",
 }
-
 def lock_product(raw: Optional[str]) -> str:
     clean = (raw or "").strip().lower()
-    # Take first word if user typed "coffee farming" / "coffee in Nyeri"
     first = clean.split()[0] if clean.split() else ""
-    # Try full string first, then first word
     if clean in PRODUCT_ALIASES:
         return PRODUCT_ALIASES[clean]
     if first in PRODUCT_ALIASES:
         return PRODUCT_ALIASES[first]
     return first or clean
-
 def _product_text_filter(column, product: str):
-    """Match product in a text column, case-insensitive."""
     return column.ilike(f"%{product}%")
-
+def _safe_float(v):
+    try:
+        if v is None or v == "":
+            return None
+        return float(v)
+    except Exception:
+        return None
+def _rollback(session):
+    try:
+        session.rollback()
+    except Exception:
+        pass
 class DetailedAnalysisRequest(BaseModel):
     product: Optional[str] = None
     query: Optional[str] = None
@@ -131,9 +128,6 @@ class DetailedAnalysisRequest(BaseModel):
     business_model: Optional[str] = None
     model_config = {"extra": "allow"}
     def get_product(self):
-        # FIXED: old default "general market analysis" matched nothing,
-        # so every query fell back to sector-wide = other crops in report.
-        # Now: lock to canonical product, never a generic phrase.
         raw = self.product or self.query or self.q or self.topic or ""
         locked = lock_product(raw)
         return locked
@@ -163,7 +157,6 @@ class DetailedAnalysisRequest(BaseModel):
         return 0.0
     def get_business_model(self):
         return self.business_model or "Retail"
-
 def create_chart(fig_func):
     if not HAS_MATPLOTLIB or not HAS_REPORTLAB:
         return Spacer(1, 10)
@@ -173,14 +166,12 @@ def create_chart(fig_func):
     plt.close()
     buf.seek(0)
     return Image(buf, width=80*mm, height=50*mm)
-
 def donut_chart(data, labels, title):
     def _plot():
         fig, ax = plt.subplots(figsize=(3, 3))
         ax.pie(data, labels=labels, autopct="%1.0f%%", startangle=90, wedgeprops=dict(width=0.4), colors=["#0A1F44", "#14B8A6", "#C5A880", "#64748B", "#E2E8F0"])
         ax.set_title(title, fontsize=10, color="#0A1F44", fontweight="bold")
     return create_chart(_plot)
-
 def bar_chart(data, labels, title):
     def _plot():
         fig, ax = plt.subplots(figsize=(4, 3))
@@ -191,7 +182,6 @@ def bar_chart(data, labels, title):
             ax.text(v, i, f" {v}", va="center", fontsize=8)
         plt.tight_layout()
     return create_chart(_plot)
-
 def _run_analysis(req: DetailedAnalysisRequest, session: Session):
     product = req.get_product()
     if not product:
@@ -212,45 +202,33 @@ def _run_analysis(req: DetailedAnalysisRequest, session: Session):
             subcounty_filter = MarketMetric.subcounty.in_(subcounties)
         except Exception:
             subcounty_filter = True
-    # Product filter - used by EVERY MarketMetric query below.
-    # Old code only used it for price. Demand / seasonal / competitors
-    # used sector only, so they averaged in tea / maize / avocado.
     product_filter = MarketMetric.product.ilike(f"%{product}%")
-
-    # --- Price: already product-locked, unchanged ---
     price_history_stmt = select(MarketMetric).where(product_filter, county_filter, subcounty_filter, MarketMetric.created_at >= last_90_days).order_by(MarketMetric.created_at.asc())
     price_history = session.exec(price_history_stmt).all()
-    prices = [p.avg_price_kes for p in price_history if p.avg_price_kes]
+    prices = [p.avg_price_kes for p in price_history if p.avg_price_kes is not None]
     current_price = prices[-1] if prices else None
     avg_price_30d = statistics.mean(prices[-30:]) if len(prices) >= 30 else statistics.mean(prices) if prices else None
-    price_trend = "Stable"
+    price_trend = None
     if len(prices) >= 2:
         price_trend = "Rising" if prices[-1] > prices[0] * 1.05 else "Falling" if prices[-1] < prices[0] * 0.95 else "Stable"
-    price_volatility = statistics.stdev(prices) if len(prices) > 1 else 0
-    forecast_90d = round(current_price * 1.03, 2) if price_trend == "Rising" and current_price else current_price
-
-    # --- Demand: FIXED - was sector-only, now product + county + subcounty ---
+    price_volatility = statistics.stdev(prices) if len(prices) > 1 else None
+    forecast_90d = round(current_price * 1.03, 2) if price_trend == "Rising" and current_price is not None else current_price
     demand_stmt = select(MarketMetric).where(product_filter, county_filter, subcounty_filter, MarketMetric.created_at >= last_30_days)
     sector_data = session.exec(demand_stmt).all()
-    demand_scores = [d.demand_score for d in sector_data if d.demand_score]
-    avg_demand = statistics.mean(demand_scores) if demand_scores else 0
-    demand_level = "Low" if avg_demand < 4 else "Medium" if avg_demand < 7 else "High"
-    # FIXED: old code counted OTHER products in this sector and put them
-    # in the report as "top_products_in_sector". Removed.
+    demand_scores = [d.demand_score for d in sector_data if d.demand_score is not None]
+    avg_demand = statistics.mean(demand_scores) if demand_scores else None
+    demand_level = "Unknown" if avg_demand is None else "Low" if avg_demand < 4 else "Medium" if avg_demand < 7 else "High"
     product_records = len(sector_data)
-
-    # --- Seasonality: was already product-locked, kept ---
     seasonal_stmt = select(MarketMetric).where(product_filter, county_filter).order_by(MarketMetric.created_at.desc()).limit(12)
     seasonal_data = session.exec(seasonal_stmt).all()
-    seasonality = "Peak Season" if len(seasonal_data) > 6 and statistics.mean([d.demand_score or 0 for d in seasonal_data[:3]]) > statistics.mean([d.demand_score or 0 for d in seasonal_data[-3:]]) else "Off Season"
-
-    # --- Competitors: FIXED - old code returned OTHER PRODUCTS as competitors.
-    # New: same product, other sub-counties / locations. That is a real competitor.
+    seasonality = None
+    if len(seasonal_data) >= 6:
+        first_avg = statistics.mean([d.demand_score or 0 for d in seasonal_data[:3]])
+        last_avg = statistics.mean([d.demand_score or 0 for d in seasonal_data[-3:]])
+        seasonality = "Peak Season" if first_avg > last_avg else "Off Season"
     competitor_stmt = select(MarketMetric.subcounty).where(product_filter, county_filter).distinct().limit(10)
     competitor_locations = session.exec(competitor_stmt).all()
     top_competitors = [c for c in competitor_locations if c][:5]
-
-    # --- Supply news: FIXED - was county-only, now product + county + keyword ---
     supply_risk_keywords = ["shortage", "transport", "drought", "flood", "strike"]
     supply_candidates = session.exec(select(NewsArticle).where(NewsArticle.county.ilike(f"%{county}%"), NewsArticle.published_at >= last_30_days)).all()
     supply_news = [
@@ -265,12 +243,9 @@ def _run_analysis(req: DetailedAnalysisRequest, session: Session):
         distribution_channels = ["Distributors", "Bulk Buyers", "Institutions"]
     else:
         distribution_channels = ["E-commerce", "Direct to Consumer"]
-    estimated_cost_price = current_price * 0.75 if current_price else None
-    estimated_margin_percent = 25.0
-    estimated_profit_per_unit = current_price - estimated_cost_price if current_price and estimated_cost_price else None
-
-    # --- News: FIXED - was sector + county, now product + county ---
-    # A news row must mention the product in title / summary / content.
+    estimated_cost_price = current_price * 0.75 if current_price is not None else None
+    estimated_margin_percent = 25.0 if current_price is not None else None
+    estimated_profit_per_unit = current_price - estimated_cost_price if current_price is not None and estimated_cost_price is not None else None
     news_candidates = session.exec(select(NewsArticle).where(NewsArticle.county.ilike(f"%{county}%"), NewsArticle.published_at >= last_30_days).order_by(NewsArticle.published_at.desc()).limit(50)).all()
     news = [
         n for n in news_candidates
@@ -279,22 +254,22 @@ def _run_analysis(req: DetailedAnalysisRequest, session: Session):
     risk_keywords = ["ban", "shortage", "tax", "drought", "protest", "inflation", "disease", "policy"]
     risk_news = [n for n in news if any(k in ((n.title or "") + (n.summary or "")).lower() for k in risk_keywords)]
     risk_score = min(10, len(risk_news) * 2)
-
-    # --- Social: FIXED - was sector + county, now product + county ---
     social_candidates = session.exec(select(SocialMention).where(SocialMention.county.ilike(f"%{county}%"), SocialMention.created_at >= last_7_days).order_by(SocialMention.created_at.desc()).limit(100)).all()
     social = [
         s for s in social_candidates
         if product in ((getattr(s, "content", "") or "") + " " + (getattr(s, "author", "") or "")).lower()
     ][:20]
     platforms = Counter([s.platform for s in social if s.platform])
-    sentiment_score = 6.5
-    units_possible = int(budget_kes / current_price) if current_price and budget_kes > 0 else 0
-    estimated_revenue = units_possible * current_price if current_price else 0
-    estimated_profit = units_possible * estimated_profit_per_unit if estimated_profit_per_unit else 0
-    roi_percent = (estimated_profit / budget_kes * 100) if budget_kes > 0 else 0
+    sentiment_score = None
+    if social:
+        sentiment_score = 6.5
+    units_possible = int(budget_kes / current_price) if current_price is not None and budget_kes > 0 else 0
+    estimated_revenue = units_possible * current_price if current_price is not None else 0
+    estimated_profit = units_possible * estimated_profit_per_unit if estimated_profit_per_unit is not None else 0
+    roi_percent = (estimated_profit / budget_kes * 100) if budget_kes > 0 and estimated_profit is not None else 0
     score = 0
     reasons = []
-    if avg_demand > 7:
+    if avg_demand is not None and avg_demand > 7:
         score += 3
         reasons.append(f"High demand for {product} in {county}")
     if price_trend == "Rising":
@@ -320,30 +295,30 @@ def _run_analysis(req: DetailedAnalysisRequest, session: Session):
         recommendation = "HOLD - Monitor 30 days"
     else:
         recommendation = "AVOID - High risk"
-    # No-data honesty: if there are no product rows at all, say so in reasons
-    # instead of silently using sector averages (old behaviour).
     if product_records == 0 and not prices:
         reasons.append(f"No live data for {product} in {county} in last 30 days - figures are estimated / nearest-county, verify before spending")
-    return {"status": "success", "timestamp": now.isoformat(), "input_parameters": {"product": product, "county": county, "sector": sector, "subcounties": subcounties, "budget_kes": budget_kes, "business_model": business_model}, "market_overview": {"product": product, "sector": sector, "location": {"county": county, "subcounties": subcounties}, "current_price_kes": round(current_price, 2) if current_price else None, "30_day_avg_kes": round(avg_price_30d, 2) if avg_price_30d else None, "90_day_forecast_kes": forecast_90d, "price_trend": price_trend, "volatility": round(price_volatility, 2), "seasonality": seasonality}, "demand_competition": {"demand_level": demand_level, "avg_demand_score": round(avg_demand, 2), "product_records_in_sector": product_records, "top_competitors": top_competitors}, "financials": {"budget_kes": budget_kes, "business_model": business_model, "estimated_cost_per_unit": round(estimated_cost_price, 2) if estimated_cost_price else None, "estimated_margin_percent": estimated_margin_percent, "estimated_profit_per_unit": round(estimated_profit_per_unit, 2) if estimated_profit_per_unit else None, "units_you_can_buy": units_possible, "estimated_monthly_revenue": round(estimated_revenue, 2), "estimated_monthly_profit": round(estimated_profit, 2), "estimated_roi_percent": round(roi_percent, 2)}, "operations": {"recommended_distribution": distribution_channels, "supply_chain_risk": supply_chain_risk, "supply_risk_events": len(supply_news)}, "risk_intelligence": {"risk_score_10": risk_score, "risk_level": "High" if risk_score > 6 else "Medium" if risk_score > 3 else "Low", "recent_risks": [{"title": n.title, "date": n.published_at.isoformat() if getattr(n, "published_at", None) else None} for n in risk_news[:3]]}, "social_intelligence": {"mentions_7d": len(social), "platforms": dict(platforms), "sentiment_score_10": sentiment_score}, "final_verdict": {"overall_score_10": score, "recommendation": recommendation, "key_reasons": reasons, "next_steps": [f"Source {product} suppliers in {county}", "Lock pricing for 30 days if trend is rising", "Monitor news for policy changes"] if score >= 6 else ["Wait and re-evaluate in 30 days", "Test with smaller budget", f"Look at alternative products to {product}"]}}
-
+    return {"status": "success", "timestamp": now.isoformat(), "input_parameters": {"product": product, "county": county, "sector": sector, "subcounties": subcounties, "budget_kes": budget_kes, "business_model": business_model}, "market_overview": {"product": product, "sector": sector, "location": {"county": county, "subcounties": subcounties}, "current_price_kes": round(current_price, 2) if current_price is not None else None, "30_day_avg_kes": round(avg_price_30d, 2) if avg_price_30d is not None else None, "90_day_forecast_kes": forecast_90d, "price_trend": price_trend, "volatility": round(price_volatility, 2) if price_volatility is not None else None, "seasonality": seasonality}, "demand_competition": {"demand_level": demand_level, "avg_demand_score": round(avg_demand, 2) if avg_demand is not None else None, "product_records_in_sector": product_records, "top_competitors": top_competitors}, "financials": {"budget_kes": budget_kes, "business_model": business_model, "estimated_cost_per_unit": round(estimated_cost_price, 2) if estimated_cost_price is not None else None, "estimated_margin_percent": estimated_margin_percent, "estimated_profit_per_unit": round(estimated_profit_per_unit, 2) if estimated_profit_per_unit is not None else None, "units_you_can_buy": units_possible, "estimated_monthly_revenue": round(estimated_revenue, 2), "estimated_monthly_profit": round(estimated_profit, 2), "estimated_roi_percent": round(roi_percent, 2)}, "operations": {"recommended_distribution": distribution_channels, "supply_chain_risk": supply_chain_risk, "supply_risk_events": len(supply_news)}, "risk_intelligence": {"risk_score_10": risk_score, "risk_level": "High" if risk_score > 6 else "Medium" if risk_score > 3 else "Low", "recent_risks": [{"title": n.title, "date": n.published_at.isoformat() if getattr(n, "published_at", None) else None} for n in risk_news[:3]]}, "social_intelligence": {"mentions_7d": len(social), "platforms": dict(platforms), "sentiment_score_10": sentiment_score}, "final_verdict": {"overall_score_10": score, "recommendation": recommendation, "key_reasons": reasons, "next_steps": [f"Source {product} suppliers in {county}", "Lock pricing for 30 days if trend is rising", "Monitor news for policy changes"] if score >= 6 else ["Wait and re-evaluate in 30 days", "Test with smaller budget", f"Look at alternative products to {product}"]}}
 @api_router.post("/analyze")
 def analyze_api(req: DetailedAnalysisRequest, session: Session = Depends(get_session)):
     try:
+        _rollback(session)
         return _run_analysis(req, session)
     except Exception as e:
+        _rollback(session)
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
-
 @router.post("/detailed")
 def detailed_analysis(req: DetailedAnalysisRequest, session: Session = Depends(get_session)):
     try:
+        _rollback(session)
         return _run_analysis(req, session)
     except Exception as e:
+        _rollback(session)
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
-
 @router.post("/download-pdf")
 def download_pdf(req: DetailedAnalysisRequest, session: Session = Depends(get_session)):
     if not HAS_REPORTLAB:
         raise HTTPException(status_code=503, detail="PDF export not available - reportlab not installed")
+    _rollback(session)
     analysis_data = _run_analysis(req, session)
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=10*mm, leftMargin=10*mm, topMargin=10*mm, bottomMargin=10*mm)
@@ -380,7 +355,7 @@ def download_pdf(req: DetailedAnalysisRequest, session: Session = Depends(get_se
     main_elements.append(Paragraph("ANALYTICAL FINDINGS", styles["TitleNavy"]))
     main_elements.append(Paragraph(f"MARKET REPORT - {req.get_product().upper()} IN {req.get_county().upper()}", styles["SubtitleTeal"]))
     main_elements.append(Spacer(1, 6))
-    kpi_data = [[Paragraph(f"KES {mo['current_price_kes'] or 'N/A'}", styles["KPIBig"]), Paragraph(f"{dc['demand_level']}", styles["KPIBig"]), Paragraph(f"{fv['overall_score_10']}/10", styles["KPIBig"])], [Paragraph("Current Price", styles["KPISmall"]), Paragraph("Demand Level", styles["KPISmall"]), Paragraph("Overall Score", styles["KPISmall"])]]
+    kpi_data = [[Paragraph(f"KES {mo['current_price_kes'] if mo['current_price_kes'] is not None else 'N/A'}", styles["KPIBig"]), Paragraph(f"{dc['demand_level']}", styles["KPIBig"]), Paragraph(f"{fv['overall_score_10']}/10", styles["KPIBig"])], [Paragraph("Current Price", styles["KPISmall"]), Paragraph("Demand Level", styles["KPISmall"]), Paragraph("Overall Score", styles["KPISmall"])]]
     kpi_table = Table(kpi_data, colWidths=[40*mm, 40*mm, 40*mm])
     kpi_table.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 1, LIGHT_TEAL), ("BACKGROUND", (0, 0), (-1, -1), LIGHT_TEAL)]))
     main_elements.append(kpi_table)
@@ -395,16 +370,13 @@ def download_pdf(req: DetailedAnalysisRequest, session: Session = Depends(get_se
     price_data = [mo["current_price_kes"] or 0, mo["30_day_avg_kes"] or 0, mo["90_day_forecast_kes"] or 0]
     price_labels = ["Current", "30D Avg", "90D Forecast"]
     donut = donut_chart(price_data, price_labels, f"{req.get_product().capitalize()} Price")
-    # FIXED: old bar chart was "Top Products in Sector" - it injected
-    # tea / maize / avocado into a coffee PDF. Replaced with demand
-    # for THIS product only.
-    demand_data = [dc["avg_demand_score"], max(0, 10 - ri["risk_score_10"]), fv["overall_score_10"]]
+    demand_data = [dc["avg_demand_score"] or 0, max(0, 10 - ri["risk_score_10"]), fv["overall_score_10"]]
     demand_labels = ["Demand", "Low Risk", "Score"]
     bar = bar_chart(demand_data, demand_labels, f"{req.get_product().capitalize()} - Demand / Risk / Score")
     charts_table = Table([[donut, bar]], colWidths=[85*mm, 85*mm])
     main_elements.append(charts_table)
     main_elements.append(Spacer(1, 8))
-    main_elements.append(Paragraph(f"<b>Insight:</b> {mo['price_trend']} trend for {req.get_product()} with {mo['seasonality']}. Risk level is {ri['risk_level']}.", styles["Insight"]))
+    main_elements.append(Paragraph(f"<b>Insight:</b> {mo['price_trend'] or 'No trend yet'} trend for {req.get_product()} with {mo['seasonality'] or 'seasonality unknown'}. Risk level is {ri['risk_level']}.", styles["Insight"]))
     page1 = Table([[sidebar_table, main_elements]], colWidths=[55*mm, 125*mm])
     page1.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
     story.append(page1)
@@ -412,13 +384,13 @@ def download_pdf(req: DetailedAnalysisRequest, session: Session = Depends(get_se
     story.append(Paragraph("DETAILED ANALYSIS", styles["TitleNavy"]))
     story.append(Spacer(1, 6))
     story.append(Paragraph("1. FINANCIALS & FEASIBILITY", styles["SubtitleTeal"]))
-    fin_data = [["Metric", "Value"], ["Budget KES", f"{fin['budget_kes']:,.0f}"], ["Business Model", fin["business_model"]], ["Units You Can Buy", fin["units_you_can_buy"]], ["Est. Cost Per Unit", f"KES {fin['estimated_cost_per_unit']}"], ["Est. Monthly Profit", f"KES {fin['estimated_monthly_profit']:,.0f}"], ["Est. ROI", f"{fin['estimated_roi_percent']}%"]]
+    fin_data = [["Metric", "Value"], ["Budget KES", f"{fin['budget_kes']:,.0f}"], ["Business Model", fin["business_model"]], ["Units You Can Buy", fin["units_you_can_buy"]], ["Est. Cost Per Unit", f"KES {fin['estimated_cost_per_unit'] if fin['estimated_cost_per_unit'] is not None else '—'}"], ["Est. Monthly Profit", f"KES {fin['estimated_monthly_profit']:,.0f}"], ["Est. ROI", f"{fin['estimated_roi_percent']}%"]]
     fin_table = Table(fin_data, colWidths=[90*mm, 90*mm])
     fin_table.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, colors.grey), ("BACKGROUND", (0, 0), (-1, 0), NAVY), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white)]))
     story.append(fin_table)
     story.append(Spacer(1, 8))
     story.append(Paragraph("2. DEMAND & COMPETITION", styles["SubtitleTeal"]))
-    story.append(Paragraph(f"<b>Demand Score for {req.get_product()}:</b> {dc['avg_demand_score']}/10 - {dc['demand_level']}", styles["Normal"]))
+    story.append(Paragraph(f"<b>Demand Score for {req.get_product()}:</b> {dc['avg_demand_score'] if dc['avg_demand_score'] is not None else '—'}/10 - {dc['demand_level']}", styles["Normal"]))
     story.append(Paragraph(f"<b>Same product, other locations:</b> {', '.join(dc['top_competitors']) or 'None recorded'}", styles["Normal"]))
     story.append(Spacer(1, 8))
     story.append(Paragraph("3. OPERATIONS & RISK", styles["SubtitleTeal"]))
@@ -427,8 +399,8 @@ def download_pdf(req: DetailedAnalysisRequest, session: Session = Depends(get_se
     story.append(Paragraph(f"<b>Risk Score:</b> {ri['risk_score_10']}/10 - {ri['risk_level']}", styles["Normal"]))
     story.append(Spacer(1, 8))
     story.append(Paragraph("4. SOCIAL INTELLIGENCE - 7 DAYS", styles["SubtitleTeal"]))
-    story.append(Paragraph(f"Mentions for {req.get_product()}: {soc['mentions_7d']} | Sentiment: {soc['sentiment_score_10']}/10", styles["Normal"]))
-    story.append(Paragraph(f"Platforms: {', '.join(soc['platforms'].keys())}", styles["Normal"]))
+    story.append(Paragraph(f"Mentions for {req.get_product()}: {soc['mentions_7d']} | Sentiment: {soc['sentiment_score_10'] if soc['sentiment_score_10'] is not None else '—'}/10", styles["Normal"]))
+    story.append(Paragraph(f"Platforms: {', '.join(soc['platforms'].keys()) or 'None'}", styles["Normal"]))
     story.append(Spacer(1, 8))
     story.append(Paragraph("5. RECOMMENDATIONS & NEXT STEPS", styles["SubtitleTeal"]))
     for i, step in enumerate(fv["next_steps"], 1):
@@ -438,42 +410,62 @@ def download_pdf(req: DetailedAnalysisRequest, session: Session = Depends(get_se
     doc.build(story)
     buffer.seek(0)
     return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=EvidLens_Report_{req.get_product()}_{req.get_county()}.pdf"})
-
 @router.get("/trending")
 def get_trending(session: Session = Depends(get_session)):
     try:
+        _rollback(session)
         two_weeks_ago = datetime.utcnow() - timedelta(days=14)
         activity_count = func.count(MarketMetric.id).label("activity_count")
         stmt = select(MarketMetric.product, MarketMetric.county, MarketMetric.sector, func.avg(MarketMetric.demand_score).label("avg_demand"), func.avg(MarketMetric.avg_price_kes).label("avg_price"), activity_count).where(MarketMetric.created_at > two_weeks_ago).group_by(MarketMetric.product, MarketMetric.county, MarketMetric.sector).order_by(desc(activity_count)).limit(6)
         results = session.exec(stmt).all()
         trending_list = []
+        seen = set()
         for r in results:
-            old_stmt = select(func.avg(MarketMetric.avg_price_kes)).where(MarketMetric.product == r.product, MarketMetric.county == r.county, MarketMetric.created_at.between(two_weeks_ago - timedelta(days=30), two_weeks_ago))
-            old_avg = session.exec(old_stmt).first() or r.avg_price
-            price_change = 0
-            if old_avg and old_avg > 0:
-                price_change = round(((r.avg_price - old_avg) / old_avg) * 100, 1)
-            trend = "up" if price_change > 0 else "down" if price_change < 0 else "stable"
-            trending_list.append({"product": r.product, "county": r.county, "sector": r.sector, "demand_score": round(r.avg_demand or 0, 1), "current_price_kes": int(r.avg_price or 0), "price_change_percent": price_change, "trend": trend, "activity": r.activity_count})
-        if not trending_list:
-            metrics = session.exec(select(MarketMetric).order_by(MarketMetric.demand_score.desc()).limit(6)).all()
-            for m in metrics:
-                price = 0
-                try:
-                    p = session.exec(select(PriceData).where(PriceData.product_name == m.product, PriceData.county == m.county).order_by(PriceData.created_at.desc())).first()
-                    if p:
-                        price = getattr(p, "price", getattr(p, "avg_price_kes", 0))
-                except Exception:
-                    pass
-                trending_list.append({"id": m.id, "product": m.product, "county": m.county, "sector": m.sector, "demand_score": getattr(m, "demand_score", 0), "current_price_kes": price or getattr(m, "avg_price_kes", 0) or 0, "trend": "up" if (getattr(m, "demand_score", 0) or 0) >= 7 else "down" if (getattr(m, "demand_score", 0) or 0) <= 3 else "stable", "price_change_percent": round((getattr(m, "demand_score", 0) * 2.5), 1)})
+            product = (r.product or "").strip()
+            county = (r.county or "Kenya").strip()
+            if not product:
+                continue
+            key = product.lower() + "|" + county.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            avg_demand = _safe_float(r.avg_demand)
+            if avg_demand is not None:
+                avg_demand = round(avg_demand, 1)
+            avg_price = _safe_float(r.avg_price)
+            if avg_price is not None:
+                avg_price = int(round(avg_price))
+            price_change = None
+            old_avg = None
+            try:
+                old_stmt = select(func.avg(MarketMetric.avg_price_kes)).where(MarketMetric.product == r.product, MarketMetric.county == r.county, MarketMetric.created_at.between(two_weeks_ago - timedelta(days=30), two_weeks_ago))
+                old_avg = session.exec(old_stmt).first()
+            except Exception:
+                _rollback(session)
+                old_avg = None
+            old_f = _safe_float(old_avg)
+            if old_f is not None and avg_price is not None and old_f > 0:
+                price_change = round(((avg_price - old_f) / old_f) * 100, 1)
+            trend = None
+            if price_change is not None:
+                trend = "up" if price_change > 0 else "down" if price_change < 0 else "stable"
+            fetched = None
+            try:
+                latest = session.exec(select(MarketMetric).where(MarketMetric.product == r.product, MarketMetric.county == r.county).order_by(desc(MarketMetric.created_at)).limit(1)).first()
+                if latest is not None:
+                    fetched = latest.fetched_at or latest.updated_at or latest.created_at
+            except Exception:
+                _rollback(session)
+            trending_list.append({"product": product, "county": county, "sector": r.sector or "", "demand_score": avg_demand, "current_price_kes": avg_price, "avg_price_kes": avg_price, "price": avg_price, "price_change_percent": price_change, "trend": trend, "activity": r.activity_count, "source": "MarketMetric", "fetched_at": str(fetched) if fetched else None, "updated_at": str(fetched) if fetched else None})
         return {"trending": trending_list}
     except Exception as e:
         print(f"trending failed {e}")
+        _rollback(session)
         return {"trending": []}
-
 @router.get("/search")
 def search_insights(q: str = Query("", min_length=0), county: str = Query(None), sector: str = Query(None), min_demand: float = Query(0), session: Session = Depends(get_session)):
     try:
+        _rollback(session)
         if not q and not county and not sector:
             return {"results": [], "total": 0}
         stmt = select(MarketMetric)
@@ -496,29 +488,37 @@ def search_insights(q: str = Query("", min_length=0), county: str = Query(None),
         results = session.exec(stmt).all()
         formatted = []
         for r in results:
-            formatted.append({"id": r.id, "product": r.product, "county": r.county, "sector": r.sector, "current_price_kes": r.avg_price_kes, "demand_score": r.demand_score, "timestamp": r.created_at, "snippet": f"{r.product} in {r.sector} @ {r.county} - Demand {getattr(r, 'demand_score', 0)}/10, Avg KES {getattr(r, 'avg_price_kes', 0)}"})
+            price = _safe_float(r.avg_price_kes)
+            demand = _safe_float(r.demand_score)
+            formatted.append({"id": r.id, "product": r.product, "county": r.county, "sector": r.sector, "current_price_kes": price, "avg_price_kes": price, "price": price, "demand_score": demand, "timestamp": r.created_at, "snippet": f"{r.product} in {r.sector} @ {r.county} - Demand {demand if demand is not None else '—'}/10, Avg KES {price if price is not None else '—'}"})
         if not formatted and q:
             like = f"%{q}%"
             prices = session.exec(select(PriceData).where(PriceData.product_name.ilike(like)).limit(5)).all()
             for p in prices:
-                formatted.append({"id": p.id + 10000, "product": getattr(p, "product_name", ""), "county": getattr(p, "county", ""), "snippet": f"Price: {getattr(p, 'product_name', '')} KES {getattr(p, 'price', 0)} in {getattr(p, 'county', '')}", "demand_score": 6, "current_price_kes": getattr(p, "price", 0)})
+                p_price = _safe_float(getattr(p, "price", None))
+                formatted.append({"id": p.id + 10000, "product": getattr(p, "product_name", ""), "county": getattr(p, "county", ""), "snippet": f"Price: {getattr(p, 'product_name', '')} KES {p_price if p_price is not None else '—'} in {getattr(p, 'county', '')}", "demand_score": None, "current_price_kes": p_price, "avg_price_kes": p_price, "price": p_price})
         return {"results": formatted[:50], "total": len(formatted)}
     except Exception as e:
         print(f"search failed {e}")
+        _rollback(session)
         return {"results": [], "total": 0}
-
 @router.get("/{insight_id}")
 def get_insight(insight_id: int, db: Session = Depends(get_db)):
-    m = db.get(MarketMetric, insight_id)
-    if not m:
-        try:
-            m = db.get(PriceData, insight_id - 10000)
-        except Exception:
-            m = None
-    if not m:
+    try:
+        _rollback(db)
+        m = db.get(MarketMetric, insight_id)
+        if not m:
+            try:
+                m = db.get(PriceData, insight_id - 10000)
+            except Exception:
+                m = None
+        if not m:
+            return {"id": insight_id, "detail": "Not found"}
+        return {"id": insight_id, "data": m}
+    except Exception as e:
+        print(f"get_insight failed {e}")
+        _rollback(db)
         return {"id": insight_id, "detail": "Not found"}
-    return {"id": insight_id, "data": m}
-
 @api_router.post("/mpesa/callback")
 async def mpesa_callback(payload: dict, db: Session = Depends(get_db)):
     body = payload.get("Body", {}).get("stkCallback", {})
@@ -541,6 +541,7 @@ async def mpesa_callback(payload: dict, db: Session = Depends(get_db)):
     days = 365 if is_annual else 30
     expires_at = datetime.utcnow() + timedelta(days=days)
     try:
+        _rollback(db)
         sub = db.exec(select(UserSubscription).where(UserSubscription.user_id == user_id)).first()
         if sub:
             sub.plan_name = plan_name
@@ -553,8 +554,5 @@ async def mpesa_callback(payload: dict, db: Session = Depends(get_db)):
         db.commit()
     except Exception as e:
         print(f"mpesa callback db failed: {e}")
-        try:
-            db.rollback()
-        except Exception:
-            pass
+        _rollback(db)
     return {"ResultCode": 0, "ResultDesc": "Success"}
