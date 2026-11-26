@@ -33,8 +33,6 @@ class AuthUser(SQLModel, table=True):
     two_fa_enabled: bool = Field(default=False)
     theme: str = Field(default="light", max_length=20)
     language: str = Field(default="en", max_length=10)
-    failed_login_attempts: int = Field(default=0)
-    locked_until: Optional[datetime] = Field(default=None)
     created_at: datetime = Field(default_factory=_utcnow, sa_column_kwargs={"server_default": func.now()})
     updated_at: datetime = Field(default_factory=_utcnow, sa_column_kwargs={"server_default": func.now(), "onupdate": func.now()})
     last_login: Optional[datetime] = Field(default=None)
