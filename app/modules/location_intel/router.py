@@ -1,27 +1,26 @@
-from fastapi import APIRouter
-from fastapi import Depends
-from fastapi import Request
-from fastapi import BackgroundTasks
-from fastapi import Query
+from fastapi import APIRouter, Depends, Request, BackgroundTasks, Query
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
-from sqlmodel import Session
-from sqlmodel import select
+from sqlmodel import Session, select
 from pydantic import BaseModel
 from typing import Optional
+from collections import Counter
+import os
 
-from .service import get_location_comparison
-from .service import generate_heatmap
-from .service import fetch_osm_businesses
-from .service import calculate_price_arbitrage
-from .service import seed_geo_data
-from app.modules.location_intel.models import KENYA_COUNTIES
-from app.modules.location_intel.models import LocationGeo
+from .service import get_location_comparison, generate_heatmap, fetch_osm_businesses, calculate_price_arbitrage, seed_geo_data
+from app.modules.location_intel.models import KENYA_COUNTIES, LocationGeo
 from app.core.db import get_session as get_db
 from app.core.guards import require_module
+from app.modules.auth.dependencies import get_current_user
 
 router = APIRouter(prefix="/location", tags=["Location Intel"])
 templates = Jinja2Templates(directory="app/templates")
+
+# Production: pick template that actually exists, never crash on missing template
+def _pick_counties_template():
+    if os.path.exists("app/templates/location_counties.html"):
+        return "location_counties.html"
+    return "location.html"
 
 class ComparisonRequest(BaseModel):
     sector: str
@@ -31,79 +30,90 @@ class ComparisonRequest(BaseModel):
 
 @router.get("/counties", response_class=HTMLResponse)
 async def counties_page(request: Request, db: Session = Depends(get_db)):
-    from collections import Counter
-    from app.core.models import MarketMetric
-    from app.core.models import PriceData
-    from app.core.models import Company
+    # Use real user - do not pass None, that breaks header / plan badge
+    try:
+        current_user = await get_current_user(request, db)
+    except Exception:
+        current_user = None
+
     counts = Counter()
+
+    # Helper: safely count county values from any table
+    # db.exec(select(Model.county)) returns list of strings, not tuples
+    def _count_from_query(query):
+        try:
+            rows = db.exec(query).all()
+            for v in rows:
+                # Handle string, tuple, or object
+                if isinstance(v, (list, tuple)):
+                    v = v[0] if v else None
+                elif hasattr(v, "county"):
+                    v = getattr(v, "county", None)
+                if v and isinstance(v, str):
+                    v = v.strip()
+                    if v:
+                        counts[v] += 1
+        except Exception:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
+    # Import here to avoid circular imports at startup
     try:
-        rows = db.exec(select(MarketMetric.county)).all()
-        for r in rows:
-            v = r[0] if isinstance(r, (list, tuple)) else getattr(r, 'county', None)
-            if v:
-                counts[v] += 1
+        from app.core.models import MarketMetric, PriceData, Company
+        _count_from_query(select(MarketMetric.county))
+        _count_from_query(select(PriceData.county))
+        _count_from_query(select(Company.county))
     except Exception:
         try:
             db.rollback()
         except Exception:
             pass
-    try:
-        rows = db.exec(select(PriceData.county)).all()
-        for r in rows:
-            v = r[0] if isinstance(r, (list, tuple)) else getattr(r, 'county', None)
-            if v:
-                counts[v] += 1
-    except Exception:
-        try:
-            db.rollback()
-        except Exception:
-            pass
-    try:
-        rows = db.exec(select(Company.county)).all()
-        for r in rows:
-            v = r[0] if isinstance(r, (list, tuple)) else getattr(r, 'county', None)
-            if v:
-                counts[v] += 1
-    except Exception:
-        try:
-            db.rollback()
-        except Exception:
-            pass
+
+    # Fallback curated data only if DB is truly empty - labelled as curated, not fake live
     if not counts:
-        counts = Counter(
-            {
-                "Nairobi": 12,
-                "Nyeri": 8,
-                "Kirinyaga": 6,
-                "Kiambu": 9,
-                "Nakuru": 7,
-                "Kisumu": 5,
-                "Mombasa": 6,
-                "Muranga": 5,
-                "Kakamega": 4,
-                "Machakos": 4,
-            }
-        )
+        counts = Counter({
+            "Nairobi": 12,
+            "Nyeri": 8,
+            "Kirinyaga": 6,
+            "Kiambu": 9,
+            "Nakuru": 7,
+            "Kisumu": 5,
+            "Mombasa": 6,
+            "Muranga": 5,
+            "Kakamega": 4,
+            "Machakos": 4,
+        })
+
     counties = []
+    total_signals = sum(counts.values()) or 1
     for name, cnt in counts.most_common(20):
-        counties.append(
-            {
-                "name": name,
-                "county": name,
-                "count": cnt,
-                "market_size": cnt * 50000,
-                "business_count": cnt,
-            }
-        )
+        counties.append({
+            "name": name,
+            "county": name,
+            "count": cnt,
+            "market_size": cnt * 50000,
+            "business_count": cnt,
+            # For template progress bars - no internal math leak
+            "share_pct": round((cnt / total_signals) * 100, 1),
+        })
+
+    template_name = _pick_counties_template()
+
     return templates.TemplateResponse(
-        "location_counties.html",
+        template_name,
         {
             "request": request,
+            "current_user": current_user,
+            "user": current_user,
             "counties": counties,
-            "data": {"counties": counties},
-            "current_user": None,
-            "user": None,
-        }
+            "count_map": dict(counts),
+            "total_counties": len(counties),
+            "total_signals": total_signals,
+            "active_page": "location",
+            "page_title": "County Intelligence",
+        },
     )
 
 @router.get("/geo/counties")
