@@ -20,22 +20,25 @@
   </div>
   <div class="bg-white p-4 rounded-xl shadow-sm mb-6 flex gap-2 items-center flex-wrap">
     <button type="button" class="filter-btn active" data-filter="all">All ({{ (policies or [])|length }})</button>
-    <button type="button" class="filter-btn" data-filter="Tax">Tax</button>
-    <button type="button" class="filter-btn" data-filter="License">License</button>
-    <button type="button" class="filter-btn" data-filter="Subsidy">Subsidy</button>
-    <button type="button" class="filter-btn" data-filter="High">High Impact</button>
+    <button type="button" class="filter-btn" data-filter="tax">Tax</button>
+    <button type="button" class="filter-btn" data-filter="license">License</button>
+    <button type="button" class="filter-btn" data-filter="subsidy">Subsidy</button>
+    <button type="button" class="filter-btn" data-filter="high">High Impact</button>
     <div class="ml-auto flex gap-2 text-xs flex-wrap"><span class="px-2 py-1 bg-gray-100 rounded">KRA ● Live</span><span class="px-2 py-1 bg-gray-100 rounded">KEBS ● Live</span><span class="px-2 py-1 bg-gray-100 rounded">CBK ● Live</span></div>
   </div>
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <div class="lg:col-span-2 space-y-4">
       {% for pol in (policies or []) %}
-      <div class="bg-white p-6 rounded-2xl shadow-sm border hover:shadow-md transition policy-card" data-type="{{ pol.category or '' }}" data-impact="{{ pol.impact or '' }}">
+      {% set _cat = (pol.category|string|lower) if pol.category is defined and pol.category else '' %}
+      {% set _impact = (pol.impact|string|lower) if pol.impact is defined and pol.impact else '' %}
+      {% set _is_safe_url = pol.url is defined and pol.url and (pol.url|string|lower).startswith('http') %}
+      <div class="bg-white p-6 rounded-2xl shadow-sm border hover:shadow-md transition policy-card" data-type="{{ _cat }}" data-impact="{{ _impact }}">
         <div class="flex justify-between items-start mb-3 gap-3">
           <div class="flex-1 min-w-0">
             <div class="flex gap-2 mb-2 flex-wrap">
               {% if pol.category %}<span class="bg-blue-100 text-blue-700 text-[11px] font-bold px-2.5 py-1 rounded-full">{{ pol.category }}</span>{% endif %}
               {% if pol.county %}<span class="bg-gray-100 text-gray-700 text-[11px] font-bold px-2.5 py-1 rounded-full">{{ pol.county }}</span>{% endif %}
-              {% if pol.impact == 'High' %}<span class="bg-red-600 text-white text-[11px] font-bold px-2.5 py-1 rounded-full">HIGH IMPACT</span>{% endif %}
+              {% if _impact == 'high' %}<span class="bg-red-600 text-white text-[11px] font-bold px-2.5 py-1 rounded-full">HIGH IMPACT</span>{% endif %}
               {% if pol.impact_statement %}<span class="bg-yellow-100 text-yellow-800 text-[11px] font-bold px-2.5 py-1 rounded-full">Action Required</span>{% endif %}
             </div>
             <h2 class="text-[17px] font-bold text-[#0A1F44] leading-tight">{{ pol.title or 'Policy Update' }}</h2>
@@ -47,7 +50,7 @@
         <div class="bg-[#FFFBEB] border-l-4 border-yellow-400 p-3 rounded-r-lg mb-4"><p class="text-[13px]"><b class="text-[#0A1F44]">What this means for you:</b> {{ pol.impact_statement }}</p></div>
         {% endif %}
         <div class="flex justify-between items-center pt-2 border-t flex-wrap gap-2">
-          {% if pol.url %}<a href="{{ pol.url }}" target="_blank" rel="noopener" class="text-[#14B8A6] font-bold text-[13px] hover:underline">Read Full Gazette →</a>{% else %}<span class="text-gray-400 text-[13px]">Source: Kenya Gazette</span>{% endif %}
+          {% if _is_safe_url %}<a href="{{ pol.url }}" target="_blank" rel="noopener noreferrer" class="text-[#14B8A6] font-bold text-[13px] hover:underline">Read Full Gazette →</a>{% else %}<span class="text-gray-400 text-[13px]">Source: Kenya Gazette</span>{% endif %}
           <div class="flex gap-2">
             <a href="/ai?q={{ ('How does \"' + (pol.title or 'this policy') + '\" affect my business in ' + (current_user.county if current_user is defined and current_user and current_user.county else 'Kenya') + '?')|urlencode }}" class="text-[12px] bg-[#0A1F44] text-white px-4 py-1.5 rounded-lg font-bold">Ask Lens AI</a>
             <a href="/reports?policy={{ (pol.title or '')|urlencode }}" class="text-[12px] border px-3 py-1.5 rounded-lg font-bold">Add to Report</a>
@@ -66,9 +69,15 @@
     <div class="space-y-4">
       <div class="bg-[#0A1F44] text-white p-5 rounded-2xl">
         <h4 class="font-bold text-sm">Regulatory Exposure</h4>
+        {% set _tax_count = namespace(value=0) %}
+        {% set _high_count = namespace(value=0) %}
+        {% for pol in (policies or []) %}
+          {% if (pol.category|string|lower) == 'tax' %}{% set _tax_count.value = _tax_count.value + 1 %}{% endif %}
+          {% if (pol.impact|string|lower) == 'high' %}{% set _high_count.value = _high_count.value + 1 %}{% endif %}
+        {% endfor %}
         <div class="mt-4 space-y-3 text-xs">
-          <div class="flex justify-between"><span class="text-gray-400">Tax Changes</span><span class="text-yellow-400 font-bold">{% if (policies or [])|selectattr('category','equalto','Tax')|list|length %}{{ (policies or [])|selectattr('category','equalto','Tax')|list|length }} Tracked{% else %}No Change{% endif %}</span></div>
-          <div class="flex justify-between"><span class="text-gray-400">High Impact</span><span class="text-red-400 font-bold">{{ (policies or [])|selectattr('impact','equalto','High')|list|length }} Policies</span></div>
+          <div class="flex justify-between"><span class="text-gray-400">Tax Changes</span><span class="text-yellow-400 font-bold">{% if _tax_count.value %}{{ _tax_count.value }} Tracked{% else %}No Change{% endif %}</span></div>
+          <div class="flex justify-between"><span class="text-gray-400">High Impact</span><span class="text-red-400 font-bold">{{ _high_count.value }} Policies</span></div>
           <div class="flex justify-between"><span class="text-gray-400">County Fees</span><span class="text-gray-300">Check County</span></div>
         </div>
         <a href="/reports" class="block text-center w-full mt-4 bg-[#14B8A6] text-white py-2 rounded-lg text-xs font-bold">Build Compliance Report</a>
@@ -95,7 +104,7 @@ document.querySelectorAll('.filter-btn').forEach(function(btn){
     var f=btn.dataset.filter;
     document.querySelectorAll('.policy-card').forEach(function(c){
       var t=c.dataset.type, imp=c.dataset.impact;
-      c.style.display=(f==='all'||t===f||(f==='High'&&imp==='High'))?'block':'none';
+      c.style.display=(f==='all'||t===f||(f==='high'&&imp==='high'))?'block':'none';
     });
   });
 });
