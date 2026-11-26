@@ -3,7 +3,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, JSONResponse
 from sqlmodel import Session, select, func
 from typing import Optional
-import traceback
+import logging
 
 from app.core.db import get_session
 from app.core.models import Competitor, Company, KenyaLensBusiness
@@ -11,78 +11,111 @@ from app.modules.competitive_engine.service import CompetitiveEngineService
 
 router = APIRouter(prefix="/competitive", tags=["Competitive Engine"])
 templates = Jinja2Templates(directory="app/templates")
+logger = logging.getLogger("evidlens.competitive")
 
 def get_service(db: Session = Depends(get_session)):
     return CompetitiveEngineService(db)
 
+async def _get_user(request: Request, db: Session):
+    try:
+        from app.modules.auth.dependencies import get_current_user
+        return await get_current_user(request, db)
+    except Exception:
+        return None
+
+def _clean_rating(value):
+    if value is None:
+        return None
+    try:
+        v = float(value)
+    except Exception:
+        return None
+    if v <= 0:
+        return None
+    if v > 5:
+        return 5.0
+    return round(v, 1)
+
+def _threat_level(sector, county, rating):
+    text = f"{sector or ''} {county or ''}".lower()
+    if any(k in text for k in ["telecom", "banking", "fintech", "insurance"]):
+        return "High"
+    if any(k in text for k in ["retail", "agriculture", "manufacturing", "energy"]):
+        return "Medium"
+    return "Low"
+
+def _normalize_company(c):
+    rating = _clean_rating(getattr(c, "rating", None))
+    sector = getattr(c, "sector", "") or "General"
+    county = getattr(c, "county", "") or "Kenya"
+    return {
+        "id": getattr(c, "id", None),
+        "name": getattr(c, "name", "Unknown") or "Unknown",
+        "sector": sector,
+        "county": county,
+        "description": getattr(c, "description", "") or "",
+        "rating": rating,
+        "avg_rating": rating,
+        "threat": _threat_level(sector, county, rating),
+        "threat_level": _threat_level(sector, county, rating),
+    }
+
+def _normalize_competitor(c):
+    rating = _clean_rating(getattr(c, "rating", None))
+    sector = getattr(c, "sector", "") or "General"
+    county = getattr(c, "county", "") or "Kenya"
+    return {
+        "id": getattr(c, "id", None),
+        "name": getattr(c, "name", "Unknown") or "Unknown",
+        "sector": sector,
+        "county": county,
+        "description": getattr(c, "description", "") or "",
+        "rating": rating,
+        "avg_rating": rating,
+        "threat": _threat_level(sector, county, rating),
+        "threat_level": _threat_level(sector, county, rating),
+    }
+
 @router.get("/", response_class=HTMLResponse)
 async def competitive_page(request: Request, db: Session = Depends(get_session)):
-    # Keep original behavior but add real count and never 500
     try:
-        try:
-            competitors = db.exec(select(Competitor).limit(200)).all()
-            companies = db.exec(select(Company).limit(200)).all()
-        except Exception as e:
-            print(f"DB query failed in competitive_page: {e}")
-            try:
-                db.rollback()
-            except:
-                pass
-            competitors = []
-            companies = []
-
-        return templates.TemplateResponse("competitive.html", {
-            "request": request,
-            "competitors": competitors,
-            "companies": companies,
-            "count": len(competitors),
-            "company_count": len(companies)
-        })
+        competitors_raw = db.exec(select(Competitor).limit(200)).all()
+        companies_raw = db.exec(select(Company).limit(200)).all()
     except Exception as e:
-        print(f"competitive_page template error: {e}")
-        traceback.print_exc()
+        logger.exception(f"competitive_page DB failed: {e}")
         try:
-            competitors = db.exec(select(Competitor).limit(100)).all()
-        except:
-            competitors = []
-        # Fallback HTML that still shows real data
-        rows = ""
-        for c in competitors[:50]:
-            name = getattr(c, 'name', 'Unknown')
-            sector = getattr(c, 'sector', '-')
-            county = getattr(c, 'county', '-')
-            rows += f"<tr><td>{name}</td><td>{sector}</td><td>{county}</td></tr>"
+            db.rollback()
+        except Exception:
+            pass
+        competitors_raw = []
+        companies_raw = []
 
-        return HTMLResponse(f"""
-        <html>
-        <head><title>Competitive Engine</title>
-        <style>
-            body {{ font-family: Inter, sans-serif; padding: 30px; background: #f8fafc; }}
-           .header {{ display: flex; justify-content: space-between; align-items: center; }}
-            table {{ width: 100%; border-collapse: collapse; background: white; margin-top: 20px; }}
-            td, th {{ border: 1px solid #e2e8f0; padding: 10px; text-align: left; }}
-            th {{ background: #f1f5f9; }}
-            a {{ color: #2563eb; text-decoration: none; }}
-        </style>
-        </head>
-        <body>
-            <div class="header">
-                <h1>Competitive Engine</h1>
-                <a href="/">← Back to Dashboard</a>
-            </div>
-            <p>{len(competitors)} records from evidlens_1a5n</p>
-            <p><a href="/competitive/sync-real">Sync real data from kenyalens_business</a> | <a href="/competitive/count">Check count API</a></p>
-            <table>
-                <tr><th>Name</th><th>Sector</th><th>County</th></tr>
-                {rows if rows else "<tr><td colspan='3'>No competitors yet - click Sync</td></tr>"}
-            </table>
-        </body>
-        </html>
-        """, status_code=200)
+    competitors = [_normalize_competitor(c) for c in competitors_raw]
+    companies = [_normalize_company(c) for c in companies_raw]
+    all_items = competitors + companies
+    rated = [x for x in all_items if x["rating"] is not None]
+    avg_rating = round(sum(x["rating"] for x in rated) / len(rated), 1) if rated else None
+    high_threat = len([x for x in all_items if x["threat"] == "High"])
+
+    current_user = await _get_user(request, db)
+    return templates.TemplateResponse("competitive.html", {
+        "request": request,
+        "competitors": competitors,
+        "companies": companies,
+        "items": all_items,
+        "count": len(competitors),
+        "company_count": len(companies),
+        "total_count": len(all_items),
+        "avg_rating": avg_rating,
+        "high_threat_count": high_threat,
+        "has_data": len(all_items) > 0,
+        "current_user": current_user,
+        "user": current_user,
+    })
 
 @router.get("/api/company")
 async def company_db(
-    sector: str = Query(..., description="Sector to search"),
+    sector: str = Query(...),
     county: Optional[str] = Query(default=None),
     company_name: Optional[str] = Query(default=None),
     service: CompetitiveEngineService = Depends(get_service),
@@ -92,13 +125,11 @@ async def company_db(
         result = await service.company_deal_database(sector, county, company_name)
         return result
     except Exception as e:
-        print(f"company_db service failed: {e}")
-        traceback.print_exc()
+        logger.exception(f"company_db service failed: {e}")
         try:
             db.rollback()
-        except:
+        except Exception:
             pass
-        # REAL fallback - direct DB query
         try:
             q = select(Company)
             if sector:
@@ -113,16 +144,16 @@ async def company_db(
                 "county": county,
                 "company_name": company_name,
                 "count": len(companies),
-                "companies": [c.model_dump() if hasattr(c, 'model_dump') else {"id": c.id, "name": c.name, "sector": c.sector, "county": c.county} for c in companies],
-                "source": "company table - real"
+                "companies": [_normalize_company(c) for c in companies],
+                "source": "Company Directory",
             }
         except Exception as e2:
-            print(f"company_db fallback also failed: {e2}")
+            logger.exception(f"company_db fallback failed: {e2}")
             try:
                 db.rollback()
-            except:
+            except Exception:
                 pass
-            return JSONResponse({"count": 0, "companies": [], "error": str(e2)[:300]}, status_code=200)
+            return JSONResponse({"count": 0, "companies": []}, status_code=200)
 
 @router.get("/api/funding")
 async def funding(
@@ -137,11 +168,10 @@ async def funding(
         result = await service.funding_tracker(sector, county, investor, date_range)
         return result
     except Exception as e:
-        print(f"funding_tracker failed: {e}")
-        traceback.print_exc()
+        logger.exception(f"funding_tracker failed: {e}")
         try:
             db.rollback()
-        except:
+        except Exception:
             pass
         return {
             "sector": sector,
@@ -150,7 +180,7 @@ async def funding(
             "date_range": date_range,
             "count": 0,
             "funding": [],
-            "message": "No funding data in DB yet - real data will appear after cron"
+            "message": "No funding data yet",
         }
 
 @router.get("/api/traffic")
@@ -164,24 +194,23 @@ async def traffic(
         result = await service.digital_traffic_analyzer(competitor1, competitor2)
         return result
     except Exception as e:
-        print(f"traffic analyzer failed: {e}")
-        traceback.print_exc()
+        logger.exception(f"traffic analyzer failed: {e}")
         try:
             db.rollback()
-        except:
+        except Exception:
             pass
         return {
             "competitor1": competitor1,
             "competitor2": competitor2,
             "traffic": {},
             "comparison": {},
-            "message": "Traffic data not yet available"
+            "message": "Traffic data not yet available",
         }
 
 @router.get("/api/monitor")
 async def monitor(
     competitor: str = Query(...),
-    signal_type: str = Query(..., description="news|sentiment|funding"),
+    signal_type: str = Query(...),
     service: CompetitiveEngineService = Depends(get_service),
     db: Session = Depends(get_session),
 ):
@@ -189,68 +218,65 @@ async def monitor(
         result = await service.competitor_monitor(competitor, signal_type)
         return result
     except Exception as e:
-        print(f"monitor failed: {e}")
-        traceback.print_exc()
+        logger.exception(f"monitor failed: {e}")
         try:
             db.rollback()
-        except:
+        except Exception:
             pass
         return {
             "competitor": competitor,
             "signal_type": signal_type,
             "signals": [],
-            "count": 0
+            "count": 0,
         }
 
 @router.get("/sync-real")
 def sync_real(db: Session = Depends(get_session)):
-    """Populate competitor tables from kenyalens_business - REAL DATA"""
     try:
         try:
             businesses = db.exec(select(KenyaLensBusiness).limit(1000)).all()
         except Exception as e:
-            print(f"KenyaLensBusiness table query failed: {e}")
+            logger.exception(f"KenyaLensBusiness query failed: {e}")
             try:
                 db.rollback()
-            except:
+            except Exception:
                 pass
-            return JSONResponse({"synced": 0, "error": f"kenyalens_business table not found or empty: {str(e)[:200]}"}, status_code=200)
+            return JSONResponse({"synced": 0, "error": "Business directory not available"}, status_code=200)
 
         inserted_company = 0
         skipped_company = 0
         for b in businesses:
             try:
-                b_name = getattr(b, 'name', None) or getattr(b, 'business_name', None) or 'Unknown'
-                b_sector = getattr(b, 'sector', None) or 'General'
-                b_county = getattr(b, 'county', None) or 'Kenya'
-
+                b_name = getattr(b, "name", None) or getattr(b, "business_name", None) or "Unknown"
+                b_sector = getattr(b, "sector", None) or "General"
+                b_county = getattr(b, "county", None) or "Kenya"
                 exists = db.exec(select(Company).where(Company.name == b_name)).first()
                 if not exists:
                     new_company = Company(
                         name=b_name,
                         sector=b_sector,
                         county=b_county,
-                        description=getattr(b, 'description', None)
+                        description=getattr(b, "description", None),
                     )
                     db.add(new_company)
                     inserted_company += 1
                 else:
                     skipped_company += 1
             except Exception as e:
-                print(f"Company insert error for {getattr(b,'name','unknown')}: {e}")
+                logger.exception(f"Company insert failed: {e}")
                 try:
                     db.rollback()
-                except:
+                except Exception:
                     pass
                 continue
 
         try:
             db.commit()
         except Exception as e:
-            print(f"Commit failed in sync-real: {e}")
+            logger.exception(f"Commit failed in sync-real: {e}")
             try:
                 db.rollback()
-            except:
+            except Exception:
                 pass
 
         try:
@@ -258,10 +284,10 @@ def sync_real(db: Session = Depends(get_session)):
             total_competitor = db.exec(select(func.count()).select_from(Competitor)).first() or 0
             total_source = len(businesses)
         except Exception as e:
-            print(f"Count query failed: {e}")
+            logger.exception(f"Count query failed: {e}")
             total_company = 0
             total_competitor = 0
-            total_source = len(businesses) if 'businesses' in locals() else 0
+            total_source = len(businesses)
 
         return {
             "synced": inserted_company,
@@ -269,17 +295,15 @@ def sync_real(db: Session = Depends(get_session)):
             "total_business_source": total_source,
             "total_company_now": int(total_company),
             "total_competitor_now": int(total_competitor),
-            "status": "sync complete - real data"
+            "status": "sync complete",
         }
-
     except Exception as e:
-        print(f"sync-real fatal error: {e}")
-        traceback.print_exc()
+        logger.exception(f"sync-real fatal: {e}")
         try:
             db.rollback()
-        except:
+        except Exception:
             pass
-        return JSONResponse({"synced": 0, "error": str(e)[:500]}, status_code=200)
+        return JSONResponse({"synced": 0, "error": "Sync failed. Please try again."}, status_code=200)
 
 @router.get("/count")
 def count_api(db: Session = Depends(get_session)):
@@ -289,15 +313,15 @@ def count_api(db: Session = Depends(get_session)):
         return {
             "competitor_records": int(total_competitor),
             "company_records": int(total_company),
-            "total": int(total_competitor) + int(total_company)
+            "total": int(total_competitor) + int(total_company),
         }
     except Exception as e:
-        print(f"count API error: {e}")
+        logger.exception(f"count API error: {e}")
         try:
             db.rollback()
-        except:
+        except Exception:
             pass
-        return {"competitor_records": 0, "company_records": 0, "total": 0, "error": str(e)[:200]}
+        return {"competitor_records": 0, "company_records": 0, "total": 0}
 
 @router.get("/api/stats")
 def stats_api(db: Session = Depends(get_session)):
@@ -306,16 +330,17 @@ def stats_api(db: Session = Depends(get_session)):
         compy_count = db.exec(select(func.count()).select_from(Company)).first() or 0
         try:
             kb_count = db.exec(select(func.count()).select_from(KenyaLensBusiness)).first() or 0
-        except:
+        except Exception:
             kb_count = 0
         return {
             "competitor": int(comp_count),
             "company": int(compy_count),
-            "kenyalens_business": int(kb_count)
+            "kenyalens_business": int(kb_count),
         }
     except Exception as e:
+        logger.exception(f"stats API error: {e}")
         try:
             db.rollback()
-        except:
+        except Exception:
             pass
-        return {"competitor": 0, "company": 0, "kenyalens_business": 0, "error": str(e)[:200]}
+        return {"competitor": 0, "company": 0, "kenyalens_business": 0}
