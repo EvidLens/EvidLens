@@ -32,10 +32,18 @@
       <a href="/competitive" class="bg-white border px-4 py-2 rounded-xl font-bold text-sm">Clear</a>
     </form>
     {% if companies is defined and companies %}
+    {# FIXED: app.core.models.Company has NO 'rating' attribute. c.rating throws UndefinedError and kills the whole page. Use c.__dict__.get('rating') which returns None instead of throwing. #}
+    {% set ns = namespace(high=0, total=0, sum=0) %}
+    {% for c in companies %}
+      {% set _r = (c.__dict__.get('rating') or 0)|float %}
+      {% set ns.sum = ns.sum + _r %}
+      {% if _r >= 4 %}{% set ns.high = ns.high + 1 %}{% endif %}
+      {% set ns.total = ns.total + 1 %}
+    {% endfor %}
     <div class="grid grid-cols-3 gap-3 mb-6 text-center">
       <div class="bg-slate-50 rounded-xl p-4"><p class="text-2xl font-bold text-[#0A1F44]">{{ companies|length }}</p><p class="text-xs text-gray-500">Competitors Found</p></div>
-      <div class="bg-red-50 rounded-xl p-4"><p class="text-2xl font-bold text-red-600">{{ companies|selectattr('rating', 'ge', 4)|list|length if companies else 0 }}</p><p class="text-xs text-gray-500">High Threat</p></div>
-      <div class="bg-teal-50 rounded-xl p-4"><p class="text-2xl font-bold text-teal-600">{{ ((companies|map(attribute='rating')|select('defined')|list|sum / companies|length) if companies else 0)|round(1) }}/5</p><p class="text-xs text-gray-500">Avg Rating</p></div>
+      <div class="bg-red-50 rounded-xl p-4"><p class="text-2xl font-bold text-red-600">{{ ns.high }}</p><p class="text-xs text-gray-500">High Threat</p></div>
+      <div class="bg-teal-50 rounded-xl p-4"><p class="text-2xl font-bold text-teal-600">{{ ((ns.sum / ns.total) if ns.total else 0)|round(1) }}/5</p><p class="text-xs text-gray-500">Avg Rating</p></div>
     </div>
     {% endif %}
     <div class="overflow-x-auto">
@@ -43,16 +51,18 @@
         <thead><tr class="text-left text-sm text-gray-500 border-b"><th class="p-3">Company</th><th class="p-3">Sector</th><th class="p-3">County</th><th class="p-3">Rating</th><th class="p-3">Strength</th><th class="p-3"></th></tr></thead>
         <tbody>
           {% for c in (companies or []) %}
-          {% set r = ((c.rating or 0)|float)|round|int %}
+          {% set r = ((c.__dict__.get('rating') or 0)|float)|round|int %}
           {% if r < 0 %}{% set r = 0 %}{% endif %}
           {% if r > 5 %}{% set r = 5 %}{% endif %}
+          {% set _loc = c.__dict__.get('location') %}
+          {% set _url = c.__dict__.get('url') %}
           <tr class="border-b hover:bg-gray-50">
-            <td class="p-3 font-semibold text-[#0A1F44]">{{ c.name or 'Company' }}{% if c.location %}<p class="text-xs text-gray-400 font-normal">{{ c.location }}</p>{% endif %}</td>
+            <td class="p-3 font-semibold text-[#0A1F44]">{{ c.name or 'Company' }}{% if _loc %}<p class="text-xs text-gray-400 font-normal">{{ _loc }}</p>{% endif %}</td>
             <td class="p-3">{{ c.sector or sector or '-' }}</td>
             <td class="p-3">{{ c.county or county or '-' }}</td>
             <td class="p-3 whitespace-nowrap"><span class="text-[#F59E0B]">{{ '★' * r }}{{ '☆' * (5 - r) }}</span> <span class="text-sm ml-1">{{ r }}/5</span></td>
             <td class="p-3">{% if r >= 4 %}<span class="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full font-bold">High Threat</span>{% elif r >= 3 %}<span class="bg-yellow-100 text-yellow-700 text-xs px-2 py-1 rounded-full font-bold">Medium</span>{% else %}<span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full font-bold">Low</span>{% endif %}</td>
-            <td class="p-3 text-right">{% if c.url %}<a href="{{ c.url }}" target="_blank" rel="noopener" class="text-[#0d9488] font-bold text-[13px]">View →</a>{% elif c.name %}<a href="/ai?q={{ ('Competitors of ' + c.name + ' in ' + (c.county or county or 'Kenya'))|urlencode }}" class="text-[#0d9488] font-bold text-[13px]">Analyze →</a>{% endif %}</td>
+            <td class="p-3 text-right">{% if _url %}<a href="{{ _url }}" target="_blank" rel="noopener" class="text-[#0d9488] font-bold text-[13px]">View →</a>{% elif c.name %}<a href="/ai?q={{ ('Competitors of ' + c.name + ' in ' + (c.county or county or 'Kenya'))|urlencode }}" class="text-[#0d9488] font-bold text-[13px]">Analyze →</a>{% endif %}</td>
           </tr>
           {% else %}
           <tr><td colspan="6" class="text-center p-10 text-gray-500">No competitors found yet. Pick a sector + county and click Analyze.<br><a href="/ai" class="text-[#0d9488] font-bold underline">Or ask Lens to find competitors for you →</a></td></tr>
