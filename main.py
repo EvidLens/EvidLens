@@ -654,6 +654,8 @@ templates = Jinja2Templates(
     directory="app/templates",
     auto_reload=True
 )
+app.include_router(analysis_router)
+app.include_router(analysis_api_router)
 app.include_router(pages_router)
 app.include_router(data_router)
 app.include_router(billing_page_router)
@@ -676,8 +678,6 @@ app.include_router(storage_router)
 app.include_router(billing.router)
 app.include_router(data.router)
 app.include_router(meta.router)
-app.include_router(analysis_router)
-app.include_router(analysis_api_router)
 
 @app.get("/privacy", response_class=HTMLResponse)
 def privacy_page(request: Request):
@@ -801,10 +801,6 @@ def forgot_alias_page(request: Request):
         }
     )
 
-# --- Auth page aliases ---
-# Old templates linked to /auth/register, /auth/forgot-password, /auth/oauth/*
-# as GET page routes. Those never existed in main.py, so FastAPI returned
-# {"detail":"Not Found"} JSON. Redirect them to the real pages instead.
 @app.get("/auth/login", response_class=HTMLResponse)
 def auth_login_alias(request: Request):
     return RedirectResponse(url="/login", status_code=302)
@@ -848,8 +844,6 @@ def pricing_page(request: Request):
 
 @app.get("/pricing-data")
 def pricing_data_alias():
-    # pricing.html JS calls /pricing-data, real API is /api/billing/plans.
-    # Return the same plans shape as billing.py so it returns 200, not 404.
     return {
         "plans": [
             {"code": "FREE", "name": "Free", "monthly": 0, "annual": 0, "analyses": 5, "reports": 1, "seats": 1, "engines": 6},
@@ -905,17 +899,43 @@ def root(
     cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=48)
     real_count = 0
     try:
-        real_count = db.exec(
-            select(func.count()).select_from(MarketMetric).where(
-                MarketMetric.created_at >= cutoff
-            )
-        ).first() or 0
+        source_col = getattr(MarketMetric, "source", None)
+        if source_col is not None:
+            real_count = db.exec(
+                select(func.count()).select_from(MarketMetric).where(
+                    MarketMetric.created_at >= cutoff,
+                    MarketMetric.product.is_not(None),
+                    MarketMetric.product != "",
+                    func.coalesce(source_col, "").not_ilike("%seed%"),
+                    func.coalesce(source_col, "").not_ilike("%fake%"),
+                    func.coalesce(source_col, "").not_ilike("%demo%")
+                )
+            ).first() or 0
+        else:
+            real_count = db.exec(
+                select(func.count()).select_from(MarketMetric).where(
+                    MarketMetric.created_at >= cutoff,
+                    MarketMetric.product.is_not(None),
+                    MarketMetric.product != ""
+                )
+            ).first() or 0
     except Exception:
         try:
             db.rollback()
         except Exception:
             pass
-        real_count = 0
+        try:
+            real_count = db.exec(
+                select(func.count()).select_from(MarketMetric).where(
+                    MarketMetric.created_at >= cutoff
+                )
+            ).first() or 0
+        except Exception:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            real_count = 0
     API = {}
     API["prices"] = "/api/data/prices"
     API["demand"] = "/api/data/demand"
