@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Funding | EvidLens{% endblock %}
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <div class="flex flex-wrap justify-between items-start gap-4 mb-6">
+    <div>
+      <h1 class="text-3xl font-bold text-[#0A1F44]">💰 Funding</h1>
+      <p class="text-gray-500 text-[14px] mt-1">Loans, grants and investor funding for {{ (current_user.sector if current_user is defined and current_user and current_user.sector else 'your sector') }} • {{ (current_user.county if current_user is defined and current_user and current_user.county else 'Kenya') }}</p>
+    </div>
+    <a href="/ai" class="bg-[#14B8A6] text-white px-4 py-2 rounded-xl font-bold text-[13px]">Ask Lens →</a>
+  </div>
+  <form method="get" action="/business-os/funding" class="bg-white p-4 rounded-xl shadow-sm border mb-6 flex gap-2 flex-wrap">
+    <input name="q" value="{{ q or '' }}" placeholder="Search funding (e.g. Hustler Fund, grant)..." class="border rounded-xl px-3 py-2 text-sm flex-1 min-w-[180px]" autocomplete="off">
+    <input name="sector" value="{{ sector or '' }}" placeholder="Sector" class="border rounded-xl px-3 py-2 text-sm" autocomplete="off">
+    <input name="county" value="{{ county or '' }}" placeholder="County" class="border rounded-xl px-3 py-2 text-sm" autocomplete="off">
+    <button type="submit" class="bg-[#0A1F44] text-white px-4 py-2 rounded-xl font-bold text-sm">Filter</button>
+    {% if q or sector or county %}<a href="/business-os/funding" class="border px-4 py-2 rounded-xl font-bold text-sm">Clear</a>{% endif %}
+  </form>
+  {% set _items = funding if funding is defined and funding else (opportunities if opportunities is defined and opportunities else (loans if loans is defined and loans else (grants if grants is defined and grants else []))) %}
+  {% set _total = namespace(value=0) %}
+  {% set _max = namespace(value=0) %}
+  {% for f in _items %}
+    {% set _amt = f.amount_max if f.amount_max is defined and f.amount_max is not none else (f.max_amount if f.max_amount is defined and f.max_amount is not none else (f.amount if f.amount is defined and f.amount is not none else None)) %}
+    {% if _amt is not none and (_amt|float) > (_max.value|float) %}{% set _max.value = _amt %}{% endif %}
+    {% set _total.value = _total.value + 1 %}
+  {% endfor %}
+  <div class="grid grid-cols-3 gap-3 mb-6 text-center">
+    <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-[#0A1F44]">{{ _total.value }}</p><p class="text-xs text-gray-500">Funding Options</p></div>
+    <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-[#0A1F44]">{% if _max.value %}KES {{ "{:,.0f}".format(_max.value|float) }}{% else %}—{% endif %}</p><p class="text-xs text-gray-500">Largest Amount</p></div>
+    <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-[#0A1F44]">{{ (current_user.county if current_user is defined and current_user and current_user.county else 'Kenya') }}</p><p class="text-xs text-gray-500">County</p></div>
+  </div>
+  <div class="flex gap-2 mb-6 flex-wrap">
+    <button type="button" class="filter-btn active" data-filter="all">All ({{ _total.value }})</button>
+    <button type="button" class="filter-btn" data-filter="loan">Loans</button>
+    <button type="button" class="filter-btn" data-filter="grant">Grants</button>
+    <button type="button" class="filter-btn" data-filter="equity">Equity / Investors</button>
+    <button type="button" class="filter-btn" data-filter="government">Government</button>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for f in _items %}
+    {% set _title = f.title if f.title is defined and f.title else (f.name if f.name is defined and f.name else (f.provider if f.provider is defined and f.provider else 'Funding Option')) %}
+    {% set _provider = f.provider if f.provider is defined and f.provider else (f.funder if f.funder is defined and f.funder else (f.source if f.source is defined and f.source else '')) %}
+    {% set _desc = f.description if f.description is defined and f.description else (f.summary if f.summary is defined and f.summary else (f.details if f.details is defined and f.details else '')) %}
+    {% set _type = (f.type|string|lower) if f.type is defined and f.type else ((f.funding_type|string|lower) if f.funding_type is defined and f.funding_type else '') %}
+    {% set _amt = f.amount_max if f.amount_max is defined and f.amount_max is not none else (f.max_amount if f.max_amount is defined and f.max_amount is not none else (f.amount if f.amount is defined and f.amount is not none else None)) %}
+    {% set _min_amt = f.amount_min if f.amount_min is defined and f.amount_min is not none else (f.min_amount if f.min_amount is defined and f.min_amount is not none else None) %}
+    {% set _rate = f.interest_rate if f.interest_rate is defined and f.interest_rate is not none else (f.rate if f.rate is defined and f.rate is not none else None) %}
+    {% set _deadline = f.deadline if f.deadline is defined and f.deadline else (f.due_date if f.due_date is defined and f.due_date else None) %}
+    {% set _url = f.url if f.url is defined and f.url else (f.apply_url if f.apply_url is defined and f.apply_url else (f.link if f.link is defined and f.link else None)) %}
+    {% set _is_safe_url = _url and (_url|string|lower).startswith('http') %}
+    <div class="bg-white p-5 rounded-2xl border hover:shadow-md transition funding-card flex flex-col" data-type="{{ _type }}">
+      <div class="flex gap-2 mb-2 flex-wrap">
+        {% if _type %}<span class="bg-teal-100 text-teal-700 text-[11px] font-bold px-2.5 py-1 rounded-full">{{ _type|title }}</span>{% endif %}
+        {% if _provider and _provider != _title %}<span class="bg-gray-100 text-gray-700 text-[11px] font-bold px-2.5 py-1 rounded-full">{{ _provider }}</span>{% endif %}
+      </div>
+      <h2 class="text-[16px] font-bold text-[#0A1F44] leading-tight mb-2">{{ _title }}</h2>
+      {% if _desc %}<p class="text-[13px] text-gray-600 leading-relaxed flex-1">{{ _desc|string|truncate(200, True, '...') }}</p>{% endif %}
+      <div class="text-[13px] mt-3 space-y-1">
+        <p><b>Amount:</b> {% if _amt is not none %}KES {{ "{:,.0f}".format(_amt|float) }}{% if _min_amt is not none %} (from KES {{ "{:,.0f}".format(_min_amt|float) }}){% endif %}{% else %}—{% endif %}</p>
+        {% if _rate is not none %}<p><b>Rate:</b> {{ _rate }}%</p>{% endif %}
+        {% if _deadline %}<p><b>Deadline:</b> {% if _deadline is string %}{{ _deadline[:10] }}{% else %}{{ _deadline.strftime('%b %d, %Y') }}{% endif %}</p>{% endif %}
+      </div>
+      <div class="flex justify-between items-center pt-3 mt-3 border-t gap-2">
+        {% if _is_safe_url %}<a href="{{ _url }}" target="_blank" rel="noopener noreferrer" class="text-[#14B8A6] font-bold text-[13px]">Apply →</a>{% else %}<span class="text-gray-400 text-[13px]">Check provider</span>{% endif %}
+        <a href="/ai?q={{ ('Is \"' + _title + '\" a good funding option for my business in ' + (current_user.county if current_user is defined and current_user and current_user.county else 'Kenya') + '? What are the requirements?')|urlencode }}" class="text-[12px] bg-[#0A1F44] text-white px-3 py-1.5 rounded-lg font-bold">Ask Lens</a>
+      </div>
+    </div>
+    {% else %}
+    <div class="col-span-full bg-white p-10 rounded-2xl border text-center">
+      <p class="text-4xl mb-2">💰</p>
+      <p class="font-bold text-[#0A1F44]">No funding options found</p>
+      <p class="text-[14px] text-gray-500 mt-1">Try a different search, or ask Lens for funding for your sector.</p>
+      <a href="/ai" class="inline-block mt-4 bg-[#0A1F44] text-white px-4 py-2 rounded-lg font-bold text-[13px]">Ask Lens →</a>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-6 text-[12px] text-amber-800">⚠️ Verify terms directly with the provider before applying. Never pay upfront fees to access a loan or grant.</div>
+  <div class="flex flex-wrap gap-2 mt-6">
+    <a href="/business-os" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Business OS</a>
+    <a href="/market/demand" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Demand Radar</a>
+    <a href="/kb/policy" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Policy Watch</a>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<style>.filter-btn{border:1px solid #e5e7eb;padding:8px 16px;border-radius:9999px;font-size:12px;font-weight:700}.filter-btn.active{background:#0A1F44;color:white;border-color:#0A1F44}</style>
+<script>
+document.querySelectorAll('.filter-btn').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
+    btn.classList.add('active');
+    var f=btn.dataset.filter;
+    document.querySelectorAll('.funding-card').forEach(function(c){
+      var t=(c.dataset.type || '').toLowerCase();
+      var show = f==='all' || t===f || (f==='equity' && (t.indexOf('equity')===0 || t.indexOf('invest')===0 || t.indexOf('vc')===0 || t.indexOf('angel')===0)) || (f==='government' && (t.indexOf('gov')===0 || t.indexOf('hustler')===0 || t.indexOf('youth')===0 || t.indexOf('women')===0));
+      c.style.display = show ? 'flex' : 'none';
+    });
+  });
+});
+</script>
+{% endblock %}
