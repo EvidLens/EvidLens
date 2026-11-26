@@ -846,6 +846,19 @@ def pricing_page(request: Request):
         }
     )
 
+@app.get("/pricing-data")
+def pricing_data_alias():
+    # pricing.html JS calls /pricing-data, real API is /api/billing/plans.
+    # Return the same plans shape as billing.py so it returns 200, not 404.
+    return {
+        "plans": [
+            {"code": "FREE", "name": "Free", "monthly": 0, "annual": 0, "analyses": 5, "reports": 1, "seats": 1, "engines": 6},
+            {"code": "BASIC", "name": "Starter", "monthly": 500, "annual": 5000, "analyses": 10, "reports": 5, "seats": 1, "engines": 8},
+            {"code": "PROFESSIONAL", "name": "Pro", "monthly": 1500, "annual": 15000, "analyses": 100, "reports": 30, "seats": 1, "engines": 11},
+            {"code": "ENTERPRISE", "name": "Enterprise", "monthly": 5000, "annual": 50000, "analyses": -1, "reports": -1, "seats": 5, "engines": 12},
+        ]
+    }
+
 @app.get("/welcome", response_class=HTMLResponse)
 def welcome_page(
     request: Request,
