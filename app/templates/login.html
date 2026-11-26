@@ -66,8 +66,8 @@
           <button id="btn" type="submit" class="w-full bg-[#14B8A6] hover:bg-[#0d9488] active:bg-[#0f766e] text-white font-semibold py-3 rounded-xl shadow-[0_4px_14px_rgba(20,184,166,0.35)] flex items-center justify-center gap-2 disabled:opacity-60 transition"><span id="btnText">Sign in to EvidLens</span><span id="btnLoader" class="hidden w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span></button>
           <div class="relative my-5"><div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-200"></div></div><div class="relative flex justify-center"><span class="bg-white px-3 text-[11px] font-semibold tracking-widest text-slate-400">OR</span></div></div>
           <div class="grid grid-cols-2 gap-3">
-            <button type="button" onclick="alert('Google sign-in coming soon - use email for now')" class="border border-slate-200 py-2.5 rounded-xl text-[13px] font-semibold hover:bg-slate-50 flex items-center justify-center gap-2 opacity-60">Google</button>
-            <button type="button" onclick="alert('Microsoft sign-in coming soon - use email for now')" class="border border-slate-200 py-2.5 rounded-xl text-[13px] font-semibold hover:bg-slate-50 flex items-center justify-center gap-2 opacity-60">Microsoft</button>
+            <a href="/auth/oauth/google" class="border border-slate-200 py-2.5 rounded-xl text-[13px] font-semibold hover:bg-slate-50 flex items-center justify-center gap-2">Google</a>
+            <span class="border border-slate-200 py-2.5 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2 opacity-40 cursor-not-allowed">Microsoft</span>
           </div>
         </form>
         <p class="mt-6 text-center text-[13px] text-slate-600">Don't have an account? <a href="/signup" class="font-semibold text-[#0d9488]">Create account</a></p>
