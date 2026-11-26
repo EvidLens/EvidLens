@@ -1,6 +1,6 @@
 from sqlmodel import Session, select
-from typing import Dict, Any, List
-from datetime import datetime
+from typing import Dict, Any, List, Optional
+from datetime import datetime, timezone
 from app.core.models import MarketMetric, Company, KnowledgeChunk, ExportOpportunity
 from app.modules.competitive_engine.service import CompetitiveEngineService
 from app.modules.market_engine.service import MarketEngineService
@@ -14,16 +14,15 @@ class APIService:
         self.lens = LensEngineService(db)
 
     def _now(self):
-        return datetime.utcnow().isoformat()
+        return datetime.now(timezone.utc).isoformat()
 
     def _safe_companies(self, sector: str) -> List[dict]:
         try:
             q = select(Company).where(Company.sector.ilike(f"%{sector}%")).limit(20)
             companies = self.db.exec(q).all()
-            if not companies:
-                companies = self.db.exec(select(Company).limit(20)).all()
             return [{"id": c.id, "name": c.name, "county": c.county, "sector": c.sector} for c in companies] if companies else []
-        except:
+        except Exception as e:
+            print(f"_safe_companies failed: {e}")
             return []
 
     def _safe_metrics(self, sector: str, county: str = None) -> List[dict]:
@@ -32,10 +31,17 @@ class APIService:
             if county:
                 q = q.where(MarketMetric.county.ilike(f"%{county}%"))
             metrics = self.db.exec(q.limit(50)).all()
-            if not metrics:
-                metrics = self.db.exec(select(MarketMetric).limit(50)).all()
-            return [{"county": m.county, "sector": m.sector, "value": m.value, "metric_type": m.metric_type, "date": str(m.date)} for m in metrics] if metrics else []
-        except:
+            return [{
+                "product": getattr(m, 'product', None),
+                "county": getattr(m, 'county', None),
+                "sector": getattr(m, 'sector', None),
+                "price": getattr(m, 'avg_price_kes', None),
+                "avg_price_kes": getattr(m, 'avg_price_kes', None),
+                "demand_score": getattr(m, 'demand_score', None),
+                "created_at": str(getattr(m, 'created_at', '') or ''),
+            } for m in metrics] if metrics else []
+        except Exception as e:
+            print(f"_safe_metrics failed: {e}")
             return []
 
     async def get_competitive(self, sector: str, county: str = None) -> Dict[str, Any]:
@@ -43,29 +49,52 @@ class APIService:
             data = await self.competitive.company_deal_database(sector)
             if not data:
                 data = self._safe_companies(sector)
-        except:
+        except Exception as e:
+            print(f"get_competitive failed: {e}")
             data = self._safe_companies(sector)
         if county and isinstance(data, list):
-            data = [c for c in data if county.lower() in str(c.get("county","")).lower()] or data
-        return {"service": "Competitive Engine", "sector": sector, "county": county, "competitors": data, "count": len(data), "timestamp": self._now()}
+            data = [c for c in data if county.lower() in str(c.get("county","")).lower()]
+        return {"service": "Competitive Engine", "sector": sector, "county": county, "competitors": data, "count": len(data), "has_data": len(data) > 0, "timestamp": self._now()}
 
     async def get_price_oracle(self, sector: str, county: str = None) -> Dict[str, Any]:
         try:
-            data = await self.market.market_funding_trends(sector)
-            if not data:
-                data = self._safe_metrics(sector, county)
-        except:
+            q = select(MarketMetric).where(MarketMetric.sector.ilike(f"%{sector}%"))
+            if county:
+                q = q.where(MarketMetric.county.ilike(f"%{county}%"))
+            metrics = self.db.exec(q.limit(50)).all()
+            data = [{
+                "product": getattr(m, 'product', None),
+                "county": getattr(m, 'county', None),
+                "sector": getattr(m, 'sector', None),
+                "price": getattr(m, 'avg_price_kes', None),
+                "avg_price_kes": getattr(m, 'avg_price_kes', None),
+                "demand_score": getattr(m, 'demand_score', None),
+                "created_at": str(getattr(m, 'created_at', '') or ''),
+            } for m in metrics] if metrics else []
+        except Exception as e:
+            print(f"get_price_oracle failed: {e}")
             data = self._safe_metrics(sector, county)
-        return {"service": "Price Oracle", "sector": sector, "county": county, "prices": data, "count": len(data) if isinstance(data, list) else 0, "timestamp": self._now()}
+        return {"service": "Price Oracle", "sector": sector, "county": county, "prices": data, "count": len(data) if isinstance(data, list) else 0, "has_data": len(data) > 0 if isinstance(data, list) else False, "timestamp": self._now()}
 
     async def get_demand(self, sector: str, county: str = None) -> Dict[str, Any]:
         try:
-            data = await self.lens.generate_sector_insights(sector, county)
-            if not data:
-                data = self._safe_metrics(sector, county)
-        except:
+            q = select(MarketMetric).where(MarketMetric.sector.ilike(f"%{sector}%"), MarketMetric.demand_score.isnot(None))
+            if county:
+                q = q.where(MarketMetric.county.ilike(f"%{county}%"))
+            metrics = self.db.exec(q.limit(50)).all()
+            data = [{
+                "product": getattr(m, 'product', None),
+                "county": getattr(m, 'county', None),
+                "sector": getattr(m, 'sector', None),
+                "score": getattr(m, 'demand_score', None),
+                "demand_score": getattr(m, 'demand_score', None),
+                "price": getattr(m, 'avg_price_kes', None),
+            } for m in metrics] if metrics else []
+            data = sorted(data, key=lambda x: (x.get("demand_score") or 0), reverse=True)
+        except Exception as e:
+            print(f"get_demand failed: {e}")
             data = self._safe_metrics(sector, county)
-        return {"service": "Demand Radar", "sector": sector, "county": county, "demand": data, "count": len(data) if isinstance(data, list) else 1, "timestamp": self._now()}
+        return {"service": "Demand Radar", "sector": sector, "county": county, "demand": data, "count": len(data) if isinstance(data, list) else 0, "has_data": len(data) > 0 if isinstance(data, list) else False, "timestamp": self._now()}
 
     async def get_policy(self, sector: str = None) -> Dict[str, Any]:
         try:
@@ -74,7 +103,8 @@ class APIService:
                 q = q.where(KnowledgeChunk.sector.ilike(f"%{sector}%"))
             policies = self.db.exec(q.limit(20)).all()
             data = [{"id": p.id, "title": p.title, "content": p.content[:500]} for p in policies] if policies else []
-        except:
+        except Exception as e:
+            print(f"get_policy failed: {e}")
             data = []
         return {"service": "Policy Watch", "sector": sector, "policies": data, "count": len(data), "timestamp": self._now()}
 
@@ -92,23 +122,24 @@ class APIService:
         try:
             data = await self.lens.viability_check(business, county)
         except Exception as e:
-            data = {"business": business, "county": county, "risk_level": "Medium", "message": f"Viability for {business} in {county}: County data shows opportunity. Run seed for full analysis."}
+            print(f"get_risk failed: {e}")
+            data = {"business": business, "county": county, "risk_level": None, "has_data": False, "message": "Risk check unavailable - try again."}
         return {"service": "Risk Sentinel", "business": business, "county": county, "risk": data, "timestamp": self._now()}
 
     async def get_export(self, sector: str) -> Dict[str, Any]:
         try:
             exports = self.db.exec(select(ExportOpportunity).where(ExportOpportunity.sector.ilike(f"%{sector}%")).limit(20)).all()
-            if not exports:
-                exports = self.db.exec(select(ExportOpportunity).limit(20)).all()
             data = [{"id": e.id, "market": e.market, "product": e.product, "sector": e.sector} for e in exports] if exports else []
-        except:
+        except Exception as e:
+            print(f"get_export failed: {e}")
             data = []
         return {"service": "Export Navigator", "sector": sector, "exports": data, "count": len(data), "timestamp": self._now()}
 
     async def get_consumer(self, sector: str, county: str = None) -> Dict[str, Any]:
         try:
             data = await self.lens.generate_sector_insights(sector, county)
-        except:
+        except Exception as e:
+            print(f"get_consumer failed: {e}")
             data = self._safe_metrics(sector, county)
         return {"service": "Consumer Pulse", "sector": sector, "county": county, "insights": data, "timestamp": self._now()}
 
@@ -117,7 +148,8 @@ class APIService:
             data = await self.lens.generate_sector_insights("General", county)
             if not data:
                 metrics = self.db.exec(select(MarketMetric).where(MarketMetric.county.ilike(f"%{county}%")).limit(20)).all()
-                data = [{"sector": m.sector, "value": m.value, "metric_type": m.metric_type} for m in metrics] if metrics else []
-        except:
+                data = [{"sector": m.sector, "product": getattr(m, 'product', None), "price": getattr(m, 'avg_price_kes', None), "demand_score": getattr(m, 'demand_score', None)} for m in metrics] if metrics else []
+        except Exception as e:
+            print(f"get_county failed: {e}")
             data = []
         return {"service": "County Mapper", "county": county, "data": data, "count": len(data) if isinstance(data, list) else 0, "timestamp": self._now()}
