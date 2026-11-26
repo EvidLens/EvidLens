@@ -7,45 +7,51 @@
     <span class="text-sm bg-teal-100 text-teal-700 px-3 py-1 rounded-full">Last 7 Days</span>
   </div>
   <p class="text-gray-500 mb-6">What people are saying about <b>{{ current_user.sector if current_user and current_user.sector else 'your sector' }}</b> on social media</p>
-
+  {% set _pos = sentiment_counts.positive if sentiment_counts is defined and sentiment_counts and sentiment_counts.positive is defined and sentiment_counts.positive is not none else 0 %}
+  {% set _neu = sentiment_counts.neutral if sentiment_counts is defined and sentiment_counts and sentiment_counts.neutral is defined and sentiment_counts.neutral is not none else 0 %}
+  {% set _neg = sentiment_counts.negative if sentiment_counts is defined and sentiment_counts and sentiment_counts.negative is defined and sentiment_counts.negative is not none else 0 %}
+  {% set _total = (_pos|int) + (_neu|int) + (_neg|int) %}
   <div class="grid grid-cols-3 gap-4 mb-8">
     <div class="bg-green-50 p-4 rounded-xl text-center">
-      <p class="text-3xl font-bold text-green-600">{{ sentiment_counts.positive if sentiment_counts is defined and sentiment_counts.positive is defined else 0 }}</p>
-      <p class="text-sm text-gray-600">Positive</p>
+      <p class="text-3xl font-bold text-green-600">{{ _pos|int }}</p>
+      <p class="text-sm text-gray-600">Positive{% if _total %} ({{ ((_pos|float / _total) * 100)|round|int }}%){% endif %}</p>
     </div>
     <div class="bg-gray-50 p-4 rounded-xl text-center">
-      <p class="text-3xl font-bold text-gray-600">{{ sentiment_counts.neutral if sentiment_counts is defined and sentiment_counts.neutral is defined else 0 }}</p>
-      <p class="text-sm text-gray-600">Neutral</p>
+      <p class="text-3xl font-bold text-gray-600">{{ _neu|int }}</p>
+      <p class="text-sm text-gray-600">Neutral{% if _total %} ({{ ((_neu|float / _total) * 100)|round|int }}%){% endif %}</p>
     </div>
     <div class="bg-red-50 p-4 rounded-xl text-center">
-      <p class="text-3xl font-bold text-red-600">{{ sentiment_counts.negative if sentiment_counts is defined and sentiment_counts.negative is defined else 0 }}</p>
-      <p class="text-sm text-gray-600">Negative</p>
+      <p class="text-3xl font-bold text-red-600">{{ _neg|int }}</p>
+      <p class="text-sm text-gray-600">Negative{% if _total %} ({{ ((_neg|float / _total) * 100)|round|int }}%){% endif %}</p>
     </div>
   </div>
-
   <div class="space-y-4">
     {% for p in posts | default([], true) %}
-    {% set platform = (p.platform if p.platform is defined else (p.source if p.source is defined else '')) | default('', true) | lower %}
-    {% set sentiment = (p.sentiment if p.sentiment is defined else '') | default('', true) | lower %}
-    {% set text = (p.content if p.content is defined else (p.text if p.text is defined else (p.mention if p.mention is defined else ''))) | default('', true) %}
-    {% set author = (p.author if p.author is defined else (p.username if p.username is defined else (p.handle if p.handle is defined else 'Unknown'))) | default('Unknown', true) %}
+    {% set platform = (p.platform if p.platform is defined and p.platform else (p.source if p.source is defined and p.source else '')) | default('', true) | lower %}
+    {% set sentiment = (p.sentiment if p.sentiment is defined and p.sentiment else '') | default('', true) | lower %}
+    {% set text = (p.content if p.content is defined and p.content else (p.text if p.text is defined and p.text else (p.mention if p.mention is defined and p.mention else (p.caption if p.caption is defined and p.caption else '')))) | default('', true) %}
+    {% set _author_raw = p.author if p.author is defined and p.author else (p.username if p.username is defined and p.username else (p.handle if p.handle is defined and p.handle else None)) %}
+    {% set author = _author_raw.name if _author_raw is mapping and _author_raw.name is defined and _author_raw.name else (_author_raw.username if _author_raw is mapping and _author_raw.username is defined and _author_raw.username else (_author_raw.handle if _author_raw is mapping and _author_raw.handle is defined and _author_raw.handle else (_author_raw if _author_raw is string else 'Unknown'))) %}
+    {% set _platform_label = p.platform if p.platform is defined and p.platform else (p.source if p.source is defined and p.source else 'Social') %}
     <div class="bg-white p-5 rounded-xl shadow-sm border">
       <div class="flex justify-between items-start mb-2">
         <div class="flex items-center gap-2">
-          {% if 'twitter' in platform or 'x' == platform %}<span class="text-blue-500 font-bold">𝕏</span>
+          {% if platform == 'twitter' or platform == 'x' %}<span class="text-blue-500 font-bold">𝕏</span>
           {% elif 'facebook' in platform %}<span class="text-blue-700 font-bold">f</span>
           {% elif 'instagram' in platform %}<span class="text-pink-500 font-bold">📷</span>
           {% elif 'tiktok' in platform %}<span class="font-bold">♪</span>
+          {% elif 'youtube' in platform %}<span class="font-bold">▶</span>
           {% else %}<span class="text-gray-500 font-bold">💬</span>{% endif %}
-          <b class="text-[#0A1F44]">{{ (p.platform if p.platform is defined else (p.source if p.source is defined else 'Social')) | default('Social', true) | title }}</b>
+          <b class="text-[#0A1F44]">{{ _platform_label | default('Social', true) | title }}</b>
         </div>
         {% if sentiment == 'positive' %}<span class="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded">POSITIVE</span>
         {% elif sentiment == 'negative' %}<span class="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded">NEGATIVE</span>
+        {% elif sentiment == 'mixed' %}<span class="bg-yellow-100 text-yellow-700 text-xs font-bold px-2 py-1 rounded">MIXED</span>
         {% else %}<span class="bg-gray-100 text-gray-700 text-xs font-bold px-2 py-1 rounded">NEUTRAL</span>{% endif %}
       </div>
-      <p class="text-gray-800 mb-2">{{ text or 'No text available' }}</p>
+      <p class="text-gray-800 mb-2 break-words">{{ text or 'No text available' }}</p>
       <div class="flex justify-between text-xs text-gray-500">
-        <span>{{ author }}</span>
+        <span>@{{ author }}</span>
         <span>{% if p.created_at is defined and p.created_at %}{% if p.created_at is string %}{{ p.created_at[:10] }}{% else %}{{ p.created_at.strftime('%b %d') }}{% endif %}{% else %}Today{% endif %}</span>
       </div>
     </div>
