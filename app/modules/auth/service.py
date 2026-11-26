@@ -133,7 +133,6 @@ def login_user(db: Session, email: str, password: str):
         return {"error": "Invalid credentials"}
     if not user.email_verified:
         return {"error": "Email not verified - check inbox for verification email"}
-    user.last_login = _utcnow()
     db.add(user)
     db.commit()
     db.refresh(user)
