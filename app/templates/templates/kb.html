@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Knowledge Base | EvidLens{% endblock %}
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <div class="flex flex-wrap justify-between items-start gap-4 mb-6">
+    <div>
+      <h1 class="text-3xl font-bold text-[#0A1F44]">📚 Knowledge Base</h1>
+      <p class="text-gray-500 text-[14px] mt-1">Guides, policies and market explainers for {{ (current_user.sector if current_user is defined and current_user and current_user.sector else 'your sector') }} • {{ (current_user.county if current_user is defined and current_user and current_user.county else 'Kenya') }}</p>
+    </div>
+    <a href="/ai" class="bg-[#14B8A6] text-white px-4 py-2 rounded-xl font-bold text-[13px]">Ask Lens →</a>
+  </div>
+  <form method="get" action="/kb" class="bg-white p-4 rounded-xl shadow-sm border mb-6 flex gap-2 flex-wrap">
+    <input name="q" value="{{ q or '' }}" placeholder="Search guides, policies, terms..." class="border rounded-xl px-3 py-2 text-sm flex-1 min-w-[180px]" autocomplete="off">
+    <input name="category" value="{{ category or '' }}" placeholder="Category (e.g. Tax)" class="border rounded-xl px-3 py-2 text-sm" autocomplete="off">
+    <button type="submit" class="bg-[#0A1F44] text-white px-4 py-2 rounded-xl font-bold text-sm">Search</button>
+    {% if q or category %}<a href="/kb" class="border px-4 py-2 rounded-xl font-bold text-sm">Clear</a>{% endif %}
+  </form>
+  {% set _items = items if items is defined and items else (articles if articles is defined and articles else (entries if entries is defined and entries else (policies if policies is defined and policies else []))) %}
+  <div class="flex gap-2 mb-6 flex-wrap">
+    <button type="button" class="filter-btn active" data-filter="all">All ({{ _items|length }})</button>
+    <button type="button" class="filter-btn" data-filter="guide">Guides</button>
+    <button type="button" class="filter-btn" data-filter="policy">Policies</button>
+    <button type="button" class="filter-btn" data-filter="tax">Tax</button>
+    <button type="button" class="filter-btn" data-filter="license">Licenses</button>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for item in _items %}
+    {% set _title = item.title if item.title is defined and item.title else (item.name if item.name is defined and item.name else 'Untitled') %}
+    {% set _summary = item.summary if item.summary is defined and item.summary else (item.description if item.description is defined and item.description else (item.content if item.content is defined and item.content else '')) %}
+    {% set _cat = (item.category|string|lower) if item.category is defined and item.category else ((item.type|string|lower) if item.type is defined and item.type else '') %}
+    {% set _url = item.url if item.url is defined and item.url else (item.source_url if item.source_url is defined and item.source_url else None) %}
+    {% set _is_safe_url = _url and (_url|string|lower).startswith('http') %}
+    {% set _slug = item.slug if item.slug is defined and item.slug else (item.id if item.id is defined else None) %}
+    <div class="bg-white p-5 rounded-2xl border hover:shadow-md transition kb-card flex flex-col" data-type="{{ _cat }}">
+      <div class="flex gap-2 mb-2 flex-wrap">
+        {% if item.category %}<span class="bg-blue-100 text-blue-700 text-[11px] font-bold px-2.5 py-1 rounded-full">{{ item.category }}</span>{% endif %}
+        {% if item.county %}<span class="bg-gray-100 text-gray-700 text-[11px] font-bold px-2.5 py-1 rounded-full">{{ item.county }}</span>{% endif %}
+      </div>
+      <h2 class="text-[16px] font-bold text-[#0A1F44] leading-tight mb-2">{{ _title }}</h2>
+      {% if _summary %}<p class="text-[13px] text-gray-600 leading-relaxed flex-1">{{ _summary|string|truncate(220, True, '...') }}</p>{% endif %}
+      <div class="flex justify-between items-center pt-3 mt-3 border-t gap-2">
+        {% if _is_safe_url %}<a href="{{ _url }}" target="_blank" rel="noopener noreferrer" class="text-[#14B8A6] font-bold text-[13px]">Read Source →</a>
+        {% elif _slug is not none %}<a href="/kb/{{ _slug }}" class="text-[#14B8A6] font-bold text-[13px]">Read →</a>
+        {% else %}<span class="text-gray-400 text-[13px]">EvidLens</span>{% endif %}
+        <a href="/ai?q={{ ('Explain \"' + _title + '\" for my business in ' + (current_user.county if current_user is defined and current_user and current_user.county else 'Kenya') + '.')|urlencode }}" class="text-[12px] bg-[#0A1F44] text-white px-3 py-1.5 rounded-lg font-bold">Ask Lens</a>
+      </div>
+    </div>
+    {% else %}
+    <div class="col-span-full bg-white p-10 rounded-2xl border text-center">
+      <p class="text-4xl mb-2">📚</p>
+      <p class="font-bold text-[#0A1F44]">No articles found</p>
+      <p class="text-[14px] text-gray-500 mt-1">Try a different search, or ask Lens for an explainer.</p>
+      <a href="/ai" class="inline-block mt-4 bg-[#0A1F44] text-white px-4 py-2 rounded-lg font-bold text-[13px]">Ask Lens →</a>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="flex flex-wrap gap-2 mt-6">
+    <a href="/kb/policy" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Policy Watch</a>
+    <a href="/market/demand" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Demand Radar</a>
+    <a href="/market/prices" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Prices</a>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<style>.filter-btn{border:1px solid #e5e7eb;padding:8px 16px;border-radius:9999px;font-size:12px;font-weight:700}.filter-btn.active{background:#0A1F44;color:white;border-color:#0A1F44}</style>
+<script>
+document.querySelectorAll('.filter-btn').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
+    btn.classList.add('active');
+    var f=btn.dataset.filter;
+    document.querySelectorAll('.kb-card').forEach(function(c){
+      var t=c.dataset.type || '';
+      var show = f==='all' || t===f || (f==='policy' && t.indexOf('polic')===0) || (f==='guide' && (t.indexOf('guide')===0 || t.indexOf('how')===0));
+      c.style.display = show ? 'flex' : 'none';
+    });
+  });
+});
+</script>
+{% endblock %}
