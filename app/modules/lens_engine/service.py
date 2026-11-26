@@ -7,7 +7,7 @@ from app.core.db import engine
 from app.core.config import settings
 UTC = timezone.utc
 SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", "support@evidlens.co.ke")
-GROQ_MODELS = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "openai/gpt-oss-120b", "openai/gpt-oss-20b"]
+GROQ_MODELS = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "meta-llama/llama-4-scout-17b-16e-instruct", "moonshotai/kimi-k2-instruct"]
 SYSTEM_PROMPT = """You are Lens, EvidLens Kenya's AI partner.
 Personality: Real human, smart, warm, slightly playful, Kenyan. You know counties, KES, farming, SMEs, markets, prices.
 Rules:
@@ -42,7 +42,12 @@ class LensEngineService:
     def __init__(self, db: Session):
         self.db = db
         self.groq_key = os.getenv("GROQ_API_KEY") or getattr(settings, "GROQ_API_KEY", "") or ""
-        self.groq_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+        self.groq_model = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+    def _rollback(self):
+        try:
+            self.db.rollback()
+        except Exception:
+            pass
     def _model_list(self):
         models = []
         if self.groq_model and self.groq_model not in models:
@@ -94,25 +99,41 @@ class LensEngineService:
             return {"reply": "Got you, I'm here. What are you thinking about starting or growing? Just tell me the product or business, even in one word, and I'll take it from there.", "source": "Lens"}
         if "problem" in low or "bug" in low or "not working" in low or "error" in low:
             return {"reply": f"Pole sana for that! Tell me what's not working and I'll raise a ticket to {SUPPORT_EMAIL} right away. What broke?", "source": "Lens"}
+        self._rollback()
         top_counties = []
         prices = []
         companies = []
         try:
             top_counties = list(self.db.exec(select(MarketMetric.county, func.count(MarketMetric.id)).group_by(MarketMetric.county).order_by(func.count(MarketMetric.id).desc()).limit(5)))
+        except Exception as e:
+            print(f"DB context error top_counties: {e}")
+            self._rollback()
+        try:
             prices = list(self.db.exec(select(MarketMetric).limit(5)))
+        except Exception as e:
+            print(f"DB context error prices: {e}")
+            self._rollback()
+        try:
             companies = list(self.db.exec(select(Company).limit(5)))
         except Exception as e:
-            print(f"DB context error: {e}")
+            print(f"DB context error companies: {e}")
+            self._rollback()
         context = f"DB Context: top_counties={top_counties} sample_prices={[p.model_dump() for p in prices]} sample_companies={[c.model_dump() for c in companies]}"
         ai_reply = await self.call_groq(user_message, context, history)
         if ai_reply:
             return {"reply": ai_reply, "source": "EvidLens DB + Groq"}
         return {"reply": f"Got you - '{user_message}'. If you give me a product and a county, I'll pull demand, avg KES price, and top competitors from our 9 data lanes. What's your idea?", "source": "fallback"}
     async def generate_sector_insights(self, sector: str, county: str = None) -> Dict[str, Any]:
-        q = select(MarketMetric).where(MarketMetric.sector == sector)
-        if county:
-            q = q.where(MarketMetric.county == county)
-        market = list(self.db.exec(q.limit(10)))
+        self._rollback()
+        try:
+            q = select(MarketMetric).where(MarketMetric.sector == sector)
+            if county:
+                q = q.where(MarketMetric.county == county)
+            market = list(self.db.exec(q.limit(10)))
+        except Exception as e:
+            print(f"DB context error generate_sector_insights: {e}")
+            self._rollback()
+            market = []
         if not market:
             return {"reply": f"No data yet for {sector} in {county or 'Kenya'} - but I can still estimate. Want a rough market sense?", "source": "DB"}
         context = f"Market data: {[m.model_dump() for m in market]}"
@@ -120,3 +141,36 @@ class LensEngineService:
         if not reply:
             reply = f"In {county or 'Kenya'}, we have {len(market)} records for {sector}. Avg demand looks strong. Check /market/prices for live KES."
         return {"insights": reply, "source": "DB + Groq"}
+    async def viability_check(self, business: str, county: str) -> Dict[str, Any]:
+        self._rollback()
+        try:
+            market = list(self.db.exec(select(MarketMetric).where(MarketMetric.county.ilike(f"%{county}%")).limit(10)))
+        except Exception as e:
+            print(f"DB context error viability_check: {e}")
+            self._rollback()
+            market = []
+        context = f"Viability context for {business} in {county}: {[m.model_dump() for m in market]}"
+        reply = await self.call_groq(f"Give a short viability check for {business} in {county}, Kenya. Use the DB context if present.", context)
+        if reply:
+            return {"business": business, "county": county, "risk_level": None, "has_data": len(market) > 0, "viability": reply, "source": "DB + Groq"}
+        return {"business": business, "county": county, "risk_level": None, "has_data": False, "message": "Risk check unavailable - try again.", "source": "fallback"}
+    async def market_funding_trends(self, sector: str) -> List[dict]:
+        self._rollback()
+        try:
+            rows = list(self.db.exec(select(MarketMetric).where(MarketMetric.sector.ilike(f"%{sector}%")).limit(20)))
+            return [{"product": getattr(m, 'product', None), "county": getattr(m, 'county', None), "sector": getattr(m, 'sector', None), "price": getattr(m, 'avg_price_kes', None), "demand_score": getattr(m, 'demand_score', None)} for m in rows]
+        except Exception as e:
+            print(f"DB context error market_funding_trends: {e}")
+            self._rollback()
+            return []
+    async def funding_tracker(self, sector: str) -> List[dict]:
+        return await self.market_funding_trends(sector)
+    async def company_deal_database(self, sector: str) -> List[dict]:
+        self._rollback()
+        try:
+            rows = list(self.db.exec(select(Company).where(Company.sector.ilike(f"%{sector}%")).limit(20)))
+            return [{"id": c.id, "name": c.name, "county": c.county, "sector": c.sector} for c in rows]
+        except Exception as e:
+            print(f"DB context error company_deal_database: {e}")
+            self._rollback()
+            return []
