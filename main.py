@@ -706,6 +706,15 @@ def dpa_page(request: Request):
         }
     )
 
+@app.get("/about", response_class=HTMLResponse)
+def about_page(request: Request):
+    return templates.TemplateResponse(
+        "about.html",
+        {
+            "request": request
+        }
+    )
+
 @app.get("/signup", response_class=HTMLResponse)
 def signup_page(
     request: Request,
@@ -791,6 +800,42 @@ def forgot_alias_page(request: Request):
             "request": request
         }
     )
+
+# --- Auth page aliases ---
+# Old templates linked to /auth/register, /auth/forgot-password, /auth/oauth/*
+# as GET page routes. Those never existed in main.py, so FastAPI returned
+# {"detail":"Not Found"} JSON. Redirect them to the real pages instead.
+@app.get("/auth/login", response_class=HTMLResponse)
+def auth_login_alias(request: Request):
+    return RedirectResponse(url="/login", status_code=302)
+
+@app.get("/auth/signin", response_class=HTMLResponse)
+def auth_signin_alias(request: Request):
+    return RedirectResponse(url="/login", status_code=302)
+
+@app.get("/auth/register", response_class=HTMLResponse)
+def auth_register_alias(request: Request):
+    return RedirectResponse(url="/signup", status_code=302)
+
+@app.get("/auth/signup", response_class=HTMLResponse)
+def auth_signup_alias(request: Request):
+    return RedirectResponse(url="/signup", status_code=302)
+
+@app.get("/auth/create-account", response_class=HTMLResponse)
+def auth_create_account_alias(request: Request):
+    return RedirectResponse(url="/signup", status_code=302)
+
+@app.get("/auth/forgot-password", response_class=HTMLResponse)
+def auth_forgot_alias(request: Request):
+    return RedirectResponse(url="/forgot-password", status_code=302)
+
+@app.get("/auth/forgot", response_class=HTMLResponse)
+def auth_forgot_short_alias(request: Request):
+    return RedirectResponse(url="/forgot-password", status_code=302)
+
+@app.get("/auth/reset-password", response_class=HTMLResponse)
+def auth_reset_alias(request: Request):
+    return RedirectResponse(url="/forgot-password", status_code=302)
 
 @app.get("/pricing", response_class=HTMLResponse)
 def pricing_page(request: Request):
