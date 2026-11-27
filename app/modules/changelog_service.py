@@ -51,9 +51,9 @@ def get_changelog(limit=50):
                 "version": get_app_version(),
                 "date": commit_date,
                 "summary": "",
-                "items": []
+                "changes": []
             }
-        releases[key]["items"].append({"type": item_type, "text": text})
+        releases[key]["changes"].append({"type": item_type, "text": text})
     sorted_releases = sorted(releases.values(), key=lambda x: x["date"], reverse=True)
     if sorted_releases:
         sorted_releases[0]["version"] = get_app_version()
