@@ -12,10 +12,16 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from app.modules.auth.dependencies import get_current_user_optional
-from .service import generate_market_report_pdf_file, generate_market_report_excel
 from app.core.models import Report, ReportType, ReportFormat, ReportStatus, User, UserSubscription
 from app.core.db import get_session as get_db, engine
 from app.core import billing
+
+try:
+    from .service import generate_report_pdf_file
+    from .service import generate_market_report_excel
+except ImportError:
+    from .service import generate_market_report_pdf_file as generate_report_pdf_file
+    from .service import generate_market_report_excel
 
 router = APIRouter(prefix="/reports", tags=["Report Builder"])
 templates = Jinja2Templates(directory="app/templates")
@@ -23,8 +29,19 @@ UTC = timezone.utc
 logger = logging.getLogger("evidlens.reports")
 
 ADMIN_USER_IDS = [1]
-ADMIN_EMAILS = ["noreply@evidlens.co.ke", "evid@example.com", "admin@evidlens.co.ke"]
 _RATE: Dict[int, list] = {}
+
+SERIES_MAP = {
+    "EXEC_BRIEF": "ExecBrief",
+    "MARKET_FEASIBILITY": "MarketIntelligence",
+    "INDUSTRY_OUTLOOK": "IndustryOutlook",
+    "SECTOR_PULSE": "SectorPulse",
+    "CONSUMER_ANALYSIS": "ConsumerInsights",
+    "PRODUCT_WATCH": "ProductWatch",
+    "INVESTOR_PITCH": "InvestorPitch",
+    "BUSINESS_PLAN": "BusinessPlan",
+    "KRA_TAX": "KRATax",
+}
 
 CURATED_FUNDERS = [
     {"name": "Equity Bank - SME Loan", "type": "Bank", "sector": "All Sectors", "county": "All Counties", "min_amount": 50000, "max_amount": 5000000, "interest_rate": 14.0, "rating": 4.5, "requirements": "ID, Business registration, 6 months statements", "apply_link": "https://equitygroupholdings.com/ke/borrow/"},
@@ -44,7 +61,7 @@ def _soft_rate_check(user_id: int):
     lst.append(now)
     _RATE[user_id] = lst
     if len(lst) > 20:
-        logger.warning(f"Rate notice: user {user_id} generated {len(lst)} in 1 min")
+        raise HTTPException(status_code=429, detail="Too many reports. Wait 60 seconds and try again.")
 
 def audit(request: Request, user_id: int, action: str, report_id: int = None):
     try:
@@ -83,13 +100,21 @@ class GenerateReportRequest(BaseModel):
 
     def get_report_type_str(self):
         u = (self.report_type or "").upper()
-        if "CONSUMER" in u:
+        if "EXEC" in u or "BRIEF" in u or "BUSINESS_BRIEF" in u:
+            return "EXEC_BRIEF"
+        if "CONSUMER" in u or "INSIGHT" in u:
             return "CONSUMER_ANALYSIS"
-        if "INVESTOR" in u:
+        if "INDUSTRY" in u or "OUTLOOK" in u:
+            return "INDUSTRY_OUTLOOK"
+        if "SECTOR" in u or "PULSE" in u:
+            return "SECTOR_PULSE"
+        if "PRODUCT" in u or "WATCH" in u:
+            return "PRODUCT_WATCH"
+        if "INVESTOR" in u or "PITCH" in u:
             return "INVESTOR_PITCH"
-        if "KRA" in u:
+        if "KRA" in u or "TAX" in u:
             return "KRA_TAX"
-        if "BUSINESS" in u or "BANK" in u:
+        if "BUSINESS" in u or "BANK" in u or "LOAN" in u:
             return "BUSINESS_PLAN"
         return "MARKET_FEASIBILITY"
 
@@ -125,20 +150,27 @@ def get_user_plan(db: Session, user_id: int) -> str:
             pass
     return "Trial"
 
-def check_plan_access(plan_name: str, user_id: int, db: Session) -> bool:
+def _is_admin(user_id: int, db: Session = None) -> bool:
     if user_id in ADMIN_USER_IDS:
         return True
-    try:
-        u = db.exec(select(User).where(User.id == user_id)).first()
-        if u is not None:
-            email = getattr(u, "email", None)
-            if email in ADMIN_EMAILS:
-                return True
-    except Exception:
+    if db is not None:
         try:
-            db.rollback()
+            u = db.exec(select(User).where(User.id == user_id)).first()
+            if u is not None:
+                if getattr(u, "is_admin", False):
+                    return True
+                if getattr(u, "role", "") in ("admin", "superadmin"):
+                    return True
         except Exception:
-            pass
+            try:
+                db.rollback()
+            except Exception:
+                pass
+    return False
+
+def check_plan_access(plan_name: str, user_id: int, db: Session) -> bool:
+    if _is_admin(user_id, db):
+        return True
     try:
         allowed = billing.PLAN_MODULES.get(plan_name, billing.PLAN_MODULES["Trial"])
         if "Report Builder" in allowed:
@@ -155,11 +187,8 @@ def resolve_user_id(request: Request, current_user=None) -> int:
         return int(st.id)
     raise HTTPException(status_code=401, detail="Please log in to generate or view reports")
 
-def _is_admin(user_id: int) -> bool:
-    return user_id in ADMIN_USER_IDS
-
 def _get_report_or_404(db: Session, report_id: int, user_id: int):
-    if _is_admin(user_id):
+    if _is_admin(user_id, db):
         r = db.exec(select(Report).where(Report.id == report_id)).first()
     else:
         r = db.exec(select(Report).where(Report.id == report_id, Report.user_id == user_id)).first()
@@ -210,12 +239,19 @@ def generate_report(request: Request, req: GenerateReportRequest, db: Session = 
     audit(request, user_id, "REPORT_GENERATE", report.id)
     try:
         if fmt_str == "pdf":
-            filepath = generate_market_report_pdf_file(q=q, sector=sec, country=req.country, county=req.county, sub_county=req.sub_county, ward=req.ward, town=req.town, budget=req.budget, plan_name=plan_name)
+            try:
+                filepath = generate_report_pdf_file(rtype_str, q, sec, req.country, req.county, req.sub_county, req.ward, req.town, req.budget, plan_name)
+            except TypeError:
+                filepath = generate_report_pdf_file(q=q, sector=sec, country=req.country, county=req.county, sub_county=req.sub_county, ward=req.ward, town=req.town, budget=req.budget, plan_name=plan_name)
         else:
             result = generate_market_report_excel(db, sec, req.country, req.county, req.sub_county, req.ward, req.town, q)
             if isinstance(result, (bytes, bytearray)):
                 os.makedirs("app/static/reports", exist_ok=True)
-                filepath = f"app/static/reports/EvidLens_{q.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"
+                series = SERIES_MAP.get(rtype_str, "MarketIntelligence")
+                safe_q = "".join(c for c in q.replace(" ", "") if c.isalnum() or c in "-_")[:40] or "Kenya"
+                geo = "".join(c for c in (location_str or "Kenya").replace(" ", "") if c.isalnum() or c in "-_")[:40] or "Kenya"
+                year = datetime.now().strftime("%Y")
+                filepath = f"app/static/reports/EvidLens_{series}_{safe_q}_{geo}_{year}_v1.0.xlsx"
                 with open(filepath, "wb") as f:
                     f.write(bytes(result))
             else:
@@ -304,7 +340,7 @@ def download_report(request: Request, report_id: int, db: Session = Depends(get_
 @router.get("/list")
 def list_reports(request: Request, db: Session = Depends(get_db), current_user=Depends(get_current_user_optional)):
     user_id = resolve_user_id(request, current_user)
-    if _is_admin(user_id):
+    if _is_admin(user_id, db):
         rows = list(db.exec(select(Report).order_by(desc(Report.created_at)).limit(50)))
     else:
         rows = list(db.exec(select(Report).where(Report.user_id == user_id).order_by(desc(Report.created_at)).limit(50)))
@@ -330,7 +366,7 @@ def delete_report(request: Request, report_id: int, db: Session = Depends(get_db
 @router.post("/cleanup-stuck")
 def cleanup_stuck(request: Request, db: Session = Depends(get_db), current_user=Depends(get_current_user_optional)):
     user_id = resolve_user_id(request, current_user)
-    if _is_admin(user_id):
+    if _is_admin(user_id, db):
         rows = list(db.exec(select(Report).where(Report.status == "GENERATING")))
     else:
         rows = list(db.exec(select(Report).where(Report.status == "GENERATING", Report.user_id == user_id)))
@@ -346,4 +382,14 @@ def cleanup_stuck(request: Request, db: Session = Depends(get_db), current_user=
 
 @router.get("/templates")
 def get_templates():
-    return {"templates": [{"type": "MARKET_FEASIBILITY", "name": "Market Feasibility Report - 12 Engines", "premium": False}, {"type": "CONSUMER_ANALYSIS", "name": "Consumer Analysis", "premium": False}, {"type": "INVESTOR_PITCH", "name": "Investor Pitch Deck", "premium": True}, {"type": "KRA_TAX", "name": "KRA Tax Report", "premium": True}, {"type": "BUSINESS_PLAN", "name": "Bank Loan Pack", "premium": True}]}
+    return {"templates": [
+        {"type": "EXEC_BRIEF", "name": "Executive Intelligence Brief", "series": "EvidLens Business Briefs", "pages": "4-8", "premium": False, "audience": "C-Suite / Board"},
+        {"type": "MARKET_FEASIBILITY", "name": "Market Feasibility Report - 12 Engines", "series": "EvidLens Market Intelligence", "pages": "10-15", "premium": False, "audience": "Strategy / Investment teams"},
+        {"type": "INDUSTRY_OUTLOOK", "name": "Industry Outlook", "series": "EvidLens Industry Outlook", "pages": "40-120", "premium": True, "audience": "Strategy / Investment teams"},
+        {"type": "SECTOR_PULSE", "name": "Sector Pulse", "series": "EvidLens Sector Pulse", "pages": "8-15", "premium": False, "audience": "Periodic monitoring"},
+        {"type": "CONSUMER_ANALYSIS", "name": "Consumer Insights Report", "series": "EvidLens Consumer Insights", "pages": "20-40", "premium": True, "audience": "Strategy / Marketing"},
+        {"type": "PRODUCT_WATCH", "name": "Product Watch", "series": "EvidLens Product Watch", "pages": "15-25", "premium": True, "audience": "Product teams"},
+        {"type": "INVESTOR_PITCH", "name": "Investor Pitch Deck", "series": "EvidLens Business Briefs", "pages": "10-15", "premium": True, "audience": "C-Suite / Investors"},
+        {"type": "BUSINESS_PLAN", "name": "Bank Loan Pack", "series": "EvidLens Business Briefs", "pages": "15-25", "premium": True, "audience": "SME / Bank"},
+        {"type": "KRA_TAX", "name": "KRA Tax Report", "series": "EvidLens Business Briefs", "pages": "8-12", "premium": True, "audience": "Finance / Compliance"},
+    ]}
