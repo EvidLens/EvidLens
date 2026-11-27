@@ -5,7 +5,7 @@ from sqlmodel import Session, select, func, desc, or_
 from jinja2 import TemplateNotFound
 import traceback
 import markdown, bleach
-from datetime import datetime
+from datetime import datetime, timedelta
 from app.core.db import get_session as get_db
 from app.core.models import MarketMetric, Company, NewsArticle, SocialMention, ExportOpportunity
 from app.modules.auth.models import AuthUser
@@ -453,3 +453,12 @@ def forgot_page(request: Request):
 @router.get("/reset-password", response_class=HTMLResponse)
 def reset_page(request: Request, token: str = ""):
     return safe_template(request, "reset.html", {"request": request, "token": token}, "Reset Password")
+
+@router.get("/about", response_class=HTMLResponse)
+def about(request: Request, db: Session = Depends(get_db)):
+    try:
+        real_count = db.exec(select(func.count()).select_from(MarketMetric).where(MarketMetric.created_at >= datetime.now() - timedelta(hours=48))).first() or 0
+    except Exception:
+        real_count = 0
+    data = {"current_version": "2.6.4", "last_updated": str(datetime.now().date()), "stats": {"counties_covered": 47, "lanes": 9, "modules": 12, "real_records": real_count}, "company": {"name": "EvidLens Ltd", "address": "Kimathi House, 2nd Floor, Nyeri, 10100, Kenya"}}
+    return safe_template(request, "about.html", {"request": request, "data": data}, "About EvidLens")
