@@ -55,8 +55,8 @@
       {% for p in prices %}
       {% set name = p.product_name if p.product_name is defined and p.product_name else (p.product if p.product is defined and p.product else 'Product') %}
       {% set price = p.price if p.price is defined and p.price is not none else (p.avg_price_kes if p.avg_price_kes is defined and p.avg_price_kes is not none else (p.current_price_kes if p.current_price_kes is defined and p.current_price_kes is not none else None)) %}
-      {% set dem = p.demand_score if p.demand_score is defined and p.demand_score is not none else (p.score if p.score is defined and p.score is not none else None) %}
-      {% set _upd = p.updated_at if p.updated_at is defined and p.updated_at else (p.fetched_at if p.fetched_at is defined and p.fetched_at else (p.created_at if p.created_at is defined and p.created_at else '')) %}
+      {% set dem = p.demand_score if p.demand_score is defined and p.demand_score is not none else (p.demand if p.demand is defined and p.demand is not none else (p.score if p.score is defined and p.score is not none else None)) %}
+      {% set _upd = p.updated_label if p.updated_label is defined and p.updated_label else (p.updated_at if p.updated_at is defined and p.updated_at else (p.fetched_at if p.fetched_at is defined and p.fetched_at else (p.created_at if p.created_at is defined and p.created_at else ''))) %}
       {% set _county = p.county if p.county is defined and p.county else 'Kenya' %}
       <tr class="border-b hover:bg-gray-50">
         <td class="p-3 font-semibold text-[#0A1F44]">{{ name }}</td>
@@ -64,7 +64,7 @@
         <td class="p-3">{{ p.sector if p.sector is defined and p.sector else '—' }}</td>
         <td class="p-3 font-bold">{% if price is not none %}KES {{ "{:,.0f}".format(price|float) }}{% else %}—{% endif %}</td>
         <td class="p-3">{% if dem is not none %}<span class="font-bold {% if dem|float>=70 %}text-green-600{% elif dem|float>=40 %}text-yellow-600{% else %}text-red-600{% endif %}">{{ dem|int }}/100</span>{% else %}<span class="text-slate-400">-</span>{% endif %}</td>
-        <td class="p-3 text-[12px] text-gray-400">{% if _upd %}{{ _upd|string|truncate(10, True, '') }}{% else %}—{% endif %}</td>
+        <td class="p-3 text-[12px] text-gray-400">{{ _upd if _upd else '—' }}</td>
         <td class="p-3 text-right whitespace-nowrap"><a href="/ai?q={{ ('What is a fair price for ' + name + ' in ' + _county + '?')|urlencode }}" class="text-[#0d9488] font-bold text-[13px]">Ask Lens →</a></td>
       </tr>
       {% endfor %}
