@@ -69,6 +69,17 @@ SERIES_MAP = {
     "BUSINESS_PLAN": "BusinessPlan",
     "KRA_TAX": "KRATax",
 }
+SERIES_TITLE_MAP = {
+    "EXEC_BRIEF": "EvidLens Business Briefs",
+    "MARKET_FEASIBILITY": "EvidLens Market Intelligence",
+    "INDUSTRY_OUTLOOK": "EvidLens Industry Outlook",
+    "SECTOR_PULSE": "EvidLens Sector Pulse",
+    "CONSUMER_ANALYSIS": "EvidLens Consumer Insights",
+    "PRODUCT_WATCH": "EvidLens Product Watch",
+    "INVESTOR_PITCH": "EvidLens Market Intelligence",
+    "BUSINESS_PLAN": "EvidLens Market Intelligence",
+    "KRA_TAX": "EvidLens Market Intelligence",
+}
 TITLE_MAP = {
     "EXEC_BRIEF": "Executive Intelligence Brief",
     "MARKET_FEASIBILITY": "Market Feasibility Report",
@@ -81,20 +92,21 @@ TITLE_MAP = {
     "KRA_TAX": "KRA Tax Report",
 }
 if HAS_CORPORATE:
-    NAVY = colors.HexColor("#0A1F44")
-    NAVY_LIGHT = colors.HexColor("#0F2340")
-    TEAL = colors.HexColor("#14B8A6")
-    TEAL_DARK = colors.HexColor("#0D9488")
-    GOLD = colors.HexColor("#C5A880")
-    GREY_BG = colors.HexColor("#F5F7FA")
-    GREY_TEXT = colors.HexColor("#64748B")
-    GREY_BORDER = colors.HexColor("#E2E8F0")
+    NAVY = colors.HexColor("#0B3D5C")
+    NAVY_LIGHT = colors.HexColor("#1A6B9A")
+    TEAL = colors.HexColor("#1A6B9A")
+    TEAL_DARK = colors.HexColor("#1A6B9A")
+    GOLD = colors.HexColor("#E8A838")
+    GREY_BG = colors.HexColor("#F7FAFC")
+    GREY_TEXT = colors.HexColor("#718096")
+    GREY_BORDER = colors.HexColor("#EDF2F7")
     GREEN = colors.HexColor("#16A34A")
-    AMBER = colors.HexColor("#F59E0B")
+    AMBER = colors.HexColor("#E8A838")
     RED = colors.HexColor("#DC2626")
     WHITE = colors.white
-    BLACK = colors.HexColor("#0F172A")
-    SLATE = colors.HexColor("#334155")
+    BLACK = colors.HexColor("#2D3748")
+    SLATE = colors.HexColor("#2D3748")
+    DARK = colors.HexColor("#1A1A2E")
 def safe(s):
     if s is None:
         return ""
@@ -210,7 +222,7 @@ def _chart_price_bar(prices, demand):
     labels = [k[:18] for k in list(seen.keys())[:10]]
     values = list(seen.values())[:10]
     if not labels:
-        ax.text(0.5, 0.5, "No live price data yet\nReal KPIN prices collected at 03:00 EAT daily", ha="center", va="center", fontsize=10, color="#64748B")
+        ax.text(0.5, 0.5, "No live price data yet\nReal KPIN prices collected at 03:00 EAT daily", ha="center", va="center", fontsize=10, color="#718096")
         ax.set_xticks([])
         ax.set_yticks([])
         for sp in ["top", "right", "bottom", "left"]:
@@ -222,14 +234,14 @@ def _chart_price_bar(prices, demand):
         buf.seek(0)
         return buf
     x = range(len(labels))
-    bars = ax.bar(x, values, color="#0A1F44", edgecolor="white", linewidth=0.8, width=0.62, zorder=3)
+    bars = ax.bar(x, values, color="#0B3D5C", edgecolor="white", linewidth=0.8, width=0.62, zorder=3)
     for bar, val in zip(bars, values):
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + max(values) * 0.02 if max(values) else 0, f"{val:,.0f}", ha="center", va="bottom", fontsize=8, color="#0A1F44", weight="bold")
+        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + max(values) * 0.02 if max(values) else 0, f"{val:,.0f}", ha="center", va="bottom", fontsize=8, color="#0B3D5C", weight="bold")
     ax.set_xticks(list(x))
-    ax.set_xticklabels(labels, fontsize=8, color="#334155", rotation=18, ha="right")
-    ax.set_ylabel("KES", fontsize=9, color="#64748B")
+    ax.set_xticklabels(labels, fontsize=8, color="#2D3748", rotation=18, ha="right")
+    ax.set_ylabel("KES", fontsize=9, color="#718096")
     ax.set_ylim(0, max(values) * 1.18 if values and max(values) > 0 else 1)
-    ax.set_title("Figure 3.1 - Average Price by Product (KES)", fontsize=11, color="#0A1F44", weight="bold", loc="left", pad=12)
+    ax.set_title("Figure 3.1 - Average Price by Product (KES)", fontsize=11, color="#0B3D5C", weight="bold", loc="left", pad=12)
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda y, _: f"{y:,.0f}"))
     ax.grid(axis="y", linestyle="--", alpha=0.3, zorder=0)
     ax.spines["top"].set_visible(False)
@@ -248,7 +260,7 @@ def _chart_demand_donut(demand):
     low = sum(1 for m in demand if _safe_float(getattr(m, "demand_score", 0)) < 40)
     total = high + med + low
     if total == 0:
-        ax.text(0.5, 0.5, "No live\ndemand data yet", ha="center", va="center", fontsize=10, color="#64748B")
+        ax.text(0.5, 0.5, "No live\ndemand data yet", ha="center", va="center", fontsize=10, color="#718096")
         ax.set_xticks([])
         ax.set_yticks([])
         buf = io.BytesIO()
@@ -258,11 +270,11 @@ def _chart_demand_donut(demand):
         buf.seek(0)
         return buf
     vals = [high, med, low]
-    cols = ["#0A1F44", "#14B8A6", "#CBD5E1"]
+    cols = ["#0B3D5C", "#1A6B9A", "#E8A838"]
     labs = [f"High (70+) - {high}", f"Medium (40-69) - {med}", f"Low (<40) - {low}"]
     wedges, _ = ax.pie(vals, colors=cols, startangle=90, counterclock=False, wedgeprops=dict(width=0.42, edgecolor="white", linewidth=2))
     ax.legend(wedges, labs, loc="center", bbox_to_anchor=(0.5, -0.12), fontsize=8, frameon=False, ncol=1)
-    ax.set_title("Figure 3.2 - Demand Distribution", fontsize=11, color="#0A1F44", weight="bold", pad=10)
+    ax.set_title("Figure 3.2 - Demand Distribution", fontsize=11, color="#0B3D5C", weight="bold", pad=10)
     buf = io.BytesIO()
     plt.tight_layout()
     plt.savefig(buf, format="png", dpi=200, bbox_inches="tight")
@@ -284,7 +296,7 @@ def _chart_county_bar(demand):
             labels.append(c)
             values.append(sum(arr) / len(arr))
     if not labels:
-        ax.text(0.5, 0.5, "No live county data yet", ha="center", va="center", fontsize=10, color="#64748B")
+        ax.text(0.5, 0.5, "No live county data yet", ha="center", va="center", fontsize=10, color="#718096")
         ax.set_xticks([])
         ax.set_yticks([])
         buf = io.BytesIO()
@@ -294,13 +306,13 @@ def _chart_county_bar(demand):
         buf.seek(0)
         return buf
     y = range(len(labels))
-    ax.barh(y, values, color="#14B8A6", edgecolor="white", height=0.55)
+    ax.barh(y, values, color="#1A6B9A", edgecolor="white", height=0.55)
     ax.set_yticks(list(y))
-    ax.set_yticklabels(labels, fontsize=9, color="#334155")
+    ax.set_yticklabels(labels, fontsize=9, color="#2D3748")
     ax.invert_yaxis()
-    ax.set_xlabel("Avg Price KES", fontsize=9, color="#64748B")
+    ax.set_xlabel("Avg Price KES", fontsize=9, color="#718096")
     ax.set_xlim(0, max(values) * 1.15 if values and max(values) > 0 else 1)
-    ax.set_title("Figure 3.3 - Average Price by County (KES)", fontsize=11, color="#0A1F44", weight="bold", loc="left", pad=10)
+    ax.set_title("Figure 3.3 - Average Price by County (KES)", fontsize=11, color="#0B3D5C", weight="bold", loc="left", pad=10)
     ax.xaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"{x:,.0f}"))
     ax.grid(axis="x", linestyle="--", alpha=0.3)
     ax.spines["top"].set_visible(False)
@@ -340,7 +352,7 @@ def _hf(canvas, doc):
         canvas.setFont("Helvetica-Bold", 10)
         canvas.drawString(18 * mm, A4[1] - 10 * mm, "EvidLens")
         canvas.setFont("Helvetica", 7.5)
-        canvas.drawString(18 * mm, A4[1] - 13.5 * mm, "Kenya Decision Intelligence")
+        canvas.drawString(18 * mm, A4[1] - 13.5 * mm, "Research. Insights. Impact.")
         canvas.setFillColor(GOLD)
         canvas.setFont("Helvetica-Bold", 7.5)
         canvas.drawRightString(A4[0] - 18 * mm, A4[1] - 10 * mm, "CONFIDENTIAL")
@@ -356,10 +368,10 @@ def _hf(canvas, doc):
         canvas.drawString(18 * mm, A4[1] - 10 * mm, "EvidLens")
         canvas.setFillColor(GREY_TEXT)
         canvas.setFont("Helvetica", 7)
-        canvas.drawRightString(A4[0] - 18 * mm, A4[1] - 10 * mm, "Kenya Decision Intelligence  |  Live Data Only")
+        canvas.drawRightString(A4[0] - 18 * mm, A4[1] - 10 * mm, "Research. Insights. Impact.  |  Live Data Only")
     canvas.setFillColor(GREY_TEXT)
     canvas.setFont("Helvetica", 7.5)
-    canvas.drawCentredString(A4[0] / 2, 14 * mm, f"EvidLens  |  Decision Intelligence for Kenya  |  Confidential  |  Page {doc.page}")
+    canvas.drawCentredString(A4[0] / 2, 14 * mm, f"EvidLens  |  Research. Insights. Impact.  |  Confidential  |  Page {doc.page}")
     canvas.setFont("Helvetica", 7)
     canvas.drawCentredString(A4[0] / 2, 10 * mm, "app.evidlens.co.ke  |  Source: KPIN + Live DB  |  Generated from live data only - no demo data")
     canvas.restoreState()
@@ -396,7 +408,7 @@ def _verdict(live, m):
     if m["avg_demand"] >= 50:
         return ("CONDITIONAL GO - VALIDATE BEFORE SCALING", AMBER, f"The evidence suggests a conditional entry. Live demand is moderate at {m['avg_demand']:.0f} out of 100, median price is {_fmt_kes(m['median_price'])}, and {len(live['competitors'])} competitors were tracked. A small pilot is recommended before scaling.", has_data)
     return ("HOLD - LOW LIVE DEMAND", RED, f"The evidence suggests holding. Live demand is low at {m['avg_demand']:.0f} out of 100. Large capital commitment is not supported by the current evidence base. Re-check after the next KPIN collection.", has_data)
-def _cover(story, S, title, q, sector, location, county, country, budget_str, plan_name, now_str, report_no):
+def _cover(story, S, title, q, sector, location, county, country, budget_str, plan_name, now_str, report_no, series_name="EvidLens Market Intelligence"):
     if os.path.exists(LOGO_PATH):
         try:
             lt = Table([[RLImage(LOGO_PATH, width=32 * mm, height=12 * mm)]], colWidths=[170 * mm])
@@ -406,21 +418,74 @@ def _cover(story, S, title, q, sector, location, county, country, budget_str, pl
             story.append(Paragraph("EvidLens", ParagraphStyle("LogoTxt", parent=S["sub"], fontSize=18, leading=20, textColor=NAVY, fontName="Helvetica-Bold")))
     else:
         story.append(Paragraph("EvidLens", ParagraphStyle("LogoTxt2", parent=S["sub"], fontSize=18, leading=20, textColor=NAVY, fontName="Helvetica-Bold")))
-    story.append(Paragraph("KENYA  |  DECISION INTELLIGENCE", ParagraphStyle("Eyebrow", parent=S["sub"], fontSize=9, leading=11, textColor=TEAL_DARK, fontName="Helvetica-Bold")))
+    story.append(Paragraph("EVIDLENS  |  RESEARCH. INSIGHTS. IMPACT.", ParagraphStyle("Eyebrow", parent=S["sub"], fontSize=9, leading=11, textColor=TEAL_DARK, fontName="Helvetica-Bold")))
+    story.append(Spacer(1, 3 * mm))
+    story.append(Paragraph(series_name, ParagraphStyle("Series", parent=S["sub"], fontSize=11, leading=14, textColor=NAVY_LIGHT, fontName="Helvetica-Bold")))
     story.append(Spacer(1, 3 * mm))
     story.append(Paragraph(title, S["title"]))
     story.append(Paragraph(f"{safe(q)}  |  {safe(sector)}", ParagraphStyle("Sub2", parent=S["sub"], fontSize=15, leading=19, textColor=NAVY, fontName="Helvetica-Bold")))
     story.append(Spacer(1, 3 * mm))
     story.append(Paragraph(f"Location: {safe(location)}  |  County: {safe(county) or 'All Counties'}  |  Country: {safe(country)}", S["sub"]))
     story.append(Paragraph(f"Report No: {report_no}  |  Budget: {budget_str}  |  Plan: {safe(plan_name)}", S["sub"]))
+    story.append(Paragraph(f"Publication Date: {now_str}  |  Version 1.0  |  Confidential", S["sub"]))
     story.append(Paragraph(f"Generated: {now_str}  |  app.evidlens.co.ke", S["sub"]))
     story.append(Spacer(1, 5 * mm))
     div = Table([[""]], colWidths=[170 * mm])
     div.setStyle(TableStyle([("LINEBELOW", (0, 0), (-1, -1), 2.5, GOLD), ("TOPPADDING", (0, 0), (-1, -1), 2), ("BOTTOMPADDING", (0, 0), (-1, -1), 6)]))
     story.append(div)
-    story.append(Paragraph("EvidLens Kenya Decision Intelligence", ParagraphStyle("Brand", parent=S["sub"], fontSize=10, leading=13, textColor=NAVY, fontName="Helvetica-Bold")))
-    story.append(Paragraph("Competitive  •  Pricing  •  Demand  •  Location  •  Consumer  •  Risk  •  Policy  •  Funding  •  Export  •  Knowledge  •  AI Insights", ParagraphStyle("Eng", parent=S["sub"], fontSize=8.5, leading=12, textColor=GREY_TEXT)))
+    story.append(Paragraph("Research Solutions That Drive Informed Decisions.", ParagraphStyle("Brand", parent=S["sub"], fontSize=10, leading=13, textColor=NAVY, fontName="Helvetica-Bold")))
     story.append(Spacer(1, 6 * mm))
+def _disclaimer_block(story, S):
+    story.append(Paragraph("Disclaimer & Copyright", S["h1"]))
+    story.append(Paragraph("This report is the intellectual property of EvidLens. It is provided for the exclusive use of the intended recipient. Unauthorised distribution, reproduction or citation without prior written consent is prohibited.", S["body"]))
+    story.append(Paragraph("While every effort has been made to ensure accuracy, EvidLens does not accept liability for decisions made on the basis of this research. Data sources, assumptions and limitations are stated within the methodology section.", S["body"]))
+    story.append(Paragraph("© 2026 EvidLens. All rights reserved.", S["body"]))
+    story.append(PageBreak())
+def _toc_block(story, S):
+    story.append(Paragraph("Table of Contents", S["h1"]))
+    toc = [("01","Executive Summary"),("02","Background and Context"),("03","Research Objectives"),("04","Research Methodology"),("05","Scope and Geographical Coverage"),("06","Market Overview and Industry Context"),("07","Detailed Research Findings"),("08","Data Analysis and Interpretation"),("09","Charts, Graphs and Visualisations"),("10","Market and Competitor Comparisons"),("11","Consumer / Stakeholder Insights"),("12","Key Findings and Strategic Implications"),("13","Opportunities, Challenges and Risks"),("14","Strategic Recommendations"),("15","Conclusion"),("16","References and Appendices")]
+    rows = [[Paragraph(f"<b>{n}</b>", S["cell"]), Paragraph(t, S["cell"])] for n,t in toc]
+    tt = Table(rows, colWidths=[14*mm, 156*mm])
+    tt.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),GREY_BG),("BOX",(0,0),(-1,-1),0.6,GREY_BORDER),("INNERGRID",(0,0),(-1,-1),0.4,GREY_BORDER),("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),5),("LEFTPADDING",(0,0),(-1,-1),6),("RIGHTPADDING",(0,0),(-1,-1),6)]))
+    story.append(tt)
+    story.append(Spacer(1, 4*mm))
+    story.append(Paragraph("List of Figures: Figure 3.1 Average Price by Product, Figure 3.2 Demand Distribution, Figure 3.3 Average Price by County. List of Tables: Table 3.1 Live Price and Demand Records, Table A.1 Full Live Records.", S["note"]))
+    story.append(PageBreak())
+def _core_chapters(story, S, live, m, has_data, q, sector, location, county, sub_county, ward, town, budget_str, benchmark, ai_text):
+    story.append(Paragraph("02  Background and Context", S["h1"]))
+    story.append(Paragraph(f"This research was commissioned to assess {safe(q)} in {safe(location)} for the {safe(sector)} sector. Recent shifts in pricing, demand, competition and regulation make live evidence essential before committing capital. This report uses live KPIN and MarketMetric records at generation time, not forecasts or demo values.", S["body"]))
+    story.append(Paragraph("03  Research Objectives", S["h1"]))
+    for b in ["Objective 1  —  Assess live pricing and demand for the focus product.","Objective 2  —  Map live competitors and companies for this filter.","Objective 3  —  Assess consumer signals, risks and policy constraints.","Objective 4  —  Provide a prioritised, actionable recommendation."]:
+        story.append(Paragraph(b, S["bullet"]))
+    story.append(Paragraph("Research Questions", S["h2"]))
+    story.append(Paragraph(f"RQ1  —  What is the live median price for {safe(q)} in {safe(location)}?", S["bullet"]))
+    story.append(Paragraph("RQ2  —  What is live demand and how many competitors are tracked?", S["bullet"]))
+    story.append(Paragraph("RQ3  —  What should the reader do next: enter, pilot, or hold?", S["bullet"]))
+    story.append(Paragraph("04  Research Methodology", S["h1"]))
+    story.append(Paragraph("Research Design: Mixed-methods, live database analysis. Primary: KPIN daily collection at 03:00 EAT, MarketMetric records. Secondary: Company and Competitor records, NewsArticle and SocialMention records, Knowledge Base and ExportOpportunity records.", S["body"]))
+    story.append(Paragraph("Data Sources: Primary: KPIN live prices, MarketMetric demand scores. Secondary: EvidLens live database, KRA eTIMS guidance, CBK guidance, EPRA guidance where applicable.", S["body"]))
+    story.append(Paragraph("Limitations: Counts are snapshots at generation time. Informal competitors may not be captured. Demand score is a recorded signal, not a forecast. Prices change daily. Verify on the ground before committing capital.", S["body"]))
+    if benchmark: story.append(Paragraph(f"Sector benchmark (Knowledge Base): {safe(str(benchmark)[:400])}", S["small"]))
+    if ai_text: story.append(Paragraph(f"AI insight: {safe(ai_text[:500])}", S["small"]))
+    story.append(Paragraph("05  Scope and Geographical Coverage", S["h1"]))
+    story.append(Paragraph(f"Included: Product {safe(q)}, Sector {safe(sector)}, County {safe(county) or 'All'}, Sub-county {safe(sub_county) or 'All'}, Ward {safe(ward) or 'All'}, Town {safe(town) or 'All'}. Excluded: Sectors and counties outside this filter.", S["body"]))
+    story.append(Paragraph("06  Market Overview and Industry Context", S["h1"]))
+    story.append(Paragraph(f"Market overview is based on {len(live['prices'])+len(live['demand'])} live price and metric records, {len(live['companies'])} companies and {len(live['competitors'])} competitors. Median price is {_fmt_kes(m['median_price']) if has_data else 'not available'}. Average demand is {m['avg_demand']:.0f} / 100 if live data exists.", S["body"]))
+def _ocr_conclusion_block(story, S, live, m, has_data, verdict, vtext):
+    story.append(Paragraph("08  Data Analysis and Interpretation", S["h1"]))
+    story.append(Paragraph(f"Median is used for pricing because one outlier can distort the mean. Median {_fmt_kes(m['median_price'])}, mean {_fmt_kes(m['avg_price'])}, range {_fmt_kes(m['min_price'])} to {_fmt_kes(m['max_price'])} if live data exists. Demand above 70 with few competitors is attractive. Demand below 40 is a hold signal. Price dispersion across counties signals arbitrage after transport cost.", S["body"]))
+    story.append(Paragraph("13  Opportunities, Challenges and Risks", S["h1"]))
+    story.append(Paragraph("Opportunities", S["h2"]))
+    story.append(Paragraph("Opportunity 1  —  Price at median and compete on availability, pack size, delivery and trust.", S["bullet"]))
+    story.append(Paragraph("Opportunity 2  —  Buy in low-price county, sell in high-price county after transport.", S["bullet"]))
+    story.append(Paragraph("Challenges", S["h2"]))
+    story.append(Paragraph("Challenge 1  —  Price volatility and informal competition not fully captured.", S["bullet"]))
+    story.append(Paragraph("Challenge 2  —  Working capital, rent and licences consume budget before sales stabilise.", S["bullet"]))
+    story.append(Paragraph("Risks", S["h2"]))
+    if not live["news"]: story.append(Paragraph("Risk 1  —  No live risk alerts for this filter. Validate policy and supply on the ground.", S["bullet"]))
+    for n in live["news"][:5]: story.append(Paragraph(f"Risk  —  {safe(getattr(n,'title','News'))}: {safe(str(getattr(n,'summary',''))[:140])}", S["bullet"]))
+    story.append(Paragraph("15  Conclusion", S["h1"]))
+    story.append(Paragraph(f"Conclusion: {verdict}. {vtext} Next step: validate with 20 customer interviews, pilot at median price, then decide to scale or pivot.", S["body"]))
 def _verdict_box(story, S, verdict, vcolor, vtext):
     vt = Table([[Paragraph("<b>INVESTMENT VERDICT</b>", ParagraphStyle("VL", parent=S["small"], textColor=WHITE, fontName="Helvetica-Bold", alignment=TA_LEFT)), Paragraph(f"<b>{verdict}</b>", ParagraphStyle("VV", parent=S["small"], textColor=WHITE, fontName="Helvetica-Bold", alignment=TA_LEFT))]], colWidths=[38 * mm, 132 * mm])
     vt.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), vcolor), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 10), ("RIGHTPADDING", (0, 0), (-1, -1), 10), ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 8), ("ROUNDEDCORNERS", [6, 6, 6, 6])]))
@@ -524,7 +589,10 @@ def _consumer_risk_block(story, S, live, plan_name, budget_str, q, sector, count
     for e in live["exports"][:8]:
         story.append(Paragraph(f"{safe(getattr(e, 'product', 'Product'))} to {safe(getattr(e, 'country', 'Country'))}  |  Score {safe(getattr(e, 'opportunity_score', 0))}", S["bullet"]))
 def _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str, plan_name="Trial"):
-    story.append(Paragraph("Annex A  Full Data Tables", S["h1"]))
+    story.append(Paragraph("16  References and Appendices", S["h1"]))
+    story.append(Paragraph("Appendix A  Detailed Methodology", S["h2"]))
+    story.append(Paragraph("Sampling frame: All live KPIN and MarketMetric rows matching the filter at generation time. No sampling, no interpolation. Full counts are in Appendix A below.", S["body"]))
+    story.append(Paragraph("Appendix A  Full Data Tables", S["h2"]))
     story.append(Paragraph("Table A.1 below contains the full live records used for this report, up to 50 rows. It is the audit trail for Figures 3.1 to 3.3 and Table 3.1.", S["body"]))
     a_rows = [[Paragraph("Product", S["th"]), Paragraph("County", S["th"]), Paragraph("Price (KES)", S["th_r"]), Paragraph("Demand / 100", S["th_r"]), Paragraph("Sector", S["th"])]]
     all_comb = []
@@ -544,11 +612,14 @@ def _annex_block(story, S, live, q, sector, location, county, sub_county, ward, 
     story.append(Paragraph("Table A.1 - Annex A - Full Live Records", S["h3"]))
     story.append(at)
     story.append(Paragraph("Source: EvidLens live database at generation time. Note: This table is the source for the charts. No rows have been added or removed except the 50-row limit.", S["note"]))
-    story.append(Paragraph("Annex B  Methodology Detail and Reproducibility", S["h1"]))
+    story.append(Paragraph("Appendix B  Methodology Detail and Reproducibility", S["h2"]))
     story.append(Paragraph(f"Report No: {report_no}. Generated: {now_str}. Product: {safe(q)}. Sector: {safe(sector)}. Location: {safe(location)}. Filter: County {safe(county) or 'All'}, Sub-county {safe(sub_county) or 'All'}, Ward {safe(ward) or 'All'}, Town {safe(town) or 'All'}.", S["body"]))
     story.append(Paragraph(f"Records used: PriceData {len(live['prices'])}, MarketMetric {len(live['demand'])}, Company {len(live['companies'])}, Competitor {len(live['competitors'])}, NewsArticle {len(live['news'])}, SocialMention {len(live['social'])}, KnowledgeChunk {len(live['knowledge'])}, ExportOpportunity {len(live['exports'])}.", S["body"]))
     story.append(Paragraph("Reproducibility: Re-run the same filter in the EvidLens dashboard after the next KPIN collection. Counts and prices will change as new live rows arrive. This PDF is a snapshot and is not updated automatically.", S["body"]))
     story.append(Paragraph("Quality checks: (1) No seed values were used. (2) Y-axes on charts start at zero. (3) Median is reported alongside mean. (4) Empty filters show an honest empty state.", S["body"]))
+    story.append(Paragraph("Appendix C  Glossary", S["h2"]))
+    for g in ["KPIN  —  Kenya Price Information Network, daily price collection at 03:00 EAT.","MarketMetric  —  Live demand score 0 to 100 and average price in KES.","Median  —  Middle value when live prices are sorted.","eTIMS  —  KRA electronic Tax Invoice Management System.","M-Pesa Till  —  Mobile money merchant till for receipts and statements."]:
+        story.append(Paragraph(g, S["bullet"]))
     story.append(Paragraph("References", S["h1"]))
     story.append(Paragraph("1.  EvidLens live database. KPIN daily collection, 03:00 EAT. Accessed at generation time.", S["bullet"]))
     story.append(Paragraph("2.  MarketMetric records. Demand score 0 to 100 and average price in KES.", S["bullet"]))
@@ -605,13 +676,16 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
     ai_text = _ai_text(q, sector, county)
     benchmark = _benchmark(sector)
     story = []
-    _cover(story, S, title, q, sector, location, county, country, budget_str, plan_name, now_str, report_no)
+    _cover(story, S, title, q, sector, location, county, country, budget_str, plan_name, now_str, report_no, SERIES_TITLE_MAP.get(mode, "EvidLens Market Intelligence"))
+    _disclaimer_block(story, S)
+    if mode != "EXEC_BRIEF":
+        _toc_block(story, S)
     _verdict_box(story, S, verdict, vcolor, vtext)
     story.append(Paragraph("How to read this report  —  Start with the Executive Summary, then Chapter 3 for pricing and demand evidence, then Chapter 5 for risks and the action plan. Annex A contains the full data table. Annex B documents methodology and limitations. A section that says No live data means no real KPIN row existed at generation time. It has not been filled with demo values.", S["small"]))
-    story.append(Paragraph("Copyright  —  2026 EvidLens. Decision Intelligence for Kenya. All rights reserved. This report is prepared for the requesting user. It is for information only and is not investment, legal, or tax advice. Validate with KRA, CBK, and county licensing before committing capital.", ParagraphStyle("Copy", parent=S["small"], textColor=GREY_TEXT, fontName="Helvetica-Oblique")))
+    story.append(Paragraph("Copyright  —  2026 EvidLens. Research. Insights. Impact. All rights reserved. This report is prepared for the requesting user. It is for information only and is not investment, legal, or tax advice. Validate with KRA, CBK, and county licensing before committing capital.", ParagraphStyle("Copy", parent=S["small"], textColor=GREY_TEXT, fontName="Helvetica-Oblique")))
     story.append(PageBreak())
     if mode == "EXEC_BRIEF":
-        story.append(Paragraph("Executive Summary - 1 Page Snapshot", S["h1"]))
+        story.append(Paragraph("ONE-PAGE SNAPSHOT", S["h1"]))
         story.append(Paragraph(f"This brief assesses <b>{safe(q)}</b> in <b>{safe(location)}</b> for the <b>{safe(sector)}</b> sector. It is based on <b>{len(live['prices']) + len(live['demand'])} live price and metric records</b>, <b>{len(live['companies'])} companies</b>, <b>{len(live['competitors'])} competitors</b>, <b>{len(live['news'])} risk signals</b>, and <b>{len(live['social'])} consumer mentions</b>.", S["body"]))
         if not has_data:
             story.append(Paragraph("The evidence base is insufficient for a decision. No live market data was available for this exact filter. Regenerate after the next KPIN collection or broaden the county or sector filter.", S["body"]))
@@ -630,12 +704,12 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
         story.append(Paragraph("Implication 2  —  Price at median, not at the highest observed price. Test three price points in week one.", S["body"]))
         story.append(Paragraph("Implication 3  —  Do not compete on price alone. Compete on availability, packaging size, delivery, and trust.", S["body"]))
         story.append(Paragraph("Recommended Actions", S["h1"]))
-        story.append(Paragraph("90-Day Actions", S["h2"]))
-        story.append(Paragraph("Week 1-2  —  Validate. Interview 20 potential customers. Ask what they buy now, at what price, and what they dislike.", S["bullet"]))
-        story.append(Paragraph("Week 3-6  —  Test. Sell a small batch at median price. Track daily volume, margin, and repeat buyers.", S["bullet"]))
-        story.append(Paragraph("Week 7-12  —  Fix one variable only: price, location, or packaging. Then decide to scale or pivot.", S["bullet"]))
-        story.append(Paragraph("6-12 Month Actions", S["h2"]))
-        story.append(Paragraph("Month 4-6  —  If daily net profit covers rent, transport, and time, scale. Add one new product or location.", S["bullet"]))
+        story.append(Paragraph("Immediate (Next 90 Days)", S["h2"]))
+        story.append(Paragraph("Week 1-2  —  Validate. Owner: Founder. Interview 20 potential customers. Ask what they buy now, at what price, and what they dislike. Outcome: Go / Pivot signal.", S["bullet"]))
+        story.append(Paragraph("Week 3-6  —  Test. Owner: Founder. Sell a small batch at median price. Track daily volume, margin, and repeat buyers. Outcome: Proven unit economics.", S["bullet"]))
+        story.append(Paragraph("Week 7-12  —  Fix. Owner: Founder. Fix one variable only: price, location, or packaging. Then decide to scale or pivot. Outcome: Clear scale decision.", S["bullet"]))
+        story.append(Paragraph("Next 6-12 Months", S["h2"]))
+        story.append(Paragraph("Month 4-6  —  Scale. If daily net profit covers rent, transport, and time, scale. Add one new product or location.", S["bullet"]))
         story.append(Paragraph("Month 7-12  —  Formalise: KRA eTIMS, county permit, M-Pesa till records. Explore SACCO or bank funding with 6 months statements.", S["bullet"]))
         story.append(Paragraph("Risks to Monitor", S["h1"]))
         if not live["news"]:
@@ -647,10 +721,14 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
             story.append(Paragraph(f"AI insight: {safe(ai_text[:500])}", S["body"]))
         _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str, plan_name)
     elif mode == "CONSUMER_ANALYSIS":
-        story.append(Paragraph("Executive Summary", S["h1"]))
+        story.append(Paragraph("1  Executive Snapshot", S["h1"]))
         story.append(Paragraph(f"This report assesses consumer demand for <b>{safe(q)}</b> in <b>{safe(location)}</b>. It is based on <b>{len(live['social'])} live consumer mentions</b>, <b>{len(live['demand'])} demand records</b>, and <b>{len(live['prices'])} price records</b>.", S["body"]))
         _kpi_table(story, S, live, m, has_data)
-        story.append(Paragraph("1  Consumer Segmentation", S["h1"]))
+        story.append(Paragraph("2  Research Objectives & Design", S["h1"]))
+        for b in ["Objective 1  —  Understand who buys, how often, where, and why.","Objective 2  —  Map attitudes, trust drivers, and unmet needs.","Objective 3  —  Map the customer journey and switching triggers.","Objective 4  —  Give prioritised actions for positioning, product, price, and experience."]:
+            story.append(Paragraph(b, S["bullet"]))
+        story.append(Paragraph("Design: Mixed-methods, live database analysis. Target population: Consumers and buyers in the filter location. Sample: All live records at generation time - no sampling, no interpolation. Fieldwork: KPIN daily collection 03:00 EAT + live MarketMetric, SocialMention, NewsArticle records.", S["body"]))
+        story.append(Paragraph("3  Consumer Segmentation", S["h1"]))
         pos = sum(1 for s in live["social"] if "positive" in str(getattr(s, "sentiment", "")).lower() or "pos" in str(getattr(s, "sentiment", "")).lower())
         neg = sum(1 for s in live["social"] if "negative" in str(getattr(s, "sentiment", "")).lower() or "neg" in str(getattr(s, "sentiment", "")).lower())
         neu = len(live["social"]) - pos - neg
@@ -665,12 +743,16 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
         st.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), NAVY), ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, GREY_BG]), ("GRID", (0, 0), (-1, -1), 0.4, GREY_BORDER), ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5), ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6)]))
         story.append(st)
         story.append(Paragraph("Source: SocialMention + MarketMetric live records. Segments are inferred from sentiment and demand score. No demographic data is invented.", S["note"]))
-        story.append(Paragraph("2  Persona Cards", S["h1"]))
+        story.append(Paragraph("Persona Cards", S["h2"]))
         story.append(Paragraph("Persona 1  —  Price-Sensitive Regular. Buys weekly, compares price first, loyal if price is stable and quality is consistent. Serve with small pack sizes and M-Pesa till.", S["body"]))
         story.append(Paragraph("Persona 2  —  Quality-First Buyer. Pays more for consistent quality, packaging, and receipts. Serve with branded pack, expiry date, and delivery.", S["body"]))
         story.append(Paragraph("Persona 3  —  Convenience Buyer. Buys when available near home or work. Serve with location near foot traffic and extended hours.", S["body"]))
         story.append(Paragraph("Validate personas with 20 interviews before using them for targeting. These are hypotheses from live signals, not surveyed personas.", S["note"]))
-        story.append(Paragraph("3  Customer Journey Map", S["h1"]))
+        story.append(Paragraph("4  Behavioural Findings", S["h1"]))
+        story.append(Paragraph(f"Median price is <b>{_fmt_kes(m['median_price'])}</b>, mean is {_fmt_kes(m['avg_price'])}. Average demand {m['avg_demand']:.0f} / 100. {len(live['companies'])} companies, {len(live['competitors'])} competitors.", S["body"]))
+        story.append(Paragraph("5  Attitudinal & Perceptual Insights", S["h1"]))
+        story.append(Paragraph("Trust drivers: Consistent quality, fair price, receipt, clean location, polite service. Unmet needs: Smaller pack sizes, delivery, credit / layaway, clearer labelling, M-Pesa till receipt.", S["body"]))
+        story.append(Paragraph("6  Customer Journey Mapping", S["h1"]))
         j_rows = [[Paragraph("Stage", S["th"]), Paragraph("What customer does", S["th"]), Paragraph("Friction", S["th"]), Paragraph("Fix", S["th"])]]
         j_rows.append([Paragraph("Awareness", S["cell"]), Paragraph("Hears from neighbour / market", S["cell"]), Paragraph("No signage", S["cell"]), Paragraph("Clear price board", S["cell"])])
         j_rows.append([Paragraph("Consideration", S["cell"]), Paragraph("Compares price + quality", S["cell"]), Paragraph("No samples", S["cell"]), Paragraph("Small trial pack", S["cell"])])
@@ -680,52 +762,77 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
         jt = Table(j_rows, colWidths=[28 * mm, 48 * mm, 42 * mm, 52 * mm], repeatRows=1)
         jt.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), NAVY), ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, GREY_BG]), ("GRID", (0, 0), (-1, -1), 0.4, GREY_BORDER), ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5), ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6)]))
         story.append(jt)
-        story.append(Paragraph("4  Consumer Pulse - Live Mentions", S["h1"]))
+        story.append(Paragraph("7  Loyalty, Switching & Retention", S["h1"]))
+        story.append(Paragraph("Loyalty drivers: Consistent quality, stable price, availability, polite service, receipt.", S["bullet"]))
+        story.append(Paragraph("Switching triggers: Price hike without notice, stock-out, rude service, quality drop, competitor closer / cheaper.", S["bullet"]))
+        story.append(Paragraph("Win-back: Apologise, offer small pack at old price for 1 week, explain price change, give receipt.", S["bullet"]))
+        story.append(Paragraph("NPS proxy: Repeat purchase rate in Week 1-2 pilot. Target: 20% repeat = healthy. Below 10% = fix quality / price / service.", S["body"]))
+        story.append(Paragraph("8  Implications for Brands & Retailers", S["h1"]))
+        for b in ["Positioning: Do not compete on price alone. Position on availability + trust + small pack + delivery.","Product: Offer 2 pack sizes - small (trial) + regular. Keep quality consistent.","Pricing: Price at median. Test 3 price points in Week 1. Keep price stable for 30 days after launch.","Communication: WhatsApp + market talk + shopkeeper advice. State price clearly, no hidden charges.","Experience: Clean location, correct change, receipt, polite service, M-Pesa till."]:
+            story.append(Paragraph(b, S["bullet"]))
+        story.append(Paragraph("9  Actionable Recommendations", S["h1"]))
+        story.append(Paragraph(f"Recommendation 1  —  <b>{verdict}</b>. {vtext}", S["bullet"]))
+        story.append(Paragraph("Recommendation 2  —  Week 1: Interview 20 buyers. Ask: What do you buy now, at what price, what do you dislike, what would make you switch?", S["bullet"]))
+        story.append(Paragraph("Recommendation 3  —  Week 2: Test 2 pack sizes + 2 channels at median price. Track volume, margin, repeat.", S["bullet"]))
+        story.append(Paragraph("Recommendation 4  —  Week 3-4: Fix one variable only - price, location, or packaging. Then decide to scale or pivot.", S["bullet"]))
+        story.append(Paragraph("Recommendation 5  —  Formalise: KRA eTIMS, county permit, M-Pesa till. This builds trust and unlocks SACCO / bank funding.", S["bullet"]))
+        story.append(Paragraph("Consumer Pulse - Live Mentions", S["h2"]))
         if not live["social"]:
             story.append(Paragraph("No live consumer mentions were found for this filter.", S["bullet"]))
         for s in live["social"][:15]:
             story.append(Paragraph(f"[{safe(getattr(s, 'platform', 'X'))}  {safe(getattr(s, 'sentiment', 'neutral'))}]  {safe(str(getattr(s, 'content', ''))[:160])}", S["bullet"]))
-        story.append(Paragraph("5  Pricing Sensitivity", S["h1"]))
+        story.append(Paragraph("Pricing Sensitivity", S["h2"]))
         story.append(Paragraph(f"Median price is <b>{_fmt_kes(m['median_price'])}</b>, mean is {_fmt_kes(m['avg_price'])}. Price at median for trial. If repeat is below 20 percent, price, quality, or location is wrong.", S["body"]))
         _charts_block(story, S, live)
+        if ai_text:
+            story.append(Paragraph(f"AI insight: {safe(ai_text[:600])}", S["body"]))
         _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str, plan_name)
     elif mode == "INDUSTRY_OUTLOOK":
-        story.append(Paragraph("Executive Summary", S["h1"]))
+        story.append(Paragraph("1  Executive Summary", S["h1"]))
         story.append(Paragraph(f"This Industry Outlook assesses <b>{safe(sector)}</b> in <b>{safe(location)}</b> with focus product <b>{safe(q)}</b>. It is based on <b>{len(live['prices']) + len(live['demand'])} live price and metric records</b>, <b>{len(live['companies'])} companies</b>, <b>{len(live['competitors'])} competitors</b>.", S["body"]))
         _kpi_table(story, S, live, m, has_data)
-        story.append(Paragraph("1  Introduction", S["h1"]))
-        story.append(Paragraph(f"The question addressed is whether <b>{safe(q)}</b> is feasible in <b>{safe(location)}</b> at budget <b>{budget_str}</b>. Chapter 2 documents method. Chapter 3 presents pricing and demand. Chapter 4 presents competitive and location. Chapter 5 presents consumer, risk, policy, funding, and export.", S["body"]))
-        story.append(Paragraph("2  Methodology, Data Sources and Limitations", S["h1"]))
-        story.append(Paragraph("Source 1  —  KPIN daily collection at 03:00 EAT. Live price records.", S["bullet"]))
-        story.append(Paragraph("Source 2  —  MarketMetric records. Demand score 0 to 100 and average price in KES.", S["bullet"]))
-        story.append(Paragraph("Source 3  —  Company and Competitor records.", S["bullet"]))
-        story.append(Paragraph("Source 4  —  NewsArticle and SocialMention records.", S["bullet"]))
-        story.append(Paragraph("Source 5  —  Knowledge Base and ExportOpportunity records.", S["bullet"]))
-        story.append(Paragraph("Median is the middle value when live prices are sorted. Mean is the arithmetic average. No smoothing, no interpolation, no demo fallback. Counts are real counts at generation time.", S["body"]))
+        story.append(Paragraph("Top 5 trends: (1) Median live price " + _fmt_kes(m['median_price']) + f". (2) Average live demand {m['avg_demand']:.0f} / 100. (3) {len(live['competitors'])} competitors tracked. (4) Budget {budget_str}. (5) Consumer pulse {len(live['social'])} mentions, risk alerts {len(live['news'])}.", S["body"]))
+        story.append(Paragraph("2  Macro & Industry Context", S["h1"]))
+        story.append(Paragraph("Kenya macro context affects demand, input costs, and credit. Check CBK monetary guidance, inflation, and FX before committing capital. This report does not forecast macro variables. It uses live micro prices as the primary evidence.", S["body"]))
+        story.append(Paragraph("Policy environment: Check KRA eTIMS, county permit, and sector licences before launch. If you sell food, LPG, or fuel, additional safety, KEBS, and EPRA approvals apply.", S["body"]))
         if benchmark:
             story.append(Paragraph(f"Sector benchmark (Knowledge Base): {safe(str(benchmark)[:400])}", S["small"]))
-        if ai_text:
-            story.append(Paragraph(f"AI insight: {safe(ai_text[:500])}", S["small"]))
-        story.append(Paragraph("3  Macro Context", S["h1"]))
-        story.append(Paragraph("Kenya macro context affects demand, input costs, and credit. Check CBK monetary guidance, inflation, and FX before committing capital. This report does not forecast macro variables. It uses live micro prices as the primary evidence.", S["body"]))
-        story.append(Paragraph("4  Industry Structure and Segments", S["h1"]))
+        story.append(Paragraph("3  Industry Performance Review", S["h1"]))
+        story.append(Paragraph(f"Performance is measured from live records only. Median price {_fmt_kes(m['median_price'])}, mean {_fmt_kes(m['avg_price'])}, range {_fmt_kes(m['min_price'])} to {_fmt_kes(m['max_price'])}. Average demand {m['avg_demand']:.0f} / 100. No smoothing, no interpolation, no demo fallback.", S["body"]))
+        story.append(Paragraph("4  Segment & Value-Chain Deep Dive", S["h1"]))
         story.append(Paragraph(f"Segments in this filter: {len(live['companies'])} companies and {len(live['competitors'])} competitors tracked. Informal competitors may not be captured. Segment by price tier, pack size, and channel: market stall, kiosk, supermarket, and wholesale.", S["body"]))
+        story.append(Paragraph("Value chain: Supplier -> Transport -> Storage -> Retail -> Customer. Margin is lost at transport, storage, and wastage. Fix one stage at a time.", S["body"]))
         _competitor_table(story, S, live)
-        story.append(Paragraph("5  Findings: Pricing, Demand and County Comparison", S["h1"]))
-        _charts_block(story, S, live)
-        story.append(Paragraph("6  Pricing and Margin Analysis", S["h1"]))
-        story.append(Paragraph(f"At median price {_fmt_kes(m['median_price'])}, the budget {budget_str} buys roughly {int(budget_val / m['median_price']) if has_data and m['median_price'] > 0 else 0} units before other costs. This is arithmetic, not a sales forecast. Deduct transport, rent, licences, packaging, and wastage to get true margin. Test three price points in week one.", S["body"]))
-        story.append(Paragraph("7  Competitive and Location Intelligence", S["h1"]))
+        story.append(Paragraph("5  Competitive Landscape", S["h1"]))
+        story.append(Paragraph(f"Market structure: {len(live['competitors'])} competitors and {len(live['companies'])} companies tracked. Concentration is as recorded. Barriers to entry: capital, supplier access, location, licences, and trust.", S["body"]))
+        story.append(Paragraph("6  Demand Drivers & Consumer Trends", S["h1"]))
+        story.append(Paragraph(f"Demand drivers: price at median, availability, quality consistency, location, and trust. Consumer pulse: {len(live['social'])} live mentions.", S["body"]))
+        for s in live["social"][:10]:
+            story.append(Paragraph(f"[{safe(getattr(s, 'platform', 'X'))}  {safe(getattr(s, 'sentiment', 'neutral'))}]  {safe(str(getattr(s, 'content', ''))[:140])}", S["bullet"]))
+        story.append(Paragraph("7  Supply-Side Dynamics", S["h1"]))
         story.append(Paragraph(f"Focus location: <b>{safe(location)}</b>. County: {safe(county) or 'All'}. Sub-county: {safe(sub_county) or 'All'}. Ward: {safe(ward) or 'All'}. Town: {safe(town) or 'All'}. Coverage: {len(live['companies'])} companies mapped.", S["body"]))
         story.append(Paragraph("Site checklist: (1) Foot traffic at 07:00, 12:00, and 18:00 for three days. (2) Nearest competitor distance. (3) Transport cost from supplier to site. (4) Rent and goodwill against three months of revenue at median price. (5) County single business permit plus health or fire approval where applicable.", S["body"]))
-        story.append(Paragraph("8  Consumer, Risk, Policy, Funding and Export", S["h1"]))
-        _consumer_risk_block(story, S, live, plan_name, budget_str, q, sector, county)
-        story.append(Paragraph("9  Forecasts and Scenarios", S["h1"]))
+        story.append(Paragraph("8  Pricing & Margin Analysis", S["h1"]))
+        story.append(Paragraph(f"At median price {_fmt_kes(m['median_price'])}, the budget {budget_str} buys roughly {int(budget_val / m['median_price']) if has_data and m['median_price'] > 0 else 0} units before other costs. This is arithmetic, not a sales forecast. Deduct transport, rent, licences, packaging, and wastage to get true margin. Test three price points in week one.", S["body"]))
+        story.append(Paragraph("9  Emerging Trends & Disruptors", S["h1"]))
+        story.append(Paragraph("Trends to watch: (1) Digital payments and M-Pesa till adoption. (2) Smaller pack sizes for price-sensitive buyers. (3) Delivery and WhatsApp ordering. (4) Regulation: eTIMS, county permits, KEBS, EPRA where applicable. (5) Climate and input cost volatility.", S["body"]))
+        for k in live["knowledge"][:8]:
+            story.append(Paragraph(f"{safe(getattr(k, 'sector', 'Policy'))}  |  {safe(str(getattr(k, 'chunk_text', ''))[:140])}", S["bullet"]))
+        story.append(Paragraph("10  Market Forecasts & Scenarios", S["h1"]))
         story.append(Paragraph("Base case  —  Demand stays at current live average. Price at median. Small pilot, then scale if repeat exceeds 20 percent.", S["bullet"]))
         story.append(Paragraph("Upside case  —  Demand rises 20 percent after next KPIN collection. Competitor count stays low. Scale faster, add one location.", S["bullet"]))
         story.append(Paragraph("Downside case  —  Demand falls below 40. Price pressure from competitors. Cut stock, renegotiate supplier, or pivot product or county.", S["bullet"]))
         story.append(Paragraph("These are scenarios, not forecasts. No smoothing or projection model has been applied to live data.", S["note"]))
-        story.append(Paragraph("10  Recommendations and 30-Day Action Plan", S["h1"]))
+        story.append(Paragraph("11  Investment & Growth Opportunities", S["h1"]))
+        story.append(Paragraph("Opportunity 1  —  Price at median and compete on availability, pack size, delivery, and trust.", S["bullet"]))
+        story.append(Paragraph("Opportunity 2  —  Buy in low-price county, sell in high-price county after transport cost.", S["bullet"]))
+        story.append(Paragraph("Opportunity 3  —  Formalise early: eTIMS, M-Pesa till, receipts. This unlocks SACCO and bank funding.", S["bullet"]))
+        story.append(Paragraph("12  Risks & Challenges", S["h1"]))
+        if not live["news"]:
+            story.append(Paragraph("No live risk alerts were found for this filter.", S["bullet"]))
+        for n in live["news"][:8]:
+            story.append(Paragraph(f"{safe(getattr(n, 'title', 'News'))}: {safe(str(getattr(n, 'summary', ''))[:140])}", S["bullet"]))
+        story.append(Paragraph("13  Strategic Recommendations", S["h1"]))
         story.append(Paragraph(f"Recommendation 1  —  <b>{verdict}</b>. {vtext}", S["bullet"]))
         story.append(Paragraph("Recommendation 2  —  Price at median and test. Keep at least 30 percent for rent, transport, licences, and one month of buffer.", S["bullet"]))
         story.append(Paragraph("Recommendation 3  —  Interview 20 potential customers before scaling.", S["bullet"]))
@@ -735,6 +842,9 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
         story.append(Paragraph("Week 2  —  Test. Sell a small batch at median price. Track volume, margin, repeat.", S["bullet"]))
         story.append(Paragraph("Week 3  —  Fix. Adjust one variable only: price, location, or packaging.", S["bullet"]))
         story.append(Paragraph("Week 4  —  Decide. If daily net profit covers rent, transport, and time, scale. If not, pivot.", S["bullet"]))
+        story.append(Paragraph("14  Conclusion", S["h1"]))
+        story.append(Paragraph(f"Conclusion: {verdict}. {vtext} Next step: validate with 20 customer interviews, pilot at median price, then decide to scale or pivot.", S["body"]))
+        _charts_block(story, S, live)
         _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str, plan_name)
     elif mode == "SECTOR_PULSE":
         story.append(Paragraph("Sector Pulse - Snapshot", S["h1"]))
@@ -816,7 +926,7 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
         story.append(Paragraph("Sources: kra.go.ke, KRA eTIMS guidance. Verify rates at generation time.", S["note"]))
         _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str, plan_name)
     else:
-        story.append(Paragraph("Executive Summary", S["h1"]))
+        story.append(Paragraph("01  Executive Summary", S["h1"]))
         story.append(Paragraph(f"This report assesses the feasibility of <b>{safe(q)}</b> in <b>{safe(location)}</b> for the <b>{safe(sector)}</b> sector. It is based on <b>{len(live['prices']) + len(live['demand'])} live price and metric records</b>, <b>{len(live['companies'])} companies</b>, <b>{len(live['competitors'])} competitors</b>, <b>{len(live['news'])} risk and policy signals</b>, and <b>{len(live['social'])} consumer mentions</b> available at generation time.", S["body"]))
         if not has_data:
             story.append(Paragraph("The evidence base is insufficient for a decision. No live market data was available for this exact filter. The charts in Chapter 3 show an honest empty state. Regenerate after the next KPIN collection or broaden the county or sector filter.", S["body"]))
@@ -829,28 +939,24 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
             story.append(Paragraph(f"Finding 4  —  Budget provided is <b>{budget_str}</b>. If budget is below three months of operating cost at median price, start smaller or seek funding.", S["bullet"]))
         else:
             story.append(Paragraph("Finding 1  —  No live findings yet. See the empty-state note above. Do not base a decision on this report alone.", S["bullet"]))
-        story.append(Paragraph("1  Introduction", S["h1"]))
-        story.append(Paragraph(f"The question addressed is whether <b>{safe(q)}</b> is feasible in <b>{safe(location)}</b> at budget <b>{budget_str}</b>.", S["body"]))
-        story.append(Paragraph("2  Methodology, Data Sources and Limitations", S["h1"]))
-        story.append(Paragraph("Source 1  —  KPIN daily collection at 03:00 EAT. Live price records.", S["bullet"]))
-        story.append(Paragraph("Source 2  —  MarketMetric records. Demand score 0 to 100 and average price in KES.", S["bullet"]))
-        story.append(Paragraph("Source 3  —  Company and Competitor records.", S["bullet"]))
-        story.append(Paragraph("Source 4  —  NewsArticle and SocialMention records.", S["bullet"]))
-        story.append(Paragraph("Source 5  —  Knowledge Base and ExportOpportunity records.", S["bullet"]))
-        story.append(Paragraph("Median is the middle value when live prices are sorted. Mean is the arithmetic average. No smoothing, no interpolation, no demo fallback. Counts are real counts at generation time.", S["body"]))
-        if benchmark:
-            story.append(Paragraph(f"Sector benchmark (Knowledge Base): {safe(str(benchmark)[:400])}", S["small"]))
-        if ai_text:
-            story.append(Paragraph(f"AI insight: {safe(ai_text[:500])}", S["small"]))
-        story.append(Paragraph("3  Pricing, Demand and County Comparison", S["h1"]))
+        _core_chapters(story, S, live, m, has_data, q, sector, location, county, sub_county, ward, town, budget_str, benchmark, ai_text)
+        story.append(Paragraph("07  Detailed Research Findings", S["h1"]))
+        story.append(Paragraph("Findings are based on live records only. No demo fallback. Counts at generation time are in Appendix A.", S["body"]))
+        story.append(Paragraph("09  Charts, Graphs and Visualisations", S["h1"]))
         _charts_block(story, S, live)
-        story.append(Paragraph("4  Competitive and Location Intelligence", S["h1"]))
+        story.append(Paragraph("10  Market and Competitor Comparisons", S["h1"]))
         story.append(Paragraph(f"Focus location: <b>{safe(location)}</b>. County: {safe(county) or 'All'}. Sub-county: {safe(sub_county) or 'All'}. Ward: {safe(ward) or 'All'}. Town: {safe(town) or 'All'}. Coverage: {len(live['companies'])} companies mapped.", S["body"]))
         _competitor_table(story, S, live)
         story.append(Paragraph("Site checklist: (1) Foot traffic at 07:00, 12:00, and 18:00 for three days. (2) Nearest competitor distance. (3) Transport cost from supplier to site. (4) Rent and goodwill against three months of revenue at median price. (5) County single business permit plus health or fire approval where applicable.", S["body"]))
-        story.append(Paragraph("5  Consumer, Risk, Policy, Funding and Export", S["h1"]))
+        story.append(Paragraph("11  Consumer / Stakeholder Insights", S["h1"]))
         _consumer_risk_block(story, S, live, plan_name, budget_str, q, sector, county)
-        story.append(Paragraph("6  Recommendations and 30-Day Action Plan", S["h1"]))
+        story.append(Paragraph("12  Key Findings and Strategic Implications", S["h1"]))
+        story.append(Paragraph("Key findings are in the Verdict box and KPI table. Implication: Price at median, compete on availability and trust, validate before scaling.", S["body"]))
+        _ocr_conclusion_block(story, S, live, m, has_data, verdict, vtext)
+        story.append(Paragraph("14  Strategic Recommendations", S["h1"]))
+        story.append(Paragraph(f"Priority 1 (0-6 months)  —  {verdict}. {vtext} Price at median, test, validate.", S["bullet"]))
+        story.append(Paragraph("Priority 2 (6-18 months)  —  Scale if repeat >20%. Add one product/location. Formalise eTIMS + M-Pesa till.", S["bullet"]))
+        story.append(Paragraph("Priority 3 (Long-term)  —  Build supplier relationships, explore SACCO/bank funding with 6 months statements.", S["bullet"]))
         story.append(Paragraph(f"Recommendation 1  —  <b>{verdict}</b>. {vtext}", S["bullet"]))
         story.append(Paragraph("Recommendation 2  —  Price at median and test. Keep at least 30 percent for rent, transport, licences, and one month of buffer.", S["bullet"]))
         story.append(Paragraph("Recommendation 3  —  Interview 20 potential customers before scaling.", S["bullet"]))
