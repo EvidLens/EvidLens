@@ -17,6 +17,12 @@ except Exception:
     HAS_MODEL = False
     Workspace = None
     WorkspaceMember = None
+try:
+    from app.modules.auth.models import AuthUser
+    HAS_AUTH_USER = True
+except Exception:
+    HAS_AUTH_USER = False
+    AuthUser = None
 
 def _ws_to_dict(ws, members_count=0, members=None):
     return {
@@ -28,17 +34,52 @@ def _ws_to_dict(ws, members_count=0, members=None):
         "member_count": members_count,
     }
 
-def _get_real_user(db, current_user):
-    if not current_user:
-        return None
+def _resolve_user_id(request, current_user):
+    if current_user is not None:
+        uid = getattr(current_user, "id", None)
+        if uid is not None:
+            return uid, getattr(current_user, "email", None)
     try:
-        real = db.get(User, current_user.id)
-        if real:
-            return real
+        uid = request.session.get("user_id")
+        if uid is not None:
+            return int(uid), request.session.get("email")
     except Exception:
         pass
     try:
+        uid = request.cookies.get("user_id")
+        if uid is not None:
+            return int(uid), None
+    except Exception:
+        pass
+    return None, None
+
+def _get_real_user(db, request, current_user):
+    user_id, email = _resolve_user_id(request, current_user)
+    if email is None and current_user is not None:
         email = getattr(current_user, "email", None)
+    if HAS_AUTH_USER and AuthUser is not None:
+        try:
+            if user_id is not None:
+                real = db.get(AuthUser, user_id)
+                if real:
+                    return real
+        except Exception:
+            pass
+        try:
+            if email:
+                rows = db.exec(select(AuthUser).where(AuthUser.email == email)).all()
+                if rows:
+                    return rows[0]
+        except Exception:
+            pass
+    try:
+        if user_id is not None:
+            real = db.get(User, user_id)
+            if real:
+                return real
+    except Exception:
+        pass
+    try:
         if email:
             rows = db.exec(select(User).where(User.email == email)).all()
             if rows:
@@ -47,12 +88,40 @@ def _get_real_user(db, current_user):
         pass
     return None
 
+def _is_json_request(request):
+    accept = (request.headers.get("accept", "") or "").lower()
+    ctype = (request.headers.get("content-type", "") or "").lower()
+    return "application/json" in accept or "application/json" in ctype
+
+async def _get_name(request, form_name):
+    if form_name:
+        return (form_name or "").strip()
+    try:
+        ctype = (request.headers.get("content-type", "") or "").lower()
+        if "application/json" in ctype:
+            body = await request.json()
+            if isinstance(body, dict):
+                return str(body.get("name", "") or "").strip()
+    except Exception:
+        pass
+    try:
+        form = await request.form()
+        return str(form.get("name", "") or "").strip()
+    except Exception:
+        pass
+    return ""
+
+def _unauthorized(request):
+    if _is_json_request(request):
+        return JSONResponse({"ok": False, "error": "Session expired. Please logout and login again."}, status_code=401)
+    return RedirectResponse("/login?next=/workspaces", status_code=303)
+
 @router.get("", response_class=HTMLResponse)
 @router.get("/", response_class=HTMLResponse)
 async def list_workspaces(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     workspaces = []
     current_workspace_id = None
-    real_user = _get_real_user(db, current_user)
+    real_user = _get_real_user(db, request, current_user)
     try:
         if HAS_MODEL and real_user:
             rows = db.exec(select(Workspace).where(Workspace.owner_id == real_user.id)).all()
@@ -82,14 +151,10 @@ async def list_workspaces(request: Request, current_user: User = Depends(get_cur
     })
 
 @router.post("/create")
-async def create_workspace(request: Request, name: str = Form(...), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    name = (name or "").strip()
-    is_json = "application/json" in (request.headers.get("accept", "") or "")
-    if not current_user:
-        if is_json:
-            return JSONResponse({"ok": False, "error": "Login required"}, status_code=401)
-        return RedirectResponse("/login?next=/workspaces", status_code=303)
-    real_user = _get_real_user(db, current_user)
+async def create_workspace(request: Request, name: Optional[str] = Form(None), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    name = await _get_name(request, name)
+    is_json = _is_json_request(request)
+    real_user = _get_real_user(db, request, current_user)
     if not real_user:
         try:
             db.rollback()
@@ -142,11 +207,22 @@ async def create_workspace(request: Request, name: str = Form(...), current_user
     return RedirectResponse("/workspaces", status_code=303)
 
 @router.post("/switch")
-async def switch_workspace(request: Request, workspace_id: int = Form(...), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    is_json = "application/json" in (request.headers.get("accept", "") or "")
-    if not current_user:
-        return JSONResponse({"ok": False, "error": "Login required"}, status_code=401) if is_json else RedirectResponse("/login?next=/workspaces", status_code=303)
-    real_user = _get_real_user(db, current_user)
+async def switch_workspace(request: Request, workspace_id: Optional[int] = Form(None), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    is_json = _is_json_request(request)
+    if workspace_id is None:
+        try:
+            ctype = (request.headers.get("content-type", "") or "").lower()
+            if "application/json" in ctype:
+                body = await request.json()
+                if isinstance(body, dict):
+                    workspace_id = body.get("workspace_id") or body.get("id")
+                    if workspace_id is not None:
+                        workspace_id = int(workspace_id)
+        except Exception:
+            pass
+    if workspace_id is None:
+        return JSONResponse({"ok": False, "error": "Workspace id is required"}, status_code=400) if is_json else RedirectResponse("/workspaces?error=Id+required", status_code=303)
+    real_user = _get_real_user(db, request, current_user)
     if not real_user:
         return JSONResponse({"ok": False, "error": "Session expired. Please logout and login again."}, status_code=401) if is_json else RedirectResponse("/login?next=/workspaces", status_code=303)
     try:
@@ -171,7 +247,7 @@ async def switch_workspace(request: Request, workspace_id: int = Form(...), curr
 async def workspace_detail(request: Request, workspace_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     ws = None
     members = []
-    real_user = _get_real_user(db, current_user)
+    real_user = _get_real_user(db, request, current_user)
     if HAS_MODEL and real_user:
         try:
             ws = db.get(Workspace, workspace_id)
