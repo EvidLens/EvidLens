@@ -47,7 +47,7 @@ KENYA_SECTORS = [
     "Waste Management & Recycling", "Environmental & Climate Services"
 ]
 
-CURATED_POLICIES = [
+POLICY_DIRECTORY = [
     {"title": "Business Registration Service Act", "category": "Registration", "description": "Register a business name, sole proprietorship, partnership or limited company via eCitizen / BRS. Cost from KES 1,000 for business name.", "link": "https://www.brs.go.ke/", "authority": "Business Registration Service"},
     {"title": "Tax Procedures Act - KRA PIN & Filing", "category": "Tax", "description": "All businesses must have KRA PIN. File monthly VAT by 20th and annual income tax by 30 June. Register on iTax.", "link": "https://www.kra.go.ke/", "authority": "Kenya Revenue Authority"},
     {"title": "Single Business Permit - County", "category": "Licensing", "description": "Every business needs a county Single Business Permit. Apply at your county revenue office or eCitizen county portal.", "link": "https://www.ecitizen.go.ke/", "authority": "County Government"},
@@ -73,6 +73,21 @@ class SearchRequest(BaseModel):
     county: Optional[str] = None
     top_k: int = 5
 
+def _normalize_policy(p):
+    return {
+        "title": p.get("title", ""),
+        "name": p.get("title", ""),
+        "category": p.get("category", ""),
+        "description": p.get("description", ""),
+        "summary": p.get("description", ""),
+        "link": p.get("link", ""),
+        "url": p.get("link", ""),
+        "authority": p.get("authority", ""),
+        "source": p.get("authority", ""),
+        "is_curated": True,
+        "is_live": False,
+    }
+
 @router.get("", response_class=HTMLResponse)
 @router.get("/", response_class=HTMLResponse)
 async def kb_home(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -87,11 +102,59 @@ async def kb_home(request: Request, current_user: User = Depends(get_current_use
         except Exception:
             pass
         recent = []
-    return templates.TemplateResponse("kb.html", {"request": request, "current_user": current_user, "user": current_user, "sectors": KENYA_SECTORS, "total_sectors": len(KENYA_SECTORS), "recent_reports": recent, "has_data": len(recent) > 0})
+    policies = [_normalize_policy(p) for p in POLICY_DIRECTORY]
+    return templates.TemplateResponse("kb.html", {
+        "request": request,
+        "current_user": current_user,
+        "user": current_user,
+        "sectors": KENYA_SECTORS,
+        "total_sectors": len(KENYA_SECTORS),
+        "recent_reports": recent,
+        "reports": recent,
+        "policies": policies,
+        "policy_count": len(policies),
+        "total_policies": len(policies),
+        "total_reports": len(recent),
+        "total": len(recent),
+        "has_data": len(recent) > 0,
+        "has_policies": len(policies) > 0,
+        "is_curated": True,
+        "data_source": "Curated Directory - Verify with regulator",
+    })
 
 @router.get("/policy", response_class=HTMLResponse)
-async def policy_page(request: Request, current_user: User = Depends(get_current_user)):
-    return templates.TemplateResponse("kb_policy.html", {"request": request, "current_user": current_user, "user": current_user, "policies": CURATED_POLICIES, "total": len(CURATED_POLICIES), "has_data": len(CURATED_POLICIES) > 0})
+async def policy_page(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    recent = []
+    try:
+        rows = db.exec(select(SectorReport).order_by(desc(SectorReport.created_at)).limit(12)).all()
+        recent = [{"sector": getattr(r, "sector", ""), "title": getattr(r, "title", "") or getattr(r, "sector", ""), "summary": (getattr(r, "summary", "") or "")[:180]} for r in rows]
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        recent = []
+    policies = [_normalize_policy(p) for p in POLICY_DIRECTORY]
+    return templates.TemplateResponse("kb_policy.html", {
+        "request": request,
+        "current_user": current_user,
+        "user": current_user,
+        "policies": policies,
+        "policy_list": policies,
+        "items": policies,
+        "data": policies,
+        "total": len(policies),
+        "count": len(policies),
+        "total_policies": len(policies),
+        "policy_count": len(policies),
+        "total_reports": len(recent),
+        "recent_reports": recent,
+        "has_data": len(policies) > 0,
+        "has_policies": len(policies) > 0,
+        "is_curated": True,
+        "is_live": False,
+        "data_source": "Curated Directory - Verify with regulator",
+    })
 
 @router.get("/sectors")
 def list_sectors():
