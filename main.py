@@ -396,6 +396,35 @@ def fix_live_tables():
         print("✓ LIVE TABLES MIGRATED")
     except Exception as e:
         print(f"LIVE TABLES error: {e}")
+def fix_workspace_fks():
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT conname, conrelid::regclass::text AS tbl, a.attname AS col "
+                "FROM pg_constraint c "
+                "JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey) "
+                "WHERE c.contype = 'f' AND c.confrelid = 'user'::regclass "
+                "AND conrelid::regclass::text ILIKE '%workspace%'"
+            )).fetchall()
+            for conname, tbl, col in rows:
+                ref = "workspaces" if col == "workspace_id" else "auth_user"
+                print(f"Fixing FK {tbl}.{conname} ({col}) -> {ref}(id)")
+                try:
+                    conn.execute(text(f"ALTER TABLE {tbl} DROP CONSTRAINT IF EXISTS {conname}"))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+                try:
+                    conn.execute(text(f"ALTER TABLE {tbl} ADD CONSTRAINT {conname} FOREIGN KEY ({col}) REFERENCES {ref}(id) ON DELETE CASCADE"))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+            if rows:
+                print(f"✓ WORKSPACE FKs FIXED: {len(rows)}")
+            else:
+                print("✓ WORKSPACE FKs: no FKs pointing to user")
+    except Exception as e:
+        print(f"WORKSPACE FK error: {e}")
 def force_create_tables():
     tables = []
     tables.append(
@@ -564,6 +593,10 @@ def on_startup():
     except Exception as e:
         print(f"DB init error: {e}")
         traceback.print_exc()
+    try:
+        fix_workspace_fks()
+    except Exception as e:
+        print(f"Workspace FK migrate error: {e}")
     try:
         force_create_tables()
     except Exception as e:
@@ -1020,7 +1053,7 @@ def root(
         select(func.count()).select_from(ExportOpportunity)
     )
     county_count = safe_count(
-        select(func.count(func.distinct(MarketMetric.county)))
+        select(func.count()).select_from(MarketMetric.county)
     )
     policy_count = news_count
     modules = []
