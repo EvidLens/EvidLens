@@ -12,6 +12,8 @@
     </div>
   </div>
   {% else %}
+  <div id="wsError" class="hidden bg-red-50 border border-red-200 text-red-700 text-[13px] rounded-xl p-3 mb-4"></div>
+  <div id="wsSuccess" class="hidden bg-green-50 border border-green-200 text-green-700 text-[13px] rounded-xl p-3 mb-4"></div>
   <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
     <div>
       <h1 class="text-3xl font-bold text-[#0A1F44]">Workspaces</h1>
@@ -51,10 +53,7 @@
       </div>
       <div class="mt-4 flex flex-wrap gap-2">
         {% if current_workspace_id is not defined or ws.id != current_workspace_id %}
-        <form action="/workspaces/switch" method="post">
-          <input type="hidden" name="workspace_id" value="{{ ws.id }}">
-          <button class="bg-[#0A1F44] text-white px-4 py-2 rounded-lg text-sm font-bold">Switch</button>
-        </form>
+        <button type="button" data-switch="{{ ws.id }}" class="js-switch bg-[#0A1F44] text-white px-4 py-2 rounded-lg text-sm font-bold">Switch</button>
         {% endif %}
         <a href="/workspaces/{{ ws.id }}" class="border border-gray-300 px-4 py-2 rounded-lg text-sm font-bold">Manage</a>
         <a href="/ai" class="border border-gray-300 px-4 py-2 rounded-lg text-sm font-bold">Open Ask Lens</a>
@@ -78,10 +77,11 @@
   <div class="bg-white p-6 rounded-2xl w-full max-w-md">
     <h2 class="text-xl font-bold mb-1">Create New Workspace</h2>
     <p class="text-[13px] text-gray-500 mb-4">For your company, team, or project. You can invite members after.</p>
-    <form action="/workspaces/create" method="post">
+    <form id="createWsForm">
       <label class="text-sm font-semibold" for="wsName">Workspace Name</label>
-      <input id="wsName" name="name" placeholder="e.g Acme Ltd Marketing" required maxlength="80" autocomplete="organization" class="w-full border p-3 rounded-lg mt-1 mb-4">
-      <button class="w-full bg-[#14B8A6] text-white p-3 rounded-lg font-bold">Create</button>
+      <input id="wsName" name="name" placeholder="e.g Acme Ltd Marketing" required maxlength="80" autocomplete="organization" class="w-full border p-3 rounded-lg mt-1 mb-2">
+      <p id="wsFormError" class="hidden text-red-600 text-[13px] mb-2"></p>
+      <button id="createWsBtn" type="submit" class="w-full bg-[#14B8A6] text-white p-3 rounded-lg font-bold">Create</button>
     </form>
     <button id="closeNewWs" type="button" class="w-full mt-2 text-gray-500 text-[13px]">Cancel</button>
   </div>
@@ -92,13 +92,55 @@
 <script>
 (function(){
   var modal = document.getElementById('newWsModal');
-  if(!modal) return;
-  function open(){ modal.classList.remove('hidden'); modal.classList.add('flex'); var i=document.getElementById('wsName'); if(i) i.focus(); }
-  function close(){ modal.classList.add('hidden'); modal.classList.remove('flex'); }
+  var errBox = document.getElementById('wsError');
+  var okBox = document.getElementById('wsSuccess');
+  var formErr = document.getElementById('wsFormError');
+  function show(el, msg){ if(!el) return; el.textContent = msg; el.classList.remove('hidden'); }
+  function hide(el){ if(el) el.classList.add('hidden'); }
+  function open(){ if(!modal) return; modal.classList.remove('hidden'); modal.classList.add('flex'); var i=document.getElementById('wsName'); if(i) i.focus(); }
+  function close(){ if(!modal) return; modal.classList.add('hidden'); modal.classList.remove('flex'); hide(formErr); }
   ['openNewWs','openNewWsEmpty'].forEach(function(id){ var b=document.getElementById(id); if(b) b.addEventListener('click', open); });
   var c=document.getElementById('closeNewWs'); if(c) c.addEventListener('click', close);
-  modal.addEventListener('click', function(e){ if(e.target===modal) close(); });
+  if(modal) modal.addEventListener('click', function(e){ if(e.target===modal) close(); });
   document.addEventListener('keydown', function(e){ if(e.key==='Escape') close(); });
+  var form = document.getElementById('createWsForm');
+  if(form){
+    form.addEventListener('submit', async function(e){
+      e.preventDefault();
+      var btn = document.getElementById('createWsBtn');
+      var name = document.getElementById('wsName').value.trim();
+      if(!name){ show(formErr, 'Please enter a workspace name'); return; }
+      btn.disabled = true; btn.textContent = 'Creating...';
+      hide(formErr); hide(errBox);
+      try{
+        var fd = new FormData(); fd.append('name', name);
+        var res = await fetch('/workspaces/create', {method: 'POST', body: fd, headers: {'Accept': 'application/json'}});
+        var data = await res.json().catch(function(){ return {}; });
+        if(!res.ok || !data.ok){ throw new Error(data.error || ('Failed: ' + res.status)); }
+        show(okBox, 'Workspace created: ' + data.workspace.name);
+        close();
+        window.location.reload();
+      }catch(err){
+        show(formErr, err.message || 'Create failed. Please try again.');
+        show(errBox, err.message || 'Create failed.');
+      }finally{
+        btn.disabled = false; btn.textContent = 'Create';
+      }
+    });
+  }
+  document.querySelectorAll('.js-switch').forEach(function(b){
+    b.addEventListener('click', async function(){
+      var id = b.getAttribute('data-switch');
+      b.disabled = true; b.textContent = 'Switching...';
+      try{
+        var fd = new FormData(); fd.append('workspace_id', id);
+        var res = await fetch('/workspaces/switch', {method: 'POST', body: fd, headers: {'Accept': 'application/json'}});
+        var data = await res.json().catch(function(){ return {}; });
+        if(!res.ok || !data.ok) throw new Error(data.error || 'Switch failed');
+        window.location.reload();
+      }catch(err){ show(errBox, err.message); b.disabled = false; b.textContent = 'Switch'; }
+    });
+  });
 })();
 </script>
 {% endblock %}
