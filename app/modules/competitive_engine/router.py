@@ -48,6 +48,7 @@ def _normalize_company(c):
     rating = _clean_rating(getattr(c, "rating", None))
     sector = getattr(c, "sector", "") or "General"
     county = getattr(c, "county", "") or "Kenya"
+    threat = _threat_level(sector, county, rating)
     return {
         "id": getattr(c, "id", None),
         "name": getattr(c, "name", "Unknown") or "Unknown",
@@ -55,15 +56,19 @@ def _normalize_company(c):
         "county": county,
         "description": getattr(c, "description", "") or "",
         "rating": rating,
+        "rating_display": f"{rating:.1f}" if rating is not None else None,
         "avg_rating": rating,
-        "threat": _threat_level(sector, county, rating),
-        "threat_level": _threat_level(sector, county, rating),
+        "strength": threat,
+        "strength_label": threat,
+        "threat": threat,
+        "threat_level": threat,
     }
 
 def _normalize_competitor(c):
     rating = _clean_rating(getattr(c, "rating", None))
     sector = getattr(c, "sector", "") or "General"
     county = getattr(c, "county", "") or "Kenya"
+    threat = _threat_level(sector, county, rating)
     return {
         "id": getattr(c, "id", None),
         "name": getattr(c, "name", "Unknown") or "Unknown",
@@ -71,10 +76,24 @@ def _normalize_competitor(c):
         "county": county,
         "description": getattr(c, "description", "") or "",
         "rating": rating,
+        "rating_display": f"{rating:.1f}" if rating is not None else None,
         "avg_rating": rating,
-        "threat": _threat_level(sector, county, rating),
-        "threat_level": _threat_level(sector, county, rating),
+        "strength": threat,
+        "strength_label": threat,
+        "threat": threat,
+        "threat_level": threat,
     }
+
+def _dedupe(items):
+    seen = set()
+    out = []
+    for x in items:
+        key = (x.get("name") or "").strip().lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        out.append(x)
+    return out
 
 @router.get("/", response_class=HTMLResponse)
 async def competitive_page(request: Request, db: Session = Depends(get_session)):
@@ -90,9 +109,9 @@ async def competitive_page(request: Request, db: Session = Depends(get_session))
         competitors_raw = []
         companies_raw = []
 
-    competitors = [_normalize_competitor(c) for c in competitors_raw]
-    companies = [_normalize_company(c) for c in companies_raw]
-    all_items = competitors + companies
+    competitors = _dedupe([_normalize_competitor(c) for c in competitors_raw])
+    companies = _dedupe([_normalize_company(c) for c in companies_raw])
+    all_items = _dedupe(competitors + companies)
     rated = [x for x in all_items if x["rating"] is not None]
     avg_rating = round(sum(x["rating"] for x in rated) / len(rated), 1) if rated else None
     high_threat = len([x for x in all_items if x["threat"] == "High"])
@@ -100,13 +119,14 @@ async def competitive_page(request: Request, db: Session = Depends(get_session))
     current_user = await _get_user(request, db)
     return templates.TemplateResponse("competitive.html", {
         "request": request,
-        "competitors": competitors,
-        "companies": companies,
+        "competitors": all_items,
+        "companies": all_items,
         "items": all_items,
-        "count": len(competitors),
-        "company_count": len(companies),
+        "count": len(all_items),
+        "company_count": len(all_items),
         "total_count": len(all_items),
         "avg_rating": avg_rating,
+        "avg_rating_display": f"{avg_rating:.1f}" if avg_rating is not None else None,
         "high_threat_count": high_threat,
         "has_data": len(all_items) > 0,
         "current_user": current_user,
