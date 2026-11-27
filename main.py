@@ -62,8 +62,6 @@ from app.modules.api import data
 from app.modules.api import meta
 from app.core import billing
 from app.modules.workspaces.router import router as workspaces_router
-from app.modules.changelog_service import get_changelog
-from app.modules.changelog_service import get_app_version
 
 load_dotenv()
 UTC = timezone.utc
@@ -716,23 +714,6 @@ def about_page(request: Request):
         "about.html",
         {
             "request": request
-        }
-    )
-
-@app.get("/api/changelog")
-def get_changelog_api():
-    return get_changelog()
-
-@app.get("/changelog", response_class=HTMLResponse)
-def changelog_page(request: Request):
-    data = get_changelog()
-    data["current_version"] = APP_VERSION
-    data["last_updated"] = str(datetime.now().date())
-    return templates.TemplateResponse(
-        "changelog.html",
-        {
-            "request": request,
-            "data": data
         }
     )
 
