@@ -23,7 +23,6 @@ try:
 except Exception:
     HAS_AUTH_USER = False
     AuthUser = None
-
 def _ws_to_dict(ws, members_count=0, members=None):
     return {
         "id": getattr(ws, "id", 0),
@@ -33,7 +32,6 @@ def _ws_to_dict(ws, members_count=0, members=None):
         "members": members or [],
         "member_count": members_count,
     }
-
 def _resolve_user_id(request, current_user):
     if current_user is not None:
         uid = getattr(current_user, "id", None)
@@ -52,7 +50,41 @@ def _resolve_user_id(request, current_user):
     except Exception:
         pass
     return None, None
-
+def _ensure_user_row(db, auth_user):
+    if auth_user is None:
+        return None
+    try:
+        existing = db.get(User, getattr(auth_user, "id", None))
+        if existing:
+            return auth_user
+    except Exception:
+        pass
+    try:
+        shadow = User()
+        shadow.id = getattr(auth_user, "id", None)
+        if hasattr(shadow, "email"):
+            shadow.email = getattr(auth_user, "email", "") or ""
+        if hasattr(shadow, "full_name"):
+            shadow.full_name = getattr(auth_user, "full_name", None) or getattr(auth_user, "email", "")
+        if hasattr(shadow, "hashed_password"):
+            shadow.hashed_password = getattr(auth_user, "hashed_password", "") or ""
+        if hasattr(shadow, "is_active"):
+            shadow.is_active = True
+        if hasattr(shadow, "email_verified"):
+            shadow.email_verified = True
+        if hasattr(shadow, "current_workspace_id"):
+            shadow.current_workspace_id = getattr(auth_user, "current_workspace_id", None)
+        db.add(shadow)
+        db.commit()
+        db.refresh(shadow)
+        return auth_user
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return auth_user
+    return auth_user
 def _get_real_user(db, request, current_user):
     user_id, email = _resolve_user_id(request, current_user)
     if email is None and current_user is not None:
@@ -62,14 +94,14 @@ def _get_real_user(db, request, current_user):
             if user_id is not None:
                 real = db.get(AuthUser, user_id)
                 if real:
-                    return real
+                    return _ensure_user_row(db, real)
         except Exception:
             pass
         try:
             if email:
                 rows = db.exec(select(AuthUser).where(AuthUser.email == email)).all()
                 if rows:
-                    return rows[0]
+                    return _ensure_user_row(db, rows[0])
         except Exception:
             pass
     try:
@@ -87,12 +119,10 @@ def _get_real_user(db, request, current_user):
     except Exception:
         pass
     return None
-
 def _is_json_request(request):
     accept = (request.headers.get("accept", "") or "").lower()
     ctype = (request.headers.get("content-type", "") or "").lower()
     return "application/json" in accept or "application/json" in ctype
-
 async def _get_name(request, form_name):
     if form_name:
         return (form_name or "").strip()
@@ -110,12 +140,10 @@ async def _get_name(request, form_name):
     except Exception:
         pass
     return ""
-
 def _unauthorized(request):
     if _is_json_request(request):
         return JSONResponse({"ok": False, "error": "Session expired. Please logout and login again."}, status_code=401)
     return RedirectResponse("/login?next=/workspaces", status_code=303)
-
 @router.get("", response_class=HTMLResponse)
 @router.get("/", response_class=HTMLResponse)
 async def list_workspaces(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -149,7 +177,6 @@ async def list_workspaces(request: Request, current_user: User = Depends(get_cur
         "request": request, "current_user": current_user, "user": current_user,
         "workspaces": workspaces, "current_workspace_id": current_workspace_id,
     })
-
 @router.post("/create")
 async def create_workspace(request: Request, name: Optional[str] = Form(None), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     name = await _get_name(request, name)
@@ -205,7 +232,6 @@ async def create_workspace(request: Request, name: Optional[str] = Form(None), c
     if is_json:
         return JSONResponse({"ok": True, "workspace": {"id": ws.id, "name": ws.name}})
     return RedirectResponse("/workspaces", status_code=303)
-
 @router.post("/switch")
 async def switch_workspace(request: Request, workspace_id: Optional[int] = Form(None), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     is_json = _is_json_request(request)
@@ -242,7 +268,6 @@ async def switch_workspace(request: Request, workspace_id: Optional[int] = Form(
         logger.exception(f"switch failed: {e}")
         return JSONResponse({"ok": False, "error": str(e)}, status_code=400) if is_json else RedirectResponse("/workspaces?error=Switch+failed", status_code=303)
     return JSONResponse({"ok": True, "workspace_id": workspace_id}) if is_json else RedirectResponse("/workspaces", status_code=303)
-
 @router.get("/{workspace_id}", response_class=HTMLResponse)
 async def workspace_detail(request: Request, workspace_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     ws = None
