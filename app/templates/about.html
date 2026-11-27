@@ -1,33 +1,58 @@
 {% extends "base.html" %}
 {% block content %}
+{% set stats = data.stats if data is defined and data.stats is defined else {} %}
+{% set company = data.company if data is defined and data.company is defined else {} %}
+{% set version = data.current_version if data is defined and data.current_version is defined else '2.6.4' %}
+{% set last_updated = data.last_updated if data is defined and data.last_updated is defined else '' %}
+<title>About EvidLens - Kenya Decision Intelligence | Built in Nyeri, For All 47 Counties</title>
+<meta name="description" content="EvidLens is Kenya's Decision Intelligence Platform. Real prices, demand, competitors and policy across 47 counties. Evidence before opinion. Built in Nyeri.">
+<meta property="og:title" content="About EvidLens - Kenya Decision Intelligence">
+<meta property="og:description" content="Should you start, scale, or stop - and what will it cost you if you're wrong? Evidence before opinion.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://app.evidlens.co.ke/about">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Organization","name":"EvidLens Ltd","url":"https://app.evidlens.co.ke","description":"Kenya Decision Intelligence Platform for farmers, SMEs and enterprises","address":{"@type":"PostalAddress","streetAddress":"Kimathi House, 2nd Floor","addressLocality":"Nyeri","postalCode":"10100","addressCountry":"KE"},"email":"info@evidlens.co.ke","telephone":"+254739758289","foundingLocation":"Nyeri, Kenya","areaServed":"KE"}
+</script>
 <div class="max-w-6xl mx-auto px-4 py-8 lg:py-12">
-  <!-- Hero -->
   <div class="text-center max-w-3xl mx-auto">
-    <p class="text-[11px] font-bold tracking-widest text-[#0d9488]">BUILT IN NYERI • FOR ALL 47 COUNTIES</p>
-    <h1 class="text-[32px] lg:text-[44px] font-extrabold tracking-tight mt-2">About EvidLens</h1>
+    <p class="text-[11px] font-bold tracking-widest text-[#0d9488]">BUILT IN NYERI • FOR ALL 47 COUNTIES • v{{ version }}</p>
+    <h1 class="text-[32px] lg:text-[44px] font-extrabold tracking-tight mt-2 leading-tight">About EvidLens</h1>
     <p class="text-[16px] text-slate-600 mt-4 leading-relaxed">EvidLens is Kenya's Decision Intelligence Platform for farmers, SMEs, and enterprises. We turn fragmented prices, demand, competitors, and policy into one clear answer: <b>should you start, scale, or stop - and what will it cost you if you're wrong?</b></p>
     <div class="flex flex-wrap justify-center gap-3 mt-6">
       <a href="/pricing" class="bg-[#14B8A6] text-white px-6 py-3 rounded-xl font-bold text-[14px]">See Pricing - From KES 500/mo →</a>
       <a href="/ai" class="bg-white border px-6 py-3 rounded-xl font-bold text-[14px]">Try Ask Lens →</a>
+      <a href="/changelog" class="bg-white border px-6 py-3 rounded-xl font-bold text-[14px]">Changelog →</a>
     </div>
-    <p class="text-[12px] text-slate-400 mt-4">No demo data. No fake prices. If we don't have live data for your county, we say so.</p>
+    <p class="text-[12px] text-slate-400 mt-4">No demo data. No fake prices. If we don't have live data for your county, we say so. Last updated: {{ last_updated or '2026-11-27' }}</p>
   </div>
-
-  <!-- Stats -->
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-10">
-    <div class="bg-white border rounded-[20px] p-5 text-center"><p class="text-[28px] font-extrabold">47</p><p class="text-[13px] text-slate-600">Counties covered</p><p class="text-[11px] text-slate-400 mt-1">Plus sub-counties &amp; wards where data exists</p></div>
-    <div class="bg-white border rounded-[20px] p-5 text-center"><p class="text-[28px] font-extrabold">9</p><p class="text-[13px] text-slate-600">Lanes of intelligence</p><p class="text-[11px] text-slate-400 mt-1">Delivered through 12 dashboard modules</p></div>
-    <div class="bg-white border rounded-[20px] p-5 text-center"><p class="text-[28px] font-extrabold">12</p><p class="text-[13px] text-slate-600">Engines on Enterprise</p><p class="text-[11px] text-slate-400 mt-1">FREE gets 6, Starter 8, Pro 11</p></div>
+    <div class="bg-white border rounded-[20px] p-5 text-center"><p class="text-[28px] font-extrabold">{{ stats.counties_covered | default(47) }}</p><p class="text-[13px] text-slate-600">Counties covered</p><p class="text-[11px] text-slate-400 mt-1">Plus sub-counties &amp; wards where data exists</p></div>
+    <div class="bg-white border rounded-[20px] p-5 text-center"><p class="text-[28px] font-extrabold">{{ stats.lanes | default(9) }}</p><p class="text-[13px] text-slate-600">Lanes of intelligence</p><p class="text-[11px] text-slate-400 mt-1">Delivered through {{ stats.modules | default(12) }} dashboard modules</p></div>
+    <div class="bg-white border rounded-[20px] p-5 text-center"><p class="text-[28px] font-extrabold">{{ stats.real_records | default('—') }}</p><p class="text-[13px] text-slate-600">Real records in last 48h</p><p class="text-[11px] text-slate-400 mt-1">Not seeded. Not demo. Live only.</p></div>
     <div class="bg-white border rounded-[20px] p-5 text-center"><p class="text-[28px] font-extrabold">KES 500</p><p class="text-[13px] text-slate-600">Starting price / month</p><p class="text-[11px] text-slate-400 mt-1">Cancel anytime. Pay via M-Pesa.</p></div>
   </div>
-
-  <!-- Mission / Problem -->
+  <div class="flex flex-wrap justify-center gap-2 mt-6 text-[12px] font-semibold">
+    <span class="bg-white border px-3 py-1.5 rounded-full">✓ Live prices labelled Live</span>
+    <span class="bg-white border px-3 py-1.5 rounded-full">✓ Estimates labelled Estimated</span>
+    <span class="bg-white border px-3 py-1.5 rounded-full">✓ No data = we say so</span>
+    <span class="bg-white border px-3 py-1.5 rounded-full">✓ We do not sell your data</span>
+    <span class="bg-white border px-3 py-1.5 rounded-full">✓ KES, M-Pesa, Swahili-friendly</span>
+  </div>
   <div class="grid md:grid-cols-2 gap-6 mt-8">
     <div class="bg-white border rounded-[20px] p-6 lg:p-8">
       <h2 class="text-[20px] font-bold">Our Mission</h2>
       <p class="text-[14px] text-slate-600 mt-2 leading-relaxed">To remove guesswork from business in Kenya. A farmer in Nyeri, a shop owner in Kisumu, and a manufacturer in Nairobi should all get the same quality of market intelligence that big corporates pay consultants millions for - in minutes, in KES, for their county.</p>
       <p class="text-[14px] text-slate-600 mt-3 leading-relaxed">That means one thing above everything else: <b class="text-slate-900">evidence before opinion.</b> If the data says your idea is weak in your ward, we tell you. If it says it's strong but only at a different price point, we tell you that too. A "No-Go" that saves you KES 500,000 is worth more than a flattering "Go" that costs you KES 500,000.</p>
       <p class="text-[14px] text-slate-600 mt-3 leading-relaxed">We started in Nyeri because that's where the problem is most visible: smart people, good products, terrible information. A dairy farmer doesn't fail because they can't farm. They fail because they didn't know the price in the next town, or that three other cooperatives already supply the same buyer.</p>
+      <div class="mt-5 border-t pt-4">
+        <p class="text-[12px] font-bold text-slate-900">OUR PRINCIPLES</p>
+        <ul class="text-[13px] text-slate-600 mt-2 space-y-1">
+          <li>1. Evidence before opinion - every verdict shows its sources</li>
+          <li>2. County before country - national averages hide the truth</li>
+          <li>3. Honest uncertainty - if we don't know, we say we don't know</li>
+          <li>4. Action before dashboard - a decision you can act on today</li>
+        </ul>
+      </div>
     </div>
     <div class="bg-[#0B1220] text-white rounded-[20px] p-6 lg:p-8">
       <h2 class="text-[20px] font-bold">The problem we solve</h2>
@@ -38,10 +63,12 @@
         <li>• <b class="text-white">Policy changes late</b> - a new county levy, a KRA rule, a KEBS standard hits and you hear about it from a fine, not from a notice.</li>
         <li>• <b class="text-white">Advice is generic</b> - most "business advice" in Kenya is written for Nairobi, or for America. It doesn't know your county, your budget, or your ward.</li>
       </ul>
+      <div class="mt-5 bg-white/10 rounded-xl p-4">
+        <p class="text-[12px] font-bold">THE COST OF GUESSING</p>
+        <p class="text-[13px] text-slate-300 mt-1">One wrong launch - wrong product, wrong ward, wrong price - can cost KES 100,000 to KES 500,000 in stock, rent, and lost time. EvidLens exists to make that mistake visible <i>before</i> you spend the money, not after.</p>
+      </div>
     </div>
   </div>
-
-  <!-- A real example -->
   <div class="bg-white border rounded-[20px] p-6 lg:p-8 mt-6">
     <h2 class="text-[20px] font-bold">What this looks like in real life</h2>
     <p class="text-[14px] text-slate-600 mt-2 leading-relaxed"><b class="text-slate-900">Example:</b> A farmer in Mathira, Nyeri, has KES 400,000 and is deciding between expanding dairy or starting poultry.</p>
@@ -53,11 +80,24 @@
     </div>
     <p class="text-[13px] text-slate-500 mt-4">That is the whole product. Not a dashboard to stare at. A decision, with evidence, that you can act on today.</p>
   </div>
-
-  <!-- 9 Lanes - matches rest of site -->
+  <div class="bg-white border rounded-[20px] p-6 lg:p-8 mt-6">
+    <h2 class="text-[20px] font-bold">How we build an answer - methodology</h2>
+    <p class="text-[14px] text-slate-600 mt-2">Every Ask Lens answer follows the same pipeline. No black box.</p>
+    <div class="grid md:grid-cols-3 gap-4 mt-5 text-[13px]">
+      <div class="border rounded-xl p-4"><p class="font-bold">1. Collect - Live only</p><p class="text-slate-600 mt-1">Prices from KPIN and market sources, businesses, news, policy, and consumer signals. Collected daily at 03:00 EAT. No seeding, no demo prices.</p></div>
+      <div class="border rounded-xl p-4"><p class="font-bold">2. Label - Live / Recent / Estimated</p><p class="text-slate-600 mt-1"><b>Live:</b> last 48h. <b>Recent:</b> last 30 days. <b>Estimated:</b> modelled from nearest county + last known price, clearly marked. If we have nothing, we show a gap, not a guess.</p></div>
+      <div class="border rounded-xl p-4"><p class="font-bold">3. Decide - Go / No-Go</p><p class="text-slate-600 mt-1">Market size, margin, competition, risk, and policy are scored per county, not nationally. The verdict shows what would change it. If a price drop of 10% flips the answer, we tell you.</p></div>
+    </div>
+    <div class="mt-4 bg-slate-50 rounded-xl p-4 text-[13px] text-slate-600 leading-relaxed">
+      <p class="font-bold text-slate-900">Data sources</p>
+      <p class="mt-1">KPIN market prices, public business listings, KNBS / CBK / KRA public releases, county notices, news, and consumer signals. We do not scrape private WhatsApp groups, we do not buy personal data, and we do not present AI guesses as prices.</p>
+      <p class="font-bold text-slate-900 mt-3">Limitations - read this</p>
+      <p class="mt-1">Prices move daily. A price from yesterday is not a guarantee for tomorrow. Policy changes can be announced late. Estimates are estimates. Always verify final supplier price, lender terms, and county levies before you commit money. EvidLens is decision intelligence, not legal, tax, or financial advice.</p>
+    </div>
+  </div>
   <div class="mt-10">
     <h2 class="text-[24px] font-bold text-center">The 9 Lanes</h2>
-    <p class="text-[14px] text-slate-600 text-center mt-1 max-w-2xl mx-auto">Every Ask Lens answer pulls from these 9 lanes. Not guesswork - data. In the dashboard they appear as 12 modules, because some lanes split into two tools (for example, Price Oracle and Demand Radar are both part of the Market lane, but you use them differently).</p>
+    <p class="text-[14px] text-slate-600 text-center mt-1 max-w-2xl mx-auto">Every Ask Lens answer pulls from these 9 lanes. Not guesswork - data. In the dashboard they appear as 12 modules, because some lanes split into two tools.</p>
     <div class="grid md:grid-cols-3 gap-4 mt-6">
       <div class="bg-white border rounded-[20px] p-5"><p class="text-[20px]">🏷️</p><h3 class="font-bold mt-2">1. Price Oracle</h3><p class="text-[13px] text-slate-600 mt-1">Live market prices by product, market, county. KES, per unit. What you should charge, what suppliers will charge you, and how prices moved in the last 48 hours.</p><p class="text-[12px] text-teal-700 font-semibold mt-2">Answers: "What should I charge?"</p></div>
       <div class="bg-white border rounded-[20px] p-5"><p class="text-[20px]">📈</p><h3 class="font-bold mt-2">2. Demand Radar</h3><p class="text-[13px] text-slate-600 mt-1">What people are searching, buying, and asking for - by county &amp; ward. Not national averages. Your ward.</p><p class="text-[12px] text-teal-700 font-semibold mt-2">Answers: "Will anyone buy this here?"</p></div>
@@ -70,8 +110,6 @@
       <div class="bg-white border rounded-[20px] p-5"><p class="text-[20px]">🌍</p><h3 class="font-bold mt-2">9. Export Navigator</h3><p class="text-[13px] text-slate-600 mt-1">What Kenya can sell abroad, where, at what price, and what paperwork you need. Export is not only for big companies.</p><p class="text-[12px] text-teal-700 font-semibold mt-2">Answers: "Can I sell this abroad?"</p></div>
     </div>
   </div>
-
-  <!-- How it works - deeper -->
   <div class="bg-white border rounded-[20px] p-6 lg:p-8 mt-8">
     <h2 class="text-[20px] font-bold">How EvidLens works</h2>
     <div class="grid md:grid-cols-4 gap-4 mt-4 text-[14px]">
@@ -80,13 +118,7 @@
       <div><p class="font-bold">3. Decide</p><p class="text-slate-600 mt-1">Get Go / No-Go, market size, pricing, competitors, financials, and risks. Every number is labelled: Live, Recent, or Estimated.</p></div>
       <div><p class="font-bold">4. Act</p><p class="text-slate-600 mt-1">Get a 30-day action plan, alerts when prices or policy change, and a board-ready report if you need a loan or investor.</p></div>
     </div>
-    <div class="mt-6 bg-slate-50 rounded-xl p-4 text-[13px] text-slate-600 leading-relaxed">
-      <p class="font-bold text-slate-900">How we handle missing data</p>
-      <p class="mt-1">If we don't have live prices for your product in your county in the last 48 hours, we tell you. We will show you the nearest county, the last known price, and mark it as Estimated - we will not invent a confident-looking price to fill a gap. That is the difference between intelligence and a pretty dashboard.</p>
-    </div>
   </div>
-
-  <!-- Who it's for + who it's NOT for -->
   <div class="grid md:grid-cols-3 gap-4 mt-6">
     <div class="bg-white border rounded-[20px] p-6"><h3 class="font-bold">🌾 Farmers &amp; Agribusiness</h3><p class="text-[13px] text-slate-600 mt-2">What to plant, where to sell, what price to ask. Avocado, dairy, poultry, maize, horticulture. The question is never just "can I grow it" - it is "can I sell it, at a profit, in my county."</p></div>
     <div class="bg-white border rounded-[20px] p-6"><h3 class="font-bold">🏪 SMEs &amp; Traders</h3><p class="text-[13px] text-slate-600 mt-2">Where to open, what to stock, how to price, who your competitors are. Especially before you sign a lease or take stock on credit.</p></div>
@@ -96,8 +128,6 @@
     <h3 class="font-bold">Who EvidLens is NOT for</h3>
     <p class="text-[13px] text-slate-600 mt-2 leading-relaxed">If you want someone to tell you your idea is great no matter what, we are not that. If you want a get-rich-quick scheme, a trading signal, or a guaranteed loan, we don't do that. EvidLens is for people who would rather hear a hard truth early than an expensive truth late.</p>
   </div>
-
-  <!-- Pricing in-page -->
   <div class="bg-white border rounded-[20px] p-6 lg:p-8 mt-6">
     <h2 class="text-[20px] font-bold">Pricing - simple, in KES, via M-Pesa</h2>
     <div class="grid md:grid-cols-3 gap-4 mt-4 text-[13px]">
@@ -105,10 +135,28 @@
       <div class="border-2 border-[#14B8A6] rounded-xl p-4"><p class="font-bold">Pro - KES 1,500/mo <span class="text-[11px] bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full">MOST POPULAR</span></p><p class="text-slate-600 mt-1">KES 15,000/year. 11 engines. 100 analyses, 30 reports / month. For growing businesses that decide weekly.</p></div>
       <div class="border rounded-xl p-4"><p class="font-bold">Enterprise - KES 5,000/mo</p><p class="text-slate-600 mt-1">KES 50,000/year. All 12 engines. Unlimited analyses &amp; reports. 5 seats. For teams, NGOs, and county expansion.</p></div>
     </div>
-    <p class="text-[12px] text-slate-500 mt-3">FREE plan: 6 engines, 5 analyses, 1 report. No card needed. Full pricing on <a href="/pricing" class="text-[#0d9488] font-semibold">/pricing</a>.</p>
+    <p class="text-[12px] text-slate-500 mt-3">FREE plan: 6 engines, 5 analyses, 1 report. No card needed. Full pricing on <a href="/pricing" class="text-[#0d9488] font-semibold">/pricing</a>. Prices include VAT where applicable. See Terms for refunds.</p>
   </div>
-
-  <!-- First 30 days -->
+  <div class="grid md:grid-cols-2 gap-6 mt-6">
+    <div class="bg-white border rounded-[20px] p-6">
+      <h2 class="font-bold">Security &amp; Privacy</h2>
+      <ul class="text-[13px] text-slate-600 mt-2 space-y-2">
+        <li>• Your queries and reports are private to your account. We do not share them with other users.</li>
+        <li>• We do not sell personal data. See <a href="/privacy" class="text-[#0d9488] font-semibold">Privacy Policy</a>.</li>
+        <li>• 2FA available in Settings &gt; Security. Use it if you store business plans in reports.</li>
+        <li>• To delete your account, email <a href="mailto:support@evidlens.co.ke" class="text-[#0d9488] font-semibold">support@evidlens.co.ke</a> from your registered email.</li>
+      </ul>
+    </div>
+    <div class="bg-white border rounded-[20px] p-6">
+      <h2 class="font-bold">Roadmap - what we are building next</h2>
+      <ul class="text-[13px] text-slate-600 mt-2 space-y-2">
+        <li>• Ward-level prices where data exists - not just county averages</li>
+        <li>• Price alerts - get notified when your product moves 10% in your county</li>
+        <li>• More funding sources - SACCOs, county funds, and donor grants</li>
+      </ul>
+      <p class="text-[12px] text-slate-500 mt-3">Roadmap is not a promise. See <a href="/changelog" class="text-[#0d9488] font-semibold">Changelog</a> for what actually shipped.</p>
+    </div>
+  </div>
   <div class="bg-white border rounded-[20px] p-6 lg:p-8 mt-6">
     <h2 class="text-[20px] font-bold">Your first 30 days</h2>
     <div class="grid md:grid-cols-3 gap-4 mt-4 text-[13px]">
@@ -117,8 +165,6 @@
       <div><p class="font-bold">Week 3-4 - One plan</p><p class="text-slate-600 mt-1">Turn the answer into a 30-day plan and a report. If you need funding, that report is what a SACCO, bank, or investor actually wants to see.</p></div>
     </div>
   </div>
-
-  <!-- FAQ -->
   <div class="bg-white border rounded-[20px] p-6 lg:p-8 mt-6">
     <h2 class="text-[20px] font-bold">Questions people actually ask</h2>
     <div class="space-y-4 mt-4 text-[13px]">
@@ -129,14 +175,14 @@
       <div><p class="font-bold">Do you sell my data?</p><p class="text-slate-600 mt-1">No. Your queries, your business ideas, and your reports are yours. See <a href="/privacy" class="text-[#0d9488] font-semibold">Privacy Policy</a>.</p></div>
     </div>
   </div>
-
-  <!-- Built in Kenya -->
   <div class="grid md:grid-cols-2 gap-6 mt-6">
     <div class="bg-teal-50 border border-teal-200 rounded-[20px] p-6">
       <h2 class="font-bold">Built in Kenya</h2>
       <p class="text-[14px] text-slate-600 mt-2 leading-relaxed">Founded in Nyeri. Powered by real-time M-Pesa, Groq AI, and live data from 47 counties. Prices in KES. Counties, sub-counties, and wards - not US states. Swahili-friendly. Built for low-bandwidth phones, not just laptops.</p>
-      <p class="text-[13px] mt-3"><b>Office:</b> EvidLens Ltd, Kimathi House, 2nd Floor, Nyeri, 10100, Kenya</p>
+      <p class="text-[13px] mt-3"><b>Company:</b> {{ company.name | default('EvidLens Ltd') }}</p>
+      <p class="text-[13px]"><b>Office:</b> {{ company.address | default('Kimathi House, 2nd Floor, Nyeri, 10100, Kenya') }}</p>
       <p class="text-[13px]"><b>Contact:</b> <a href="mailto:info@evidlens.co.ke" class="text-[#0d9488] font-semibold">info@evidlens.co.ke</a> • <a href="tel:+254739758289" class="font-semibold">+254 739 758 289</a></p>
+      <p class="text-[13px]"><b>Version:</b> v{{ version }} • <a href="/changelog" class="text-[#0d9488] font-semibold">See what changed</a></p>
     </div>
     <div class="bg-white border rounded-[20px] p-6">
       <h2 class="font-bold">Our promise</h2>
@@ -150,7 +196,6 @@
       <div class="flex gap-3 mt-5"><a href="/pricing" class="bg-[#0B1220] text-white px-5 py-2.5 rounded-lg text-[13px] font-bold">See Pricing</a><a href="/contact" class="bg-white border px-5 py-2.5 rounded-lg text-[13px] font-bold">Contact Us</a></div>
     </div>
   </div>
-
-  <p class="text-center text-[12px] text-slate-400 mt-8">© 2026 EvidLens Ltd • <a href="/privacy" class="underline">Privacy</a> • <a href="/terms" class="underline">Terms</a> • <a href="/contact" class="underline">Contact</a></p>
+  <p class="text-center text-[12px] text-slate-400 mt-8">© 2026 EvidLens Ltd • v{{ version }} • <a href="/privacy" class="underline">Privacy</a> • <a href="/terms" class="underline">Terms</a> • <a href="/contact" class="underline">Contact</a> • <a href="/changelog" class="underline">Changelog</a></p>
 </div>
 {% endblock %}
