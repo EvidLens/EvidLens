@@ -579,3 +579,24 @@ class DetailedAnalysisRequest(BaseModel):
     def strip_text(cls, v: str) -> str:
         return v.strip() if isinstance(v, str) else v
     model_config = {"extra": "allow"}
+
+class Workspace(SQLModel, table=True):
+    __tablename__ = "workspaces"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(max_length=80)
+    owner_id: int = Field(index=True)
+    plan: str = Field(default="Free", max_length=20)
+    credits: int = Field(default=0)
+    created_at: datetime = Field(default_factory=utc_now, sa_column_kwargs={"server_default": func.now()})
+
+class WorkspaceMember(SQLModel, table=True):
+    __tablename__ = "workspace_members"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    workspace_id: int = Field(index=True)
+    user_id: int = Field(index=True)
+    role: str = Field(default="member", max_length=20)
+    full_name: Optional[str] = Field(default=None, max_length=150)
+    email: Optional[str] = Field(default=None, max_length=255)
+    created_at: datetime = Field(default_factory=utc_now, sa_column_kwargs={"server_default": func.now()})
