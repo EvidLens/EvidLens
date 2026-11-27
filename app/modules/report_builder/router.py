@@ -99,14 +99,33 @@ class GenerateReportRequest(BaseModel):
         return "Agriculture"
 
     def get_report_type_str(self):
-        u = (self.report_type or "").upper()
-        if "EXEC" in u or "BRIEF" in u or "BUSINESS_BRIEF" in u:
+        # Portfolio Quick Reference -> Router Logic
+        # Priority: explicit report_type (if not default) > query/title/sector text > default
+        u = (self.report_type or "").upper().strip()
+        explicit = {
+            "EXEC_BRIEF": "EXEC_BRIEF", "EXEC": "EXEC_BRIEF", "BRIEF": "EXEC_BRIEF",
+            "BUSINESS_BRIEF": "EXEC_BRIEF", "BUSINESS_BRIEFS": "EXEC_BRIEF",
+            "CONSUMER_ANALYSIS": "CONSUMER_ANALYSIS", "CONSUMER": "CONSUMER_ANALYSIS",
+            "CONSUMER_INSIGHTS": "CONSUMER_ANALYSIS",
+            "INDUSTRY_OUTLOOK": "INDUSTRY_OUTLOOK", "INDUSTRY": "INDUSTRY_OUTLOOK",
+            "SECTOR_PULSE": "SECTOR_PULSE", "PULSE": "SECTOR_PULSE",
+            "PRODUCT_WATCH": "PRODUCT_WATCH", "PRODUCT": "PRODUCT_WATCH",
+            "INVESTOR_PITCH": "INVESTOR_PITCH", "INVESTOR": "INVESTOR_PITCH",
+            "KRA_TAX": "KRA_TAX", "KRA": "KRA_TAX", "TAX": "KRA_TAX",
+            "BUSINESS_PLAN": "BUSINESS_PLAN",
+            "MARKET_FEASIBILITY": "MARKET_FEASIBILITY",
+        }
+        # Only treat as explicit if user actually picked it - if it's the default, fall through to text routing
+        if u in explicit and u != "MARKET_FEASIBILITY":
+            return explicit[u]
+        # Also handle legacy substrings when report_type is a long label e.g. "Executive Intelligence Brief"
+        if "EXEC" in u or "BRIEF" in u:
             return "EXEC_BRIEF"
         if "CONSUMER" in u or "INSIGHT" in u:
             return "CONSUMER_ANALYSIS"
         if "INDUSTRY" in u or "OUTLOOK" in u:
             return "INDUSTRY_OUTLOOK"
-        if "SECTOR" in u or "PULSE" in u:
+        if "PULSE" in u:
             return "SECTOR_PULSE"
         if "PRODUCT" in u or "WATCH" in u:
             return "PRODUCT_WATCH"
@@ -114,8 +133,40 @@ class GenerateReportRequest(BaseModel):
             return "INVESTOR_PITCH"
         if "KRA" in u or "TAX" in u:
             return "KRA_TAX"
-        if "BUSINESS" in u or "BANK" in u or "LOAN" in u:
+        if "BUSINESS_PLAN" in u or "BANK" in u or "LOAN" in u:
             return "BUSINESS_PLAN"
+
+        # Text routing - from query + title + sector (Section A/B/C of Portfolio Sheet)
+        s = f"{self.query or ''} {self.title or ''} {self.sector or ''}".lower()
+
+        # C. Audience wins first
+        if any(k in s for k in ["ceo", "board", "c-suite", "executive", "business brief", "brief"]):
+            return "EXEC_BRIEF"
+        if any(k in s for k in ["sector pulse", "pulse", "bulletin", "quarterly", "periodic", "monitoring"]):
+            return "SECTOR_PULSE"
+
+        # B. Series
+        if "industry outlook" in s or "annual industry" in s:
+            return "INDUSTRY_OUTLOOK"
+        if "consumer insights" in s or "consumer" in s or "customer" in s or "brand awareness" in s or "satisfaction" in s or "loyalty" in s or "segmentation" in s or "journey" in s or "behaviour" in s or "behavior" in s:
+            return "CONSUMER_ANALYSIS"
+        if "product watch" in s or "product" in s or "packaging" in s or "lifecycle" in s:
+            return "PRODUCT_WATCH"
+        if "market intelligence" in s:
+            return "MARKET_FEASIBILITY"
+
+        # A. Research Type - Market & Industry
+        if any(k in s for k in ["industry", "sector performance", "market landscape", "market entry", "market size", "market dynamics", "market share", "competitive intelligence", "supply", "demand", "emerging market"]):
+            return "INDUSTRY_OUTLOOK"
+
+        # A. Corporate Strategy
+        if "kra" in s or "tax" in s or "etim" in s:
+            return "KRA_TAX"
+        if "investor" in s or "investment" in s:
+            return "INVESTOR_PITCH"
+        if "business plan" in s or "bank" in s or "loan" in s or "feasibility" in s or "swot" in s or "benchmark" in s or "strategic" in s:
+            return "BUSINESS_PLAN"
+
         return "MARKET_FEASIBILITY"
 
     def get_format_str(self):
@@ -383,13 +434,13 @@ def cleanup_stuck(request: Request, db: Session = Depends(get_db), current_user=
 @router.get("/templates")
 def get_templates():
     return {"templates": [
-        {"type": "EXEC_BRIEF", "name": "Executive Intelligence Brief", "series": "EvidLens Business Briefs", "pages": "4-8", "premium": False, "audience": "C-Suite / Board"},
-        {"type": "MARKET_FEASIBILITY", "name": "Market Feasibility Report - 12 Engines", "series": "EvidLens Market Intelligence", "pages": "10-15", "premium": False, "audience": "Strategy / Investment teams"},
-        {"type": "INDUSTRY_OUTLOOK", "name": "Industry Outlook", "series": "EvidLens Industry Outlook", "pages": "40-120", "premium": True, "audience": "Strategy / Investment teams"},
-        {"type": "SECTOR_PULSE", "name": "Sector Pulse", "series": "EvidLens Sector Pulse", "pages": "8-15", "premium": False, "audience": "Periodic monitoring"},
-        {"type": "CONSUMER_ANALYSIS", "name": "Consumer Insights Report", "series": "EvidLens Consumer Insights", "pages": "20-40", "premium": True, "audience": "Strategy / Marketing"},
-        {"type": "PRODUCT_WATCH", "name": "Product Watch", "series": "EvidLens Product Watch", "pages": "15-25", "premium": True, "audience": "Product teams"},
-        {"type": "INVESTOR_PITCH", "name": "Investor Pitch Deck", "series": "EvidLens Business Briefs", "pages": "10-15", "premium": True, "audience": "C-Suite / Investors"},
-        {"type": "BUSINESS_PLAN", "name": "Bank Loan Pack", "series": "EvidLens Business Briefs", "pages": "15-25", "premium": True, "audience": "SME / Bank"},
-        {"type": "KRA_TAX", "name": "KRA Tax Report", "series": "EvidLens Business Briefs", "pages": "8-12", "premium": True, "audience": "Finance / Compliance"},
+        {"type": "EXEC_BRIEF", "name": "Executive Intelligence Brief", "series": "EvidLens Business Briefs", "pages": "4-8", "premium": False, "audience": "C-Suite / Board", "template": "Executive Brief"},
+        {"type": "MARKET_FEASIBILITY", "name": "Market Intelligence / Comprehensive Research Report", "series": "EvidLens Market Intelligence", "pages": "40-120", "premium": False, "audience": "Strategy / Investment teams", "template": "Comprehensive - 16 chapters"},
+        {"type": "INDUSTRY_OUTLOOK", "name": "Industry Outlook / Annual Industry Report", "series": "EvidLens Industry Outlook", "pages": "40-120", "premium": True, "audience": "Strategy / Investment / Public", "template": "Template 04 - 14 chapters"},
+        {"type": "SECTOR_PULSE", "name": "Sector Pulse / Market Intelligence Bulletin", "series": "EvidLens Sector Pulse", "pages": "8-15", "premium": False, "audience": "Periodic monitoring", "template": "Short Industry Outlook"},
+        {"type": "CONSUMER_ANALYSIS", "name": "Consumer Insights Report", "series": "EvidLens Consumer Insights", "pages": "20-60", "premium": True, "audience": "Marketing / Product / Strategy", "template": "Template 05 - 9 chapters"},
+        {"type": "PRODUCT_WATCH", "name": "Product Intelligence Report", "series": "EvidLens Product Watch", "pages": "15-40", "premium": True, "audience": "Product / Brand", "template": "Product-focused Comprehensive"},
+        {"type": "INVESTOR_PITCH", "name": "Investment Opportunity Report", "series": "EvidLens Market Intelligence", "pages": "15-30", "premium": True, "audience": "Investors", "template": "Comprehensive - Investment"},
+        {"type": "BUSINESS_PLAN", "name": "Business Feasibility / Business Plan - Bank Loan Pack", "series": "EvidLens Market Intelligence", "pages": "20-40", "premium": True, "audience": "Business Owner / Bank", "template": "Comprehensive - Business"},
+        {"type": "KRA_TAX", "name": "KRA Tax / Compliance Report", "series": "EvidLens Market Intelligence", "pages": "10-20", "premium": True, "audience": "Business Owner / Accountant", "template": "Comprehensive - Tax"},
     ]}
