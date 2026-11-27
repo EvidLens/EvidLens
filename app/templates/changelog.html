@@ -17,12 +17,10 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
       <span class="text-xs bg-[#14B8A6] px-3 py-1 rounded-full font-bold" id="current-version-badge">v{{ data.current_version | default('1.2.0') }}</span>
     </div>
   </header>
-
   <div class="max-w-4xl mx-auto p-6">
     <div class="card">
       <h1 class="text-3xl font-bold text-[#0A1F44]">Changelog</h1>
       <p class="text-gray-500 mb-6">New features, improvements, and bug fixes for EvidLens. Updated automatically on every deploy.</p>
-
       <div id="changelog-list">
         {% if data.changelog | default([]) | length > 0 %}
           {% for release in data.changelog %}
@@ -35,7 +33,7 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
             </div>
             {% if release.summary %}<p class="text-sm text-gray-600 mb-2">{{ release.summary }}</p>{% endif %}
             <ul class="space-y-2 text-gray-700">
-              {% for item in release.items | default([]) %}
+              {% for item in release.changes | default([]) %}
               <li>
                 {% if item.type == 'added' %}✨ <b>Added:</b>
                 {% elif item.type == 'fixed' %}🐛 <b>Fixed:</b>
@@ -55,16 +53,13 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
           </div>
         {% endif %}
       </div>
-
       <p class="text-[11px] text-gray-400 mt-6">Last updated: {{ data.last_updated | default('') }} • Source: backend /api/changelog</p>
     </div>
   </div>
-
 <script>
 async function loadChangelogFromApi(){
   const list = document.getElementById('changelog-list');
   if(!list) return;
-  // If server already rendered entries, do nothing
   if(list.querySelector('h2')) return;
   try{
     const res = await fetch('/api/changelog');
@@ -80,7 +75,7 @@ async function loadChangelogFromApi(){
       const div = document.createElement('div');
       div.className = 'border-l-4 pl-5 py-4 mb-6';
       div.style.borderColor = idx === 0 ? '#14B8A6' : '#D1D5DB';
-      const itemsHtml = (release.items || []).map(item => {
+      const itemsHtml = (release.changes || []).map(item => {
         const icon = item.type === 'added' ? '✨ <b>Added:</b>' : item.type === 'fixed' ? '🐛 <b>Fixed:</b>' : item.type === 'improved' ? '⚡ <b>Improved:</b>' : item.type === 'launch' ? '🚀 <b>Launch:</b>' : '• <b>Update:</b>';
         return `<li>${icon} ${item.text || item}</li>`;
       }).join('');
