@@ -399,14 +399,17 @@ def fix_live_tables():
 def fix_workspace_fks():
     try:
         with engine.connect() as conn:
-            rows = conn.execute(text(
-                "SELECT conname, conrelid::regclass::text AS tbl, a.attname AS col "
+            all_rows = conn.execute(text(
+                "SELECT conname, conrelid::regclass::text AS tbl, a.attname AS col, confrelid::regclass::text AS ref_tbl "
                 "FROM pg_constraint c "
                 "JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey) "
-                "WHERE c.contype = 'f' AND c.confrelid = 'user'::regclass "
+                "WHERE c.contype = 'f' "
                 "AND conrelid::regclass::text ILIKE '%workspace%'"
             )).fetchall()
-            for conname, tbl, col in rows:
+            for conname, tbl, col, ref_tbl in all_rows:
+                print(f"Workspace FK found: {tbl}.{conname} ({col}) -> {ref_tbl}")
+            rows = [r for r in all_rows if r[3] == "user"]
+            for conname, tbl, col, ref_tbl in rows:
                 ref = "workspaces" if col == "workspace_id" else "auth_user"
                 print(f"Fixing FK {tbl}.{conname} ({col}) -> {ref}(id)")
                 try:
@@ -421,8 +424,10 @@ def fix_workspace_fks():
                     conn.rollback()
             if rows:
                 print(f"✓ WORKSPACE FKs FIXED: {len(rows)}")
+            elif all_rows:
+                print("✓ WORKSPACE FKs: already pointing to auth_user, nothing to fix")
             else:
-                print("✓ WORKSPACE FKs: no FKs pointing to user")
+                print("✓ WORKSPACE FKs: no workspace FKs found at all - table may not exist yet")
     except Exception as e:
         print(f"WORKSPACE FK error: {e}")
 def force_create_tables():
