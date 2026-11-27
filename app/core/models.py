@@ -8,6 +8,9 @@ from enum import Enum
 
 UTC = timezone.utc
 
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
 ALL_MODULES = [
     "Competitive Engine",
     "Price Oracle",
@@ -120,13 +123,25 @@ class KenyaLensBusiness(SQLModel, table=True):
     lng: float = 0
 
 class Workspace(SQLModel, table=True):
-    __tablename__ = "workspace"
+    __tablename__ = "workspaces"
     __table_args__ = {"extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
-    name: str
-    owner_id: int = Field(foreign_key="user.id")
+    name: str = Field(max_length=80)
+    owner_id: int = Field(foreign_key="user.id", index=True)
+    plan: str = Field(default="Free", max_length=20)
     credits: int = Field(default=0)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(default_factory=utc_now, sa_column_kwargs={"server_default": func.now()})
+
+class WorkspaceMember(SQLModel, table=True):
+    __tablename__ = "workspace_members"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    workspace_id: int = Field(foreign_key="workspaces.id", index=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    role: str = Field(default="member", max_length=20)
+    full_name: Optional[str] = Field(default=None, max_length=150)
+    email: Optional[str] = Field(default=None, max_length=255)
+    created_at: datetime = Field(default_factory=utc_now, sa_column_kwargs={"server_default": func.now()})
 
 class User(SQLModel, table=True):
     __tablename__ = "user"
@@ -140,7 +155,7 @@ class User(SQLModel, table=True):
     sector: Optional[str] = None
     credits: int = Field(default=0)
     tenant_id: Optional[str] = None
-    current_workspace_id: Optional[int] = Field(default=None, foreign_key="workspace.id")
+    current_workspace_id: Optional[int] = Field(default=None, foreign_key="workspaces.id")
     reset_token: Optional[str] = None
     reset_token_expires: Optional[datetime] = None
     consent_at: Optional[datetime] = None
@@ -579,24 +594,3 @@ class DetailedAnalysisRequest(BaseModel):
     def strip_text(cls, v: str) -> str:
         return v.strip() if isinstance(v, str) else v
     model_config = {"extra": "allow"}
-
-class Workspace(SQLModel, table=True):
-    __tablename__ = "workspaces"
-    __table_args__ = {"extend_existing": True}
-    id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(max_length=80)
-    owner_id: int = Field(index=True)
-    plan: str = Field(default="Free", max_length=20)
-    credits: int = Field(default=0)
-    created_at: datetime = Field(default_factory=utc_now, sa_column_kwargs={"server_default": func.now()})
-
-class WorkspaceMember(SQLModel, table=True):
-    __tablename__ = "workspace_members"
-    __table_args__ = {"extend_existing": True}
-    id: Optional[int] = Field(default=None, primary_key=True)
-    workspace_id: int = Field(index=True)
-    user_id: int = Field(index=True)
-    role: str = Field(default="member", max_length=20)
-    full_name: Optional[str] = Field(default=None, max_length=150)
-    email: Optional[str] = Field(default=None, max_length=255)
-    created_at: datetime = Field(default_factory=utc_now, sa_column_kwargs={"server_default": func.now()})
