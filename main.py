@@ -717,6 +717,7 @@ templates = Jinja2Templates(
     directory="app/templates",
     auto_reload=True
 )
+app.include_router(workspaces_router)
 app.include_router(analysis_router)
 app.include_router(analysis_api_router)
 app.include_router(pages_router)
@@ -741,7 +742,6 @@ app.include_router(storage_router)
 app.include_router(billing.router)
 app.include_router(data.router)
 app.include_router(meta.router)
-app.include_router(workspaces_router)
 @app.get("/privacy", response_class=HTMLResponse)
 def privacy_page(request: Request):
     return templates.TemplateResponse(
