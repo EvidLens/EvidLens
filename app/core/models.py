@@ -95,16 +95,18 @@ class Funder(SQLModel, table=True):
     __tablename__ = "funder"
     __table_args__ = {"extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
-    name: str
-    type: str
-    sector: str
-    county: str
-    rating: int = 0
-    min_amount: int = 0
-    max_amount: int = 0
-    interest_rate: float = 0
+    name: str = ""
+    type: str = ""
+    sector: str = ""
+    county: str = ""
+    rating: Optional[int] = None
+    min_amount: Optional[int] = None
+    max_amount: Optional[int] = None
+    interest_rate: Optional[float] = None
     requirements: str = ""
     apply_link: str = ""
+    source_url: Optional[str] = None
+    last_verified_at: Optional[datetime] = None
 
 class KenyaLensBusiness(SQLModel, table=True):
     __tablename__ = "kenyalens_business"
@@ -295,6 +297,8 @@ class MarketMetric(SQLModel, table=True):
     company_name: Optional[str] = None
     avg_price_kes: Optional[float] = None
     demand_score: Optional[float] = None
+    source: Optional[str] = None
+    source_url: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
@@ -441,7 +445,9 @@ class PriceData(SQLModel, table=True):
     product_name: str = ""
     county: str = ""
     sector: str = ""
-    price: float = 0
+    price: Optional[float] = None
+    source_url: Optional[str] = None
+    source_name: Optional[str] = None
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class ExportOpportunity(SQLModel, table=True):
@@ -451,7 +457,13 @@ class ExportOpportunity(SQLModel, table=True):
     tenant_id: Optional[str] = Field(index=True, default=None)
     country: str = ""
     product: str = ""
-    opportunity_score: float = 0
+    opportunity_score: Optional[float] = None
+    destination: Optional[str] = None
+    county: Optional[str] = None
+    description: Optional[str] = None
+    source_url: Optional[str] = None
+    source_name: Optional[str] = None
+    last_verified_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class MarketSearch(SQLModel, table=True):
