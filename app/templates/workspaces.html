@@ -103,6 +103,24 @@
   var c=document.getElementById('closeNewWs'); if(c) c.addEventListener('click', close);
   if(modal) modal.addEventListener('click', function(e){ if(e.target===modal) close(); });
   document.addEventListener('keydown', function(e){ if(e.key==='Escape') close(); });
+  async function postForm(url, fd){
+    var res = await fetch(url, {method: 'POST', body: fd, credentials: 'include', redirect: 'manual', headers: {'Accept': 'application/json'}});
+    if(res.type === 'opaqueredirect' || res.status === 302 || res.status === 303){
+      window.location.href = '/login?next=/workspaces';
+      throw new Error('Session expired. Please login again.');
+    }
+    var ctype = (res.headers.get('content-type') || '').toLowerCase();
+    if(ctype.indexOf('application/json') === -1){
+      if(res.redirected || (res.url && res.url.indexOf('/login') !== -1)){
+        window.location.href = '/login?next=/workspaces';
+        throw new Error('Session expired. Please login again.');
+      }
+      throw new Error('Server returned HTML instead of JSON. Status: ' + res.status);
+    }
+    var data = await res.json().catch(function(){ return {}; });
+    if(!res.ok || !data.ok){ throw new Error(data.error || data.detail || ('Failed: ' + res.status)); }
+    return data;
+  }
   var form = document.getElementById('createWsForm');
   if(form){
     form.addEventListener('submit', async function(e){
@@ -114,9 +132,7 @@
       hide(formErr); hide(errBox);
       try{
         var fd = new FormData(); fd.append('name', name);
-        var res = await fetch('/workspaces/create', {method: 'POST', body: fd, headers: {'Accept': 'application/json'}});
-        var data = await res.json().catch(function(){ return {}; });
-        if(!res.ok || !data.ok){ throw new Error(data.error || ('Failed: ' + res.status)); }
+        var data = await postForm('/workspaces/create', fd);
         show(okBox, 'Workspace created: ' + data.workspace.name);
         close();
         window.location.reload();
@@ -134,9 +150,7 @@
       b.disabled = true; b.textContent = 'Switching...';
       try{
         var fd = new FormData(); fd.append('workspace_id', id);
-        var res = await fetch('/workspaces/switch', {method: 'POST', body: fd, headers: {'Accept': 'application/json'}});
-        var data = await res.json().catch(function(){ return {}; });
-        if(!res.ok || !data.ok) throw new Error(data.error || 'Switch failed');
+        await postForm('/workspaces/switch', fd);
         window.location.reload();
       }catch(err){ show(errBox, err.message); b.disabled = false; b.textContent = 'Switch'; }
     });
