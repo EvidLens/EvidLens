@@ -95,7 +95,6 @@ if HAS_CORPORATE:
     WHITE = colors.white
     BLACK = colors.HexColor("#0F172A")
     SLATE = colors.HexColor("#334155")
-
 def safe(s):
     if s is None:
         return ""
@@ -118,14 +117,12 @@ def safe(s):
     s = s.replace("\n", " | ")
     s = s.replace("\r", " ")
     return s.encode("latin-1", "ignore").decode("latin-1")
-
 def short(s, n=150):
     txt = safe(s)
     txt = " ".join(txt.split())
     if len(txt) > n:
         txt = txt[:n]
     return txt
-
 def _safe_float(v, default=0.0):
     try:
         if v is None:
@@ -133,13 +130,11 @@ def _safe_float(v, default=0.0):
         return float(v)
     except Exception:
         return default
-
 def _fmt_kes(v):
     try:
         return f"KES {float(v):,.0f}"
     except Exception:
         return "KES 0"
-
 def _clean(v, default=""):
     if v is None:
         return default
@@ -147,7 +142,6 @@ def _clean(v, default=""):
     if s == "":
         return default
     return s
-
 def _build_filename(series, topic, geography, ext="pdf"):
     def clean(s):
         s = safe(str(s or "")).replace(" ", "")
@@ -155,14 +149,12 @@ def _build_filename(series, topic, geography, ext="pdf"):
         return s[:40] or "Kenya"
     year = datetime.now().strftime("%Y")
     return f"EvidLens_{clean(series)}_{clean(topic)}_{clean(geography)}_{year}_v1.0.{ext}"
-
 def _build_path(report_type, q, county, town, ward, sub_county, country):
     series = SERIES_MAP.get(report_type, "MarketIntelligence")
     geo = town or ward or sub_county or county or country or "Kenya"
     fname = _build_filename(series, q, geo, "pdf")
     os.makedirs("app/static/reports", exist_ok=True)
     return f"app/static/reports/{fname}"
-
 def save_to_storage(local_path: str) -> str:
     if not S3_BUCKET:
         return local_path
@@ -175,7 +167,6 @@ def save_to_storage(local_path: str) -> str:
     except Exception as e:
         print(f"S3 backup skipped, local still works: {e}")
     return local_path
-
 def fetch_all_live(sector: str = None, county: str = None, product: str = None, limit: int = 20):
     with Session(engine) as s:
         def safe_query(model, l=limit):
@@ -199,7 +190,6 @@ def fetch_all_live(sector: str = None, county: str = None, product: str = None, 
         knowledge = safe_query(KnowledgeChunk, 15)
         exports = safe_query(ExportOpportunity, 8)
         return {"competitors": competitors, "prices": prices, "demand": demand, "companies": companies, "news": news, "social": social, "knowledge": knowledge, "exports": exports}
-
 def _chart_price_bar(prices, demand):
     fig, ax = plt.subplots(figsize=(7.2, 3.2))
     fig.patch.set_facecolor("white")
@@ -246,7 +236,6 @@ def _chart_price_bar(prices, demand):
     plt.close()
     buf.seek(0)
     return buf
-
 def _chart_demand_donut(demand):
     fig, ax = plt.subplots(figsize=(3.6, 3.2))
     fig.patch.set_facecolor("white")
@@ -276,7 +265,6 @@ def _chart_demand_donut(demand):
     plt.close()
     buf.seek(0)
     return buf
-
 def _chart_county_bar(demand):
     fig, ax = plt.subplots(figsize=(7.2, 2.8))
     fig.patch.set_facecolor("white")
@@ -319,7 +307,6 @@ def _chart_county_bar(demand):
     plt.close()
     buf.seek(0)
     return buf
-
 def _styles():
     ss = getSampleStyleSheet()
     S_title = ParagraphStyle("CorpTitle", parent=ss["Title"], fontSize=30, leading=34, textColor=NAVY, alignment=TA_LEFT, fontName="Helvetica-Bold", spaceAfter=6)
@@ -340,7 +327,6 @@ def _styles():
     S_th = ParagraphStyle("TH", parent=ss["Normal"], fontSize=8.5, leading=11, textColor=WHITE, fontName="Helvetica-Bold", alignment=TA_LEFT)
     S_th_r = ParagraphStyle("THR", parent=S_th, alignment=TA_RIGHT)
     return {"title": S_title, "sub": S_sub, "h1": S_h1, "h2": S_h2, "h3": S_h3, "body": S_body, "small": S_small, "bullet": S_bullet, "note": S_note, "cap": S_cap, "kpi_l": S_kpi_l, "kpi_v": S_kpi_v, "kpi_s": S_kpi_s, "cell": S_cell, "cell_r": S_cell_r, "th": S_th, "th_r": S_th_r}
-
 def _hf(canvas, doc):
     canvas.saveState()
     if doc.page == 1:
@@ -373,7 +359,6 @@ def _hf(canvas, doc):
     canvas.setFont("Helvetica", 7)
     canvas.drawCentredString(A4[0] / 2, 10 * mm, "app.evidlens.co.ke  |  Source: KPIN + Live DB  |  Generated from live data only - no demo data")
     canvas.restoreState()
-
 def _metrics(live):
     demand = live["demand"]
     prices = live["prices"]
@@ -398,7 +383,6 @@ def _metrics(live):
         min_price = 0
         median_price = 0
     return {"avg_price": avg_price, "avg_demand": avg_demand, "max_price": max_price, "min_price": min_price, "median_price": median_price}
-
 def _verdict(live, m):
     has_data = len(live["demand"]) > 0 or len(live["prices"]) > 0 or len(live["companies"]) > 0
     if not has_data:
@@ -408,7 +392,6 @@ def _verdict(live, m):
     if m["avg_demand"] >= 50:
         return ("CONDITIONAL GO - VALIDATE BEFORE SCALING", AMBER, f"The evidence suggests a conditional entry. Live demand is moderate at {m['avg_demand']:.0f} out of 100, median price is {_fmt_kes(m['median_price'])}, and {len(live['competitors'])} competitors were tracked. A small pilot is recommended before scaling.", has_data)
     return ("HOLD - LOW LIVE DEMAND", RED, f"The evidence suggests holding. Live demand is low at {m['avg_demand']:.0f} out of 100. Large capital commitment is not supported by the current evidence base. Re-check after the next KPIN collection.", has_data)
-
 def _cover(story, S, title, q, sector, location, county, country, budget_str, plan_name, now_str, report_no):
     if os.path.exists(LOGO_PATH):
         try:
@@ -431,10 +414,9 @@ def _cover(story, S, title, q, sector, location, county, country, budget_str, pl
     div = Table([[""]], colWidths=[170 * mm])
     div.setStyle(TableStyle([("LINEBELOW", (0, 0), (-1, -1), 2.5, GOLD), ("TOPPADDING", (0, 0), (-1, -1), 2), ("BOTTOMPADDING", (0, 0), (-1, -1), 6)]))
     story.append(div)
-    story.append(Paragraph("EvidLens Kenya Decision Intelligence  |  12 Engines LIVE", ParagraphStyle("Brand", parent=S["sub"], fontSize=10, leading=13, textColor=NAVY, fontName="Helvetica-Bold")))
+    story.append(Paragraph("EvidLens Kenya Decision Intelligence", ParagraphStyle("Brand", parent=S["sub"], fontSize=10, leading=13, textColor=NAVY, fontName="Helvetica-Bold")))
     story.append(Paragraph("Competitive  •  Pricing  •  Demand  •  Location  •  Consumer  •  Risk  •  Policy  •  Funding  •  Export  •  Knowledge  •  AI Insights", ParagraphStyle("Eng", parent=S["sub"], fontSize=8.5, leading=12, textColor=GREY_TEXT)))
     story.append(Spacer(1, 6 * mm))
-
 def _verdict_box(story, S, verdict, vcolor, vtext):
     vt = Table([[Paragraph("<b>INVESTMENT VERDICT</b>", ParagraphStyle("VL", parent=S["small"], textColor=WHITE, fontName="Helvetica-Bold", alignment=TA_LEFT)), Paragraph(f"<b>{verdict}</b>", ParagraphStyle("VV", parent=S["small"], textColor=WHITE, fontName="Helvetica-Bold", alignment=TA_LEFT))]], colWidths=[38 * mm, 132 * mm])
     vt.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), vcolor), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 10), ("RIGHTPADDING", (0, 0), (-1, -1), 10), ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 8), ("ROUNDEDCORNERS", [6, 6, 6, 6])]))
@@ -442,7 +424,6 @@ def _verdict_box(story, S, verdict, vcolor, vtext):
     story.append(Spacer(1, 4 * mm))
     story.append(Paragraph(vtext, S["body"]))
     story.append(Spacer(1, 4 * mm))
-
 def _kpi_table(story, S, live, m, has_data):
     kpi = []
     kpi.append([Paragraph("MEDIAN PRICE", S["kpi_l"]), Paragraph("AVG DEMAND", S["kpi_l"]), Paragraph("COMPETITORS", S["kpi_l"]), Paragraph("PRICE RECORDS", S["kpi_l"])])
@@ -452,7 +433,6 @@ def _kpi_table(story, S, live, m, has_data):
     kt.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), GREY_BG), ("BOX", (0, 0), (-1, -1), 0.6, GREY_BORDER), ("INNERGRID", (0, 0), (-1, -1), 0.4, GREY_BORDER), ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6), ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6)]))
     story.append(kt)
     story.append(Spacer(1, 3 * mm))
-
 def _price_table(story, S, live, limit=20):
     pr_rows = [[Paragraph("Product", S["th"]), Paragraph("County", S["th"]), Paragraph("Price", S["th_r"]), Paragraph("Demand", S["th_r"])]]
     comb = []
@@ -470,7 +450,6 @@ def _price_table(story, S, live, limit=20):
     pt = Table(pr_rows, colWidths=[68 * mm, 34 * mm, 34 * mm, 34 * mm], repeatRows=1)
     pt.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), NAVY), ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, GREY_BG]), ("GRID", (0, 0), (-1, -1), 0.4, GREY_BORDER), ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5), ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6)]))
     story.append(pt)
-
 def _competitor_table(story, S, live):
     if not live["competitors"] and not live["companies"]:
         story.append(Paragraph("No competitors were tracked for this exact filter at generation time. That does not mean zero competition. It means no live Company or Competitor rows matched. Check the wider county and sector in the dashboard before concluding there is no competition.", S["body"]))
@@ -482,7 +461,6 @@ def _competitor_table(story, S, live):
     ct = Table(cr, colWidths=[58 * mm, 58 * mm, 28 * mm, 26 * mm], repeatRows=1)
     ct.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), NAVY), ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, GREY_BG]), ("GRID", (0, 0), (-1, -1), 0.4, GREY_BORDER), ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5), ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6)]))
     story.append(ct)
-
 def _charts_block(story, S, live):
     story.append(Paragraph("3.1  Pricing Evidence", S["h2"]))
     story.append(Paragraph("Live prices from KPIN and MarketMetric are shown as recorded. Prices have not been smoothed.", S["body"]))
@@ -515,7 +493,6 @@ def _charts_block(story, S, live):
         story.append(Paragraph("Source: MarketMetric live records. Note: Averages are computed from live records only. Counties with no live records are not shown.", S["note"]))
     except Exception:
         traceback.print_exc()
-
 def _consumer_risk_block(story, S, live, plan_name, budget_str, q, sector, county):
     story.append(Paragraph("Consumer Pulse", S["h2"]))
     if not live["social"]:
@@ -542,7 +519,6 @@ def _consumer_risk_block(story, S, live, plan_name, budget_str, q, sector, count
         story.append(Paragraph("No live export opportunities were found for this filter. Export is a Phase 2 play. Win locally first.", S["body"]))
     for e in live["exports"][:8]:
         story.append(Paragraph(f"{safe(getattr(e, 'product', 'Product'))} to {safe(getattr(e, 'country', 'Country'))}  |  Score {safe(getattr(e, 'opportunity_score', 0))}", S["bullet"]))
-
 def _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str):
     story.append(Paragraph("Annex A  Full Data Tables", S["h1"]))
     story.append(Paragraph("Table A.1 below contains the full live records used for this report, up to 50 rows. It is the audit trail for Figures 3.1 to 3.3 and Table 3.1.", S["body"]))
@@ -579,19 +555,17 @@ def _annex_block(story, S, live, q, sector, location, county, sub_county, ward, 
     story.append(Paragraph("7.  Central Bank of Kenya (CBK). Monetary and financial guidance. centralbank.go.ke.", S["bullet"]))
     story.append(Paragraph("8.  Energy and Petroleum Regulatory Authority (EPRA). LPG and fuel licensing. epra.go.ke.", S["bullet"]))
     story.append(Spacer(1, 6 * mm))
-    sign_data = [[Paragraph("<b>Prepared by</b><br/>EvidLens Decision Intelligence<br/>app.evidlens.co.ke", S["small"]), Paragraph(f"<b>Generated</b><br/>{now_str}<br/>Plan: {safe(plan_name) if 'plan_name' in dir() else ''}<br/>Report No: {report_no}", S["small"]), Paragraph("<b>Method</b><br/>Live DB only<br/>No demo / seed data", S["small"])]]
+    sign_data = [[Paragraph("<b>Prepared by</b><br/>EvidLens Decision Intelligence<br/>app.evidlens.co.ke", S["small"]), Paragraph(f"<b>Generated</b><br/>{now_str}<br/>Plan: {safe(plan_name)}<br/>Report No: {report_no}", S["small"]), Paragraph("<b>Method</b><br/>Live DB only<br/>No demo / seed data", S["small"])]]
     sign_table = Table(sign_data, colWidths=[56 * mm, 57 * mm, 57 * mm])
     sign_table.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), GREY_BG), ("BOX", (0, 0), (-1, -1), 0.6, GREY_BORDER), ("INNERGRID", (0, 0), (-1, -1), 0.4, GREY_BORDER), ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 8), ("LEFTPADDING", (0, 0), (-1, -1), 8), ("RIGHTPADDING", (0, 0), (-1, -1), 8)]))
     story.append(sign_table)
     story.append(Spacer(1, 4 * mm))
-    story.append(Paragraph("Disclaimer: This report is for information only and is not investment, legal, or tax advice. Prices and demand change daily. Verify all figures on the ground before committing capital. © 2026 EvidLens. All rights reserved.", S["note"]))
-
+    story.append(Paragraph("Disclaimer: This report is for information only and is not investment, legal, or tax advice. Prices and demand change daily. Verify all figures on the ground before committing capital. 2026 EvidLens. All rights reserved.", S["note"]))
 def _common_context(q, sector, county, location):
     now = datetime.now(UTC)
     now_str = now.strftime("%d %b %Y %H:%M EAT")
     report_no = f"EVL-{now.strftime('%Y%m%d')}-{abs(hash(safe(q) + safe(county or ''))) % 9000 + 1000}"
     return now, now_str, report_no
-
 def _budget_parse(budget):
     budget_val = 0.0
     budget_str = "Not specified"
@@ -602,7 +576,6 @@ def _budget_parse(budget):
         except Exception:
             budget_str = str(budget)
     return budget_val, budget_str
-
 def _ai_text(q, sector, county):
     ai_text = ""
     try:
@@ -611,7 +584,6 @@ def _ai_text(q, sector, county):
     except Exception:
         ai_text = ""
     return ai_text
-
 def _benchmark(sector):
     benchmark = {}
     try:
@@ -620,7 +592,6 @@ def _benchmark(sector):
     except Exception:
         benchmark = {}
     return benchmark
-
 def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, budget, plan_name, location, live, mode):
     S = _styles()
     now, now_str, report_no = _common_context(q, sector, county, location)
@@ -633,7 +604,7 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
     _cover(story, S, title, q, sector, location, county, country, budget_str, plan_name, now_str, report_no)
     _verdict_box(story, S, verdict, vcolor, vtext)
     story.append(Paragraph("How to read this report  —  Start with the Executive Summary, then Chapter 3 for pricing and demand evidence, then Chapter 5 for risks and the action plan. Annex A contains the full data table. Annex B documents methodology and limitations. A section that says No live data means no real KPIN row existed at generation time. It has not been filled with demo values.", S["small"]))
-    story.append(Paragraph("Copyright  —  © 2026 EvidLens. Decision Intelligence for Kenya. All rights reserved. This report is prepared for the requesting user. It is for information only and is not investment, legal, or tax advice. Validate with KRA, CBK, and county licensing before committing capital.", ParagraphStyle("Copy", parent=S["small"], textColor=GREY_TEXT, fontName="Helvetica-Oblique")))
+    story.append(Paragraph("Copyright  —  2026 EvidLens. Decision Intelligence for Kenya. All rights reserved. This report is prepared for the requesting user. It is for information only and is not investment, legal, or tax advice. Validate with KRA, CBK, and county licensing before committing capital.", ParagraphStyle("Copy", parent=S["small"], textColor=GREY_TEXT, fontName="Helvetica-Oblique")))
     story.append(PageBreak())
     if mode == "EXEC_BRIEF":
         story.append(Paragraph("Executive Summary - 1 Page Snapshot", S["h1"]))
@@ -670,6 +641,7 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
         story.append(Paragraph("Sources: EvidLens live database at generation time. KPIN daily collection 03:00 EAT. No demo data used.", S["note"]))
         if ai_text:
             story.append(Paragraph(f"AI insight: {safe(ai_text[:500])}", S["body"]))
+        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str)
     elif mode == "CONSUMER_ANALYSIS":
         story.append(Paragraph("Executive Summary", S["h1"]))
         story.append(Paragraph(f"This report assesses consumer demand for <b>{safe(q)}</b> in <b>{safe(location)}</b>. It is based on <b>{len(live['social'])} live consumer mentions</b>, <b>{len(live['demand'])} demand records</b>, and <b>{len(live['prices'])} price records</b>.", S["body"]))
@@ -712,6 +684,7 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
         story.append(Paragraph("5  Pricing Sensitivity", S["h1"]))
         story.append(Paragraph(f"Median price is <b>{_fmt_kes(m['median_price'])}</b>, mean is {_fmt_kes(m['avg_price'])}. Price at median for trial. If repeat is below 20 percent, price, quality, or location is wrong.", S["body"]))
         _charts_block(story, S, live)
+        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str)
     elif mode == "INDUSTRY_OUTLOOK":
         story.append(Paragraph("Executive Summary", S["h1"]))
         story.append(Paragraph(f"This Industry Outlook assesses <b>{safe(sector)}</b> in <b>{safe(location)}</b> with focus product <b>{safe(q)}</b>. It is based on <b>{len(live['prices']) + len(live['demand'])} live price and metric records</b>, <b>{len(live['companies'])} companies</b>, <b>{len(live['competitors'])} competitors</b>.", S["body"]))
@@ -758,6 +731,7 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
         story.append(Paragraph("Week 2  —  Test. Sell a small batch at median price. Track volume, margin, repeat.", S["bullet"]))
         story.append(Paragraph("Week 3  —  Fix. Adjust one variable only: price, location, or packaging.", S["bullet"]))
         story.append(Paragraph("Week 4  —  Decide. If daily net profit covers rent, transport, and time, scale. If not, pivot.", S["bullet"]))
+        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str)
     elif mode == "SECTOR_PULSE":
         story.append(Paragraph("Sector Pulse - Snapshot", S["h1"]))
         story.append(Paragraph(f"Pulse for <b>{safe(sector)}</b> in <b>{safe(location)}</b>. Focus: <b>{safe(q)}</b>. Based on <b>{len(live['prices']) + len(live['demand'])} live records</b>.", S["body"]))
@@ -770,6 +744,7 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
             story.append(Paragraph(f"{safe(getattr(n, 'title', 'News'))}: {safe(str(getattr(n, 'summary', ''))[:140])}", S["bullet"]))
         if not live["news"]:
             story.append(Paragraph("No live risk alerts for this filter.", S["bullet"]))
+        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str)
     elif mode == "PRODUCT_WATCH":
         story.append(Paragraph("Product Watch", S["h1"]))
         story.append(Paragraph(f"Product: <b>{safe(q)}</b>. Sector: <b>{safe(sector)}</b>. Location: <b>{safe(location)}</b>.", S["body"]))
@@ -783,6 +758,7 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
             story.append(Paragraph(f"[{safe(getattr(s, 'platform', 'X'))}  {safe(getattr(s, 'sentiment', 'neutral'))}]  {safe(str(getattr(s, 'content', ''))[:140])}", S["bullet"]))
         if not live["social"]:
             story.append(Paragraph("No live consumer mentions for this filter.", S["bullet"]))
+        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str)
     elif mode == "INVESTOR_PITCH":
         story.append(Paragraph("Investor Pitch - Summary", S["h1"]))
         story.append(Paragraph(f"Opportunity: <b>{safe(q)}</b> in <b>{safe(location)}</b>, sector <b>{safe(sector)}</b>. Ask: <b>{budget_str}</b>.", S["body"]))
@@ -802,6 +778,7 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
             story.append(Paragraph(f"{safe(getattr(n, 'title', 'News'))}: {safe(str(getattr(n, 'summary', ''))[:140])}", S["bullet"]))
         if not live["news"]:
             story.append(Paragraph("No live risk alerts for this filter.", S["bullet"]))
+        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str)
     elif mode == "BUSINESS_PLAN":
         story.append(Paragraph("Business Plan - Bank Loan Pack", S["h1"]))
         story.append(Paragraph(f"Business: <b>{safe(q)}</b> in <b>{safe(location)}</b>. Sector: <b>{safe(sector)}</b>. Requested budget: <b>{budget_str}</b>.", S["body"]))
@@ -818,6 +795,7 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
         story.append(Paragraph("County single business permit, KRA eTIMS, and sector licences where applicable. Food, LPG, or fuel need KEBS and EPRA approvals.", S["body"]))
         story.append(Paragraph("Repayment Plan", S["h2"]))
         story.append(Paragraph("Repay from daily net profit after rent, transport, and stock. Bring this report plus 6 months M-Pesa statements to the lender. Do not use high-interest mobile loans to cover rent.", S["body"]))
+        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str)
     elif mode == "KRA_TAX":
         story.append(Paragraph("KRA Tax Report", S["h1"]))
         story.append(Paragraph(f"Business: <b>{safe(q)}</b> in <b>{safe(location)}</b>. Sector: <b>{safe(sector)}</b>. This is an information report, not tax advice. Confirm with KRA.", S["body"]))
@@ -832,6 +810,7 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
         story.append(Paragraph("Evidence Base", S["h2"]))
         story.append(Paragraph(f"Median price {_fmt_kes(m['median_price'])}, average demand {m['avg_demand']:.0f} / 100, records used: PriceData {len(live['prices'])}, MarketMetric {len(live['demand'])}.", S["body"]))
         story.append(Paragraph("Sources: kra.go.ke, KRA eTIMS guidance. Verify rates at generation time.", S["note"]))
+        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str)
     else:
         story.append(Paragraph("Executive Summary", S["h1"]))
         story.append(Paragraph(f"This report assesses the feasibility of <b>{safe(q)}</b> in <b>{safe(location)}</b> for the <b>{safe(sector)}</b> sector. It is based on <b>{len(live['prices']) + len(live['demand'])} live price and metric records</b>, <b>{len(live['companies'])} companies</b>, <b>{len(live['competitors'])} competitors</b>, <b>{len(live['news'])} risk and policy signals</b>, and <b>{len(live['social'])} consumer mentions</b> available at generation time.", S["body"]))
@@ -846,114 +825,98 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
             story.append(Paragraph(f"Finding 4  —  Budget provided is <b>{budget_str}</b>. If budget is below three months of operating cost at median price, start smaller or seek funding.", S["bullet"]))
         else:
             story.append(Paragraph("Finding 1  —  No live findings yet. See the empty-state note above. Do not base a decision on this report alone.", S["bullet"]))
-        story.append(Paragraph("What this report does not do", S["h2"]))
-        story.append(Paragraph("It does not invent prices, demand scores, or competitors. It does not replace customer interviews, site visits, or KRA and county licensing checks. It is a screening report. Validate on the ground before committing capital.", S["body"]))
         story.append(Paragraph("1  Introduction", S["h1"]))
-        story.append(Paragraph(f"The question addressed by this report is whether <b>{safe(q)}</b> is feasible in <b>{safe(location)}</b> at the stated budget of <b>{budget_str}</b>.", S["body"]))
+        story.append(Paragraph(f"The question addressed is whether <b>{safe(q)}</b> is feasible in <b>{safe(location)}</b> at budget <b>{budget_str}</b>.", S["body"]))
         story.append(Paragraph("2  Methodology, Data Sources and Limitations", S["h1"]))
         story.append(Paragraph("Source 1  —  KPIN daily collection at 03:00 EAT. Live price records.", S["bullet"]))
         story.append(Paragraph("Source 2  —  MarketMetric records. Demand score 0 to 100 and average price in KES.", S["bullet"]))
         story.append(Paragraph("Source 3  —  Company and Competitor records.", S["bullet"]))
         story.append(Paragraph("Source 4  —  NewsArticle and SocialMention records.", S["bullet"]))
         story.append(Paragraph("Source 5  —  Knowledge Base and ExportOpportunity records.", S["bullet"]))
-        story.append(Paragraph("Median price is the middle value when live prices are sorted. Mean is the arithmetic average. No smoothing, no interpolation, no demo fallback. Counts are real counts at generation time.", S["body"]))
+        story.append(Paragraph("Median is the middle value when live prices are sorted. Mean is the arithmetic average. No smoothing, no interpolation, no demo fallback. Counts are real counts at generation time.", S["body"]))
         if benchmark:
             story.append(Paragraph(f"Sector benchmark (Knowledge Base): {safe(str(benchmark)[:400])}", S["small"]))
         if ai_text:
             story.append(Paragraph(f"AI insight: {safe(ai_text[:500])}", S["small"]))
-        story.append(Paragraph("3  Findings: Pricing, Demand and County Comparison", S["h1"]))
+        story.append(Paragraph("3  Pricing, Demand and County Comparison", S["h1"]))
         _charts_block(story, S, live)
         story.append(Paragraph("4  Competitive and Location Intelligence", S["h1"]))
-        story.append(Paragraph("4.1  Competitive Evidence", S["h2"]))
-        _competitor_table(story, S, live)
-        story.append(Paragraph("Competitive implication: Do not compete on price alone. Compete on availability, packaging size, delivery, and trust.", S["body"]))
-        story.append(Paragraph("4.2  Location Evidence", S["h2"]))
         story.append(Paragraph(f"Focus location: <b>{safe(location)}</b>. County: {safe(county) or 'All'}. Sub-county: {safe(sub_county) or 'All'}. Ward: {safe(ward) or 'All'}. Town: {safe(town) or 'All'}. Coverage: {len(live['companies'])} companies mapped.", S["body"]))
+        _competitor_table(story, S, live)
+        story.append(Paragraph("Site checklist: (1) Foot traffic at 07:00, 12:00, and 18:00 for three days. (2) Nearest competitor distance. (3) Transport cost from supplier to site. (4) Rent and goodwill against three months of revenue at median price. (5) County single business permit plus health or fire approval where applicable.", S["body"]))
         story.append(Paragraph("5  Consumer, Risk, Policy, Funding and Export", S["h1"]))
         _consumer_risk_block(story, S, live, plan_name, budget_str, q, sector, county)
         story.append(Paragraph("6  Recommendations and 30-Day Action Plan", S["h1"]))
         story.append(Paragraph(f"Recommendation 1  —  <b>{verdict}</b>. {vtext}", S["bullet"]))
         story.append(Paragraph("Recommendation 2  —  Price at median and test. Keep at least 30 percent for rent, transport, licences, and one month of buffer.", S["bullet"]))
-        story.append(Paragraph("Recommendation 3  —  Validate demand with primary research. Interview 20 potential customers before scaling.", S["bullet"]))
+        story.append(Paragraph("Recommendation 3  —  Interview 20 potential customers before scaling.", S["bullet"]))
         if ai_text:
             story.append(Paragraph(f"AI insight: {safe(ai_text[:600])}", S["body"]))
         story.append(Paragraph("Week 1  —  Validate. Interview 20 potential customers.", S["bullet"]))
         story.append(Paragraph("Week 2  —  Test. Sell a small batch at median price. Track volume, margin, repeat.", S["bullet"]))
         story.append(Paragraph("Week 3  —  Fix. Adjust one variable only: price, location, or packaging.", S["bullet"]))
         story.append(Paragraph("Week 4  —  Decide. If daily net profit covers rent, transport, and time, scale. If not, pivot.", S["bullet"]))
-        story.append(Paragraph(f"Budget arithmetic: Budget {budget_str}. At median price {_fmt_kes(m['median_price']) if has_data else 'unknown'}, the budget buys roughly {int(budget_val / m['median_price']) if has_data and m['median_price'] > 0 else 0} units before other costs. This is arithmetic, not a sales forecast.", S["body"]))
-    _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str)
-    doc = SimpleDocTemplate(path, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm, topMargin=20 * mm, bottomMargin=18 * mm, title=f"EvidLens - {safe(q)} - {safe(location)}", author="EvidLens")
+        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str)
+    doc = SimpleDocTemplate(path, pagesize=A4, topMargin=18 * mm, bottomMargin=18 * mm, leftMargin=18 * mm, rightMargin=18 * mm, title=title, author="EvidLens")
     doc.build(story, onFirstPage=_hf, onLaterPages=_hf)
-    return path
-
-def generate_report_pdf_file(report_type: str = "MARKET_FEASIBILITY", q: str = "", sector: str = "Agriculture", country: str = "Kenya", county: str = None, sub_county: str = None, ward: str = None, town: str = None, budget: str = None, plan_name: str = "Pro") -> str:
-    rtype = (report_type or "MARKET_FEASIBILITY").upper()
-    if rtype not in SERIES_MAP:
-        rtype = "MARKET_FEASIBILITY"
-    location = town or ward or sub_county or county or country
-    path = _build_path(rtype, q, county, town, ward, sub_county, country)
-    live = fetch_all_live(sector, county, q)
-    title = TITLE_MAP.get(rtype, "Market Feasibility Report")
-    return save_to_storage(_build_pdf(path, title, q, sector, country, county, sub_county, ward, town, budget, plan_name, location, live, rtype))
-
-def generate_market_report_pdf_file(q: str, sector: str, country: str = "Kenya", county: str = None, sub_county: str = None, ward: str = None, town: str = None, budget: str = None, plan_name: str = "Pro") -> str:
-    return generate_report_pdf_file("MARKET_FEASIBILITY", q, sector, country, county, sub_county, ward, town, budget, plan_name)
-
-async def generate_market_report_pdf(db: OrmSession, q: str, sector: str, country: str = "Kenya", county: str = None, sub_county: str = None, ward: str = None, town: str = None) -> bytes:
-    path = generate_market_report_pdf_file(q, sector, country, county, sub_county, ward, town, budget=None, plan_name="Pro")
-    with open(path, "rb") as f:
-        data = f.read()
-    return data
-
-def generate_market_report_excel(db: OrmSession, sector: str, country: str, county: str = None, sub_county: str = None, ward: str = None, town: str = None, q: str = None) -> str:
-    from openpyxl import Workbook
-    from openpyxl.styles import Font
-    from openpyxl.styles import PatternFill
-    from openpyxl.styles import Alignment
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Report"
-    ws.sheet_properties.pageSetUpPr.fitToPage = True
-    header_font = Font(bold=True, color="FFFFFF", size=12)
-    header_fill = PatternFill(start_color="0A1F44", end_color="0A1F44", fill_type="solid")
-    bold_font = Font(bold=True, size=11)
-    ws.merge_cells("A1:B1")
-    c = ws["A1"]
-    c.value = f"EvidLens Market Report - {q or ''}"
-    c.font = header_font
-    c.fill = header_fill
-    c.alignment = Alignment(horizontal="left", vertical="center")
-    ws.row_dimensions[1].height = 28
-    ws.append([])
-    ws.append(["Field", "Value"])
-    for cell in ws[3]:
-        cell.font = bold_font
-        cell.fill = PatternFill(start_color="E2E8F0", end_color="E2E8F0", fill_type="solid")
-    rows = [("Query", q or ""), ("Sector", sector or ""), ("Country", country or ""), ("County", county or ""), ("SubCounty", sub_county or ""), ("Ward", ward or ""), ("Town", town or ""), ("Generated", datetime.now().strftime("%Y-%m-%d %H:%M"))]
-    for k, v in rows:
-        ws.append([k, v])
-    ws.append([])
-    ws.append(["Section", "Count"])
-    for cell in ws[ws.max_row]:
-        cell.font = bold_font
-    live = fetch_all_live(sector, county, q)
-    for k, v in live.items():
-        ws.append([k, len(v)])
-    ws.append([])
-    ws.append(["Product", "County", "Price"])
-    for cell in ws[ws.max_row]:
-        cell.font = bold_font
-    for p in live["prices"][:20]:
-        ws.append([getattr(p, "product_name", getattr(p, "product", "Product")), getattr(p, "county", ""), getattr(p, "price", getattr(p, "avg_price_kes", 0))])
-    ws.column_dimensions["A"].width = 32
-    ws.column_dimensions["B"].width = 42
-    ws.column_dimensions["C"].width = 18
-    os.makedirs("app/static/reports", exist_ok=True)
-    fname = _build_filename("MarketIntelligence", q or "report", county or country or "Kenya", "xlsx")
-    path = f"app/static/reports/{fname}"
-    wb.save(path)
+def _resolve_mode(report_type):
+    u = str(report_type or "MARKET_FEASIBILITY").upper()
+    if "EXEC" in u or "BRIEF" in u:
+        return "EXEC_BRIEF"
+    if "CONSUMER" in u or "INSIGHT" in u:
+        return "CONSUMER_ANALYSIS"
+    if "INDUSTRY" in u or "OUTLOOK" in u:
+        return "INDUSTRY_OUTLOOK"
+    if "SECTOR" in u or "PULSE" in u:
+        return "SECTOR_PULSE"
+    if "PRODUCT" in u or "WATCH" in u:
+        return "PRODUCT_WATCH"
+    if "INVESTOR" in u or "PITCH" in u:
+        return "INVESTOR_PITCH"
+    if "KRA" in u or "TAX" in u:
+        return "KRA_TAX"
+    if "BUSINESS" in u or "BANK" in u or "LOAN" in u:
+        return "BUSINESS_PLAN"
+    return "MARKET_FEASIBILITY"
+def generate_report_pdf_file(report_type=None, q=None, sector=None, country="Kenya", county=None, sub_county=None, ward=None, town=None, budget=None, plan_name="Trial", **kwargs):
+    if q is None and kwargs.get("query") is not None:
+        q = kwargs.get("query")
+    if q is None and isinstance(report_type, str) and sector is None and kwargs.get("sector") is None:
+        q = report_type
+        report_type = "MARKET_FEASIBILITY"
+    if q is None:
+        q = "general market analysis"
+    if sector is None:
+        sector = kwargs.get("sector") or "Agriculture"
+    if country is None:
+        country = "Kenya"
+    mode = _resolve_mode(report_type)
+    title = TITLE_MAP.get(mode, "Market Feasibility Report")
+    location = town or ward or sub_county or county or country or "Kenya"
+    live = fetch_all_live(sector=sector, county=county, product=q)
+    path = _build_path(mode, q, county, town, ward, sub_county, country)
+    _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, budget, plan_name, location, live, mode)
     return save_to_storage(path)
-
-generate_report_pdf = generate_market_report_pdf
-generate_pdf_path = generate_market_report_pdf_file
+def generate_market_report_pdf_file(q=None, sector=None, country="Kenya", county=None, sub_county=None, ward=None, town=None, budget=None, plan_name="Trial", **kwargs):
+    report_type = kwargs.get("report_type") or kwargs.get("rtype") or "MARKET_FEASIBILITY"
+    if isinstance(q, str) and q.upper() in TITLE_MAP:
+        report_type = q
+        q = kwargs.get("query") or kwargs.get("product") or "general market analysis"
+    return generate_report_pdf_file(report_type, q, sector, country, county, sub_county, ward, town, budget, plan_name, **kwargs)
+def generate_market_report_excel(db=None, sector=None, country="Kenya", county=None, sub_county=None, ward=None, town=None, q=None, **kwargs):
+    try:
+        import csv
+        live = fetch_all_live(sector=sector, county=county, product=q)
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["EvidLens Market Report", q or "", sector or "", county or "", country or ""])
+        writer.writerow([])
+        writer.writerow(["Product", "County", "Price KES", "Demand / 100", "Sector"])
+        for d in live["demand"][:100]:
+            writer.writerow([_clean(getattr(d, "product", ""), "Product"), _clean(getattr(d, "county", ""), "Kenya"), _safe_float(getattr(d, "avg_price_kes", 0)), _safe_float(getattr(d, "demand_score", 0)), _clean(getattr(d, "sector", ""), "")])
+        for p in live["prices"][:100]:
+            writer.writerow([_clean(getattr(p, "product_name", ""), "Product"), _clean(getattr(p, "county", ""), "Kenya"), _safe_float(getattr(p, "price", 0)), "", _clean(getattr(p, "sector", ""), "")])
+        return output.getvalue().encode("utf-8")
+    except Exception:
+        traceback.print_exc()
+        raise
