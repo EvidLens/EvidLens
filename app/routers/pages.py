@@ -5,10 +5,12 @@ from sqlmodel import Session, select, func, desc, or_
 from jinja2 import TemplateNotFound
 import traceback
 import markdown, bleach
+from datetime import datetime
 from app.core.db import get_session as get_db
 from app.core.models import MarketMetric, Company, NewsArticle, SocialMention, ExportOpportunity
 from app.modules.auth.models import AuthUser
 from app.modules.auth.dependencies import get_current_user_optional
+from app.modules.changelog_service import get_changelog
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -177,9 +179,16 @@ def billing_page(request: Request, user: AuthUser = Depends(get_current_user_opt
         return redir
     return safe_template(request, "billing.html", {"request": request, "current_user": user}, "Billing")
 
+@router.get("/api/changelog")
+def changelog_api():
+    return get_changelog()
+
 @router.get("/changelog", response_class=HTMLResponse)
 def changelog(request: Request):
-    return safe_template(request, "changelog.html", {"request": request}, "Changelog")
+    data = get_changelog()
+    data["current_version"] = "2.6.4"
+    data["last_updated"] = str(datetime.now().date())
+    return safe_template(request, "changelog.html", {"request": request, "data": data}, "Changelog")
 
 @router.get("/competitive", response_class=HTMLResponse)
 def competitive(request: Request, user: AuthUser = Depends(get_current_user_optional), db: Session = Depends(get_db)):
