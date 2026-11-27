@@ -24,7 +24,6 @@ import uuid
 from datetime import datetime
 from authlib.integrations.starlette_client import OAuth
 from starlette.config import Config
-
 router = APIRouter(prefix="/auth", tags=["Auth"])
 templates = Jinja2Templates(directory="app/templates")
 RESEND_KEY = os.getenv("RESEND_API_KEY")
@@ -33,10 +32,8 @@ FROM_NAME = os.getenv("FROM_NAME", "EvidLens")
 APP_URL = os.getenv("APP_URL", "https://app.evidlens.co.ke")
 SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", FROM_EMAIL)
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "").lower().strip()
-
 if RESEND_KEY:
     resend.api_key = RESEND_KEY
-
 config = Config('.env')
 oauth = OAuth(config)
 oauth.register(
@@ -46,7 +43,6 @@ oauth.register(
     server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
     client_kwargs={'scope': 'openid email profile'}
 )
-
 def send_verification_email(to: str, name: str, token: str):
     if not RESEND_KEY:
         print(f"[EMAIL SKIP] No RESEND_API_KEY - verify token: {token}")
@@ -81,7 +77,6 @@ def send_verification_email(to: str, name: str, token: str):
         print(f"[EMAIL SENT] Verification to {to} via {FROM_EMAIL}")
     except Exception as e:
         print(f"[EMAIL FAILED] {to}: {e}")
-
 def send_reset_email(to: str, token: str):
     if not RESEND_KEY:
         print(f"[EMAIL SKIP] Reset token: {token}")
@@ -107,19 +102,14 @@ def send_reset_email(to: str, token: str):
         print(f"[EMAIL SENT] Reset to {to}")
     except Exception as e:
         print(f"Reset email failed: {e}")
-
-def _set_auth_cookie(response, user_id: int):
+def _set_auth(request, response, user_id: int, email: str = ""):
+    try:
+        request.session["user_id"] = int(user_id)
+        request.session["email"] = email or ""
+    except Exception:
+        pass
     response.set_cookie(
         key="user_id",
-        value=str(user_id),
-        httponly=True,
-        secure=True,
-        samesite="lax",
-        max_age=86400 * 7,
-        path="/"
-    )
-    response.set_cookie(
-        key="session",
         value=str(user_id),
         httponly=True,
         secure=True,
@@ -137,17 +127,30 @@ def _set_auth_cookie(response, user_id: int):
         path="/"
     )
     return response
-
+def _clear_auth(request, response):
+    try:
+        request.session.clear()
+    except Exception:
+        pass
+    response.delete_cookie("user_id", path="/")
+    response.delete_cookie("auth_user_id", path="/")
+    response.delete_cookie("session", path="/")
+    return response
 def _is_logged_in(request: Request, db: Session):
     try:
-        uid = request.cookies.get("user_id") or request.cookies.get("session") or request.cookies.get("auth_user_id")
+        uid = None
+        try:
+            uid = request.session.get("user_id")
+        except Exception:
+            uid = None
+        if not uid:
+            uid = request.cookies.get("user_id") or request.cookies.get("auth_user_id")
         if not uid:
             return False
         user = db.get(AuthUser, int(uid))
         return bool(user and getattr(user, "is_active", True))
     except Exception:
         return False
-
 async def _parse_login_body(request: Request):
     content_type = request.headers.get("content-type", "")
     if "application/json" in content_type:
@@ -158,7 +161,6 @@ async def _parse_login_body(request: Request):
             return "", "", "/"
     form = await request.form()
     return str(form.get("email", "")).strip().lower(), str(form.get("password", "")), str(form.get("next", "/") or "/")
-
 def _do_login_logic(request: Request, email: str, password: str, next_url: str, db: Session):
     result = login_user(db, email, password)
     if "error" in result:
@@ -170,12 +172,18 @@ def _do_login_logic(request: Request, email: str, password: str, next_url: str, 
         if "application/json" in request.headers.get("accept", "") or "application/json" in request.headers.get("content-type", ""):
             return JSONResponse(content={"error": result["error"]}, status_code=401)
         return RedirectResponse(url="/login?error=invalid", status_code=303)
+    user_email = ""
+    try:
+        u = db.get(AuthUser, int(result["user_id"]))
+        if u is not None:
+            user_email = getattr(u, "email", "") or email
+    except Exception:
+        user_email = email
     if "application/json" in request.headers.get("accept", "") or "application/json" in request.headers.get("content-type", ""):
         response = JSONResponse(content=result)
-        return _set_auth_cookie(response, result["user_id"])
+        return _set_auth(request, response, result["user_id"], user_email)
     response = RedirectResponse(url=next_url or "/", status_code=303)
-    return _set_auth_cookie(response, result["user_id"])
-
+    return _set_auth(request, response, result["user_id"], user_email)
 class SignupRequest(BaseModel):
     email: EmailStr
     password: str
@@ -183,28 +191,22 @@ class SignupRequest(BaseModel):
     phone: str
     sector: str
     county: str
-
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
-
 class ForgotRequest(BaseModel):
     email: EmailStr
-
 class ResetRequest(BaseModel):
     token: str
     new_password: str
-
 class PasswordChangeRequest(BaseModel):
     old_password: str
     new_password: str
-
 class ProfileUpdateRequest(BaseModel):
     full_name: str
     phone: str
     theme: str
     language: str
-
 @router.post("/signup")
 def signup(req: SignupRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     if get_user_by_email(db, req.email):
@@ -213,7 +215,6 @@ def signup(req: SignupRequest, background_tasks: BackgroundTasks, db: Session = 
     user = create_user(db, req, token)
     background_tasks.add_task(send_verification_email, user.email, user.full_name or "there", token)
     return {"message": f"Verification email sent from {FROM_EMAIL}. Check inbox.", "email": user.email}
-
 @router.post("/do-signup")
 def do_signup(
     request: Request,
@@ -233,14 +234,12 @@ def do_signup(
     user = create_user(db, req, token)
     background_tasks.add_task(send_verification_email, user.email, user.full_name or "there", token)
     return RedirectResponse(url="/login?signup=1&check_email=1", status_code=303)
-
 @router.get("/verify")
 def verify_email(token: str, db: Session = Depends(get_db)):
     user = verify_user(db, token)
     if not user:
         return RedirectResponse(url="/login?error=invalid_link", status_code=303)
     return RedirectResponse(url="/login?verified=1", status_code=303)
-
 @router.post("/login")
 async def login(request: Request, db: Session = Depends(get_db)):
     email, password, next_url = await _parse_login_body(request)
@@ -249,76 +248,58 @@ async def login(request: Request, db: Session = Depends(get_db)):
             return JSONResponse(content={"error": "Email and password required"}, status_code=422)
         return RedirectResponse(url="/login?error=invalid", status_code=303)
     return _do_login_logic(request, email, password, next_url, db)
-
 @router.post("/do-login")
 async def do_login(request: Request, db: Session = Depends(get_db)):
     email, password, next_url = await _parse_login_body(request)
     if not email or not password:
         return RedirectResponse(url="/login?error=invalid", status_code=303)
     return _do_login_logic(request, email, password, next_url, db)
-
 @router.post("/forgot-password")
 def forgot(req: ForgotRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     result = request_password_reset(db, req.email)
     if "reset_token" in result:
         background_tasks.add_task(send_reset_email, req.email, result["reset_token"])
     return {"message": f"If email exists, reset link sent from {FROM_EMAIL}"}
-
 @router.post("/reset-password")
 def reset(req: ResetRequest, db: Session = Depends(get_db)):
     result = reset_password(db, req.token, req.new_password)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
-
 @router.post("/change-password")
 def change_password(req: PasswordChangeRequest, user: AuthUser = Depends(get_current_user), db: Session = Depends(get_db)):
     result = update_password(db, user, req.old_password, req.new_password)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
-
 @router.post("/update-profile")
 def update_profile_route(req: ProfileUpdateRequest, user: AuthUser = Depends(get_current_user), db: Session = Depends(get_db)):
     return update_profile(db, user, req.full_name, req.phone, req.theme, req.language)
-
 @router.get("/me")
 def me(user: AuthUser = Depends(get_current_user)):
     return user
-
 @router.post("/logout")
-def logout():
+def logout(request: Request):
     response = JSONResponse(content={"message": "Logged out"})
-    response.delete_cookie("user_id", path="/")
-    response.delete_cookie("session", path="/")
-    response.delete_cookie("auth_user_id", path="/")
-    return response
-
+    return _clear_auth(request, response)
 @router.get("/logout")
-def logout_get():
+def logout_get(request: Request):
     response = RedirectResponse(url="/login", status_code=303)
-    response.delete_cookie("user_id", path="/")
-    response.delete_cookie("session", path="/")
-    response.delete_cookie("auth_user_id", path="/")
-    return response
-
+    return _clear_auth(request, response)
 @router.get("/login")
 def login_page(request: Request, db: Session = Depends(get_db)):
     if _is_logged_in(request, db):
         return RedirectResponse(url="/", status_code=303)
     return templates.TemplateResponse("login.html", {"request": request})
-
 @router.get("/signup")
 def signup_page(request: Request, db: Session = Depends(get_db)):
     if _is_logged_in(request, db):
         return RedirectResponse(url="/", status_code=303)
     return templates.TemplateResponse("signup.html", {"request": request})
-
 @router.get("/oauth/google")
 async def oauth_google(request: Request):
     redirect_uri = f"{APP_URL}/auth/oauth/google/callback"
     return await oauth.google.authorize_redirect(request, redirect_uri)
-
 @router.get("/oauth/google/callback")
 async def oauth_google_callback(request: Request, db: Session = Depends(get_db)):
     try:
@@ -380,11 +361,10 @@ async def oauth_google_callback(request: Request, db: Session = Depends(get_db))
                 db.commit()
                 db.refresh(user)
         response = RedirectResponse(url="/", status_code=303)
-        return _set_auth_cookie(response, user.id)
+        return _set_auth(request, response, user.id, email)
     except Exception as e:
         print(f"[OAUTH ERROR] {e}")
         return RedirectResponse(url="/login?error=oauth_failed", status_code=303)
-
 @router.get("/admin/fix-login")
 def fix_login(db: Session = Depends(get_db), admin: AuthUser = Depends(require_admin)):
     db.exec(text("UPDATE auth_user SET email_verified = true, is_active = true WHERE email_verified = false"))
@@ -392,13 +372,9 @@ def fix_login(db: Session = Depends(get_db), admin: AuthUser = Depends(require_a
     db.commit()
     users = db.exec(text("SELECT id, email, email_verified, is_active FROM auth_user")).all()
     return {"fixed": True, "message": "Verified existing users - passwords preserved", "users": [{"id": u[0], "email": u[1], "verified": u[2], "active": u[3]} for u in users]}
-
 @router.get("/admin/clear-cache")
-def clear_cache(db: Session = Depends(get_db), admin: AuthUser = Depends(require_admin)):
+def clear_cache(request: Request, db: Session = Depends(get_db), admin: AuthUser = Depends(require_admin)):
     db.exec(text("TRUNCATE TABLE auth_user RESTART IDENTITY CASCADE"))
     db.commit()
     response = JSONResponse(content={"cleared": True, "message": "All users cleared - fresh signup required"})
-    response.delete_cookie("user_id", path="/")
-    response.delete_cookie("session", path="/")
-    response.delete_cookie("auth_user_id", path="/")
-    return response
+    return _clear_auth(request, response)
