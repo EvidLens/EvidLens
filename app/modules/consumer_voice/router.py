@@ -15,41 +15,57 @@ router = APIRouter(prefix="/voice", tags=["Consumer Voice"])
 templates = Jinja2Templates(directory="app/templates")
 logger = logging.getLogger("evidlens.voice")
 
-class SentimentRequest(BaseModel):
-    sector: str
-    county: Optional[str] = None
-    product_or_topic: str
+_sentiment_pipeline = None
+_vader = None
 
-class SentimentResponse(BaseModel):
-    sector: str
-    county: Optional[str]
-    product_or_topic: str
-    total_mentions: int
-    positive: int
-    neutral: int
-    negative: int
-    avg_sentiment_score: float
-    top_likes: List[str]
-    top_complaints: List[str]
+def _load_models():
+    global _sentiment_pipeline, _vader
+    if _sentiment_pipeline is not None or _vader is not None:
+        return
+    try:
+        from transformers import pipeline
+        _sentiment_pipeline = pipeline("sentiment-analysis", model="cardiffnlp/twitter-roberta-base-sentiment-latest", truncation=True)
+        return
+    except Exception as e:
+        logger.warning(f"transformers model not available: {e}")
+    try:
+        from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+        _vader = SentimentIntensityAnalyzer()
+    except Exception as e:
+        logger.warning(f"vader not available: {e}")
 
 def _classify_text(text):
-    t = (text or "").lower()
-    positive_words = ["good", "great", "excellent", "fair", "affordable", "cheap", "love", "happy", "quality", "fresh", "reliable", "best", "improved", "helpful"]
-    negative_words = ["bad", "expensive", "high", "poor", "terrible", "awful", "scam", "fake", "late", "rude", "broken", "worst", "overpriced", "unfair", "shortage"]
-    pos = sum(1 for w in positive_words if w in t)
-    neg = sum(1 for w in negative_words if w in t)
-    if pos > neg:
-        return "POSITIVE"
-    if neg > pos:
-        return "NEGATIVE"
-    return "NEUTRAL"
+    if not text or not str(text).strip():
+        return "NEUTRAL", None
+    _load_models()
+    if _sentiment_pipeline is not None:
+        try:
+            result = _sentiment_pipeline(str(text)[:512])[0]
+            label = str(result.get("label", "")).upper()
+            score = float(result.get("score", 0))
+            if "POSITIVE" in label:
+                return "POSITIVE", round(score, 3)
+            if "NEGATIVE" in label:
+                return "NEGATIVE", round(-score, 3)
+            return "NEUTRAL", 0.0
+        except Exception as e:
+            logger.warning(f"transformers classify failed: {e}")
+    if _vader is not None:
+        try:
+            scores = _vader.polarity_scores(str(text))
+            compound = float(scores.get("compound", 0))
+            if compound >= 0.05:
+                return "POSITIVE", round(compound, 3)
+            if compound <= -0.05:
+                return "NEGATIVE", round(compound, 3)
+            return "NEUTRAL", round(compound, 3)
+        except Exception as e:
+            logger.warning(f"vader classify failed: {e}")
+    return "NEUTRAL", None
 
 def _normalize_feedback(f):
     text = getattr(f, "text", None) or getattr(f, "content", None) or getattr(f, "feedback", None) or getattr(f, "message", None) or ""
-    raw = getattr(f, "sentiment", None) or getattr(f, "sentiment_label", None) or ""
-    raw = str(raw).strip().upper() if raw else ""
-    if raw not in ["POSITIVE", "NEUTRAL", "NEGATIVE"]:
-        raw = _classify_text(text)
+    sentiment, score = _classify_text(text)
     author = getattr(f, "author", None) or getattr(f, "username", None) or getattr(f, "source", None) or "Consumer"
     if str(author).strip().lower() in ["kenya consumer", "consumer"]:
         author = getattr(f, "source", None) or "Community Post"
@@ -60,15 +76,15 @@ def _normalize_feedback(f):
         "text": text,
         "content": text,
         "feedback": text,
-        "sentiment": raw,
-        "sentiment_label": raw,
+        "sentiment": sentiment,
+        "sentiment_label": sentiment,
         "author": author,
         "source": getattr(f, "source", "") or "",
         "sector": getattr(f, "sector", "") or "",
         "county": getattr(f, "county", "") or "",
         "product_or_topic": getattr(f, "product_or_topic", "") or getattr(f, "product", "") or "",
         "created_at": getattr(f, "created_at", None),
-        "score": getattr(f, "sentiment_score", None),
+        "score": score,
     }
 
 @router.get("/", response_class=HTMLResponse)
@@ -100,6 +116,10 @@ async def voice_page(
     neutral = len([x for x in feedback if x["sentiment"] == "NEUTRAL"])
     negative = len([x for x in feedback if x["sentiment"] == "NEGATIVE"])
     total = len(feedback)
+    scored = [x["score"] for x in feedback if x["score"] is not None]
+    avg_score = round(sum(scored) / len(scored), 3) if scored else 0.0
+    top_likes = [x["text"] for x in feedback if x["sentiment"] == "POSITIVE"][:3]
+    top_complaints = [x["text"] for x in feedback if x["sentiment"] == "NEGATIVE"][:3]
 
     return templates.TemplateResponse(
         "voice.html",
@@ -118,6 +138,12 @@ async def voice_page(
             "negative_count": negative,
             "total_mentions": total,
             "total": total,
+            "count": total,
+            "avg_sentiment_score": avg_score,
+            "sentiment_counts": {"positive": positive, "neutral": neutral, "negative": negative, "total": total},
+            "summary": {"positive": positive, "neutral": neutral, "negative": negative, "total": total, "avg_sentiment_score": avg_score},
+            "top_likes": top_likes,
+            "top_complaints": top_complaints,
             "has_data": total > 0,
             "sector": sector or "",
             "county": county or "",
