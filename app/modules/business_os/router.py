@@ -46,7 +46,7 @@ class PayInvoice(BaseModel):
     invoice_id: int
     mpesa_receipt: str
 
-CURATED_FUNDERS = [
+FUNDING_DIRECTORY = [
     {"name": "Equity Bank - SME Loan", "type": "Bank", "amount": "KES 50,000 - 5,000,000", "rate": "From 14% p.a.", "apply_url": "https://equitygroupholdings.com/ke/borrow/", "county": "All Counties", "sector": "All Sectors", "description": "Working capital and asset finance for registered SMEs with 6+ months trading history."},
     {"name": "KCB Bank - Biashara Loan", "type": "Bank", "amount": "KES 100,000 - 10,000,000", "rate": "From 13.5% p.a.", "apply_url": "https://ke.kcbgroup.com/for-business/borrow", "county": "All Counties", "sector": "All Sectors", "description": "Unsecured business loans for SMEs with KCB account and M-Pesa statements."},
     {"name": "Co-operative Bank - MSME Loan", "type": "Bank", "amount": "KES 50,000 - 3,000,000", "rate": "From 14% p.a.", "apply_url": "https://www.co-opbank.co.ke/business-banking/", "county": "All Counties", "sector": "Agriculture, Retail", "description": "MSME loans with flexible repayment for agribusiness and retail."},
@@ -57,14 +57,50 @@ CURATED_FUNDERS = [
     {"name": "Hustler Fund - Business", "type": "Government Loan", "amount": "KES 500 - 50,000", "rate": "8% p.a.", "apply_url": "https://www.hustlerfund.go.ke/", "county": "All Counties", "sector": "Micro Businesses", "description": "Government micro-loan via *254# for small traders and hustlers."},
 ]
 
-CURATED_EXPORTS = [
-    {"product": "Tea", "destination": "United Kingdom", "score": 88, "county": "Nyeri, Kericho", "description": "High demand for Kenyan black tea. Requires KEBS + Tea Board of Kenya licence."},
-    {"product": "Coffee", "destination": "Germany", "score": 86, "county": "Nyeri, Kirinyaga", "description": "Specialty AA coffee demand in EU. Requires Coffee Directorate licence."},
-    {"product": "Avocado", "destination": "United Arab Emirates", "score": 84, "county": "Muranga, Nyeri", "description": "Hass avocado demand year-round. Requires KEPHIS phytosanitary certificate."},
-    {"product": "Macadamia", "destination": "China", "score": 82, "county": "Embu, Nyeri", "description": "Growing demand for in-shell macadamia. Requires AFA Nuts Directorate licence."},
-    {"product": "Horticulture - Green Beans", "destination": "Netherlands / EU", "score": 80, "county": "Kirinyaga, Muranga", "description": "EU export under GlobalG.A.P. certification. Cold chain required."},
-    {"product": "Dried Fruits - Mango", "destination": "United States", "score": 76, "county": "Machakos, Makueni", "description": "Dried mango snacks demand. Requires FDA facility registration."},
+EXPORT_DIRECTORY = [
+    {"product": "Tea", "destination": "United Kingdom", "county": "Nyeri, Kericho", "description": "High demand for Kenyan black tea. Requires KEBS + Tea Board of Kenya licence."},
+    {"product": "Coffee", "destination": "Germany", "county": "Nyeri, Kirinyaga", "description": "Specialty AA coffee demand in EU. Requires Coffee Directorate licence."},
+    {"product": "Avocado", "destination": "United Arab Emirates", "county": "Muranga, Nyeri", "description": "Hass avocado demand year-round. Requires KEPHIS phytosanitary certificate."},
+    {"product": "Macadamia", "destination": "China", "county": "Embu, Nyeri", "description": "Growing demand for in-shell macadamia. Requires AFA Nuts Directorate licence."},
+    {"product": "Horticulture - Green Beans", "destination": "Netherlands / EU", "county": "Kirinyaga, Muranga", "description": "EU export under GlobalG.A.P. certification. Cold chain required."},
+    {"product": "Dried Fruits - Mango", "destination": "United States", "county": "Machakos, Makueni", "description": "Dried mango snacks demand. Requires FDA facility registration."},
 ]
+
+def _normalize_funder(f):
+    return {
+        "name": f.get("name", ""),
+        "funder_name": f.get("name", ""),
+        "type": f.get("type", ""),
+        "funder_type": f.get("type", ""),
+        "amount": f.get("amount", ""),
+        "amount_range": f.get("amount", ""),
+        "amount_kes": f.get("amount", ""),
+        "rate": f.get("rate", ""),
+        "apply_url": f.get("apply_url", ""),
+        "url": f.get("apply_url", ""),
+        "county": f.get("county", ""),
+        "sector": f.get("sector", ""),
+        "description": f.get("description", ""),
+        "source": "Curated Directory - Verify with provider",
+        "is_curated": True,
+        "is_live": False,
+    }
+
+def _normalize_export(e):
+    return {
+        "product": e.get("product", ""),
+        "product_name": e.get("product", ""),
+        "destination": e.get("destination", ""),
+        "country": e.get("destination", ""),
+        "destination_country": e.get("destination", ""),
+        "county": e.get("county", ""),
+        "description": e.get("description", ""),
+        "opportunity_score": None,
+        "score": None,
+        "source": "Curated Directory - Verify with buyer / regulator",
+        "is_curated": True,
+        "is_live": False,
+    }
 
 @router.get("/funding", response_class=HTMLResponse)
 async def funding_page(request: Request, sector: Optional[str] = Query(None), county: Optional[str] = Query(None), db: Session = Depends(get_session)):
@@ -72,11 +108,12 @@ async def funding_page(request: Request, sector: Optional[str] = Query(None), co
         current_user = await get_current_user(request, db)
     except Exception:
         current_user = None
-    funders = CURATED_FUNDERS
+    funders_raw = FUNDING_DIRECTORY
     if sector:
-        funders = [f for f in funders if sector.lower() in (f["sector"] or "").lower() or "all sectors" in (f["sector"] or "").lower()]
+        funders_raw = [f for f in funders_raw if sector.lower() in (f["sector"] or "").lower() or "all sectors" in (f["sector"] or "").lower()]
     if county:
-        funders = [f for f in funders if county.lower() in (f["county"] or "").lower() or "all counties" in (f["county"] or "").lower()]
+        funders_raw = [f for f in funders_raw if county.lower() in (f["county"] or "").lower() or "all counties" in (f["county"] or "").lower()]
+    funders = [_normalize_funder(f) for f in funders_raw]
     return templates.TemplateResponse("business_os_funding.html", {
         "request": request,
         "current_user": current_user,
@@ -84,8 +121,14 @@ async def funding_page(request: Request, sector: Optional[str] = Query(None), co
         "funders": funders,
         "funding": funders,
         "opportunities": funders,
+        "items": funders,
+        "data": funders,
         "total": len(funders),
+        "count": len(funders),
+        "total_funders": len(funders),
         "has_data": len(funders) > 0,
+        "is_curated": True,
+        "data_source": "Curated Directory - Verify with provider",
         "sector": sector or "",
         "county": county or "",
     })
@@ -96,17 +139,30 @@ async def export_page(request: Request, db: Session = Depends(get_session)):
         current_user = await get_current_user(request, db)
     except Exception:
         current_user = None
-    exports = CURATED_EXPORTS
+    exports = [_normalize_export(e) for e in EXPORT_DIRECTORY]
+    destinations = len(set(e["destination"] for e in exports))
     return templates.TemplateResponse("business_os_export.html", {
         "request": request,
         "current_user": current_user,
         "user": current_user,
         "exports": exports,
         "opportunities": exports,
+        "items": exports,
+        "data": exports,
+        "export_opportunities": exports,
         "total": len(exports),
-        "scored": len(exports),
-        "destinations": len(set(e["destination"] for e in exports)),
+        "count": len(exports),
+        "total_opportunities": len(exports),
+        "total_exports": len(exports),
+        "scored": 0,
+        "scored_count": 0,
+        "destinations": destinations,
+        "destination_count": destinations,
+        "total_destinations": destinations,
+        "avg_score": None,
         "has_data": len(exports) > 0,
+        "is_curated": True,
+        "data_source": "Curated Directory - Verify with buyer / regulator",
     })
 
 @router.post("/business", dependencies=[Depends(require_module(module_number=8)), Depends(consume_credits(1))])
