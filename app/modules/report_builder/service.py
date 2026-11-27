@@ -180,6 +180,10 @@ def fetch_all_live(sector: str = None, county: str = None, product: str = None, 
                 return s.exec(q).all()
             except Exception as e:
                 print(f"fetch {model} failed {e}")
+                try:
+                    s.rollback()
+                except Exception:
+                    pass
                 return []
         competitors = safe_query(Competitor)
         prices = safe_query(PriceData)
@@ -519,7 +523,7 @@ def _consumer_risk_block(story, S, live, plan_name, budget_str, q, sector, count
         story.append(Paragraph("No live export opportunities were found for this filter. Export is a Phase 2 play. Win locally first.", S["body"]))
     for e in live["exports"][:8]:
         story.append(Paragraph(f"{safe(getattr(e, 'product', 'Product'))} to {safe(getattr(e, 'country', 'Country'))}  |  Score {safe(getattr(e, 'opportunity_score', 0))}", S["bullet"]))
-def _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str):
+def _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str, plan_name="Trial"):
     story.append(Paragraph("Annex A  Full Data Tables", S["h1"]))
     story.append(Paragraph("Table A.1 below contains the full live records used for this report, up to 50 rows. It is the audit trail for Figures 3.1 to 3.3 and Table 3.1.", S["body"]))
     a_rows = [[Paragraph("Product", S["th"]), Paragraph("County", S["th"]), Paragraph("Price (KES)", S["th_r"]), Paragraph("Demand / 100", S["th_r"]), Paragraph("Sector", S["th"])]]
@@ -641,7 +645,7 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
         story.append(Paragraph("Sources: EvidLens live database at generation time. KPIN daily collection 03:00 EAT. No demo data used.", S["note"]))
         if ai_text:
             story.append(Paragraph(f"AI insight: {safe(ai_text[:500])}", S["body"]))
-        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str)
+        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str, plan_name)
     elif mode == "CONSUMER_ANALYSIS":
         story.append(Paragraph("Executive Summary", S["h1"]))
         story.append(Paragraph(f"This report assesses consumer demand for <b>{safe(q)}</b> in <b>{safe(location)}</b>. It is based on <b>{len(live['social'])} live consumer mentions</b>, <b>{len(live['demand'])} demand records</b>, and <b>{len(live['prices'])} price records</b>.", S["body"]))
@@ -684,7 +688,7 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
         story.append(Paragraph("5  Pricing Sensitivity", S["h1"]))
         story.append(Paragraph(f"Median price is <b>{_fmt_kes(m['median_price'])}</b>, mean is {_fmt_kes(m['avg_price'])}. Price at median for trial. If repeat is below 20 percent, price, quality, or location is wrong.", S["body"]))
         _charts_block(story, S, live)
-        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str)
+        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str, plan_name)
     elif mode == "INDUSTRY_OUTLOOK":
         story.append(Paragraph("Executive Summary", S["h1"]))
         story.append(Paragraph(f"This Industry Outlook assesses <b>{safe(sector)}</b> in <b>{safe(location)}</b> with focus product <b>{safe(q)}</b>. It is based on <b>{len(live['prices']) + len(live['demand'])} live price and metric records</b>, <b>{len(live['companies'])} companies</b>, <b>{len(live['competitors'])} competitors</b>.", S["body"]))
@@ -731,7 +735,7 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
         story.append(Paragraph("Week 2  —  Test. Sell a small batch at median price. Track volume, margin, repeat.", S["bullet"]))
         story.append(Paragraph("Week 3  —  Fix. Adjust one variable only: price, location, or packaging.", S["bullet"]))
         story.append(Paragraph("Week 4  —  Decide. If daily net profit covers rent, transport, and time, scale. If not, pivot.", S["bullet"]))
-        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str)
+        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str, plan_name)
     elif mode == "SECTOR_PULSE":
         story.append(Paragraph("Sector Pulse - Snapshot", S["h1"]))
         story.append(Paragraph(f"Pulse for <b>{safe(sector)}</b> in <b>{safe(location)}</b>. Focus: <b>{safe(q)}</b>. Based on <b>{len(live['prices']) + len(live['demand'])} live records</b>.", S["body"]))
@@ -744,7 +748,7 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
             story.append(Paragraph(f"{safe(getattr(n, 'title', 'News'))}: {safe(str(getattr(n, 'summary', ''))[:140])}", S["bullet"]))
         if not live["news"]:
             story.append(Paragraph("No live risk alerts for this filter.", S["bullet"]))
-        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str)
+        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str, plan_name)
     elif mode == "PRODUCT_WATCH":
         story.append(Paragraph("Product Watch", S["h1"]))
         story.append(Paragraph(f"Product: <b>{safe(q)}</b>. Sector: <b>{safe(sector)}</b>. Location: <b>{safe(location)}</b>.", S["body"]))
@@ -758,7 +762,7 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
             story.append(Paragraph(f"[{safe(getattr(s, 'platform', 'X'))}  {safe(getattr(s, 'sentiment', 'neutral'))}]  {safe(str(getattr(s, 'content', ''))[:140])}", S["bullet"]))
         if not live["social"]:
             story.append(Paragraph("No live consumer mentions for this filter.", S["bullet"]))
-        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str)
+        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str, plan_name)
     elif mode == "INVESTOR_PITCH":
         story.append(Paragraph("Investor Pitch - Summary", S["h1"]))
         story.append(Paragraph(f"Opportunity: <b>{safe(q)}</b> in <b>{safe(location)}</b>, sector <b>{safe(sector)}</b>. Ask: <b>{budget_str}</b>.", S["body"]))
@@ -778,7 +782,7 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
             story.append(Paragraph(f"{safe(getattr(n, 'title', 'News'))}: {safe(str(getattr(n, 'summary', ''))[:140])}", S["bullet"]))
         if not live["news"]:
             story.append(Paragraph("No live risk alerts for this filter.", S["bullet"]))
-        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str)
+        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str, plan_name)
     elif mode == "BUSINESS_PLAN":
         story.append(Paragraph("Business Plan - Bank Loan Pack", S["h1"]))
         story.append(Paragraph(f"Business: <b>{safe(q)}</b> in <b>{safe(location)}</b>. Sector: <b>{safe(sector)}</b>. Requested budget: <b>{budget_str}</b>.", S["body"]))
@@ -795,7 +799,7 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
         story.append(Paragraph("County single business permit, KRA eTIMS, and sector licences where applicable. Food, LPG, or fuel need KEBS and EPRA approvals.", S["body"]))
         story.append(Paragraph("Repayment Plan", S["h2"]))
         story.append(Paragraph("Repay from daily net profit after rent, transport, and stock. Bring this report plus 6 months M-Pesa statements to the lender. Do not use high-interest mobile loans to cover rent.", S["body"]))
-        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str)
+        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str, plan_name)
     elif mode == "KRA_TAX":
         story.append(Paragraph("KRA Tax Report", S["h1"]))
         story.append(Paragraph(f"Business: <b>{safe(q)}</b> in <b>{safe(location)}</b>. Sector: <b>{safe(sector)}</b>. This is an information report, not tax advice. Confirm with KRA.", S["body"]))
@@ -810,7 +814,7 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
         story.append(Paragraph("Evidence Base", S["h2"]))
         story.append(Paragraph(f"Median price {_fmt_kes(m['median_price'])}, average demand {m['avg_demand']:.0f} / 100, records used: PriceData {len(live['prices'])}, MarketMetric {len(live['demand'])}.", S["body"]))
         story.append(Paragraph("Sources: kra.go.ke, KRA eTIMS guidance. Verify rates at generation time.", S["note"]))
-        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str)
+        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str, plan_name)
     else:
         story.append(Paragraph("Executive Summary", S["h1"]))
         story.append(Paragraph(f"This report assesses the feasibility of <b>{safe(q)}</b> in <b>{safe(location)}</b> for the <b>{safe(sector)}</b> sector. It is based on <b>{len(live['prices']) + len(live['demand'])} live price and metric records</b>, <b>{len(live['companies'])} companies</b>, <b>{len(live['competitors'])} competitors</b>, <b>{len(live['news'])} risk and policy signals</b>, and <b>{len(live['social'])} consumer mentions</b> available at generation time.", S["body"]))
@@ -856,7 +860,7 @@ def _build_pdf(path, title, q, sector, country, county, sub_county, ward, town, 
         story.append(Paragraph("Week 2  —  Test. Sell a small batch at median price. Track volume, margin, repeat.", S["bullet"]))
         story.append(Paragraph("Week 3  —  Fix. Adjust one variable only: price, location, or packaging.", S["bullet"]))
         story.append(Paragraph("Week 4  —  Decide. If daily net profit covers rent, transport, and time, scale. If not, pivot.", S["bullet"]))
-        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str)
+        _annex_block(story, S, live, q, sector, location, county, sub_county, ward, town, report_no, now_str, plan_name)
     doc = SimpleDocTemplate(path, pagesize=A4, topMargin=18 * mm, bottomMargin=18 * mm, leftMargin=18 * mm, rightMargin=18 * mm, title=title, author="EvidLens")
     doc.build(story, onFirstPage=_hf, onLaterPages=_hf)
 def _resolve_mode(report_type):
