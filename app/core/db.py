@@ -129,21 +129,26 @@ def init_db():
     # --- Fix workspace FKs: workspaces -> user should be workspaces -> auth_user ---
     try:
         with engine.begin() as conn:
-            rows = conn.execute(text(
-                "SELECT conname, conrelid::regclass::text AS tbl, a.attname AS col "
+            all_rows = conn.execute(text(
+                "SELECT conname, conrelid::regclass::text AS tbl, a.attname AS col, confrelid::regclass::text AS ref_tbl "
                 "FROM pg_constraint c "
                 "JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey) "
-                "WHERE c.contype = 'f' AND c.confrelid = 'user'::regclass "
+                "WHERE c.contype = 'f' "
                 "AND conrelid::regclass::text ILIKE '%workspace%'"
             )).fetchall()
-            for conname, tbl, col in rows:
+            for conname, tbl, col, ref_tbl in all_rows:
+                logger.info(f"Workspace FK found: {tbl}.{conname} ({col}) -> {ref_tbl}")
+            rows = [r for r in all_rows if r[3] == "user"]
+            for conname, tbl, col, ref_tbl in rows:
                 ref = "workspaces" if col == "workspace_id" else "auth_user"
                 logger.info(f"Fixing FK {tbl}.{conname} ({col}) -> {ref}(id)")
                 conn.execute(text(f"ALTER TABLE {tbl} DROP CONSTRAINT IF EXISTS {conname}"))
                 conn.execute(text(f"ALTER TABLE {tbl} ADD CONSTRAINT {conname} FOREIGN KEY ({col}) REFERENCES {ref}(id) ON DELETE CASCADE"))
             if rows:
                 logger.info(f"Workspace FKs fixed: {len(rows)}")
+            elif all_rows:
+                logger.info("Workspace FKs: already pointing to auth_user, nothing to fix")
             else:
-                logger.info("Workspace FKs: no FKs pointing to user found")
+                logger.info("Workspace FKs: no workspace FKs found at all - table may not exist yet")
     except Exception as e:
         logger.warning("Workspace FK fix skipped: %s", e)
