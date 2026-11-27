@@ -6,6 +6,7 @@ from collections import Counter
 from io import BytesIO
 import statistics
 import os
+import re
 from pydantic import BaseModel
 from typing import List, Optional, Any
 try:
@@ -49,23 +50,22 @@ def _hex_color(code: str):
     if HAS_REPORTLAB and colors is not None:
         return colors.HexColor(code)
     return _DummyColor()
-NAVY = _hex_color("#0A1F44")
-TEAL = _hex_color("#14B8A6")
-LIGHT_TEAL = _hex_color("#E0F2F1")
-GOLD = _hex_color("#C5A880")
+NAVY = _hex_color("#0B3D5C")
+TEAL = _hex_color("#1A6B9A")
+LIGHT_TEAL = _hex_color("#F7FAFC")
+GOLD = _hex_color("#E8A838")
 GREEN = _hex_color("#16A34A")
-YELLOW = _hex_color("#F59E0B")
+YELLOW = _hex_color("#E8A838")
 RED = _hex_color("#DC2626")
 PRICING = {"Starter": {"monthly": 500, "annual": 5000}, "Pro": {"monthly": 1500, "annual": 15000}, "Enterprise": {"monthly": 5000, "annual": 50000}}
 PRODUCT_ALIASES = {"coffee": "coffee", "kahawa": "coffee", "arabica": "coffee", "robusta": "coffee", "tea": "tea", "chai": "tea", "maize": "maize", "corn": "maize", "avocado": "avocado", "ovacado": "avocado", "dairy": "dairy", "milk": "dairy", "poultry": "poultry", "chicken": "poultry", "eggs": "poultry", "potato": "potato", "potatoes": "potato", "banana": "banana", "bananas": "banana", "tomato": "tomato", "tomatoes": "tomato", "onion": "onion", "onions": "onion", "cabbage": "cabbage", "beans": "beans", "rice": "rice", "wheat": "wheat", "sugarcane": "sugarcane", "macadamia": "macadamia", "mango": "mango", "passion": "passion fruit"}
 def lock_product(raw: Optional[str]) -> str:
     clean = (raw or "").strip().lower()
-    first = clean.split()[0] if clean.split() else ""
+    if not clean:
+        return ""
     if clean in PRODUCT_ALIASES:
         return PRODUCT_ALIASES[clean]
-    if first in PRODUCT_ALIASES:
-        return PRODUCT_ALIASES[first]
-    return first or clean
+    return clean
 def _safe_float(v):
     try:
         if v is None or v == "":
@@ -73,55 +73,76 @@ def _safe_float(v):
         return float(v)
     except Exception:
         return None
+def _parse_budget(v) -> float:
+    if v is None or v == "":
+        return 0.0
+    try:
+        if isinstance(v, (int, float)):
+            return float(v)
+        s = str(v).replace("KES", "").replace("kes", "").replace(",", "").strip()
+        return float(s) if s else 0.0
+    except Exception:
+        return 0.0
+def _parse_subcounties(v) -> list:
+    if v is None or v == "":
+        return ["All"]
+    if isinstance(v, list):
+        return [str(x).strip() for x in v if str(x).strip()] or ["All"]
+    if isinstance(v, str):
+        s = v.strip()
+        if s.lower() in ("all", "all counties", "all subcounties", "all sub-counties"):
+            return ["All"]
+        return [p.strip() for p in re.split(r"[,;|]", s) if p.strip()] or ["All"]
+    return ["All"]
+def _norm_demand(v):
+    return _safe_float(v)
+def _demand_10(v):
+    f = _safe_float(v)
+    if f is None:
+        return None
+    if f > 10:
+        return round(f / 10.0, 2)
+    return round(f, 2)
 def _rollback(session):
     try:
         session.rollback()
     except Exception:
         pass
 class DetailedAnalysisRequest(BaseModel):
-    product: Optional[str] = None
-    query: Optional[str] = None
-    q: Optional[str] = None
-    topic: Optional[str] = None
-    timeframe: Optional[str] = None
-    county: Optional[str] = None
-    subcounties: Optional[List[str]] = None
-    sub_counties: Optional[List[str]] = None
-    sub_county: Optional[str] = None
-    sector: Optional[str] = None
-    budget_kes: Optional[float] = None
+    product: Optional[Any] = None
+    query: Optional[Any] = None
+    q: Optional[Any] = None
+    topic: Optional[Any] = None
+    timeframe: Optional[Any] = None
+    county: Optional[Any] = None
+    subcounties: Optional[Any] = None
+    sub_counties: Optional[Any] = None
+    sub_county: Optional[Any] = None
+    sector: Optional[Any] = None
+    budget_kes: Optional[Any] = None
     budget: Optional[Any] = None
-    business_model: Optional[str] = None
+    business_model: Optional[Any] = None
     model_config = {"extra": "allow"}
     def get_product(self):
         raw = self.product or self.query or self.q or self.topic or ""
-        return lock_product(raw)
+        return lock_product(str(raw))
     def get_county(self):
-        return (self.county or "Kenya").strip()
+        return (str(self.county) if self.county else "Kenya").strip() or "Kenya"
     def get_sector(self):
-        return (self.sector or "Agriculture").strip()
+        return (str(self.sector) if self.sector else "Agriculture").strip() or "Agriculture"
     def get_subcounties(self):
-        if self.subcounties:
-            return self.subcounties
-        if self.sub_counties:
-            return self.sub_counties
-        if self.sub_county:
-            return [self.sub_county]
+        for v in (self.subcounties, self.sub_counties, self.sub_county):
+            if v is not None and v != "":
+                return _parse_subcounties(v)
         return ["All"]
     def get_budget(self):
-        if self.budget_kes is not None:
-            try:
-                return float(self.budget_kes)
-            except Exception:
-                return 0.0
-        if self.budget is not None:
-            try:
-                return float(str(self.budget).replace(",", "").replace("KES", "").strip())
-            except Exception:
-                return 0.0
+        if self.budget_kes is not None and self.budget_kes != "":
+            return _parse_budget(self.budget_kes)
+        if self.budget is not None and self.budget != "":
+            return _parse_budget(self.budget)
         return 0.0
     def get_business_model(self):
-        return self.business_model or "Retail"
+        return str(self.business_model) if self.business_model else "Retail"
 def create_chart(fig_func):
     if not HAS_MATPLOTLIB or not HAS_REPORTLAB:
         return Spacer(1, 10)
@@ -134,14 +155,14 @@ def create_chart(fig_func):
 def donut_chart(data, labels, title):
     def _plot():
         fig, ax = plt.subplots(figsize=(3, 3))
-        ax.pie(data, labels=labels, autopct="%1.0f%%", startangle=90, wedgeprops=dict(width=0.4), colors=["#0A1F44", "#14B8A6", "#C5A880", "#64748B", "#E2E8F0"])
-        ax.set_title(title, fontsize=10, color="#0A1F44", fontweight="bold")
+        ax.pie(data, labels=labels, autopct="%1.0f%%", startangle=90, wedgeprops=dict(width=0.4), colors=["#0B3D5C", "#1A6B9A", "#E8A838", "#718096", "#EDF2F7"])
+        ax.set_title(title, fontsize=10, color="#0B3D5C", fontweight="bold")
     return create_chart(_plot)
 def bar_chart(data, labels, title):
     def _plot():
         fig, ax = plt.subplots(figsize=(4, 3))
-        ax.barh(labels, data, color="#14B8A6")
-        ax.set_title(title, fontsize=10, color="#0A1F44", fontweight="bold")
+        ax.barh(labels, data, color="#1A6B9A")
+        ax.set_title(title, fontsize=10, color="#0B3D5C", fontweight="bold")
         ax.invert_yaxis()
         for i, v in enumerate(data):
             ax.text(v, i, f" {v}", va="center", fontsize=8)
@@ -181,15 +202,16 @@ def _run_analysis(req: DetailedAnalysisRequest, session: Session):
     demand_stmt = select(MarketMetric).where(product_filter, county_filter, subcounty_filter, MarketMetric.created_at >= last_30_days)
     sector_data = session.exec(demand_stmt).all()
     demand_scores = [d.demand_score for d in sector_data if d.demand_score is not None]
-    avg_demand = statistics.mean(demand_scores) if demand_scores else None
+    avg_demand_raw = statistics.mean(demand_scores) if demand_scores else None
+    avg_demand = _demand_10(avg_demand_raw) if avg_demand_raw is not None else None
     demand_level = "Unknown" if avg_demand is None else "Low" if avg_demand < 4 else "Medium" if avg_demand < 7 else "High"
     product_records = len(sector_data)
     seasonal_stmt = select(MarketMetric).where(product_filter, county_filter).order_by(MarketMetric.created_at.desc()).limit(12)
     seasonal_data = session.exec(seasonal_stmt).all()
     seasonality = None
     if len(seasonal_data) >= 6:
-        first_avg = statistics.mean([d.demand_score or 0 for d in seasonal_data[:3]])
-        last_avg = statistics.mean([d.demand_score or 0 for d in seasonal_data[-3:]])
+        first_avg = statistics.mean([_demand_10(d.demand_score) or 0 for d in seasonal_data[:3]])
+        last_avg = statistics.mean([_demand_10(d.demand_score) or 0 for d in seasonal_data[-3:]])
         seasonality = "Peak Season" if first_avg > last_avg else "Off Season"
     competitor_stmt = select(MarketMetric.subcounty).where(product_filter, county_filter).distinct().limit(10)
     competitor_locations = session.exec(competitor_stmt).all()
@@ -297,7 +319,7 @@ def download_pdf(req: DetailedAnalysisRequest, session: Session = Depends(get_se
         sidebar_elements.append(Image(logo_path, width=22*mm, height=22*mm))
     sidebar_elements.append(Paragraph("EvidLens<br/>Research & Consulting", styles["Sidebar"]))
     sidebar_elements.append(Spacer(1, 8))
-    sidebar_elements.append(Paragraph("<font color='#14B8A6'>REPORT OVERVIEW</font>", styles["Sidebar"]))
+    sidebar_elements.append(Paragraph("<font color='#1A6B9A'>REPORT OVERVIEW</font>", styles["Sidebar"]))
     for icon, label, value in [("date", "DATE", datetime.utcnow().strftime("%B %Y")), ("location", "COVERAGE", f"{req.get_county()} County"), ("sector", "SECTOR", req.get_sector()), ("budget", "BUDGET", f"KES {fin['budget_kes']:,.0f}")]:
         row = [Image(icon_path(icon), 4*mm, 4*mm)] if os.path.exists(icon_path(icon)) else []
         row.append(Paragraph(f"<b>{label}</b><br/>{value}", styles["Sidebar"]))
@@ -382,7 +404,7 @@ def get_trending(session: Session = Depends(get_session)):
             if key in seen:
                 continue
             seen.add(key)
-            avg_demand = _safe_float(r.avg_demand)
+            avg_demand = _demand_10(r.avg_demand)
             if avg_demand is not None:
                 avg_demand = round(avg_demand, 1)
             avg_price = _safe_float(r.avg_price)
@@ -406,7 +428,7 @@ def get_trending(session: Session = Depends(get_session)):
             try:
                 latest = session.exec(select(MarketMetric).where(MarketMetric.product == r.product, MarketMetric.county == r.county).order_by(desc(MarketMetric.created_at)).limit(1)).first()
                 if latest is not None:
-                    fetched = latest.fetched_at or latest.updated_at or latest.created_at
+                    fetched = getattr(latest, "fetched_at", None) or getattr(latest, "updated_at", None) or getattr(latest, "created_at", None)
             except Exception:
                 _rollback(session)
             trending_list.append({"product": product, "county": county, "sector": r.sector or "", "demand_score": avg_demand, "current_price_kes": avg_price, "avg_price_kes": avg_price, "price": avg_price, "price_change_percent": price_change, "trend": trend, "activity": r.activity_count, "source": "MarketMetric", "fetched_at": str(fetched) if fetched else None, "updated_at": str(fetched) if fetched else None})
@@ -431,7 +453,7 @@ def search_insights(q: str = Query("", min_length=0), county: str = Query(None),
         if sector:
             filters.append(MarketMetric.sector == sector)
         if min_demand > 0:
-            filters.append(MarketMetric.demand_score >= min_demand)
+            filters.append(MarketMetric.demand_score >= (min_demand * 10 if min_demand <= 10 else min_demand))
         if filters:
             stmt = stmt.where(*filters)
         days_old = func.julianday("now") - func.julianday(MarketMetric.created_at)
@@ -442,7 +464,7 @@ def search_insights(q: str = Query("", min_length=0), county: str = Query(None),
         formatted = []
         for r in results:
             price = _safe_float(r.avg_price_kes)
-            demand = _safe_float(r.demand_score)
+            demand = _demand_10(r.demand_score)
             formatted.append({"id": r.id, "product": r.product, "county": r.county, "sector": r.sector, "current_price_kes": price, "avg_price_kes": price, "price": price, "demand_score": demand, "timestamp": r.created_at, "snippet": f"{r.product} in {r.sector} @ {r.county} - Demand {demand if demand is not None else '—'}/10, Avg KES {price if price is not None else '—'}"})
         if not formatted and q:
             like = f"%{q}%"
