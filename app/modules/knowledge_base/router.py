@@ -58,6 +58,26 @@ POLICY_DIRECTORY = [
     {"title": "NEMA Environmental Licence", "category": "Environment", "description": "Manufacturing, waste and construction projects need NEMA EIA licence before starting.", "link": "https://www.nema.go.ke/", "authority": "NEMA"},
 ]
 
+GUIDE_DIRECTORY = [
+    {"title": "How to Start a Business in Kenya", "category": "Starting", "description": "Step 1: Choose structure. Step 2: Register on BRS via eCitizen. Step 3: Get KRA PIN. Step 4: Get county Single Business Permit. Step 5: Open business bank / M-Pesa Till.", "link": "https://www.brs.go.ke/", "authority": "Business Registration Service"},
+    {"title": "How to Get a KRA PIN and File Tax", "category": "Tax", "description": "Register on iTax, get PIN, file monthly VAT by 20th, annual income tax by 30 June. Keep receipts for 5 years.", "link": "https://www.kra.go.ke/", "authority": "Kenya Revenue Authority"},
+    {"title": "How to Price Your Product", "category": "Pricing", "description": "Cost + margin + competitor check + county demand. Do not price below cost. Test price with 20 customers before printing price list.", "link": "/kb", "authority": "EvidLens"},
+    {"title": "How to Get Funding", "category": "Funding", "description": "Start with SACCO / group, then Youth / Uwezo / WEF, then bank. Banks want 6 months statements. Government funds want registered group.", "link": "/reports/funding", "authority": "EvidLens"},
+    {"title": "How to Export from Kenya", "category": "Export", "description": "Get KEBS mark, get export licence from regulator, check destination rules, use KEPHIS for horticulture, KEBS for food.", "link": "https://www.kepphis.org/", "authority": "KEPHIS / KEBS"},
+    {"title": "How to Protect Your Business Data", "category": "Data", "description": "Register as data controller with ODPC if you collect phone numbers / emails. Have a privacy notice and do not share customer data.", "link": "https://www.odpc.go.ke/", "authority": "Office of Data Protection Commissioner"},
+]
+
+LICENCE_DIRECTORY = [
+    {"title": "Single Business Permit", "category": "Licence", "description": "Required for every business. Apply at county revenue office or county eCitizen portal. Renew yearly. Fee depends on county and business size.", "link": "https://www.ecitizen.go.ke/", "authority": "County Government"},
+    {"title": "Food Hygiene Licence", "category": "Licence", "description": "Required for food businesses. Staff need medical certificates every 6 months. Premises inspected by Public Health.", "link": "https://www.health.go.ke/", "authority": "Ministry of Health"},
+    {"title": "KEBS Standardization Mark", "category": "Licence", "description": "Required for food, cosmetics and manufactured goods sold in Kenya. Apply via KEBS portal, product testing required.", "link": "https://www.kebs.org/", "authority": "Kenya Bureau of Standards"},
+    {"title": "NEMA EIA Licence", "category": "Licence", "description": "Required for manufacturing, waste, construction projects. EIA study before starting. No licence = closure.", "link": "https://www.nema.go.ke/", "authority": "NEMA"},
+    {"title": "Tourism Licence", "category": "Licence", "description": "Required for hotels, tour operators, travel agents. Apply via Tourism Regulatory Authority.", "link": "https://www.tourismauthority.go.ke/", "authority": "Tourism Regulatory Authority"},
+    {"title": "Pharmacy / PPB Licence", "category": "Licence", "description": "Required for pharmacies and chemists. Apply via Pharmacy and Poisons Board. Pharmacist must be registered.", "link": "https://www.pharmacyboardkenya.org/", "authority": "Pharmacy and Poisons Board"},
+    {"title": "Liquor Licence", "category": "Licence", "description": "Required to sell alcohol. Apply at county liquor licensing committee. Different classes for bar, restaurant, wholesale.", "link": "https://www.ecitizen.go.ke/", "authority": "County Government"},
+    {"title": "Transport / NTSA Licence", "category": "Licence", "description": "Required for PSV, boda, logistics. Vehicle inspection, driver PSV badge, SACCO / company registration.", "link": "https://www.ntsa.go.ke/", "authority": "NTSA"},
+]
+
 class ReportResponse(BaseModel):
     sector: str
     county: Optional[str]
@@ -88,21 +108,42 @@ def _normalize_policy(p):
         "is_live": False,
     }
 
-@router.get("", response_class=HTMLResponse)
-@router.get("/", response_class=HTMLResponse)
-async def kb_home(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def _normalize_item(p):
+    return {
+        "title": p.get("title", ""),
+        "name": p.get("title", ""),
+        "category": p.get("category", ""),
+        "description": p.get("description", ""),
+        "summary": p.get("description", ""),
+        "link": p.get("link", ""),
+        "url": p.get("link", ""),
+        "authority": p.get("authority", ""),
+        "source": p.get("authority", ""),
+        "is_curated": True,
+        "is_live": False,
+    }
+
+def _get_recent(db):
     recent = []
     try:
         rows = db.exec(select(SectorReport).order_by(desc(SectorReport.created_at)).limit(12)).all()
         recent = [{"sector": getattr(r, "sector", ""), "title": getattr(r, "title", "") or getattr(r, "sector", ""), "summary": (getattr(r, "summary", "") or "")[:180]} for r in rows]
     except Exception as e:
-        logger.exception(f"kb_home recent failed: {e}")
+        logger.exception(f"kb recent failed: {e}")
         try:
             db.rollback()
         except Exception:
             pass
         recent = []
+    return recent
+
+@router.get("", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse)
+async def kb_home(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    recent = _get_recent(db)
     policies = [_normalize_policy(p) for p in POLICY_DIRECTORY]
+    guides = [_normalize_item(p) for p in GUIDE_DIRECTORY]
+    licences = [_normalize_item(p) for p in LICENCE_DIRECTORY]
     return templates.TemplateResponse("kb.html", {
         "request": request,
         "current_user": current_user,
@@ -112,28 +153,33 @@ async def kb_home(request: Request, current_user: User = Depends(get_current_use
         "recent_reports": recent,
         "reports": recent,
         "policies": policies,
+        "policy_list": policies,
         "policy_count": len(policies),
         "total_policies": len(policies),
+        "guides": guides,
+        "guide_list": guides,
+        "guide_count": len(guides),
+        "total_guides": len(guides),
+        "licences": licences,
+        "licenses": licences,
+        "licence_list": licences,
+        "licence_count": len(licences),
+        "total_licences": len(licences),
+        "items": policies + guides + licences,
         "total_reports": len(recent),
         "total": len(recent),
         "has_data": len(recent) > 0,
         "has_policies": len(policies) > 0,
+        "has_guides": len(guides) > 0,
+        "has_licences": len(licences) > 0,
         "is_curated": True,
         "data_source": "Curated Directory - Verify with regulator",
     })
 
 @router.get("/policy", response_class=HTMLResponse)
+@router.get("/policies", response_class=HTMLResponse)
 async def policy_page(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    recent = []
-    try:
-        rows = db.exec(select(SectorReport).order_by(desc(SectorReport.created_at)).limit(12)).all()
-        recent = [{"sector": getattr(r, "sector", ""), "title": getattr(r, "title", "") or getattr(r, "sector", ""), "summary": (getattr(r, "summary", "") or "")[:180]} for r in rows]
-    except Exception:
-        try:
-            db.rollback()
-        except Exception:
-            pass
-        recent = []
+    recent = _get_recent(db)
     policies = [_normalize_policy(p) for p in POLICY_DIRECTORY]
     return templates.TemplateResponse("kb_policy.html", {
         "request": request,
@@ -155,6 +201,70 @@ async def policy_page(request: Request, current_user: User = Depends(get_current
         "is_live": False,
         "data_source": "Curated Directory - Verify with regulator",
     })
+
+@router.get("/guides", response_class=HTMLResponse)
+async def guides_page(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    recent = _get_recent(db)
+    guides = [_normalize_item(p) for p in GUIDE_DIRECTORY]
+    return templates.TemplateResponse("kb_guides.html", {
+        "request": request,
+        "current_user": current_user,
+        "user": current_user,
+        "guides": guides,
+        "guide_list": guides,
+        "items": guides,
+        "data": guides,
+        "total": len(guides),
+        "count": len(guides),
+        "total_guides": len(guides),
+        "guide_count": len(guides),
+        "total_reports": len(recent),
+        "recent_reports": recent,
+        "has_data": len(guides) > 0,
+        "has_guides": len(guides) > 0,
+        "is_curated": True,
+        "is_live": False,
+        "data_source": "Curated Directory - Verify with regulator",
+    })
+
+@router.get("/licences", response_class=HTMLResponse)
+@router.get("/licenses", response_class=HTMLResponse)
+async def licences_page(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    recent = _get_recent(db)
+    licences = [_normalize_item(p) for p in LICENCE_DIRECTORY]
+    return templates.TemplateResponse("kb_licences.html", {
+        "request": request,
+        "current_user": current_user,
+        "user": current_user,
+        "licences": licences,
+        "licenses": licences,
+        "licence_list": licences,
+        "items": licences,
+        "data": licences,
+        "total": len(licences),
+        "count": len(licences),
+        "total_licences": len(licences),
+        "licence_count": len(licences),
+        "total_reports": len(recent),
+        "recent_reports": recent,
+        "has_data": len(licences) > 0,
+        "has_licences": len(licences) > 0,
+        "is_curated": True,
+        "is_live": False,
+        "data_source": "Curated Directory - Verify with regulator",
+    })
+
+@router.get("/guides.json")
+def guides_json():
+    return {"guides": [_normalize_item(p) for p in GUIDE_DIRECTORY], "total": len(GUIDE_DIRECTORY)}
+
+@router.get("/licences.json")
+def licences_json():
+    return {"licences": [_normalize_item(p) for p in LICENCE_DIRECTORY], "total": len(LICENCE_DIRECTORY)}
+
+@router.get("/policies.json")
+def policies_json():
+    return {"policies": [_normalize_policy(p) for p in POLICY_DIRECTORY], "total": len(POLICY_DIRECTORY)}
 
 @router.get("/sectors")
 def list_sectors():
