@@ -80,8 +80,8 @@ def _ensure_user_row(db, auth_user):
     except Exception:
         pass
     _fix_fk(db, "workspaces", "workspaces_owner_id_fkey", "owner_id", "auth_user")
-    _fix_fk(db, "workspace_member", "workspace_member_user_id_fkey", "user_id", "auth_user")
-    _fix_fk(db, "workspace_member", "workspace_member_workspace_id_fkey", "workspace_id", "workspaces")
+    _fix_fk(db, "workspace_members", "workspace_members_user_id_fkey", "user_id", "auth_user")
+    _fix_fk(db, "workspace_members", "workspace_members_workspace_id_fkey", "workspace_id", "workspaces")
     return auth_user
 def _get_real_user(db, request, current_user):
     user_id, email = _resolve_user_id(request, current_user)
@@ -156,22 +156,29 @@ async def list_workspaces(request: Request, current_user: User = Depends(get_cur
     current_workspace_id = None
     real_user = _get_real_user(db, request, current_user)
     try:
-        if HAS_MODEL and real_user:
-            rows = db.exec(select(Workspace).where(Workspace.owner_id == real_user.id)).all()
-            for ws in rows:
-                members = []
-                try:
-                    mrows = db.exec(select(WorkspaceMember).where(WorkspaceMember.workspace_id == ws.id)).all()
-                    members = [{"full_name": getattr(m, "full_name", None) or getattr(m, "name", None) or getattr(m, "email", "User"), "email": getattr(m, "email", "")} for m in mrows]
-                except Exception:
-                    members = [{"full_name": getattr(real_user, "full_name", None) or getattr(real_user, "email", "You"), "email": getattr(real_user, "email", "")}]
-                workspaces.append(_ws_to_dict(ws, len(members), members))
+        if real_user:
+            uid = getattr(real_user, "id", None)
+            rows = db.execute(
+                text(
+                    "SELECT DISTINCT w.id, w.name, w.plan, w.credits "
+                    "FROM workspaces w "
+                    "LEFT JOIN workspace_members m ON m.workspace_id = w.id "
+                    "WHERE w.owner_id = :uid OR m.user_id = :uid "
+                    "ORDER BY w.id DESC"
+                ),
+                {"uid": uid},
+            ).fetchall()
+            for r in rows:
+                workspaces.append({
+                    "id": r[0],
+                    "name": r[1] or "Workspace",
+                    "plan": r[2] or "Free",
+                    "credits": r[3] or 0,
+                    "members": [],
+                    "member_count": 0,
+                })
             if workspaces:
                 current_workspace_id = workspaces[0]["id"]
-                try:
-                    current_workspace_id = getattr(real_user, "current_workspace_id", None) or current_workspace_id
-                except Exception:
-                    pass
     except Exception as e:
         logger.exception(f"list_workspaces failed: {e}")
         try:
