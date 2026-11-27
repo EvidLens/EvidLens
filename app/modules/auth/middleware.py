@@ -1,7 +1,6 @@
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import RedirectResponse
 from fastapi.responses import JSONResponse
-
 PUBLIC_PATHS = [
     "/auth",
     "/login",
@@ -28,7 +27,6 @@ PUBLIC_PATHS = [
     "/api/auth",
     "/api/public",
 ]
-
 PROTECTED_PAGE_PREFIXES = [
     "/dashboard",
     "/competitive",
@@ -53,13 +51,11 @@ PROTECTED_PAGE_PREFIXES = [
     "/security",
     "/risk",
 ]
-
 PUBLIC_READ_API_PREFIXES = [
     "/api/data/",
     "/api/meta/",
     "/analysis/",
 ]
-
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         path = request.url.path
@@ -67,26 +63,23 @@ class AuthMiddleware(BaseHTTPMiddleware):
             if path == p or path.startswith(p + "/"):
                 return await call_next(request)
         has_auth = False
-        # 1. Session
         try:
-            if request.session.get("user_id"):
+            uid = request.session.get("user_id")
+            if uid is not None and str(uid).isdigit():
                 has_auth = True
+                request.state.user_id = int(uid)
         except Exception:
             pass
-        # 2. COOKIES - THIS WAS MISSING. This is what survives restarts.
         if not has_auth:
-            for key in ("user_id", "session", "auth_user_id"):
+            for key in ("user_id", "auth_user_id"):
                 v = request.cookies.get(key)
                 if v and str(v).isdigit():
                     has_auth = True
+                    try:
+                        request.state.user_id = int(v)
+                    except Exception:
+                        pass
                     break
-        # 3. Bearer
-        if not has_auth:
-            auth = request.headers.get("Authorization")
-            if auth and auth.startswith("Bearer "):
-                token = auth.replace("Bearer ", "").strip()
-                if token.isdigit():
-                    has_auth = True
         if path == "/":
             return await call_next(request)
         is_protected_page = False
@@ -97,6 +90,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if is_protected_page:
             if not has_auth:
                 accept = request.headers.get("accept", "")
+                if "application/json" in accept:
+                    return JSONResponse(status_code=401, content={"detail": "Not authenticated - please login"})
                 if "text/html" in accept or "text/" in accept or accept == "" or "*/*" in accept:
                     return RedirectResponse(url="/login", status_code=302)
                 return JSONResponse(status_code=401, content={"detail": "Not authenticated - please login"})
@@ -106,5 +101,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 for pub in PUBLIC_READ_API_PREFIXES:
                     if path.startswith(pub):
                         return await call_next(request)
+                accept = request.headers.get("accept", "")
+                if "application/json" in accept:
+                    return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
                 return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
         return await call_next(request)
