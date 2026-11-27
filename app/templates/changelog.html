@@ -11,60 +11,99 @@ body{background:#F5F7FA; font-family:-apple-system,BlinkMacSystemFont,sans-serif
 </style>
 </head>
 <body class="bg-[#F5F7FA]">
-  <!-- Header -->
   <header class="bg-[#0A1F44] text-white px-6 py-4">
-    <div class="max-w-6xl mx-auto flex items-center gap-3">
+    <div class="max-w-6xl mx-auto flex items-center justify-between">
       <a href="/" class="font-bold text-2xl"><span>Evid</span><span style="color:#14B8A6">Lens</span></a>
+      <span class="text-xs bg-[#14B8A6] px-3 py-1 rounded-full font-bold" id="current-version-badge">v{{ data.current_version | default('1.2.0') }}</span>
     </div>
   </header>
 
   <div class="max-w-4xl mx-auto p-6">
     <div class="card">
       <h1 class="text-3xl font-bold text-[#0A1F44]">Changelog</h1>
-      <p class="text-gray-500 mb-6">New features, improvements, and bug fixes for EvidLens</p>
+      <p class="text-gray-500 mb-6">New features, improvements, and bug fixes for EvidLens. Updated automatically on every deploy.</p>
 
-      <!-- v1.2.0 -->
-      <div class="border-l-4 border-[#14B8A6] pl-5 py-4 mb-6">
-        <div class="flex items-center gap-3 mb-2">
-          <h2 class="text-xl font-bold text-[#0A1F44]">v1.2.0</h2>
-          <span class="badge bg-teal-100 text-teal-700">Latest</span>
-          <span class="text-sm text-gray-500">July 20, 2026</span>
-        </div>
-        <ul class="space-y-2 text-gray-700">
-          <li>✨ <b>Added:</b> Real user dashboard with credits, billing, and history</li>
-          <li>✨ <b>Added:</b> M-Pesa payment integration for buying credits</li>
-          <li>⚡ <b>Improved:</b> Analysis speed 3x faster for county-level data</li>
-          <li>🐛 <b>Fixed:</b> Empty stats page now shows real user data</li>
-        </ul>
+      <div id="changelog-list">
+        {% if data.changelog | default([]) | length > 0 %}
+          {% for release in data.changelog %}
+          <div class="border-l-4 pl-5 py-4 mb-6" style="border-color:{{ '#14B8A6' if loop.first else '#D1D5DB' }}">
+            <div class="flex items-center gap-3 mb-2 flex-wrap">
+              <h2 class="text-xl font-bold text-[#0A1F44]">v{{ release.version }}</h2>
+              {% if loop.first %}<span class="badge bg-teal-100 text-teal-700">Latest</span>{% endif %}
+              <span class="text-sm text-gray-500">{{ release.date }}</span>
+              {% if release.environment %}<span class="badge bg-gray-100 text-gray-600">{{ release.environment }}</span>{% endif %}
+            </div>
+            {% if release.summary %}<p class="text-sm text-gray-600 mb-2">{{ release.summary }}</p>{% endif %}
+            <ul class="space-y-2 text-gray-700">
+              {% for item in release.items | default([]) %}
+              <li>
+                {% if item.type == 'added' %}✨ <b>Added:</b>
+                {% elif item.type == 'fixed' %}🐛 <b>Fixed:</b>
+                {% elif item.type == 'improved' %}⚡ <b>Improved:</b>
+                {% elif item.type == 'launch' %}🚀 <b>Launch:</b>
+                {% else %}• <b>{{ item.type | default('Update') | title }}:</b>
+                {% endif %}
+                {{ item.text }}
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div id="changelog-empty" class="text-center py-8">
+            <p class="text-gray-500 text-sm">Loading changelog...</p>
+          </div>
+        {% endif %}
       </div>
 
-      <!-- v1.1.0 -->
-      <div class="border-l-4 border-gray-300 pl-5 py-4 mb-6">
-        <div class="flex items-center gap-3 mb-2">
-          <h2 class="text-xl font-bold text-[#0A1F44]">v1.1.0</h2>
-          <span class="text-sm text-gray-500">July 5, 2026</span>
-        </div>
-        <ul class="space-y-2 text-gray-700">
-          <li>✨ <b>Added:</b> PDF report export for market analysis</li>
-          <li>✨ <b>Added:</b> Support for all 47 Kenyan counties</li>
-          <li>⚡ <b>Improved:</b> Better demand scoring algorithm</li>
-        </ul>
-      </div>
-
-      <!-- v1.0.0 -->
-      <div class="border-l-4 border-gray-300 pl-5 py-4">
-        <div class="flex items-center gap-3 mb-2">
-          <h2 class="text-xl font-bold text-[#0A1F44]">v1.0.0</h2>
-          <span class="text-sm text-gray-500">June 15, 2026</span>
-        </div>
-        <ul class="space-y-2 text-gray-700">
-          <li>🚀 <b>Launch:</b> EvidLens MVP released</li>
-          <li>✨ <b>Added:</b> Market analysis for products and sectors</li>
-          <li>✨ <b>Added:</b> User authentication and credit system</li>
-        </ul>
-      </div>
-
+      <p class="text-[11px] text-gray-400 mt-6">Last updated: {{ data.last_updated | default('') }} • Source: backend /api/changelog</p>
     </div>
   </div>
+
+<script>
+async function loadChangelogFromApi(){
+  const list = document.getElementById('changelog-list');
+  if(!list) return;
+  // If server already rendered entries, do nothing
+  if(list.querySelector('h2')) return;
+  try{
+    const res = await fetch('/api/changelog');
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const releases = data.changelog || data.releases || data.data || [];
+    if(!releases.length){
+      list.innerHTML = '<div class="text-center py-8"><p class="text-gray-500 text-sm">No changelog entries yet. This page updates on every deploy.</p></div>';
+      return;
+    }
+    list.innerHTML = '';
+    releases.forEach((release, idx) => {
+      const div = document.createElement('div');
+      div.className = 'border-l-4 pl-5 py-4 mb-6';
+      div.style.borderColor = idx === 0 ? '#14B8A6' : '#D1D5DB';
+      const itemsHtml = (release.items || []).map(item => {
+        const icon = item.type === 'added' ? '✨ <b>Added:</b>' : item.type === 'fixed' ? '🐛 <b>Fixed:</b>' : item.type === 'improved' ? '⚡ <b>Improved:</b>' : item.type === 'launch' ? '🚀 <b>Launch:</b>' : '• <b>Update:</b>';
+        return `<li>${icon} ${item.text || item}</li>`;
+      }).join('');
+      div.innerHTML = `
+        <div class="flex items-center gap-3 mb-2 flex-wrap">
+          <h2 class="text-xl font-bold text-[#0A1F44]">v${release.version}</h2>
+          ${idx === 0 ? '<span class="badge bg-teal-100 text-teal-700">Latest</span>' : ''}
+          <span class="text-sm text-gray-500">${release.date || ''}</span>
+        </div>
+        ${release.summary ? `<p class="text-sm text-gray-600 mb-2">${release.summary}</p>` : ''}
+        <ul class="space-y-2 text-gray-700">${itemsHtml}</ul>
+      `;
+      list.appendChild(div);
+    });
+    if(data.current_version){
+      const badge = document.getElementById('current-version-badge');
+      if(badge) badge.textContent = 'v' + data.current_version;
+    }
+  }catch(e){
+    list.innerHTML = '<div class="text-center py-8"><p class="text-gray-500 text-sm">Changelog unavailable. Please try again later.</p></div>';
+  }
+}
+loadChangelogFromApi();
+</script>
 </body>
 </html>
