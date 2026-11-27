@@ -1057,7 +1057,7 @@ def root(
     export_count = safe_count(
         select(func.count()).select_from(ExportOpportunity)
     )
-        county_count = safe_count(
+    county_count = safe_count(
         select(func.count(func.distinct(MarketMetric.county)))
     )
     policy_count = news_count
