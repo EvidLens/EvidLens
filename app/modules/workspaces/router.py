@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select
+from sqlalchemy import text
 from typing import Optional
 import logging
 from app.core.db import get_session as get_db
@@ -50,6 +51,25 @@ def _resolve_user_id(request, current_user):
     except Exception:
         pass
     return None, None
+def _fix_fk(db, table, constraint, column, ref_table):
+    try:
+        db.execute(text(f"ALTER TABLE {table} DROP CONSTRAINT IF EXISTS {constraint}"))
+        db.commit()
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+    try:
+        db.execute(text(f"ALTER TABLE {table} ADD CONSTRAINT {constraint} FOREIGN KEY ({column}) REFERENCES {ref_table}(id) ON DELETE CASCADE"))
+        db.commit()
+        return True
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return False
 def _ensure_user_row(db, auth_user):
     if auth_user is None:
         return None
@@ -59,31 +79,9 @@ def _ensure_user_row(db, auth_user):
             return auth_user
     except Exception:
         pass
-    try:
-        shadow = User()
-        shadow.id = getattr(auth_user, "id", None)
-        if hasattr(shadow, "email"):
-            shadow.email = getattr(auth_user, "email", "") or ""
-        if hasattr(shadow, "full_name"):
-            shadow.full_name = getattr(auth_user, "full_name", None) or getattr(auth_user, "email", "")
-        if hasattr(shadow, "hashed_password"):
-            shadow.hashed_password = getattr(auth_user, "hashed_password", "") or ""
-        if hasattr(shadow, "is_active"):
-            shadow.is_active = True
-        if hasattr(shadow, "email_verified"):
-            shadow.email_verified = True
-        if hasattr(shadow, "current_workspace_id"):
-            shadow.current_workspace_id = getattr(auth_user, "current_workspace_id", None)
-        db.add(shadow)
-        db.commit()
-        db.refresh(shadow)
-        return auth_user
-    except Exception:
-        try:
-            db.rollback()
-        except Exception:
-            pass
-        return auth_user
+    _fix_fk(db, "workspaces", "workspaces_owner_id_fkey", "owner_id", "auth_user")
+    _fix_fk(db, "workspace_member", "workspace_member_user_id_fkey", "user_id", "auth_user")
+    _fix_fk(db, "workspace_member", "workspace_member_workspace_id_fkey", "workspace_id", "workspaces")
     return auth_user
 def _get_real_user(db, request, current_user):
     user_id, email = _resolve_user_id(request, current_user)
@@ -123,6 +121,13 @@ def _is_json_request(request):
     accept = (request.headers.get("accept", "") or "").lower()
     ctype = (request.headers.get("content-type", "") or "").lower()
     return "application/json" in accept or "application/json" in ctype
+def _clean_error(e):
+    msg = str(e)
+    if "ForeignKeyViolation" in msg or "violates foreign key" in msg.lower() or "owner_id_fkey" in msg or "user_id_fkey" in msg:
+        return "Account sync failed. Please logout, login again, then try creating the workspace."
+    if len(msg) > 120 or "INSERT INTO" in msg or "psycopg2" in msg or "sqlalchemy" in msg or "SELECT" in msg:
+        return "Create failed. Please try again."
+    return msg or "Create failed. Please try again."
 async def _get_name(request, form_name):
     if form_name:
         return (form_name or "").strip()
@@ -227,7 +232,7 @@ async def create_workspace(request: Request, name: Optional[str] = Form(None), c
         except Exception:
             pass
         if is_json:
-            return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+            return JSONResponse({"ok": False, "error": _clean_error(e)}, status_code=500)
         return RedirectResponse("/workspaces?error=Create+failed", status_code=303)
     if is_json:
         return JSONResponse({"ok": True, "workspace": {"id": ws.id, "name": ws.name}})
@@ -266,7 +271,7 @@ async def switch_workspace(request: Request, workspace_id: Optional[int] = Form(
                 pass
     except Exception as e:
         logger.exception(f"switch failed: {e}")
-        return JSONResponse({"ok": False, "error": str(e)}, status_code=400) if is_json else RedirectResponse("/workspaces?error=Switch+failed", status_code=303)
+        return JSONResponse({"ok": False, "error": _clean_error(e)}, status_code=400) if is_json else RedirectResponse("/workspaces?error=Switch+failed", status_code=303)
     return JSONResponse({"ok": True, "workspace_id": workspace_id}) if is_json else RedirectResponse("/workspaces", status_code=303)
 @router.get("/{workspace_id}", response_class=HTMLResponse)
 async def workspace_detail(request: Request, workspace_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
