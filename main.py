@@ -62,7 +62,6 @@ from app.modules.api import data
 from app.modules.api import meta
 from app.core import billing
 from app.modules.workspaces.router import router as workspaces_router
-
 load_dotenv()
 UTC = timezone.utc
 scheduler = AsyncIOScheduler(
@@ -105,7 +104,6 @@ app.add_middleware(
 app.add_middleware(
     AuthMiddleware
 )
-
 async def get_current_user_optional(
     request: Request,
     db: Session = Depends(get_db),
@@ -132,7 +130,6 @@ async def get_current_user_optional(
         except Exception:
             pass
         return None
-
 def safe_job(
     job_func,
     job_name: str,
@@ -144,7 +141,6 @@ def safe_job(
     except Exception as e:
         print(f"[{job_name}] FAILED: {e}")
         traceback.print_exc()
-
 def fix_auth_user_table():
     cols = []
     cols.append("ADD COLUMN IF NOT EXISTS phone VARCHAR")
@@ -181,7 +177,6 @@ def fix_auth_user_table():
         print("✓ AUTH_USER MIGRATED")
     except Exception as e:
         print(f"AUTH_USER error: {e}")
-
 def fix_reports_table():
     enum_sqls = []
     enum_sqls.append(
@@ -238,7 +233,6 @@ def fix_reports_table():
         print("✓ REPORTS MIGRATED")
     except Exception as e:
         print(f"REPORTS error: {e}")
-
 def fix_company_table():
     cols = []
     cols.append("ADD COLUMN IF NOT EXISTS rating FLOAT DEFAULT 0")
@@ -261,7 +255,6 @@ def fix_company_table():
         print("✓ COMPANY MIGRATED - rating + reviews added")
     except Exception as e:
         print(f"COMPANY error: {e}")
-
 def fix_export_opportunities_table():
     sqls = []
     sqls.append(
@@ -295,7 +288,6 @@ def fix_export_opportunities_table():
         print("✓ EXPORT_OPPORTUNITIES MIGRATED - country default Kenya")
     except Exception as e:
         print(f"EXPORT_OPPORTUNITIES error: {e}")
-
 def fix_audit_table():
     try:
         with engine.connect() as conn:
@@ -318,7 +310,6 @@ def fix_audit_table():
         print("✓ AUDIT_LOGS READY")
     except Exception as e:
         print(f"AUDIT error: {e}")
-
 def fix_reports_tenant():
     try:
         with engine.connect() as conn:
@@ -334,7 +325,6 @@ def fix_reports_tenant():
         print("✓ REPORTS tenant_id READY")
     except Exception as e:
         print(f"REPORTS tenant error: {e}")
-
 def fix_usersubscription_table():
     cols = []
     cols.append("ADD COLUMN IF NOT EXISTS plan_name VARCHAR DEFAULT 'FREE'")
@@ -381,7 +371,31 @@ def fix_usersubscription_table():
         print("✓ USERSUBSCRIPTION MIGRATED")
     except Exception as e:
         print(f"USERSUBSCRIPTION error: {e}")
-
+def fix_live_tables():
+    sqls = []
+    sqls.append("ALTER TABLE price_data ADD COLUMN IF NOT EXISTS source_url TEXT")
+    sqls.append("ALTER TABLE price_data ADD COLUMN IF NOT EXISTS source_name TEXT")
+    sqls.append("ALTER TABLE price_data ADD COLUMN IF NOT EXISTS source VARCHAR DEFAULT 'KPIN'")
+    sqls.append("ALTER TABLE market_metrics ADD COLUMN IF NOT EXISTS source TEXT")
+    sqls.append("ALTER TABLE market_metrics ADD COLUMN IF NOT EXISTS source_url TEXT")
+    sqls.append("ALTER TABLE market_metrics ADD COLUMN IF NOT EXISTS source_name TEXT")
+    sqls.append("ALTER TABLE export_opportunities ADD COLUMN IF NOT EXISTS destination TEXT")
+    sqls.append("ALTER TABLE export_opportunities ADD COLUMN IF NOT EXISTS source_url TEXT")
+    sqls.append("ALTER TABLE export_opportunities ADD COLUMN IF NOT EXISTS source_name TEXT")
+    sqls.append("ALTER TABLE export_opportunities ADD COLUMN IF NOT EXISTS last_verified_at TIMESTAMPTZ")
+    sqls.append("ALTER TABLE news_articles ADD COLUMN IF NOT EXISTS source_name TEXT")
+    sqls.append("ALTER TABLE social_mentions ADD COLUMN IF NOT EXISTS source_url TEXT")
+    try:
+        with engine.connect() as conn:
+            for sql in sqls:
+                try:
+                    conn.execute(text(sql))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+        print("✓ LIVE TABLES MIGRATED")
+    except Exception as e:
+        print(f"LIVE TABLES error: {e}")
 def force_create_tables():
     tables = []
     tables.append(
@@ -411,6 +425,9 @@ def force_create_tables():
             company_name VARCHAR,
             avg_price_kes FLOAT,
             demand_score FLOAT,
+            source TEXT,
+            source_url TEXT,
+            source_name TEXT,
             created_at TIMESTAMP DEFAULT NOW(),
             timestamp TIMESTAMP DEFAULT NOW(),
             user_id INTEGER
@@ -426,6 +443,9 @@ def force_create_tables():
             sector VARCHAR,
             price FLOAT,
             tenant_id VARCHAR,
+            source TEXT,
+            source_url TEXT,
+            source_name TEXT,
             timestamp TIMESTAMP DEFAULT NOW(),
             created_at TIMESTAMP DEFAULT NOW()
         )
@@ -536,7 +556,6 @@ def force_create_tables():
         print("✓ TABLES ENSURED")
     except Exception as e:
         print(f"Force create failed: {e}")
-
 @app.on_event("startup")
 def on_startup():
     try:
@@ -577,6 +596,10 @@ def on_startup():
         fix_usersubscription_table()
     except Exception as e:
         print(f"Usersubscription migrate error: {e}")
+    try:
+        fix_live_tables()
+    except Exception as e:
+        print(f"Live tables migrate error: {e}")
     try:
         from app.modules.cron.jobs import scrape_kpin_prices
         from app.modules.cron.jobs import fetch_real_news
@@ -633,7 +656,6 @@ def on_startup():
         print("✓ Scheduler ON - PRODUCTION ONLY, NO SEED")
     except Exception as e:
         print(f"Scheduler skip: {e}")
-
 @app.on_event("shutdown")
 def shutdown_event():
     try:
@@ -645,7 +667,6 @@ def shutdown_event():
         shutdown_scheduler()
     except Exception:
         pass
-
 app.mount(
     "/static",
     StaticFiles(directory="app/static"),
@@ -680,7 +701,6 @@ app.include_router(billing.router)
 app.include_router(data.router)
 app.include_router(meta.router)
 app.include_router(workspaces_router)
-
 @app.get("/privacy", response_class=HTMLResponse)
 def privacy_page(request: Request):
     return templates.TemplateResponse(
@@ -689,7 +709,6 @@ def privacy_page(request: Request):
             "request": request
         }
     )
-
 @app.get("/terms", response_class=HTMLResponse)
 def terms_page(request: Request):
     return templates.TemplateResponse(
@@ -698,7 +717,6 @@ def terms_page(request: Request):
             "request": request
         }
     )
-
 @app.get("/dpa", response_class=HTMLResponse)
 def dpa_page(request: Request):
     return templates.TemplateResponse(
@@ -707,7 +725,6 @@ def dpa_page(request: Request):
             "request": request
         }
     )
-
 @app.get("/about", response_class=HTMLResponse)
 def about_page(request: Request):
     return templates.TemplateResponse(
@@ -716,7 +733,6 @@ def about_page(request: Request):
             "request": request
         }
     )
-
 @app.get("/signup", response_class=HTMLResponse)
 def signup_page(
     request: Request,
@@ -733,7 +749,6 @@ def signup_page(
             "request": request
         }
     )
-
 @app.get("/register", response_class=HTMLResponse)
 def register_page(
     request: Request,
@@ -750,7 +765,6 @@ def register_page(
             "request": request
         }
     )
-
 @app.get("/login", response_class=HTMLResponse)
 def login_page(
     request: Request,
@@ -767,7 +781,6 @@ def login_page(
             "request": request
         }
     )
-
 @app.get("/signin", response_class=HTMLResponse)
 def signin_page(
     request: Request,
@@ -784,7 +797,6 @@ def signin_page(
             "request": request
         }
     )
-
 @app.get("/forgot-password", response_class=HTMLResponse)
 def forgot_password_page(request: Request):
     return templates.TemplateResponse(
@@ -793,7 +805,6 @@ def forgot_password_page(request: Request):
             "request": request
         }
     )
-
 @app.get("/forgot", response_class=HTMLResponse)
 def forgot_alias_page(request: Request):
     return templates.TemplateResponse(
@@ -802,39 +813,30 @@ def forgot_alias_page(request: Request):
             "request": request
         }
     )
-
 @app.get("/auth/login", response_class=HTMLResponse)
 def auth_login_alias(request: Request):
     return RedirectResponse(url="/login", status_code=302)
-
 @app.get("/auth/signin", response_class=HTMLResponse)
 def auth_signin_alias(request: Request):
     return RedirectResponse(url="/login", status_code=302)
-
 @app.get("/auth/register", response_class=HTMLResponse)
 def auth_register_alias(request: Request):
     return RedirectResponse(url="/signup", status_code=302)
-
 @app.get("/auth/signup", response_class=HTMLResponse)
 def auth_signup_alias(request: Request):
     return RedirectResponse(url="/signup", status_code=302)
-
 @app.get("/auth/create-account", response_class=HTMLResponse)
 def auth_create_account_alias(request: Request):
     return RedirectResponse(url="/signup", status_code=302)
-
 @app.get("/auth/forgot-password", response_class=HTMLResponse)
 def auth_forgot_alias(request: Request):
     return RedirectResponse(url="/forgot-password", status_code=302)
-
 @app.get("/auth/forgot", response_class=HTMLResponse)
 def auth_forgot_short_alias(request: Request):
     return RedirectResponse(url="/forgot-password", status_code=302)
-
 @app.get("/auth/reset-password", response_class=HTMLResponse)
 def auth_reset_alias(request: Request):
     return RedirectResponse(url="/forgot-password", status_code=302)
-
 @app.get("/pricing", response_class=HTMLResponse)
 def pricing_page(request: Request):
     return templates.TemplateResponse(
@@ -843,7 +845,6 @@ def pricing_page(request: Request):
             "request": request
         }
     )
-
 @app.get("/pricing-data")
 def pricing_data_alias():
     return {
@@ -854,7 +855,6 @@ def pricing_data_alias():
             {"code": "ENTERPRISE", "name": "Enterprise", "monthly": 5000, "annual": 50000, "analyses": -1, "reports": -1, "seats": 5, "engines": 12},
         ]
     }
-
 @app.get("/welcome", response_class=HTMLResponse)
 def welcome_page(
     request: Request,
@@ -871,7 +871,6 @@ def welcome_page(
             "request": request
         }
     )
-
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard_alias(
     request: Request,
@@ -886,7 +885,6 @@ def dashboard_alias(
         url="/",
         status_code=302
     )
-
 @app.get("/", response_class=HTMLResponse)
 def root(
     request: Request,
@@ -956,7 +954,6 @@ def root(
     API["search"] = "/analysis/search"
     API["logout"] = "/auth/logout"
     API["login"] = "/login"
-
     def safe_count(stmt):
         try:
             result = db.exec(stmt).first()
@@ -971,7 +968,6 @@ def root(
             except Exception:
                 pass
             return 0
-
     from app.modules.pricing_engine.models import ProductPrice
     from app.modules.pricing_engine.models import Competitor as PriceCompetitor
     from app.modules.competitive_engine.models import Company as CompCompany
@@ -1154,7 +1150,6 @@ def root(
             "current_user": current_user
         }
     )
-
 @app.post("/api/run-scraper")
 def run_scraper():
     from app.modules.cron.jobs import scrape_kpin_prices
@@ -1173,14 +1168,12 @@ def run_scraper():
             "source": "KPIN",
             "error": str(e)
         }
-
 @app.get("/health")
 def health():
     return {
         "status": "ok",
         "version": "2.6.4"
     }
-
 if __name__ == "__main__":
     import uvicorn
     port = int(
