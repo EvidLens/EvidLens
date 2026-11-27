@@ -13,11 +13,9 @@ templates = Jinja2Templates(directory="app/templates")
 UTC = timezone.utc
 logger = logging.getLogger("evidlens.market")
 
-# User-facing label - NEVER expose DB table name like "MarketMetric"
 DISPLAY_SOURCE = "Live Market Data"
 
 async def _get_user(request: Request, db: Session):
-    """Return real user or None - never crash the page if auth fails."""
     try:
         from app.modules.auth.dependencies import get_current_user
         return await get_current_user(request, db)
@@ -25,7 +23,6 @@ async def _get_user(request: Request, db: Session):
         return None
 
 def _latest_per_product_county(rows):
-    # Keep only latest row per (product, county) - fixes Maize x3 duplicates
     seen = {}
     for p in rows:
         key = (
@@ -36,13 +33,17 @@ def _latest_per_product_county(rows):
             seen[key] = p
     return list(seen.values())
 
-def _clean_demand(value):
-    """
-    Production rule: demand must be real or None.
-    - None stays None -> template shows "-"
-    - 72 repeated for every product is a seed bug, treat suspicious uniform 72 as None
-      if we cannot verify it. We do NOT invent a new fake number.
-    """
+def _is_uniform_72(values):
+    vals = [v for v in values if v is not None]
+    if len(vals) < 3:
+        return False
+    try:
+        count_72 = sum(1 for v in vals if float(v) == 72.0)
+    except Exception:
+        return False
+    return (count_72 / len(vals)) >= 0.8
+
+def _clean_demand(value, uniform_72=False):
     if value is None:
         return None
     try:
@@ -51,10 +52,11 @@ def _clean_demand(value):
         return None
     if v < 0 or v > 100:
         return None
+    if uniform_72 and v == 72.0:
+        return None
     return round(v, 1)
 
 def _risk_level(title: str, category: str, summary: str) -> str:
-    """Derive risk from content - never hard-code all LOW."""
     text = f"{title or ''} {category or ''} {summary or ''}".lower()
     if any(k in text for k in ["ban", "shutdown", "outbreak", "drought", "crisis", "sanction", "recall"]):
         return "HIGH"
@@ -76,6 +78,7 @@ async def prices_page(request: Request, q: str = None, county: str = None, secto
     try:
         rows = db.exec(select(MarketMetric).order_by(desc(MarketMetric.created_at)).limit(500)).all()
         rows = _latest_per_product_county(rows)
+        uniform_72 = _is_uniform_72([getattr(p, 'demand_score', None) for p in rows])
         for p in rows:
             if q and q.lower() not in (getattr(p, 'product', '') or '').lower():
                 continue
@@ -84,7 +87,7 @@ async def prices_page(request: Request, q: str = None, county: str = None, secto
             if sector and sector.lower() not in (getattr(p, 'sector', '') or '').lower():
                 continue
             price = getattr(p, 'avg_price_kes', None)
-            demand = _clean_demand(getattr(p, 'demand_score', None))
+            demand = _clean_demand(getattr(p, 'demand_score', None), uniform_72=uniform_72)
             created = getattr(p, 'created_at', '')
             prices.append({
                 "product_name": getattr(p, 'product', 'Product') or 'Product',
@@ -108,7 +111,6 @@ async def prices_page(request: Request, q: str = None, county: str = None, secto
             pass
         prices = []
 
-    # Empty DB = empty list. Template shows "No live prices yet" - no fake Maize/Tea injected
     current_user = await _get_user(request, db)
     return templates.TemplateResponse(
         "market_prices.html",
@@ -120,15 +122,18 @@ async def demand_page(request: Request, db: Session = Depends(get_session)):
     demand = []
     try:
         rows = db.exec(select(MarketMetric).where(MarketMetric.demand_score.isnot(None)).order_by(desc(MarketMetric.demand_score)).limit(100)).all()
-        # De-duplicate per product+county, same as prices
         rows = _latest_per_product_county(rows)
+        uniform_72 = _is_uniform_72([getattr(p, 'demand_score', None) for p in rows])
         for d in rows:
+            score = _clean_demand(getattr(d, 'demand_score', None), uniform_72=uniform_72)
+            if score is None:
+                continue
             demand.append({
                 "product": getattr(d, 'product', 'Product') or 'Product',
                 "county": getattr(d, 'county', 'Kenya') or 'Kenya',
                 "sector": getattr(d, 'sector', 'Agriculture') or 'Agriculture',
-                "score": _clean_demand(getattr(d, 'demand_score', None)),
-                "demand_score": _clean_demand(getattr(d, 'demand_score', None)),
+                "score": score,
+                "demand_score": score,
                 "price": getattr(d, 'avg_price_kes', None),
                 "avg_price_kes": getattr(d, 'avg_price_kes', None),
                 "source": DISPLAY_SOURCE,
@@ -156,11 +161,9 @@ async def risk_page(request: Request, db: Session = Depends(get_session)):
         for n in rows:
             title = getattr(n, 'title', 'Alert') or 'Alert'
             summary = getattr(n, 'summary', '') or ''
-            # FIX: summary must not just repeat title. If same, use category as fallback.
             if not summary or summary.strip().lower() == title.strip().lower():
                 summary = getattr(n, 'category', '') or 'Market update - see source for details.'
             source = getattr(n, 'source', '') or DISPLAY_SOURCE
-            # Never show internal "EvidLens" as if it were an external source
             if source.strip().lower() == "evidlens":
                 source = "Curated by EvidLens"
             alerts.append({
@@ -222,7 +225,13 @@ async def get_prices(product: str = None, county: str = None, db: Session = Depe
     if county:
         q = q.where(MarketMetric.county.ilike(f"%{county}%"))
     data = db.exec(q.limit(500)).all()
-    return {"total": len(data), "data": [d.model_dump(mode='json') for d in data]}
+    uniform_72 = _is_uniform_72([getattr(d, 'demand_score', None) for d in data])
+    out = []
+    for d in data:
+        item = d.model_dump(mode='json')
+        item['demand_score'] = _clean_demand(d.demand_score, uniform_72=uniform_72)
+        out.append(item)
+    return {"total": len(out), "data": out}
 
 @router.get("/api/demand")
 async def get_demand(sector: str = None, db: Session = Depends(get_session)):
@@ -230,7 +239,8 @@ async def get_demand(sector: str = None, db: Session = Depends(get_session)):
     if sector:
         q = q.where(MarketMetric.sector.ilike(f"%{sector}%"))
     data = db.exec(q.limit(100)).all()
-    return {"data": [{"product": d.product, "county": d.county, "sector": d.sector, "score": float(d.demand_score) if d.demand_score is not None else None, "price": float(d.avg_price_kes) if d.avg_price_kes is not None else None} for d in data]}
+    uniform_72 = _is_uniform_72([getattr(d, 'demand_score', None) for d in data])
+    return {"data": [{"product": d.product, "county": d.county, "sector": d.sector, "score": _clean_demand(d.demand_score, uniform_72=uniform_72), "price": float(d.avg_price_kes) if d.avg_price_kes is not None else None} for d in data]}
 
 @router.get("/api/risk")
 async def get_risk(db: Session = Depends(get_session)):
