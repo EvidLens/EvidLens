@@ -125,3 +125,25 @@ def init_db():
         logger.info("audit_logs columns fixed")
     except Exception as e:
         logger.warning("audit_logs fix skipped: %s", e)
+
+    # --- Fix workspace FKs: workspaces -> user should be workspaces -> auth_user ---
+    try:
+        with engine.begin() as conn:
+            rows = conn.execute(text(
+                "SELECT conname, conrelid::regclass::text AS tbl, a.attname AS col "
+                "FROM pg_constraint c "
+                "JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey) "
+                "WHERE c.contype = 'f' AND c.confrelid = 'user'::regclass "
+                "AND conrelid::regclass::text ILIKE '%workspace%'"
+            )).fetchall()
+            for conname, tbl, col in rows:
+                ref = "workspaces" if col == "workspace_id" else "auth_user"
+                logger.info(f"Fixing FK {tbl}.{conname} ({col}) -> {ref}(id)")
+                conn.execute(text(f"ALTER TABLE {tbl} DROP CONSTRAINT IF EXISTS {conname}"))
+                conn.execute(text(f"ALTER TABLE {tbl} ADD CONSTRAINT {conname} FOREIGN KEY ({col}) REFERENCES {ref}(id) ON DELETE CASCADE"))
+            if rows:
+                logger.info(f"Workspace FKs fixed: {len(rows)}")
+            else:
+                logger.info("Workspace FKs: no FKs pointing to user found")
+    except Exception as e:
+        logger.warning("Workspace FK fix skipped: %s", e)
