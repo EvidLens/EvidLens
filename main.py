@@ -61,6 +61,7 @@ from app.modules.storage.router import router as storage_router
 from app.modules.api import data
 from app.modules.api import meta
 from app.core import billing
+from app.modules.workspaces.router import router as workspaces_router
 
 load_dotenv()
 UTC = timezone.utc
@@ -678,6 +679,7 @@ app.include_router(storage_router)
 app.include_router(billing.router)
 app.include_router(data.router)
 app.include_router(meta.router)
+app.include_router(workspaces_router)
 
 @app.get("/privacy", response_class=HTMLResponse)
 def privacy_page(request: Request):
