@@ -572,7 +572,10 @@ def _consumer_risk_block(story, S, live, plan_name, budget_str, q, sector, count
     if not live["news"]:
         story.append(Paragraph("No live risk alerts were found for this filter.", S["bullet"]))
     for n in live["news"][:8]:
-        story.append(Paragraph(f"{safe(getattr(n, 'title', 'News'))}: {safe(str(getattr(n, 'summary', ''))[:140])}", S["bullet"]))
+        try:
+    story.append(Paragraph(f"{safe(getattr(n, 'title', 'News'))}: {safe(str(getattr(n, 'summary', ''))[:140])}", S["bullet"]))
+    except Exception:
+    pass
     story.append(Paragraph("Policy Watch", S["h2"]))
     story.append(Paragraph("Check KRA eTIMS, county permit, and sector licences before launch. If you sell food, LPG, or fuel, additional safety, KEBS, and EPRA approvals apply. Do not skip them.", S["body"]))
     if plan_name != "Enterprise":
