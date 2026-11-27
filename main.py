@@ -257,6 +257,9 @@ def fix_company_table():
         print(f"COMPANY error: {e}")
 def fix_export_opportunities_table():
     sqls = []
+    sqls.append("ALTER TABLE export_opportunities ADD COLUMN IF NOT EXISTS county VARCHAR(100)")
+    sqls.append("ALTER TABLE export_opportunities ADD COLUMN IF NOT EXISTS product VARCHAR(255)")
+    sqls.append("ALTER TABLE export_opportunities ADD COLUMN IF NOT EXISTS description TEXT")
     sqls.append(
         "ALTER TABLE export_opportunities ALTER COLUMN country SET DEFAULT 'Kenya'"
     )
