@@ -16,7 +16,6 @@ from app.modules.auth.dependencies import get_current_user
 router = APIRouter(prefix="/location", tags=["Location Intel"])
 templates = Jinja2Templates(directory="app/templates")
 
-# Production: pick template that actually exists, never crash on missing template
 def _pick_counties_template():
     if os.path.exists("app/templates/location_counties.html"):
         return "location_counties.html"
@@ -28,9 +27,18 @@ class ComparisonRequest(BaseModel):
     location_b: str
     location_type: str
 
+def _clean_county_name(v):
+    if not v or not isinstance(v, str):
+        return None
+    v = v.strip()
+    if not v:
+        return None
+    if v.lower() in ("county", "kenya", "unknown", "null", "none"):
+        return None
+    return v.title()
+
 @router.get("/counties", response_class=HTMLResponse)
 async def counties_page(request: Request, db: Session = Depends(get_db)):
-    # Use real user - do not pass None, that breaks header / plan badge
     try:
         current_user = await get_current_user(request, db)
     except Exception:
@@ -38,28 +46,23 @@ async def counties_page(request: Request, db: Session = Depends(get_db)):
 
     counts = Counter()
 
-    # Helper: safely count county values from any table
-    # db.exec(select(Model.county)) returns list of strings, not tuples
     def _count_from_query(query):
         try:
             rows = db.exec(query).all()
             for v in rows:
-                # Handle string, tuple, or object
                 if isinstance(v, (list, tuple)):
                     v = v[0] if v else None
                 elif hasattr(v, "county"):
                     v = getattr(v, "county", None)
-                if v and isinstance(v, str):
-                    v = v.strip()
-                    if v:
-                        counts[v] += 1
+                cleaned = _clean_county_name(v)
+                if cleaned:
+                    counts[cleaned] += 1
         except Exception:
             try:
                 db.rollback()
             except Exception:
                 pass
 
-    # Import here to avoid circular imports at startup
     try:
         from app.core.models import MarketMetric, PriceData, Company
         _count_from_query(select(MarketMetric.county))
@@ -71,7 +74,6 @@ async def counties_page(request: Request, db: Session = Depends(get_db)):
         except Exception:
             pass
 
-    # Fallback curated data only if DB is truly empty - labelled as curated, not fake live
     if not counts:
         counts = Counter({
             "Nairobi": 12,
@@ -88,14 +90,23 @@ async def counties_page(request: Request, db: Session = Depends(get_db)):
 
     counties = []
     total_signals = sum(counts.values()) or 1
+    total_market_size = 0
     for name, cnt in counts.most_common(20):
+        market_size = cnt * 50000
+        total_market_size += market_size
         counties.append({
             "name": name,
             "county": name,
+            "county_name": name,
+            "title": name,
             "count": cnt,
-            "market_size": cnt * 50000,
             "business_count": cnt,
-            # For template progress bars - no internal math leak
+            "records": cnt,
+            "total_records": cnt,
+            "signals": cnt,
+            "market_size": market_size,
+            "market_size_kes": market_size,
+            "size": market_size,
             "share_pct": round((cnt / total_signals) * 100, 1),
         })
 
@@ -108,9 +119,13 @@ async def counties_page(request: Request, db: Session = Depends(get_db)):
             "current_user": current_user,
             "user": current_user,
             "counties": counties,
+            "counties_data": counties,
+            "county_data": counties,
+            "data": counties,
             "count_map": dict(counts),
             "total_counties": len(counties),
             "total_signals": total_signals,
+            "total_market_size": total_market_size,
             "active_page": "location",
             "page_title": "County Intelligence",
         },
