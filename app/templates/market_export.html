@@ -34,6 +34,7 @@
       {% set score = (e.opportunity_score if e.opportunity_score is defined else (e.score if e.score is defined else 0))|int %}
       {% set prod = e.product if e.product is defined else 'Product' %}
       {% set dest = e.country if e.country is defined else (e.destination if e.destination is defined else '—') %}
+      {% set slug = dest|lower|replace(' ', '-')|replace(',', '')|replace('.', '')|replace("'", '') %}
       <tr class="border-b hover:bg-gray-50">
         <td class="p-3 font-semibold text-[#0A1F44]">{{ prod }}<div class="text-[11px] text-gray-400 font-normal">HS {{ e.hs }} • {{ e.year }}</div></td>
         <td class="p-3">{{ dest }}</td>
@@ -42,8 +43,12 @@
         <td class="p-3">{{ e.growth ~ '%' if e.growth is not none else 'Unknown' }}</td>
         <td class="p-3">{{ '$' ~ e.unit_value if e.unit_value is not none else 'Unknown' }}</td>
         <td class="p-3">{{ e.county if e.county is defined else 'Kenya' }}</td>
-        <td class="p-3 text-right whitespace-nowrap"><a href="/ai?q={{ ('Should I export ' + prod + ' from Kenya to ' + dest + '? Requirements, costs, buyers?')|urlencode }}" class="text-[#0d9488] font-bold text-[13px]">Ask Lens →</a></td>
+        <td class="p-3 text-right whitespace-nowrap">
+          <button onclick="findBuyers('{{ prod|replace(\"'\", '') }}','{{ e.hs }}','{{ dest|replace(\"'\", '') }}')" class="bg-[#0A1F44] text-white px-3 py-1 rounded-lg font-bold text-[12px]">Find Buyers</button>
+          <a href="/ai?q={{ ('Should I export ' + prod + ' from Kenya to ' + dest + '? Requirements, costs, buyers?')|urlencode }}" class="text-[#0d9488] font-bold text-[13px] ml-2">Ask Lens →</a>
+        </td>
       </tr>
+      <tr id="buyers-{{ slug }}" style="display:none"><td colspan="8" class="p-4 bg-gray-50 border-b"><div class="buyers-body text-[13px]"></div></td></tr>
       {% endfor %}
     </tbody>
   </table></div></div>
@@ -66,4 +71,51 @@
     <a href="/policy" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Policy Watch</a>
   </div>
 </div>
+
+<script>
+function slug(s){ return String(s||"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,""); }
+function esc(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+async function findBuyers(product, hs, country){
+  const row = document.getElementById("buyers-" + slug(country));
+  if(!row) return;
+  const body = row.querySelector(".buyers-body");
+  const open = row.style.display !== "none";
+  if(open){ row.style.display = "none"; return; }
+  row.style.display = "";
+  body.innerHTML = "Searching buyers...";
+  try{
+    const r = await fetch(`/market/api/buyers?q=${encodeURIComponent(product)}&hs=${encodeURIComponent(hs)}&country=${encodeURIComponent(country)}`);
+    const d = await r.json();
+    if(!d.ok){ body.innerHTML = "Error: " + esc(d.error || "Failed"); return; }
+    const volza = (d.volza && d.volza.available && d.volza.buyers && d.volza.buyers.length)
+      ? d.volza.buyers.map(b => `<div>${esc(b.company)} - ${esc(b.shipments || "")} shipments - ${esc(b.last_shipment || "")}</div>`).join("")
+      : `<i>${esc(d.volza ? d.volza.reason : "Volza locked")}</i> - <a href="/pricing" class="text-[#0d9488] font-bold">Unlock Premium</a>`;
+    body.innerHTML = `
+      <b>Volza (Premium):</b><br>${volza}<br><br>
+      <a href="${esc(d.linkedin.url)}" target="_blank" rel="noopener" class="text-[#0d9488] font-bold">${esc(d.linkedin.label)} →</a><br>
+      ${(d.marketplaces||[]).map(m => `<a href="${esc(m.url)}" target="_blank" rel="noopener" class="text-[#0d9488] font-bold">${esc(m.label)} →</a>`).join(" | ")}<br><br>
+      <button onclick="keprobaReq('${esc(product)}','${esc(hs)}','${esc(country)}')" class="bg-[#14B8A6] text-white px-3 py-1 rounded-lg font-bold text-[12px]">Request KEPROBA Introduction</button>
+      <button onclick="copyTemplate(this)" class="bg-white border px-3 py-1 rounded-lg font-bold text-[12px] ml-2">Copy Outreach Template</button><br><br>
+      <b>Fairs:</b> ${(d.fairs||[]).map(f => `${esc(f.name)} - ${esc(f.city)} (${esc(f.month)}) <button onclick="saveFair('${esc(f.name)}','${esc(f.city)}')" class="text-[#0d9488] font-bold">Save</button>`).join(", ")}<br><br>
+      <pre class="outreach bg-white border rounded-lg p-3 whitespace-pre-wrap text-[12px]">${esc(d.outreach_template)}</pre>`;
+  }catch(e){ body.innerHTML = "Failed to load buyers. Try again."; }
+}
+async function keprobaReq(product, hs, country){
+  const company = prompt("Your company name:") || "";
+  const volume = prompt("Volume you can supply (e.g. 10 MT / month):") || "";
+  const r = await fetch("/market/api/buyers/keproba-request", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({company, product, hs, country, volume, message:"Request introduction via KEPROBA"})});
+  const d = await r.json();
+  alert(d.ok ? "Saved. ID " + d.id + ". Forward to KEPROBA / Make It Kenya." : "Error: " + (d.error || "Failed"));
+}
+async function saveFair(name, city){
+  const r = await fetch("/market/api/buyers/save-fair", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({fair_name: name, city: city})});
+  const d = await r.json();
+  alert(d.ok ? d.message : "Error: " + (d.error || "Login required"));
+}
+function copyTemplate(btn){
+  const pre = btn.parentElement.querySelector(".outreach");
+  if(!pre) return;
+  navigator.clipboard.writeText(pre.innerText).then(()=> alert("Outreach template copied"));
+}
+</script>
 {% endblock %}
