@@ -5,47 +5,61 @@
   <div class="flex flex-wrap justify-between items-start gap-4 mb-6">
     <div>
       <h1 class="text-3xl font-bold text-[#0A1F44]">🌍 Export Navigator</h1>
-      <p class="text-gray-500 text-[14px] mt-1">Export opportunities from Kenya to world markets. 70+ = strong, 40-69 = moderate, under 40 = weak.</p>
+      <p class="text-gray-500 text-[14px] mt-1">LIVE UN Comtrade. Kenya exports 2024. 70+ = strong, 40-69 = moderate, under 40 = weak. No estimates.</p>
     </div>
     <a href="/ai" class="bg-[#14B8A6] text-white px-4 py-2 rounded-xl font-bold text-[13px]">Ask Lens →</a>
   </div>
   <form method="get" action="/market/export" class="bg-white p-4 rounded-xl shadow-sm border mb-6 flex gap-2 flex-wrap">
-    <input name="q" value="{{ q or '' }}" placeholder="Search product..." class="border rounded-xl px-3 py-2 text-sm flex-1 min-w-[160px]">
+    <input name="q" value="{{ q or '' }}" placeholder="Search product... e.g. tea, coffee, avocado" class="border rounded-xl px-3 py-2 text-sm flex-1 min-w-[160px]" required>
     <input name="country" value="{{ country or '' }}" placeholder="Destination country" class="border rounded-xl px-3 py-2 text-sm">
     <input name="county" value="{{ county or '' }}" placeholder="Kenya county (e.g. Nyeri)" class="border rounded-xl px-3 py-2 text-sm">
-    <button class="bg-[#0A1F44] text-white px-4 py-2 rounded-xl font-bold text-sm">Filter</button>
+    <button class="bg-[#0A1F44] text-white px-4 py-2 rounded-xl font-bold text-sm">Search Live →</button>
     {% if q or country or county %}<a href="/market/export" class="border px-4 py-2 rounded-xl font-bold text-sm">Clear</a>{% endif %}
   </form>
+  {% if error %}
+  <div class="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 text-sm mb-6">{{ error }}</div>
+  {% endif %}
+  {% if q and not error %}
   <div class="grid grid-cols-3 gap-3 mb-6 text-center">
-    <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-[#0A1F44]">{{ (exports or [])|length }}</p><p class="text-xs text-gray-500">Opportunities</p></div>
+    <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-[#0A1F44]">{{ (exports or [])|length }}</p><p class="text-xs text-gray-500">Destinations (Live)</p></div>
     <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-green-600">{{ (exports or [])|selectattr('opportunity_score','defined')|list|length }}</p><p class="text-xs text-gray-500">Scored</p></div>
-    <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-[#0A1F44]">{{ (exports or [])|map(attribute='country')|select('defined')|list|unique|list|length }}</p><p class="text-xs text-gray-500">Destinations</p></div>
+    <div class="bg-white rounded-2xl border p-4"><p class="text-2xl font-bold text-[#0A1F44]">{{ (exports or [])|map(attribute='value_m')|sum|round(1) }}M</p><p class="text-xs text-gray-500">Total $M (Live 2024)</p></div>
   </div>
+  {% endif %}
   {% if exports is defined and exports %}
   <div class="bg-white rounded-2xl shadow-sm border overflow-hidden"><div class="overflow-x-auto"><table class="w-full text-[14px]">
-    <thead><tr class="text-left text-sm text-gray-500 border-b"><th class="p-3">Product</th><th class="p-3">Destination</th><th class="p-3">Score</th><th class="p-3">County</th><th class="p-3"></th></tr></thead>
+    <thead><tr class="text-left text-sm text-gray-500 border-b"><th class="p-3">Product</th><th class="p-3">Destination</th><th class="p-3">Score</th><th class="p-3">Live Value</th><th class="p-3">Growth 23→24</th><th class="p-3">$/kg</th><th class="p-3">County</th><th class="p-3"></th></tr></thead>
     <tbody>
       {% for e in exports %}
       {% set score = (e.opportunity_score if e.opportunity_score is defined else (e.score if e.score is defined else 0))|int %}
       {% set prod = e.product if e.product is defined else 'Product' %}
       {% set dest = e.country if e.country is defined else (e.destination if e.destination is defined else '—') %}
       <tr class="border-b hover:bg-gray-50">
-        <td class="p-3 font-semibold text-[#0A1F44]">{{ prod }}</td>
+        <td class="p-3 font-semibold text-[#0A1F44]">{{ prod }}<div class="text-[11px] text-gray-400 font-normal">HS {{ e.hs }} • {{ e.year }}</div></td>
         <td class="p-3">{{ dest }}</td>
         <td class="p-3"><div class="flex items-center gap-2"><div class="w-20 h-2 bg-gray-100 rounded-full overflow-hidden"><div class="h-2 rounded-full" style="width:{{ score }}%;background:{% if score>=70 %}#16a34a{% elif score>=40 %}#eab308{% else %}#dc2626{% endif %}"></div></div><span class="font-bold {% if score>=70 %}text-green-600{% elif score>=40 %}text-yellow-600{% else %}text-red-600{% endif %}">{{ score }}/100</span></div></td>
+        <td class="p-3 font-bold">${{ e.value_m }}M</td>
+        <td class="p-3">{{ e.growth ~ '%' if e.growth is not none else 'Unknown' }}</td>
+        <td class="p-3">{{ '$' ~ e.unit_value if e.unit_value is not none else 'Unknown' }}</td>
         <td class="p-3">{{ e.county if e.county is defined else 'Kenya' }}</td>
         <td class="p-3 text-right whitespace-nowrap"><a href="/ai?q={{ ('Should I export ' + prod + ' from Kenya to ' + dest + '? Requirements, costs, buyers?')|urlencode }}" class="text-[#0d9488] font-bold text-[13px]">Ask Lens →</a></td>
       </tr>
       {% endfor %}
     </tbody>
   </table></div></div>
-  {% else %}
+  {% elif q and not error %}
   <div class="bg-white rounded-2xl border p-10 text-center">
-    <p class="text-4xl mb-2">🌍</p><p class="font-bold text-[#0A1F44]">No export opportunities yet</p>
-    <p class="text-[14px] text-gray-500 mt-1">Try a different search, or ask Lens for an export check for your product.</p>
+    <p class="text-4xl mb-2">🌍</p><p class="font-bold text-[#0A1F44]">No live Comtrade records</p>
+    <p class="text-[14px] text-gray-500 mt-1">Kenya did not report exports for this HS in 2024, or Comtrade has not published it yet. Try tea, coffee, avocado.</p>
     <a href="/ai" class="inline-block mt-4 bg-[#0A1F44] text-white px-4 py-2 rounded-lg font-bold text-[13px]">Ask Lens →</a>
   </div>
+  {% else %}
+  <div class="bg-white rounded-2xl border p-10 text-center">
+    <p class="text-4xl mb-2">🌍</p><p class="font-bold text-[#0A1F44]">Search to query UN Comtrade live</p>
+    <p class="text-[14px] text-gray-500 mt-1">Type <b>tea</b>, <b>coffee</b> or <b>avocado</b> above and press Search Live. No estimates, only live 2024 exports.</p>
+  </div>
   {% endif %}
+  <p class="text-[11px] text-gray-400 mt-3">{{ source or '' }}</p>
   <div class="flex flex-wrap gap-2 mt-6">
     <a href="/market/demand" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Demand Radar</a>
     <a href="/market/prices" class="bg-white border px-4 py-2 rounded-lg font-bold text-[13px]">Prices</a>
