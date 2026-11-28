@@ -236,6 +236,44 @@
     window.location.href = '/reports/download/' + encodeURIComponent(reportId);
   };
 
+  // ===== EXPORT NAVIGATOR - PRODUCTION - Real UN Comtrade only, no dummy =====
+  EvidLens.exportSearch = async function (q, resultsEl, btn) {
+    if (!resultsEl) return [];
+    if (!q) { EvidLens.toast('Type a product first', 'error'); return []; }
+    const oldText = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = 'Searching...'; }
+    resultsEl.innerHTML = '<p class="text-gray-500 text-sm py-4">Loading live from UN Comtrade for: ' + EvidLens.escape(q) + '...</p>';
+    try {
+      const res = await EvidLens.apiJSON('/market/api/export?q=' + encodeURIComponent(q), { timeout: 60000 });
+      const data = res.data || {};
+      const rows = data.results || data.data || data.rows || (Array.isArray(data) ? data : []);
+      if (!res.ok) {
+        resultsEl.innerHTML = '<p class="text-red-600 text-sm py-4">Comtrade failed (' + res.status + '): ' + EvidLens.escape(data.error || data.detail || 'Backend error') + '</p>';
+        return [];
+      }
+      if (!rows.length) {
+        resultsEl.innerHTML = '<p class="text-gray-500 text-sm py-4">No live Comtrade records found for: ' + EvidLens.escape(q) + '. Try another product name. No dummy data is shown.</p>';
+        return [];
+      }
+      resultsEl.innerHTML = '<h3 class="font-bold py-2">Live results for ' + EvidLens.escape(q) + ' — ' + rows.length + ' markets</h3>'
+        + '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left border-b-2"><th class="py-2">Market</th><th class="py-2">Year</th><th class="py-2">Trade Value (USD)</th><th class="py-2">Quantity</th></tr></thead><tbody>'
+        + rows.map(function (r) {
+          const partner = r.partner || r.partnerDesc || r.Partner || '-';
+          const value = r.value ?? r.primaryValue ?? r.PrimaryValue ?? r.TradeValue ?? 0;
+          const year = r.year || r.period || r.Period || '';
+          const qty = r.qty ?? r.quantity ?? r.Quantity ?? r.netWgt ?? null;
+          return '<tr class="border-b"><td class="py-2">' + EvidLens.escape(partner) + '</td><td class="py-2">' + EvidLens.escape(year) + '</td><td class="py-2">$' + EvidLens.formatNumber(value) + '</td><td class="py-2">' + (qty == null ? '—' : EvidLens.formatNumber(qty)) + '</td></tr>';
+        }).join('')
+        + '</tbody></table></div><p class="text-gray-400 text-xs py-2">Source: UN Comtrade live via backend. No preview / dummy data.</p>';
+      return rows;
+    } catch (e) {
+      resultsEl.innerHTML = '<p class="text-red-600 text-sm py-4">Error: ' + EvidLens.escape(String(e.message || e)) + '</p>';
+      return [];
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = oldText || 'Search Live →'; }
+    }
+  };
+
   document.addEventListener('DOMContentLoaded', function () {
     const countySel = document.querySelector('[data-county-select]');
     const subcountySel = document.querySelector('[data-subcounty-select]');
@@ -288,6 +326,32 @@
 
     document.querySelectorAll('[data-download-report]').forEach(function (btn) {
       btn.addEventListener('click', function () { EvidLens.downloadReport(btn.getAttribute('data-download-report')); });
+    });
+
+    // EXPORT NAVIGATOR - bind Search Live button (by text, not ID, so it works with your HTML)
+    const exportBtn = [...document.querySelectorAll('button')].find(function (b) { return b.textContent.includes('Search Live'); });
+    if (exportBtn) {
+      exportBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        const input = document.getElementById('exportQuery')
+          || document.querySelector('input[placeholder*="Coffee" i], input[placeholder*="product" i]')
+          || document.querySelector('input[type="text"], input[type="search"], input:not([type])');
+        const q = input ? input.value.trim() : '';
+        const resultsEl = document.getElementById('exportResults')
+          || [...document.querySelectorAll('div')].find(function (d) { return d.textContent.includes('Search to query'); })
+          || document.querySelector('main');
+        EvidLens.exportSearch(q, resultsEl, exportBtn);
+      });
+    }
+    // Also support a form with data-export-form
+    document.querySelectorAll('[data-export-form]').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        const fd = new FormData(form);
+        const q = fd.get('q') || fd.get('query') || fd.get('product') || '';
+        const resultsEl = document.getElementById('exportResults') || document.querySelector('main');
+        EvidLens.exportSearch(String(q).trim(), resultsEl, form.querySelector('button[type="submit"]'));
+      });
     });
   });
 
