@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}EvidLens - Kenya's Decision Intelligence{% endblock %}</title>
     <meta name="description" content="EvidLens - Kenya's Decision Intelligence. Demand Radar, Consumer Pulse, Policy Watch, Funding Radar, Knowledge Base, Report Builder.">
+    <!-- PWA - Real App Install -->
+    <link rel="manifest" href="/static/manifest.webmanifest">
+    <meta name="theme-color" content="#0A1F44">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="EvidLens">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/static/css/style.css?v=2.0.0">
     <link rel="icon" href="/static/logo.png?v=2.0.0">
@@ -31,6 +39,7 @@
             <a href="/workspaces" class="hover:text-teal-300">Workspaces</a>
         </nav>
         <div class="flex items-center gap-3 text-sm">
+            <button id="install-btn" class="hidden bg-white text-[#0A1F44] px-3 py-1.5 rounded-full font-bold">📲 Install App</button>
             <a href="/billing" id="plan-badge" class="bg-[#14B8A6] px-3 py-1 rounded-full font-bold text-xs md:text-sm">{% if current_user is defined and current_user %}{{ current_user.plan or 'Free' }}{% else %}Guest{% endif %}</a>
             <a href="/pricing" class="hidden md:inline bg-white text-[#0A1F44] px-3 py-1.5 rounded-full font-bold">Upgrade</a>
             <a href="/docs" class="hidden md:inline underline opacity-80">API Docs</a>
@@ -75,6 +84,33 @@
     <div id="chatbot-container"></div>
     <script src="/static/js/app.js?v=2.0.0"></script>
     <script>
+    // PWA - Real App Install
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        const btn = document.getElementById('install-btn');
+        if (btn) btn.classList.remove('hidden');
+    });
+    const installBtn = document.getElementById('install-btn');
+    if (installBtn) {
+        installBtn.addEventListener('click', async () => {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            const choice = await deferredPrompt.userChoice;
+            if (choice.outcome === 'accepted') installBtn.classList.add('hidden');
+            deferredPrompt = null;
+        });
+    }
+    window.addEventListener('appinstalled', () => {
+        const btn = document.getElementById('install-btn');
+        if (btn) btn.classList.add('hidden');
+    });
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/static/sw.js').catch(()=>{});
+        });
+    }
     window.showToast = function(msg){
         var t = document.getElementById('global-toast');
         if(!t) return;
