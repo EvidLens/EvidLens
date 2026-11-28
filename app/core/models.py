@@ -594,3 +594,57 @@ class DetailedAnalysisRequest(BaseModel):
     def strip_text(cls, v: str) -> str:
         return v.strip() if isinstance(v, str) else v
     model_config = {"extra": "allow"}
+
+class Buyer(SQLModel, table=True):
+    __tablename__ = "buyers"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[int] = Field(default=None, foreign_key="user.id", index=True)
+    company: str = ""
+    country: str = ""
+    product: str = ""
+    hs: str = Field(default="", index=True, max_length=20)
+    source: str = Field(default="Volza", max_length=50)  # Volza | LinkedIn | Alibaba | KEPROBA | Manual
+    shipments: Optional[int] = None
+    last_shipment: Optional[str] = None
+    contact_locked: bool = Field(default=True)  # True until Premium / Volza license unlocks
+    contact_name: Optional[str] = None
+    contact_email: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+class BuyerSearchCache(SQLModel, table=True):
+    __tablename__ = "buyer_search_cache"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[int] = Field(default=None, foreign_key="user.id", index=True)
+    product: str = ""
+    hs: str = Field(default="", index=True, max_length=20)
+    country: str = Field(default="", index=True)
+    result_json: str = ""  # JSON string of find_buyers() output - cached 7 days to control Volza cost
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+class KeprobaRequest(SQLModel, table=True):
+    __tablename__ = "keproba_requests"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[int] = Field(default=None, foreign_key="user.id", index=True)
+    user_email: str = ""
+    company: str = ""
+    product: str = ""
+    hs: str = Field(default="", max_length=20)
+    country: str = ""
+    volume: str = ""
+    message: str = ""
+    status: str = Field(default="pending", index=True)  # pending | sent | replied
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+class SavedFair(SQLModel, table=True):
+    __tablename__ = "saved_fairs"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[int] = Field(default=None, foreign_key="user.id", index=True)
+    user_email: str = ""
+    fair_name: str = ""
+    city: str = ""
+    remind: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
