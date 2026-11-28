@@ -83,15 +83,16 @@ def _fmt_date(dt):
 def _comtrade_live(hs: str, year: int):
     try:
         with httpx.Client(timeout=30) as c:
-            r = c.get("https://comtradeapi.un.org/public/v1/preview/C/A/HS", params={"reporterCode": "404", "period": str(year), "flowCode": "X", "partnerCode": "0", "cmdCode": hs})
+            # FIX: partnerCode="all" - "0" = World only, then filtered out = 0 partners = "- / $0"
+            r = c.get("https://comtradeapi.un.org/public/v1/preview/C/A/HS", params={"reporterCode": "404", "period": str(year), "flowCode": "X", "partnerCode": "all", "partner2Code": "0", "customsCode": "C00", "motCode": "0", "breakdownMode": "classic", "includeDesc": "true", "cmdCode": hs})
             if r.status_code != 200:
                 return {}, f"Comtrade {r.status_code}"
             out = {}
             for row in r.json().get("data", []):
                 p = row.get("partnerDesc", "")
-                if p in ("World", "Kenya", ""):
+                if p in ("World", "Kenya", "", "Unspecified"):
                     continue
-                out[p] = {"value": float(row.get("primaryValue") or 0), "qty": float(row.get("netWgt") or 0)}
+                out[p] = {"value": float(row.get("primaryValue") or 0), "qty": float(row.get("netWgt") or 0), "partner_code": row.get("partnerCode")}
             return out, None
     except Exception as e:
         return {}, str(e)
@@ -130,7 +131,15 @@ def _build_export_rows(q: str, country: str):
         size = max(0, min(100, (math.log10(max(value_m, 0.01) + 1) / 3.5) * 100))
         g_score = max(0, min(100, (growth + 20) / 50 * 100)) if growth is not None else 50
         score = round(size * 0.50 + g_score * 0.30 + 60 * 0.20)
-        exports.append({"product": prod_name, "country": partner, "destination": partner, "opportunity_score": score, "score": score, "county": "Kenya", "value_m": value_m, "growth": growth, "unit_value": unit, "hs": hs, "year": 2024, "source": "UN Comtrade"})
+        exports.append({
+            "product": prod_name, "country": partner, "destination": partner,
+            "partner": partner, "partnerDesc": partner, "partner_code": d.get("partner_code"),
+            "opportunity_score": score, "score": score, "county": "Kenya",
+            "value_m": value_m, "value": v24, "value_usd": v24, "primaryValue": v24,
+            "qty": d["qty"], "quantity": d["qty"],
+            "growth": growth, "unit_value": unit, "hs": hs,
+            "year": 2024, "period": 2024, "source": "UN Comtrade",
+        })
     exports = sorted(exports, key=lambda x: x["opportunity_score"], reverse=True)
     source = f"UN Comtrade Live 2024 + 2023 for growth - Kenya Reporter 404 - HS {hs} - https://comtradeapi.un.org"
     return exports, source, None, True
@@ -257,6 +266,7 @@ async def get_risk(db: Session = Depends(get_session)):
 @router.get("/api/export")
 async def get_export(q: str = None, country: str = None, county: str = None, db: Session = Depends(get_session)):
     if not q:
-        return {"total": 0, "data": [], "source": "Pass ?q=tea to query UN Comtrade live", "live": True, "error": None}
+        return {"total": 0, "data": [], "results": [], "source": "Pass ?q=tea to query UN Comtrade live", "live": True, "error": None}
     exports, source, error, live = _build_export_rows(q.strip(), (country or "").strip())
-    return {"total": len(exports), "data": exports, "source": source or "", "live": live, "error": error}
+    # FIX: frontend reads both `data` and `results` - return both, same rows
+    return {"ok": True, "total": len(exports), "count": len(exports), "data": exports, "results": exports, "source": source or "", "live": live, "error": error}
