@@ -3,10 +3,12 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from sqlmodel import Session, select, desc
 from datetime import datetime, timedelta, timezone
-import logging, httpx, math
+import logging, httpx, math, json
+from pydantic import BaseModel
 
 from app.core.db import get_session
-from app.core.models import MarketMetric, NewsArticle, ExportOpportunity
+from app.core.models import MarketMetric, NewsArticle, ExportOpportunity, Buyer, BuyerSearchCache, KeprobaRequest, SavedFair
+from .buyer_finder import find_buyers
 
 router = APIRouter(prefix="/market", tags=["Market"])
 templates = Jinja2Templates(directory="app/templates")
@@ -83,7 +85,6 @@ def _fmt_date(dt):
 def _comtrade_live(hs: str, year: int):
     try:
         with httpx.Client(timeout=30) as c:
-            # FIX: partnerCode="all" - "0" = World only, then filtered out = 0 partners = "- / $0"
             r = c.get("https://comtradeapi.un.org/public/v1/preview/C/A/HS", params={"reporterCode": "404", "period": str(year), "flowCode": "X", "partnerCode": "all", "partner2Code": "0", "customsCode": "C00", "motCode": "0", "breakdownMode": "classic", "includeDesc": "true", "cmdCode": hs})
             if r.status_code != 200:
                 return {}, f"Comtrade {r.status_code}"
@@ -268,5 +269,92 @@ async def get_export(q: str = None, country: str = None, county: str = None, db:
     if not q:
         return {"total": 0, "data": [], "results": [], "source": "Pass ?q=tea to query UN Comtrade live", "live": True, "error": None}
     exports, source, error, live = _build_export_rows(q.strip(), (country or "").strip())
-    # FIX: frontend reads both `data` and `results` - return both, same rows
     return {"ok": True, "total": len(exports), "count": len(exports), "data": exports, "results": exports, "source": source or "", "live": live, "error": error}
+
+# ===== Buyer Finder - Volza + LinkedIn + Alibaba + KEPROBA + Fairs =====
+class KeprobaIn(BaseModel):
+    company: str = ""
+    product: str = ""
+    hs: str = ""
+    country: str = ""
+    volume: str = ""
+    message: str = ""
+    user_email: str = ""
+
+class SaveFairIn(BaseModel):
+    fair_name: str = ""
+    city: str = ""
+
+@router.get("/api/buyers")
+async def get_buyers(request: Request, q: str = None, hs: str = None, country: str = None, db: Session = Depends(get_session)):
+    product = (q or "").strip()
+    if not product:
+        return {"ok": False, "error": "Pass ?q=coffee&country=Germany", "buyers": []}
+    hs_code = (hs or _resolve_hs(product) or "").strip()
+    country_clean = (country or "").strip()
+    user = await _get_user(request, db)
+    user_id = getattr(user, "id", None) if user else None
+    if user_id:
+        try:
+            cached = db.exec(select(BuyerSearchCache).where(BuyerSearchCache.user_id == user_id, BuyerSearchCache.product == product.lower(), BuyerSearchCache.country == country_clean).order_by(desc(BuyerSearchCache.created_at)).limit(1)).first()
+            if cached and cached.created_at and (datetime.now(UTC) - cached.created_at).days < 7 and cached.result_json:
+                return {"ok": True, "cached": True, **json.loads(cached.result_json)}
+        except Exception:
+            pass
+    result = await find_buyers(product, hs_code, country_clean)
+    if result.get("volza", {}).get("available") and user_id:
+        try:
+            for b in result["volza"].get("buyers", []):
+                if not b.get("company"):
+                    continue
+                exists = db.exec(select(Buyer).where(Buyer.user_id == user_id, Buyer.company == b["company"], Buyer.hs == hs_code).limit(1)).first()
+                if not exists:
+                    db.add(Buyer(user_id=user_id, company=b["company"], country=b.get("country") or country_clean, product=product, hs=hs_code, source="Volza", shipments=b.get("shipments"), last_shipment=str(b.get("last_shipment") or ""), contact_locked=True, contact_name=b.get("contact"), contact_email=None))
+            db.add(BuyerSearchCache(user_id=user_id, product=product.lower(), hs=hs_code, country=country_clean, result_json=json.dumps(result)))
+            db.commit()
+        except Exception as e:
+            logger.exception(f"buyer cache save failed: {e}")
+            try:
+                db.rollback()
+            except Exception:
+                pass
+    return {"ok": True, "cached": False, **result}
+
+@router.post("/api/buyers/keproba-request")
+async def keproba_request(request: Request, body: KeprobaIn, db: Session = Depends(get_session)):
+    user = await _get_user(request, db)
+    user_id = getattr(user, "id", None) if user else None
+    user_email = body.user_email or (getattr(user, "email", "") if user else "")
+    if not body.product or not user_email:
+        return {"ok": False, "error": "Product + email required"}
+    row = KeprobaRequest(user_id=user_id, user_email=user_email, company=body.company, product=body.product, hs=body.hs, country=body.country, volume=body.volume, message=body.message, status="pending")
+    db.add(row); db.commit(); db.refresh(row)
+    return {"ok": True, "id": row.id, "message": "Saved. Forward this to KEPROBA / Make It Kenya with your company profile."}
+
+@router.get("/api/buyers/keproba-requests")
+async def list_keproba_requests(request: Request, db: Session = Depends(get_session)):
+    user = await _get_user(request, db)
+    user_id = getattr(user, "id", None) if user else None
+    if not user_id:
+        return {"ok": False, "error": "Login required", "requests": []}
+    rows = db.exec(select(KeprobaRequest).where(KeprobaRequest.user_id == user_id).order_by(desc(KeprobaRequest.created_at)).limit(50)).all()
+    return {"ok": True, "requests": [{"id": r.id, "product": r.product, "country": r.country, "status": r.status, "created_at": str(r.created_at)} for r in rows]}
+
+@router.post("/api/buyers/save-fair")
+async def save_fair(request: Request, body: SaveFairIn, db: Session = Depends(get_session)):
+    user = await _get_user(request, db)
+    user_id = getattr(user, "id", None) if user else None
+    if not user_id or not body.fair_name:
+        return {"ok": False, "error": "Login + fair_name required"}
+    row = SavedFair(user_id=user_id, user_email=getattr(user, "email", "") or "", fair_name=body.fair_name, city=body.city, remind=True)
+    db.add(row); db.commit()
+    return {"ok": True, "message": f"Saved {body.fair_name} - you will get a reminder."}
+
+@router.get("/api/buyers/saved")
+async def list_saved_buyers(request: Request, db: Session = Depends(get_session)):
+    user = await _get_user(request, db)
+    user_id = getattr(user, "id", None) if user else None
+    if not user_id:
+        return {"ok": False, "error": "Login required", "buyers": []}
+    rows = db.exec(select(Buyer).where(Buyer.user_id == user_id).order_by(desc(Buyer.created_at)).limit(100)).all()
+    return {"ok": True, "buyers": [{"company": r.company, "country": r.country, "product": r.product, "hs": r.hs, "source": r.source, "shipments": r.shipments, "contact_locked": r.contact_locked} for r in rows]}
